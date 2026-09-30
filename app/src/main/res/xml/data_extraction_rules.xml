@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+   Nothing this app stores may leave the device.
+
+   The whole dataset is credentials and a record of the user's life: two API keys
+   in plaintext (`voice_prefs`), the vault (`vault_prefs` — logins and card
+   numbers), the notebook, meeting transcripts under files/meetings/, and, in
+   grounding mode, screenshots of whatever was on screen. There is no
+   non-sensitive remainder worth carrying to a new device: the endpoints have
+   compiled-in defaults, and `device_id` *should* be regenerated per device,
+   because two bodies registering the same id with one hub is a bug.
+
+   `android:allowBackup="false"` is the other half of this and does not replace
+   it: on Android 12+ it stops cloud backup but leaves **device-to-device
+   transfer** permitted, which is what <device-transfer> below is for. Both are
+   set so that flipping one back on does not silently re-enable the other.
+
+   The vault would not survive a restore anyway — its key lives in the hardware
+   Keystore and does not travel — but an undecryptable blob arriving on a new
+   device is pure downside, not a safeguard.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+    </device-transfer>
+</data-extraction-rules>

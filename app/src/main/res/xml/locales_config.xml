@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Which languages this app ships, declared to the system.
+
+    Android 13+ shows a per-app language picker in Settings, and it can only
+    list languages the app admits to supporting. Without this file the app
+    disappears from that screen entirely and the only way to change language is
+    the picker inside the card — which is fine for us, but it is not the place a
+    user looks first.
+
+    Two entries, matching [net.kuafuai.andee.config.VoiceConfig.LANG_ZH] and
+    LANG_EN. The system picker and our own picker both write through
+    AppCompatDelegate, so they stay in agreement; see
+    [net.kuafuai.andee.i18n.AppLocale] for why the overlays need the extra step
+    the system does not do for us.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="zh" />
+    <locale android:name="en" />
+</locale-config>

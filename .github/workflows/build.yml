@@ -1,0 +1,42 @@
+# Builds the debug APK on every push and PR.
+#
+# Debug, not release: the release build type has no `signingConfig` and there is
+# no keystore in this repository, so `assembleRelease` would emit an unsigned APK
+# that cannot be installed. Signing needs secrets, and a workflow that fails on a
+# fork for want of secrets the forker cannot add is worse than no workflow.
+#
+# The JDK is pinned to **17** on purpose and the range is narrow: AGP 8.3.1 needs
+# 17 or newer, and the Gradle 8.4 wrapper cannot run on 21 or newer (it rejects
+# the class file version). Bumping this without bumping Gradle breaks the build
+# with an error that does not mention Java.
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  debug-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      - run: ./gradlew --no-daemon :app:assembleDebug
+
+      # Host-side tests are template-only today, so this is a tripwire for the
+      # day someone writes a real one rather than a meaningful gate now.
+      - run: ./gradlew --no-daemon :app:testDebugUnitTest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

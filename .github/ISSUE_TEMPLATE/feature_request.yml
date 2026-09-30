@@ -1,0 +1,94 @@
+name: Feature request
+description: Propose a capability the agent should have, or a rough edge worth smoothing.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **One request per issue.** If you have three ideas, open three issues — bundled requests
+        get triaged as one and then rot.
+
+        The hard question in this project is never "can we build it". It is **"what does it cost
+        the user"**. Almost every capability here is paid for with an Android permission, and the
+        permission list is already long enough that the app looks like something it is not. A
+        feature that needs a new sensitive permission will be judged on that cost first — say so
+        up front and the discussion gets much shorter. See
+        [docs/permissions.md](https://github.com/kuafuai/andee/blob/main/docs/permissions.md)
+        ([中文](https://github.com/kuafuai/andee/blob/main/docs/permissions.zh-CN.md)).
+
+  - type: checkboxes
+    id: self-checks
+    attributes:
+      label: Self checks
+      options:
+        - label: I have read the [Contributing Guide](https://github.com/kuafuai/andee/blob/main/CONTRIBUTING.md) ([中文](https://github.com/kuafuai/andee/blob/main/CONTRIBUTING.zh-CN.md)).
+          required: true
+        - label: I have searched existing issues and discussions, including closed ones.
+          required: true
+        - label: This is a feature request, not a bug report, and not a question.
+          required: true
+        - label: This is one request, not several bundled together.
+          required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What do you want to be able to do?
+      description: Describe the outcome in user terms, not the implementation. "Ask the agent to X and have it happen" beats "add a tool called Y".
+      placeholder: "I want to ask the agent to ___ and have it ___."
+    validations:
+      required: true
+
+  - type: textarea
+    id: today
+    attributes:
+      label: What happens today, and why is that not good enough?
+      description: If you're working around the absence today, describe the workaround — it often points at the real gap.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: side
+    attributes:
+      label: Which side is this on?
+      description: This project has two halves that ship separately — the on-device half that can see and touch the phone, and the brain half that decides what to say. Several capabilities only exist in one.
+      options:
+        - Device side (a tool the agent can call — screen, taps, notifications, files, hardware)
+        - Brain side (prompt, wording, when to speak, how it reasons)
+        - Both
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: permission-cost
+    attributes:
+      label: Does this need a new sensitive permission?
+      description: Check the manifest before answering. "The app already has it" is the best possible answer — it means the feature is nearly free.
+      options:
+        - "No — it needs no new permission, or only one already declared"
+        - "Yes — it needs a new sensitive permission (name it below)"
+        - "Unsure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Other ways the same outcome could be reached, including ways that avoid a new permission. Say why they are worse.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Can you help build it?
+      description: Not a commitment — just tells us where to start.
+      options:
+        - label: I am willing to open a pull request for this.
+          required: false
+        - label: I can test it on a real device and report back.
+          required: false

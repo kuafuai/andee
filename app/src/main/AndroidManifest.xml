@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- ConnectivityManager.getNetworkCapabilities needs this (not implied by INTERNET). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- App list: query-all is required on API 30+ to see other packages. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <!-- Location & steps are runtime permissions; DeviceInfoController asks
+         nicely and degrades gracefully when denied. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <!-- Comms (runtime, all optional per-call): -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <!-- SENSOR_DELAY_FASTEST maps to a 0µs rate, which Android 14+ gates. -->
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+    <!-- Moving the keyboard. The device rests on the user's own IME — they can
+         type in any app — and the brain borrows ADBKeyboard for the length of
+         one `type_text`, because ADBKeyboard has no keyboard UI of its own.
+         See ui/ImeSwitch.
+         Not grantable at install: this is `signature|privileged|development`, so
+         the app has to be installed and then granted by adb
+         (`adb shell pm grant net.kuafuai.andee android.permission.WRITE_SECURE_SETTINGS`),
+         which the provisioning of this tablet already does. Without the grant
+         the brain cannot move the keyboard at all, so `type_text` fails loudly
+         and says why — rather than broadcasting into nobody and having the
+         failure blamed on the app being driven. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+    <!-- The eye: -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <!-- The dog: its dongle hangs off USB OTG, so this device needs to be a USB
+         host. Optional on purpose — the app is fully usable on a tablet with no
+         OTG port, and Play would otherwise refuse to install it there. The USB
+         node itself needs no manifest permission: access is granted per device,
+         at runtime, by the system dialog DogLink raises. -->
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
+    <!-- Pending todos and the quiet-hour sweep timer survive a reboot only if
+         we are told about the reboot — AlarmManager forgets alarms across one.
+         See config/AlarmReceiver + config/Scheduler. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Used when a todo comes due while the accessibility service is off: the
+         promise still has to reach the user. Runtime permission on 13+; the
+         code degrades to "no nudge" if it is refused, never to a lost todo. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Battery optimisation. Doze is what holds up the pending todos — they are
+         AlarmManager alarms, so with the screen off a non-exempt app's reminders
+         arrive late. Exempting is done from Settings' per-app request screen
+         (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`), one dialog —
+         「是否忽略电池优化？」→「忽略」 on a Chinese HONOR, where the
+         affirmative button is 忽略 rather than AOSP's 允许.
+
+         The list page is not an alternative on this device, which is why this
+         permission is load-bearing rather than optional. Measured on a HONOR
+         (MagicOS / Android 15): the 「电池优化」 list
+         (`ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`) shows ten preinstalled
+         apps and nothing else — this package is absent even while
+         `dumpsys deviceidle whitelist` lists it, `am force-stop
+         com.android.settings` does not change that, and the page's own search
+         box answers 「没有匹配的结果」 for the package name. So there is no
+         user-reachable screen there that can exempt a third-party app.
+
+         And the request screen silently refuses to open without this line:
+         `RequestIgnoreBatteryOptimizations.onCreate` checks the permission
+         against the package named in its data URI and `finish()`es otherwise —
+         `DEBUG = false` there, so not even a log line survives to explain the
+         tap that did nothing. Play restricts this permission to apps whose core
+         purpose needs it; a sideloaded device assistant is that category.
+         See device/SelfCheck.batteryFix. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Body"
+        tools:targetApi="33">
+
+        <service
+            android:name=".ScreenBodyService"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <service
+            android:name=".device.NotificationRelayService"
+            android:label="@string/notification_relay_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Todo alarms and the sweep timer land here; so does a reboot (which
+             is when every pending alarm has to be re-armed). Not exported: the
+             only senders are our own PendingIntents and the system. -->
+        <receiver
+            android:name=".config.AlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 桌面图标。这个 app 曾经刻意没有 LAUNCHER 入口(见 CLAUDE.md),
+             代价是:无障碍没开的时候,用户手里是一个什么都不做的设备,
+             而且没有任何地方能告诉他为什么。自检页就是那个"为什么"。
+
+             但图标首先是"打开 app"的那颗图标。所以这里是两条路,由
+             ui/SelfCheckActivity.onCreate 决定走哪条:服务在跑 → 和长按
+             球球做同一件事,expand() 展开成全屏卡片,然后 finish;服务没跑
+             (无障碍关着、悬浮窗权限缺失、刚重装) → 落到自检页。
+
+             这不是两个功能拼在一起,是同一个入口的两种状态:进得去的时候
+             不需要解释,进不去的时候这一页必须自己解释 —— 见
+             Theme.Body.Stage.NoPreview,它让前者不闪黑。 -->
+        <activity
+            android:name=".ui.SelfCheckActivity"
+            android:theme="@style/Theme.Body.Stage.NoPreview"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".device.PermissionRequestActivity"
+            android:theme="@style/Theme.Body"
+            android:exported="false" />
+        <!-- 三个全屏脸共用 Theme.Body.Stage:纯黑底、无标题栏、无系统转场
+             动画。入场/退场由 ui/Stage.kt 自己画,平台那一项闭嘴 —— 见
+             values/themes.xml 里关于"关闭时闪一下"的说明。 -->
+        <activity
+            android:name=".device.ScanActivity"
+            android:theme="@style/Theme.Body.Stage"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
+            android:name=".device.LookActivity"
+            android:theme="@style/Theme.Body.Stage"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
+            android:name=".ui.HtmlActivity"
+            android:theme="@style/Theme.Body.Stage"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <!-- The ⌨ field a person types into. An Activity and not an overlay
+             because on this ROM an overlay window cannot raise the soft
+             keyboard — measured; see ui/TextInputActivity. Translucent so the
+             app behind stays visible: this adds a field, it does not take the
+             screen. -->
+        <activity
+            android:name=".ui.TextInputActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+    </application>
+
+</manifest>

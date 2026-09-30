@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  全屏脸的退场,整个 window 一起走。
+
+  为什么必须是 window 级动画而不是 View 级动画 —— 这是"关闭时闪一下"的
+  真正原因,量过:
+
+  之前 StageActivity 用 `stage.animate().alpha(0f)` 收场。stage 是 View
+  树,它透明之后露出来的不是背后那个 app,而是**这个 Activity 自己的
+  windowBackground**(纯黑,见 Theme.Body.Stage)。所以逐帧看下来是:
+
+      64-72 帧   画面渐暗          ← stage 的 alpha 1→0
+      72-86 帧   整屏纯黑 ~250ms   ← 黑底 windowBackground 露出来了
+      87 帧起    背后内容淡入
+
+  中间那 250ms 谁也不是,用户说的"闪一下"就是它。View 级动画够不着
+  windowBackground,因为那层不是 View;只有 window 级动画能把整块 surface
+  (内容 + 黑底)一起淡掉,背后的东西才在动画过程中就露出来。
+
+  缩放略大于入场(入场 0.94),是为了让"走"有方向感:退到一个比来处更远的
+  位置,读起来像是退出去,而不是原路缩回。
+-->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:interpolator/fast_out_linear_in">
+    <scale
+        android:fromXScale="1.0"
+        android:toXScale="0.90"
+        android:fromYScale="1.0"
+        android:toYScale="0.90"
+        android:pivotX="50%"
+        android:pivotY="50%" />
+    <alpha
+        android:fromAlpha="1.0"
+        android:toAlpha="0.0" />
+</set>

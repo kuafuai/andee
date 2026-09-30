@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+   The pre-Android-12 half of the same rule: nothing leaves the device.
+   See res/xml/data_extraction_rules.xml for why.
+
+   `minSdk` is 30, so this file governs exactly one API level (30) — 31 and up
+   read the other one. It is dead while `android:allowBackup="false"` stands, and
+   it is filled in anyway so that flipping that attribute does not quietly start
+   uploading the vault.
+-->
+<full-backup-content>
+    <exclude domain="root" path="." />
+    <exclude domain="external" path="." />
+    <exclude domain="device_root" path="." />
+</full-backup-content>

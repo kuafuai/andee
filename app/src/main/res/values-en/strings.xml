@@ -1,0 +1,399 @@
+<resources>
+    <string name="app_name">Andee</string>
+    <string name="notification_relay_label">Andee notification access</string>
+    <string name="accessibility_service_description">Andee needs this to see what is on screen and to tap, swipe and type for you. A floating ball appears on the home screen: tap it to talk, long-press to open the conversation.</string>
+
+    <!--
+        English mirror of values/strings.xml. Same keys, same order, one entry
+        per Chinese entry — a key added on one side and not the other falls
+        back silently, so the Chinese would show through on an English tablet
+        with nothing to indicate why.
+
+        **What is here and what is not.** The app holds three kinds of Chinese
+        text and only the first is translated:
+
+        1. **What the user reads** — every window, card, bubble, settings row
+           and error line. That is this file. It is looked up through
+           `i18n/AppLocale`, never `context.getString` directly: the ball and
+           every card are overlay windows owned by a *service*, so the official
+           per-app locale API cannot reach them and the only thing that carries
+           the language is the `Context` you ask.
+        2. **What the model reads** — prompts, tool schemas, tool results. Written
+           in English, and deliberately so. The argument for leaving this kind in
+           Chinese used to be that the language a prompt is written in decides
+           the language the answer comes back in, so translating one without the
+           other is worse than translating neither. That pull still exists; it
+           has only reversed direction, so it is now held back from inside:
+           `brain/LocalPrompt.kt` §9 is the rule that makes the model answer in
+           whatever language the user actually spoke. Chinese that still turns up
+           inside an English prompt is either a label printed on the screen,
+           which the model is meant to repeat verbatim, or a specimen of what a
+           Chinese user says — never an oversight.
+
+           **A default whose value can reach the screen belongs to kind 1, not
+           kind 2**, even though it also travels inside a prompt. `会议记录`,
+           `通话` and `AI 界面` used to be Kotlin literals in `MeetingRecorder`,
+           `ScreenBodyService` and `ToolSchemas`, on the argument that the brain
+           had to be handed the same title the page displayed. They are
+           `meeting_default_title`, `call_default_scene` and
+           `html_default_title` now: one key answered for both readers, so the
+           two still cannot disagree — and an English tablet shows an English
+           page header.
+        3. **What matches system text** — `NotificationRelayService`'s call
+           keywords, the unread-count pattern, the clipboard labels. Never
+           translated: they are compared against strings WeChat and Android
+           emit, which do not follow our setting. Translating them breaks the
+           feature rather than the wording.
+    -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_default_device_name">This device</string>
+    <string name="settings_factory_reset">Factory reset</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_save">Save</string>
+    <string name="settings_factory_reset_confirm_title">Factory reset?</string>
+    <string name="settings_factory_reset_list_intro">These are deleted for good — there is no backup:</string>
+    <string name="settings_factory_reset_after">The device goes back to a fresh install: keys have to be entered again and the wake word has to be recorded again.</string>
+    <string name="settings_factory_reset_back">No, go back</string>
+    <string name="settings_factory_reset_confirm">Erase everything</string>
+    <!-- The two destructive buttons sit together at the foot of the
+         Diagnostics section, not in the footer beside Cancel/Save: a
+         destructive control beside the card's two ways out reads as a
+         third way out. -->
+    <string name="settings_clear_chat">Clear chat history</string>
+    <string name="settings_clear_chat_confirm_title">Clear the chat history?</string>
+    <string name="settings_clear_chat_confirm_body">The conversation record and its pages are deleted, and everything said in this session is forgotten. The notebook is untouched.</string>
+    <string name="settings_clear_chat_confirm">Clear it</string>
+    <string name="settings_clear_notes">Clear the notebook</string>
+    <string name="settings_clear_notes_confirm_title">Clear the notebook?</string>
+    <string name="settings_clear_notes_confirm_body">Everything it noted down, your preferences, and any reminder not yet due are deleted, with no way back. The current chat history is untouched.</string>
+    <string name="settings_clear_notes_confirm">Clear it</string>
+    <string name="settings_section_brain">Brain</string>
+    <string name="settings_brain_panel_note">Takes effect when you close this panel — no need to restart the accessibility service.</string>
+    <string name="settings_brain_cloud">Cloud</string>
+    <string name="settings_brain_local">On-device</string>
+    <string name="settings_hub_url">Hub URL</string>
+    <!-- The hub URL box is empty on a fresh install — the hint is what the
+         user sees in that empty box, so it is the pitch, not the format. -->
+    <string name="settings_hub_url_hint">Link your cloud agent</string>
+    <string name="settings_device_name">Device name</string>
+    <string name="settings_device_name_hint">What the hub should call this device</string>
+    <string name="settings_brain_cloud_note">The brain lives on a hub you run yourself; this device only acts.</string>
+    <string name="settings_llm_model">Model</string>
+    <string name="settings_llm_base_url">Base URL</string>
+    <string name="settings_llm_thinking">Deep thinking</string>
+    <string name="common_on">On</string>
+    <string name="common_off">Off</string>
+    <string name="settings_llm_effort">Reasoning effort</string>
+    <string name="common_high">High</string>
+    <string name="common_medium">Medium</string>
+    <string name="common_low">Low</string>
+    <string name="settings_brain_local_note">The device runs the agent loop itself, with no hub. Without a key it will not take over.</string>
+    <string name="settings_section_wake">Wake word</string>
+    <string name="settings_wake_enrolled">Enrolled — just say “Hey Andee” while the screen is on</string>
+    <string name="settings_wake_not_enrolled">Not enrolled — record it once to wake me by voice</string>
+    <string name="settings_wake_record">Record</string>
+    <string name="common_clear">Clear</string>
+    <string name="settings_section_vault">Vault</string>
+    <string name="settings_vault_empty_note">No accounts yet — once saved, Andee can log in as you when a task needs it</string>
+    <string name="settings_vault_count_note">%1$d saved — the brain may read the phone and email, but only this device types the password</string>
+    <string name="settings_vault_manage">Manage</string>
+    <string name="settings_section_voice">Speech (Volcengine)</string>
+    <string name="settings_voice_factory_note">The source ships without a key. Enter your own to hear and speak; leave the rows below blank for the default endpoints.</string>
+    <string name="settings_voice_api_key">Volcengine API key</string>
+    <string name="settings_voice_api_key_hint">Volcengine Speech key — hearing and speaking both need it</string>
+    <string name="settings_voice_in_use">In use</string>
+    <string name="settings_voice_in_use_own">the Volcengine account you entered</string>
+    <string name="settings_voice_in_use_factory">nothing yet — hearing and speaking are off</string>
+    <string name="settings_voice_asr_endpoint">ASR endpoint</string>
+    <string name="settings_voice_asr_resource_id">ASR resource ID</string>
+    <string name="settings_voice_tts_endpoint">TTS endpoint</string>
+    <string name="settings_voice_tts_resource_id">TTS resource ID</string>
+    <string name="settings_voice_tts_sample_rate">TTS sample rate</string>
+    <string name="settings_section_diagnostics">Diagnostics</string>
+    <string name="settings_grounding">Grounding capture</string>
+    <string name="settings_grounding_note">Records coordinate taps and screenshots to files/grounding for offline analysis — it photographs whatever you are doing. Needs the accessibility service restarted to take effect.</string>
+    <string name="settings_device_id">Device ID</string>
+    <string name="settings_section_notebook">Notebook</string>
+    <string name="settings_notebook_sweep_note">Once a conversation goes quiet it reviews it by itself: keeps what is worth keeping, schedules what it owes. On by default — this is where \\"it remembers\\" comes from. Off means it stops spending your key on those calls.</string>
+    <string name="settings_notebook_quiet_minutes">Quiet minutes before a review</string>
+    <string name="settings_notebook_daily_cap">Reviews per day, at most</string>
+    <string name="settings_notebook_today">Today / so far</string>
+    <string name="settings_notebook_stats">%1$d reviews (~%2$d tokens) · %3$d memories · %4$d promises open</string>
+    <string name="settings_notebook_dump">What is in the book</string>
+    <string name="settings_notebook_dump_hint">Read-only. Long-press to select and copy.</string>
+    <string name="settings_notebook_dump_truncated">… (%1$d more characters not shown)</string>
+    <string name="settings_section_typing">Typing</string>
+    <string name="settings_typing_no_ime">ADBKeyboard is the only keyboard on this device and it has no keyboard UI, so nothing can be typed right now. Enable one in system settings and it will show up here.</string>
+    <string name="settings_typing_current">Your keyboard</string>
+    <string name="settings_typing_note">Normally it is your own keyboard, and you can type in any app. While I am typing something for you it switches to ADBKeyboard (which has no keyboard UI — that is the only way it works), and switches straight back.</string>
+    <string name="common_show">Show</string>
+    <string name="common_hide">Hide</string>
+
+    <!-- The pinned gesture tips at the bottom of the full card. The swipe hint
+         is last because it is the one gesture that only exists unfolded — the
+         folded ball reads a horizontal flick as a move instead. The legend
+         style ("1tap: talk") is deliberate: the long-form sentence wrapped to
+         two lines on the card, and a hint the user has to scroll past is
+         longer than one they can read at a glance. -->
+    <string name="window_tips">1tap: talk · 2tap: type · 3tap: stop · swipe: character</string>
+
+    <!-- The factory-reset confirmation list; see config/FactoryReset.kt. -->
+    <string name="factory_reset_target_keys">the Volcano and DeepSeek keys, and every speech and brain setting</string>
+    <string name="factory_reset_target_notebook">the notebook: what it remembers and what it promised</string>
+    <string name="factory_reset_target_vault">the accounts, passwords and bank cards kept in the vault</string>
+    <string name="factory_reset_target_wake">the wake-word recordings (they will have to be recorded again)</string>
+    <string name="factory_reset_target_history">the conversation history and the pages it generated</string>
+    <string name="factory_reset_target_web">cookies and local storage left behind by the pages it drew</string>
+    <string name="factory_reset_target_grounding">the grounding screenshots and logs</string>
+    <string name="vault_title">Vault</string>
+    <string name="vault_edit_title">Edit account</string>
+    <string name="vault_intro">Accounts saved here let Andee log in for you when a task needs it.\nIt types the password into the field itself and never hands it to the remote brain.</string>
+    <string name="vault_empty">No accounts saved yet.</string>
+    <string name="vault_add_account">+ New account</string>
+    <string name="vault_password_saved">Password saved</string>
+    <string name="vault_summary_empty">(empty)</string>
+    <string name="vault_delete">Delete</string>
+    <string name="vault_field_name">Name</string>
+    <string name="vault_field_name_hint">Feishu / work email — the brain finds it by this name</string>
+    <string name="vault_field_phone">Phone</string>
+    <string name="vault_field_email">Email</string>
+    <string name="vault_field_username">Username</string>
+    <string name="vault_field_password">Password</string>
+    <string name="vault_password_note">The password is only typed into the field, never returned to the brain.</string>
+    <string name="vault_field_note">Note</string>
+    <string name="vault_field_note_hint">Hints like “sign in with an SMS code” — the brain can read these</string>
+    <string name="vault_section_card">Bank card (optional)</string>
+    <string name="vault_card_note">The number, expiry and CVV work like the password: typed into the field, never returned to the brain. Payment sheets in Alipay / WeChat / a banking app draw their own keypad and cannot be typed into — what this reaches is an ordinary checkout form or a card-binding page. Paying is still yours to confirm.</string>
+    <string name="vault_field_card_holder">Cardholder</string>
+    <string name="vault_field_card_holder_hint">The name printed on the card — the brain can read this</string>
+    <string name="vault_field_card_number">Card number</string>
+    <string name="vault_field_card_expiry">Expiry</string>
+    <string name="vault_field_card_expiry_hint">MM/YY</string>
+    <string name="vault_field_card_cvv">CVV</string>
+    <string name="vault_label_card_last4">Card ending</string>
+    <string name="vault_error_name_required">Name cannot be empty</string>
+    <string name="wake_title">Teach me “Hey Andee”</string>
+    <string name="wake_instructions">Tap Start, then say “Hey Andee” the way you normally call me — it stops on its own. You\'ll say it %1$d times — don\'t say it more carefully than usual, or I won\'t recognise it when you call me normally.</string>
+    <string name="wake_progress">%1$d / %2$d</string>
+    <string name="wake_status_enrolled">Already recorded — recording again will overwrite it.</string>
+    <string name="wake_status_not_enrolled">Not recorded yet.</string>
+    <string name="wake_close">Close</string>
+    <string name="wake_start">Start</string>
+    <string name="wake_listening">Listening…</string>
+    <string name="wake_speak_now">Go ahead — “Hey Andee”</string>
+    <string name="wake_retry">Try again</string>
+    <string name="wake_not_heard">Didn\'t catch that — move closer, then wait half a second after you finish before checking the screen.</string>
+    <string name="wake_say_again">Say it again</string>
+    <string name="wake_received">Got it (%1$d ms). %2$d to go.</string>
+    <string name="wake_rerecord">Record again</string>
+    <string name="wake_done">Done — just say “Hey Andee” while the screen is on. (threshold %1$s)</string>
+    <!-- device/LookActivity.kt -->
+    <string name="dev_look_focusing">Focusing…</string>
+    <string name="dev_look_seen">Got it</string>
+    <string name="dev_look_unclear">Didn\'t catch it</string>
+    <string name="dev_look_resting">Watching…</string>
+    <string name="dev_look_resting_front">Front camera · watching…</string>
+    <string name="dev_camera_unavailable">Can\'t open the camera</string>
+    <!-- device/ScanActivity.kt -->
+    <string name="dev_scan_align">Point at a QR code / barcode</string>
+    <!-- device/NotificationRelayService.kt: the signboard shown when a
+    message app pings. The app name is passed in, not translated here. -->
+    <string name="dev_notif_card_title">New %1$s message</string>
+    <string name="dev_notif_card_unread">New %1$s message (%2$d unread)</string>
+    <string name="dev_notif_card_look">Take a look</string>
+    <string name="dev_notif_card_ignore">Ignore</string>
+    <!-- device/PermissionsController.kt: the one sentence the brain reads
+    aloud, plus the per-grant phrase it is built from. The separator is
+    quoted so its trailing space survives aapt's whitespace trim. -->
+    <string name="dev_perm_feature_location">Location (where you are / navigation)</string>
+    <string name="dev_perm_feature_steps">Step count</string>
+    <string name="dev_perm_feature_contacts">Contacts (find someone to call)</string>
+    <string name="dev_perm_feature_call_phone">Direct dialing</string>
+    <string name="dev_perm_feature_call_log">Call history</string>
+    <string name="dev_perm_feature_sms">Read SMS (verification codes)</string>
+    <string name="dev_perm_feature_sms_send">Send SMS</string>
+    <string name="dev_perm_feature_calendar">Calendar (reminders)</string>
+    <string name="dev_perm_feature_calendar_write">Write calendar (add events)</string>
+    <string name="dev_perm_feature_notifications">Notification access (know when you get messages)</string>
+    <string name="dev_perm_feature_overlay">Overlay (my face)</string>
+    <string name="dev_perm_say_prefix">Turn on: %1$s.</string>
+    <string name="dev_perm_say_sep">", "</string>
+    <string name="dev_perm_say_runtime">A dialog will pop up — just tap Allow.</string>
+    <string name="dev_perm_say_notification">I\'ll open Notification access settings — find this app and turn it on.</string>
+    <string name="history_empty">No conversation yet</string>
+    <string name="history_role_you">You · %1$s</string>
+    <string name="history_role_assistant">Assistant · %1$s</string>
+    <string name="history_role_error">Error · %1$s</string>
+    <string name="history_role_page_open">Page · %1$s · Tap to reopen</string>
+    <string name="history_role_page_cleared">Page · %1$s · Cleared</string>
+    <string name="html_default_title">AI page</string>
+    <string name="textpage_role_you">You</string>
+    <string name="textpage_role_assistant">Assistant</string>
+    <string name="textpage_role_error">Error</string>
+    <string name="textpage_role_page">Page</string>
+    <string name="card_ack">Got it</string>
+    <string name="bubble_tap_to_talk">Tap to talk</string>
+    <string name="input_hint">Type to talk to it…</string>
+    <string name="input_send">Send</string>
+    <string name="cam_close">✕ Done</string>
+
+    <!-- ScreenBodyService.kt — display-only; see the comment on the Chinese side. -->
+    <string name="svc_call_in_progress">I\'m on a call — tell me once it\'s hung up.</string>
+    <string name="svc_no_typable_ime">The only keyboard on this device is ADBKeyboard, and it has no UI — nothing can be typed.\nTurn on an input method in system settings and it will work.</string>
+    <string name="svc_voice_error_line">Voice: %1$s</string>
+    <string name="svc_voice_failed">Voice stopped working.\n%1$s</string>
+    <string name="svc_btn_type_instead">Type it instead</string>
+    <string name="svc_btn_open_settings">Open settings</string>
+    <string name="svc_listening_again">(still listening…)</string>
+    <string name="svc_stopped">Stopped</string>
+    <string name="svc_meeting_ended_line">(Meeting recording ended — %1$d characters, drafting the minutes…)</string>
+    <string name="svc_call_ended_line">(Call ended — %1$d characters, summarising…)</string>
+    <string name="svc_no_brain_hub">No brain is connected yet, so I can\'t speak.</string>
+    <string name="svc_no_brain_local">The local brain has no key yet, so I can\'t speak.</string>
+
+    <string name="notebook_dump_header">"Notebook · %1$d memories\n"</string>
+    <string name="notebook_dump_sort_note">"(Listed by type and most-recently updated; read-only)\n\n"</string>
+    <string name="notebook_dump_empty_memories">"(Nothing written down yet)\n"</string>
+    <string name="notebook_dump_expired">"  [expired]"</string>
+    <string name="notebook_dump_source">" · source "</string>
+    <string name="notebook_dump_hits">" · recalled %1$d times\n\n"</string>
+    <string name="notebook_dump_todos_header">"\nTodos · %1$d\n\n"</string>
+    <string name="notebook_dump_empty_todos">"(none)\n"</string>
+    <string name="notebook_dump_recurring">every %1$s</string>
+    <string name="notebook_dump_next">" · next "</string>
+    <string name="notebook_dump_last_error">"   last error: "</string>
+    <string name="sched_channel_name">Promises</string>
+    <string name="sched_channel_desc">When the time comes but I can\'t wake up, at least say it clearly</string>
+    <string name="sched_notify_recurring">Recurring todo: %1$s</string>
+    <string name="sched_notify_title">I promised you this</string>
+    <string name="sched_notify_body">%1$s\n\n(When the time came I wasn\'t running, so I couldn\'t do it for you. Turn on the accessibility service and I\'ll pick it back up.)</string>
+    <string name="cmd_vault_filling">Typing the “%2$s” for %1$s…</string>
+    <string name="cmd_ask_yes">OK</string>
+    <string name="cmd_ask_no">No thanks</string>
+
+    <string name="asr_listening">Listening…</string>
+    <string name="meeting_live_head">Recording %1$d:%2$02d · tap the ball to stop</string>
+
+    <!-- The names for a recording that never named itself; see the Chinese side. -->
+    <string name="meeting_default_title">Meeting</string>
+    <string name="call_default_scene">Call</string>
+
+    <!-- LocalBrain — display half only; see the comment on the Chinese side. -->
+    <string name="brain_no_key">The on-device brain has no API key yet — long-press the ball, open settings and put a DeepSeek key in the Brain section.</string>
+    <string name="brain_error">Something broke on my side: %1$s</string>
+    <string name="brain_no_result">I got nothing back that time — say it again.</string>
+    <string name="brain_repeat_stop">I kept doing the same thing over and over (%1$s), so I stopped — that way is blocked. Try saying it differently, or take over.</string>
+    <string name="brain_max_steps">I have spent %1$d steps on this without finishing, so I stopped to ask: shall I try another way, or will you take over?</string>
+    <string name="narrate_get_screen">Reading the screen…</string>
+    <string name="narrate_screenshot">Looking at the screen…</string>
+    <string name="narrate_tap">Tapping…</string>
+    <string name="narrate_long_press">Long-pressing…</string>
+    <string name="narrate_swipe">Swiping…</string>
+    <string name="narrate_type">Typing…</string>
+    <string name="narrate_submit">Submitting…</string>
+    <string name="narrate_wait">Waiting…</string>
+    <string name="narrate_launch">Opening…</string>
+    <string name="narrate_system">Pressing a system key…</string>
+    <string name="narrate_show_html">Putting it on screen…</string>
+    <string name="narrate_camera">Taking a look…</string>
+    <string name="narrate_dog">Moving a leg…</string>
+    <string name="narrate_default">Running %1$s…</string>
+
+    <!--
+        Startup self-check. The findings come from `device/SelfCheck` — one
+        source, read by both the startup card and `ui/SelfCheckActivity`. The
+        two layers are deliberate: `title` says what is being checked, `detail`
+        says what was found and what breaks because of it. The second one is the
+        half a person can act on, so it names the symptom rather than the
+        setting.
+    -->
+    <string name="check_title_accessibility">Accessibility service</string>
+    <string name="check_title_overlay">Overlay permission</string>
+    <string name="check_title_network">Network</string>
+    <string name="check_title_brain">Assistant</string>
+    <string name="check_title_model">Model</string>
+    <string name="check_title_microphone">Microphone</string>
+    <string name="check_title_notifications">Notification access</string>
+    <string name="check_title_adb_keyboard">ADB keyboard</string>
+    <string name="check_title_secure_settings">Typing without root</string>
+    <string name="check_title_voice_key">Voice API key</string>
+    <string name="check_title_voice_host">Voice service</string>
+    <string name="check_title_wake">Wake phrase</string>
+    <string name="check_title_battery">Background running</string>
+    <string name="check_title_disk">Storage</string>
+
+    <string name="check_detail_accessibility_on">On. The ball and every screen action are running.</string>
+    <string name="check_detail_accessibility_off">Off. No ball, no voice, no tapping or swiping — with this one off, the rest of this list does not matter yet.</string>
+    <string name="check_detail_overlay_on">Allowed. The ball can be drawn.</string>
+    <string name="check_detail_overlay_off">Off. Neither the ball nor any card can be drawn, while the service runs perfectly well in the background — which is why it looks like nothing happened at all.</string>
+    <string name="check_detail_network_on">Online.</string>
+    <string name="check_detail_network_off">Offline. Speech recognition, speech synthesis and every model call go over the network.</string>
+    <string name="check_detail_brain_on">Configured.</string>
+    <string name="check_detail_brain_hub_missing">The cloud address is empty — nothing knows where to send what you say.</string>
+    <string name="check_detail_brain_key_missing">The on-device assistant has no API key, so asking it anything gets no answer.</string>
+    <string name="check_detail_model_cloud">Cloud assistant — the model is not on this device.</string>
+    <string name="check_detail_model_no_key">No key yet. Fill one in and this becomes testable.</string>
+    <string name="check_detail_checking">Checking…</string>
+    <string name="check_detail_skipped_offline">Offline, so not tested.</string>
+    <string name="check_detail_model_ok">%1$s answered.</string>
+    <string name="check_detail_model_throttled">Reachable but rate-limited (HTTP 429). The configuration is right; it recovers on its own.</string>
+    <string name="check_detail_model_url">Could not connect: %1$s</string>
+    <string name="check_detail_model_key">Key rejected: %1$s</string>
+    <string name="check_detail_model_name">No model called “%1$s” on this server. It offers: %2$s</string>
+    <string name="check_detail_model_other">%1$s</string>
+    <string name="check_detail_notif_on">Granted, and the listener is bound.</string>
+    <string name="check_detail_notif_zombie">Settings says “granted”, but the listener is not bound — notifications are being dropped silently.\nThis one only comes back if you turn it off and then on again; leaving it on does nothing.</string>
+    <string name="check_detail_notif_off">Off. Call announcements and forwarded notifications never arrive.</string>
+    <string name="check_detail_adb_kb_on">Enabled. It can type into other apps for you.</string>
+    <string name="check_detail_adb_kb_off">Installed but not enabled. Turn it on in system settings — it has no keyboard UI of its own, so enabling it does not get in the way of typing yourself.</string>
+    <string name="check_detail_adb_kb_missing">Not installed. Typing and filling in forms for you go through it (ADBKeyboard), so that does not work yet. Download it with the button here — when you come back this row is a one-tap enable.</string>
+    <string name="check_detail_secure_on">Granted. Typing into other apps works.</string>
+    <string name="check_detail_secure_missing">Not granted, so typing into other apps (type_text) is unavailable. There is no switch for this in Settings — it can only be given over adb with the cable plugged in.</string>
+    <string name="check_detail_mic_on">Allowed.</string>
+    <string name="check_detail_mic_off">Not allowed. Tapping the ball does nothing at all — the failure that least resembles a permission problem.</string>
+    <string name="check_detail_voice_key_ok">Set. Recognition and synthesis use it to reach Volcengine.</string>
+    <string name="check_detail_voice_key_missing">Not set. The source ships without a key — open a Volcengine Speech service of your own and put its API key in ⚙ under “Voice API key”. Without it, hearing and speaking cannot connect, and what you get back is a connection timeout that looks like a network fault. Everything else works.</string>
+    <string name="check_detail_voice_host_ok">%1$s is reachable.</string>
+    <string name="check_detail_voice_host_bad">Could not reach %1$s: %2$s. Both recognition and synthesis will time out.</string>
+    <string name="check_detail_wake_on">Taught, and it wakes while the screen is on.</string>
+    <string name="check_detail_wake_off">Not taught yet. Everything still works, you just have to tap the ball to talk.</string>
+    <string name="check_detail_battery_on">Exempt, so pending reminders are not delayed.</string>
+    <string name="check_detail_battery_off">Not exempt from battery optimisation. Tap “Open settings” — the system asks “Ignore battery optimisations?”; take the button that ignores them.\nThe vendor’s own “App launch / background running” controls are a separate system; changing them leaves this row red. With the screen off a pending reminder may arrive late, and the wake phrase stops listening.</string>
+    <string name="check_detail_disk_ok">%1$d MB free.</string>
+    <string name="check_detail_disk_low">Only %1$d MB left; screenshots and pages will start going missing.</string>
+    <string name="check_detail_disk_full">Only %1$d MB left — almost nothing can be written.</string>
+    <string name="check_detail_disk_unknown">Could not be read.</string>
+
+    <string name="check_fix_settings">Open settings</string>
+    <!-- The notification-access switch already reads as on in the zombie state,
+         so that door is not “Open settings”. See SelfCheck.Fix.Screen.label. -->
+    <string name="check_fix_repower">Off, then on</string>
+    <string name="check_fix_download">Download</string>
+    <string name="check_fix_allow">Allow</string>
+    <string name="check_fix_app_settings">Open assistant settings</string>
+    <string name="check_fix_adb_lead">This one can only be done from a computer, over adb:</string>
+    <string name="check_fix_no_screen">This device has no such settings screen. You will have to find it in Settings yourself.</string>
+    <string name="check_page_title">Self-check</string>
+    <string name="check_page_lead">Where this device stands right now.</string>
+    <string name="check_page_ok_title">All good</string>
+    <string name="check_page_ok_note">Everything is set up. Tap the ball and talk.</string>
+    <string name="check_page_recheck">Check again</string>
+    <!-- The card's way out, in both places it appears: the ✕ in the header and
+         the filled button in the footer. Deliberately the same word as the
+         settings card's "Done" — these are the same card. -->
+    <string name="check_page_done">Done</string>
+    <string name="check_page_issues">%1$d to sort out</string>
+    <string name="check_page_notes_lead">The rest is just for reference and changes nothing.</string>
+    <string name="check_page_no_service">Accessibility is off, so the assistant’s settings cannot be opened from here yet.</string>
+    <string name="check_card_title">%1$d thing(s) need attention</string>
+    <string name="check_card_open">Fix it</string>
+    <string name="check_card_ack">Got it</string>
+
+    <!-- The ball's looks. The user swipes the ball sideways on the full card to
+         change them, and the new one announces itself in the subtitle band —
+         that name is read by a person, hence a resource rather than
+         BallLook.name, which is for logs and diffs. -->
+    <string name="ball_look_cream">Cream</string>
+    <string name="ball_look_bajie">Pigsy</string>
+    <string name="ball_look_imp">Imp</string>
+</resources>

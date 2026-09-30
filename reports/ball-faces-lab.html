@@ -1,0 +1,2165 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="hJTC176C2uAF7p7h5xRD5q">
+<head data-page-node-id="4slCRHHEGMdHcTHsXmZUbE">
+<meta charset="utf-8" data-page-node-id="O9HpAC3UFFxWLUftFe5zFn">
+<meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="ExHcPBiuwcXrHgpok4jDyD">
+<title>球球性格实验室 · 邪恶与暴躁</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --line:#e3e6ec; --ink:#1b1f27;
+    --ink2:#5b6472; --ink3:#8b95a5; --accent:#3b6ef5;
+    --card:#0f172a;
+    --app:#eef1f6;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{padding:20px 24px 8px;max-width:1180px;margin:0 auto}
+  h1{margin:0 0 4px;font-size:19px;letter-spacing:-.01em}
+  .sub{color:var(--ink2);font-size:13px}
+  code{background:#eef0f4;padding:1px 5px;border-radius:4px;font-size:11.5px}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px 48px;display:grid;
+        grid-template-columns:250px 1fr;gap:20px;align-items:start}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr}}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .panel h2{margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:600}
+  .sticky{position:sticky;top:16px}
+
+  .presets{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+  .presets button{
+    text-align:left;padding:9px 11px;border:1px solid var(--line);background:#fff;
+    border-radius:9px;cursor:pointer;font:inherit;color:var(--ink);transition:.13s;
+  }
+  .presets button:hover{border-color:#c6cdd9}
+  .presets button[aria-pressed=true]{border-color:var(--accent);background:#eef3ff;box-shadow:inset 3px 0 0 var(--accent)}
+  .presets .tag{display:block;font-size:11px;color:var(--ink3);margin-top:1px}
+
+  label.row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:11px 0 3px;font-size:12px;color:var(--ink2)}
+  label.row b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;font:inherit;color:var(--ink)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px}
+  .cell{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;
+        transition:border-color .13s, box-shadow .13s}
+  .cell:hover{border-color:#c6cdd9}
+  .cell[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .cell .stage{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center}
+  .cell .stage.dark{background:var(--card)}
+  .cell .stage.app{background:var(--app)}
+  .cell .stage.app::before{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(circle at 24% 30%, #ffffff 0 28px, transparent 29px),
+      radial-gradient(circle at 78% 70%, #ffffff 0 40px, transparent 41px),
+      linear-gradient(transparent 0 44px, #ffffff 44px 46px, transparent 46px);
+    opacity:.9;
+  }
+  .cell canvas{position:relative;display:block;width:100%;height:100%}
+  .cell .cap{padding:9px 12px 11px;border-top:1px solid var(--line)}
+  .cell .cap b{font-size:13px}
+  .cell .cap span{display:block;font-size:11.5px;color:var(--ink3);margin-top:1px}
+  .badge{position:absolute;top:8px;left:8px;font-size:10.5px;letter-spacing:.04em;
+         padding:2px 7px;border-radius:20px;background:rgba(255,255,255,.14);color:#cfd6e4;
+         border:1px solid rgba(255,255,255,.16);z-index:2}
+  .stage.app .badge{background:rgba(15,23,42,.06);color:#5b6472;border-color:rgba(15,23,42,.1)}
+
+  .hero{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;
+        grid-template-columns:1fr 250px;gap:16px;align-items:center}
+  @media(max-width:1000px){.hero{grid-template-columns:1fr}}
+  .hpair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .hstage{position:relative;border-radius:10px;display:flex;align-items:center;justify-content:center;
+          padding:10px;overflow:hidden}
+  .hstage.dark{background:var(--card)}
+  .hstage.app{background:var(--app)}
+  .hstage.app::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(circle at 24% 30%, #fff 0 30px, transparent 31px),
+               radial-gradient(circle at 78% 72%, #fff 0 44px, transparent 45px);opacity:.9}
+  .hstage canvas{position:relative;width:100%;aspect-ratio:1;display:block}
+  .hbadge{position:absolute;top:8px;left:8px;font-size:10.5px;letter-spacing:.04em;z-index:2;
+          padding:2px 7px;border-radius:20px;background:rgba(255,255,255,.14);color:#cfd6e4;
+          border:1px solid rgba(255,255,255,.16)}
+  .hstage.app .hbadge{background:rgba(15,23,42,.06);color:#5b6472;border-color:rgba(15,23,42,.1)}
+
+  .seg{display:inline-flex;gap:0;margin-left:10px;vertical-align:middle;border:1px solid var(--line);
+       border-radius:8px;overflow:hidden}
+  .seg button{border:0;background:#fff;font:inherit;font-size:12px;padding:3px 11px;cursor:pointer;color:var(--ink2)}
+  .seg button[aria-pressed=true]{background:var(--accent);color:#fff}
+  .hero .notes{font-size:12.5px;color:var(--ink2)}
+  .hero .notes h3{margin:0 0 7px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+  .hero .notes ul{margin:0;padding-left:16px}
+  .hero .notes li{margin-bottom:5px}
+  .sec{margin:22px 0 10px;font-size:13px;font-weight:600;color:var(--ink)}
+  .sec em{font-style:normal;font-weight:400;color:var(--ink3);font-size:12px;margin-left:6px}
+  .legend{margin-top:14px;font-size:12.5px;color:var(--ink2);border-top:1px solid var(--line);padding-top:10px}
+  #err{margin:14px 0;padding:12px;border-radius:10px;background:#fff1f1;border:1px solid #f5c2c2;
+       color:#a02020;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;display:none}
+</style>
+</head>
+<body data-page-node-id="SPoEpCghNXJ2BBcVKouME5">
+
+<header data-page-node-id="C3dS7imDfzSrXCYs3EGg8D">
+  <h1 data-page-node-id="LsEdSfvFA8mQT1DMHaHzSu">球球性格实验室 · 邪恶与暴躁</h1>
+  <div class="sub" data-page-node-id="ArBs6ap0weFHb8cUrkZFZi">
+    上一版被否，根子不在颜色。翻一遍渲染管线：<code>brow</code> 这个数<b>从来只把眼球转 0.4 弧度</b>，
+    屏幕上没有一根眉毛 —— 所以不管把身体调成多红多油，脸都是同一张脸，
+    而一张不变的脸换什么色都只是"同一只球穿了不同的衣服"。
+  </div>
+
+  <div class="sub" style="margin-top:10px;padding:11px 14px;background:#eef3ff;border:1px solid #cfdcff;border-radius:9px;color:#22314f">
+    <b>这一版的规矩 ——</b><br>
+    <b>可爱住在骨头上</b>：球径、眼睛大小、眼睛高低、眼距、腮红，<b>一个数都不动</b>。
+    下面五套新的，骨架全部等于<b>你已经装机的奶油球</b>。<br>
+    <b>邪恶住在三个新部件上</b>：<b>眉</b>（一块能随手转角的楔子）、<b>牙</b>（同一块楔子缩到牙那么大）、
+    <b>张嘴</b>（一块半圆盘 —— 半环永远是一根线，管径加粗也只读成"嘴很厚"）。<br>
+    <b>颜色只回答"它是什么物种"，不回答"它坏不坏"。</b>
+    所以主角小恶魔的身体<b>不是血红</b>，是近黑的炭 —— 红只出现在它发光的地方。
+  </div>
+
+  <div class="sub" style="margin-top:10px;padding:11px 14px;background:#fff8ec;border:1px solid #f3ddb5;border-radius:9px;color:#584018">
+    <b>落地成本：</b>
+    每张卡上标着。<b>眉 / 牙 / 张嘴 / 蒸汽 / 怒符</b>这五样，实验室里是现加的代码
+    （一块楔子 + 一块半圆盘，加约 120 行绘制 + 20 个 <code>BallLook</code> 字段）。
+    <b>项目代码一行没动</b>，这是设计稿。<b>奶油球</b>是最左边那张，留作基线。
+  </div>
+</header>
+
+<div class="wrap" data-page-node-id="9HLcd6JUUvl59L0PSgyFBq">
+
+  <div class="panel sticky" data-page-node-id="HABepjNBIjQbY5mIlxUVr6">
+    <h2 data-page-node-id="C0jVPSKXrONWIuAjoSJG4Z">预设</h2>
+    <div class="presets" id="presets" data-page-node-id="upEDhOFwpJRq7Mo8cyRBIX"></div>
+
+    <h2 data-page-node-id="sEwhmEbvpEySRQWa4uBsCD">表情</h2>
+    <select id="mood" data-page-node-id="TZKO9dDFXI0Dq3kLQTfNRo"></select>
+
+    <label class="row" data-page-node-id="Dglty4qiK3L8HDmEezOsxR"><span data-page-node-id="UN9G4sHG0Bj8UOjfC0WL1F">眼睛大小</span><b id="v-eyeR" data-page-node-id="DYYLAOZzF6vimgx2W8FeL1"></b></label>
+    <input type="range" id="s-eyeR" min="0.06" max="0.17" step="0.004" data-page-node-id="KIz5AOYP03RgasdHpxm6Kx">
+
+    <label class="row" data-page-node-id="PukAk0fccJffQg6XoNWxAd"><span data-page-node-id="wdCOS4nl7TbGQFtfSlXwaB">眼睛间距</span><b id="v-eyeX" data-page-node-id="wz2ETthFuyKnu8oCAJXOCA"></b></label>
+    <input type="range" id="s-eyeX" min="0.16" max="0.36" step="0.004" data-page-node-id="l9Py8pmsQ6bOWullzaj5I5">
+
+    <label class="row" data-page-node-id="xgUeCusNQrGCXnChzeGh8h"><span data-page-node-id="TE1FMTFvdliJzcrCcU5n7N">眼睛高低</span><b id="v-eyeY" data-page-node-id="AKWbvoulvHQUsNM50PnTFy"></b></label>
+    <input type="range" id="s-eyeY" min="0.06" max="0.34" step="0.004" data-page-node-id="RTBkRUjpXdFZ5Zlw2fipfN">
+
+    <label class="row" data-page-node-id="wVfI6BzFBHrutMvuSuZXXb"><span data-page-node-id="UfS7UOXhtP6OKE1vHOz4vM">身体上色量</span><b id="v-tint" data-page-node-id="IsBZ3f64VsrgC1ajn7Aokz"></b></label>
+    <input type="range" id="s-tint" min="0" max="1" step="0.02" data-page-node-id="L60TKqLya1hloUPtVYyalx">
+
+    <label class="row" data-page-node-id="0G1NGHz2IBzHg5BWEoiVSW"><span data-page-node-id="xiIhwCG1jYQjA9sA3SW7Ge">身体明度</span><b id="v-mul" data-page-node-id="T8EjUg3i9AMkYbwgoHGH83"></b></label>
+    <input type="range" id="s-mul" min="0.4" max="1.15" step="0.02" data-page-node-id="GTnQGUpdtU7uAsOFG6wM0y">
+
+    <label class="row" data-page-node-id="iPBIDqhsHP63yTqaraCJee"><span data-page-node-id="grbkX5XBhzUEIXWHDckyml">镜面光泽</span><b id="v-gloss" data-page-node-id="NPMwWGefUK0sDS8HoVTCN5"></b></label>
+    <input type="range" id="s-gloss" min="0" max="1.6" step="0.05" data-page-node-id="T1XQfesEwg8JzF2xzR9hWB">
+
+    <label class="row" data-page-node-id="sSdrRiTlMSAfbQBsHCZ0ok"><span data-page-node-id="v98mmPaA8BH7wiQUUWMKtz">腮红</span><b id="v-blush" data-page-node-id="dSfidlMTI8HEJhKoa1CuOs"></b></label>
+    <input type="range" id="s-blush" min="0" max="2.4" step="0.05" data-page-node-id="Mh0jNmmGfbyp3PUVb5fopW">
+
+    <label class="row" data-page-node-id="EeTUqBAxMWNFe2FHi4RxOe"><span data-page-node-id="2h4F5Ra1j3mS3aCypOk2gG">嘴角上扬加成</span><b id="v-smile" data-page-node-id="hQwmt0CQZdkb33gFHrksXw"></b></label>
+    <input type="range" id="s-smile" min="-0.2" max="0.45" step="0.01" data-page-node-id="xolz6DWREygBhlVGXA7f6Y">
+
+    <label class="row"><span>鼻涕泡大小</span><b id="v-bubR"></b></label>
+    <input type="range" id="s-bubR" min="0.03" max="0.16" step="0.005">
+
+    <label class="row"><span>鼻涕泡高低</span><b id="v-bubY"></b></label>
+    <input type="range" id="s-bubY" min="-0.20" max="0.05" step="0.005">
+
+    <label class="row"><span>泡的厚度</span><b id="v-bubIn"></b></label>
+    <input type="range" id="s-bubIn" min="0" max="0.5" step="0.01">
+
+    <h2 style="margin-top:18px">性格 <em style="text-transform:none;letter-spacing:0;font-weight:400">邪恶住在这三样上</em></h2>
+
+    <label class="row"><span>眉：角度</span><b id="v-browTilt"></b></label>
+    <input type="range" id="s-browTilt" min="-0.5" max="0.9" step="0.02">
+    <div class="legend" style="margin-top:2px;padding-top:0;border:0;font-size:11.5px">正 = 内低外高（凶）　负 = 内高外低（委屈）</div>
+
+    <label class="row"><span>眉：左右差</span><b id="v-browSkew"></b></label>
+    <input type="range" id="s-browSkew" min="-0.9" max="0.9" step="0.02">
+
+    <label class="row"><span>眉：粗细</span><b id="v-browThick"></b></label>
+    <input type="range" id="s-browThick" min="0.012" max="0.070" step="0.002">
+
+    <label class="row"><span>眉：离眼睛多远</span><b id="v-browY"></b></label>
+    <input type="range" id="s-browY" min="0.10" max="0.26" step="0.004">
+
+    <label class="row"><span>眉：浓度</span><b id="v-brow"></b></label>
+    <input type="range" id="s-brow" min="0" max="1" step="0.05">
+
+    <label class="row"><span>眼：挤扁</span><b id="v-eyeSquash"></b></label>
+    <input type="range" id="s-eyeSquash" min="0.15" max="1.1" step="0.02">
+
+    <label class="row"><span>眼：内角下压</span><b id="v-eyeTilt"></b></label>
+    <input type="range" id="s-eyeTilt" min="-0.3" max="0.3" step="0.02">
+
+    <label class="row"><span>牙：几颗</span><b id="v-fang"></b></label>
+    <input type="range" id="s-fang" min="0" max="2" step="1">
+
+    <label class="row"><span>牙：长度</span><b id="v-fangLen"></b></label>
+    <input type="range" id="s-fangLen" min="0.015" max="0.090" step="0.003">
+
+    <label class="row"><span>牙：朝上 / 朝下</span><b id="v-fangFlip"></b></label>
+    <input type="range" id="s-fangFlip" min="0" max="1" step="1">
+
+    <label class="row"><span>锯齿牙：几颗</span><b id="v-teeth"></b></label>
+    <input type="range" id="s-teeth" min="0" max="6" step="1">
+
+    <label class="row"><span>张嘴：高/宽比</span><b id="v-gawp"></b></label>
+    <input type="range" id="s-gawp" min="0.1" max="1.3" step="0.02">
+
+    <label class="row"><span>蒸汽</span><b id="v-steam"></b></label>
+    <input type="range" id="s-steam" min="0" max="1" step="0.05">
+
+    <label class="row"><span>怒符</span><b id="v-vein"></b></label>
+    <input type="range" id="s-vein" min="0" max="1" step="0.05">
+
+    <button id="reset" style="margin-top:14px;width:100%;padding:8px;border:1px solid var(--line);background:#fff;border-radius:9px;font:inherit;cursor:pointer;color:var(--ink2)" data-page-node-id="MsiIXrvrt2aqAPJ2AEw1OU">
+      还原此预设
+    </button>
+
+    <div class="legend" data-page-node-id="YJVBjoZyCoFB3Q0bfWn9JZ">
+      瞳孔 / 高光由预设决定，不给滑块 —— 那是造型选择，不是调参。<br>
+      眉 / 牙 / 嘴这三组是这一版的新东西，<b>随便拉</b>：把眉的角度从 0.9 拉到 −0.5，
+      同一颗球会在"凶神"和"委屈"之间来回，而它的骨架一个像素都没动。
+    </div>
+  </div>
+
+  <div data-page-node-id="xHcP9fBoFkC2vu3VH59FJR">
+    <div id="err" data-page-node-id="iSvxKDZoG2BMcUjEaWOwfP"></div>
+
+    <div class="sec">放大细节 <em>选中的预设 · 两种底子并排看</em></div>
+    <div class="hero">
+      <div class="hpair">
+        <div class="hstage dark"><div class="hbadge">深色卡片</div><canvas class="heroCv"></canvas></div>
+        <div class="hstage app"><div class="hbadge">亮色 App</div><canvas class="heroCv"></canvas></div>
+      </div>
+      <div class="notes">
+        <h3>五套新的，一句话一套</h3>
+        <ul>
+          <li><b>小恶魔 ★</b> — 斜眉（内低外高 0.46 弧度）+ 一颗向上的虎牙 + 嘴角两个小勾。
+              <b>骨架就是奶油球</b>：眼宽 0.122、眼睛那么低、腮红 0.5 —— 一个都没改。
+              它是一颗"表情很坏的奶油球"，不是一颗红色的怪球。</li>
+          <li><b>暴躁球</b> — 押在眼和嘴上：两撇压到底的粗眉、把眼缝挤到 0.42、
+              <b>一张张开的嘴</b> + 上下各四颗锯齿牙；再加头顶两缕蒸汽、太阳穴一个怒符。
+              可爱靠那两块腮红<b>没有关掉</b>（0.80，全批最高）—— 这是"烈子"的全部秘密：
+              一张脸连血色都气没了，那是恐怖片，不是可爱。</li>
+          <li><b>腹黑球</b> — 没有獠牙、没有角、没有蒸汽，<b>只有不对称</b>：
+              一条眉挑起来、一条压下去（左右角度差 1.24 弧度），一只眼半闭，嘴角单边翘，
+              瞳孔偏到眼角。<b>不对称读作"心机"的前提是别的都对称</b> —— 唯一的例外就是有意为之。</li>
+          <li><b>吸血鬼球</b> — 两颗从上唇<b>垂下来</b>的獠牙 + 苍白身体 + 两块红腮。
+              苍白给了腮红一个存在的理由，腮红又把可爱度还回来。描边是深红而不是发光。</li>
+          <li><b>猫妖</b> — 全批最大的一双眼睛（0.145）+ 后压的猫耳 + ω 两个凹口里各一颗小虎牙。
+              它说的是这批设计里最反直觉的一条：<b>可爱度是弹药，不是跟邪恶抢位置的东西</b>。</li>
+        </ul>
+        <h3 style="margin-top:12px">三个部件，各自能买到什么</h3>
+        <ul>
+          <li><b>加一条眉</b> → 从"没有表情"到"有态度"。单件收益最大。</li>
+          <li><b>加一颗牙</b> → 从"凶"到"想咬你"。<b>一颗 = 调皮，两颗 = 掠食</b>。</li>
+          <li><b>把嘴换成一块面</b> → 从"咧嘴"到"在吼"。这是唯一必须新几何的一条。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="sec">
+      六套，1:1 真实尺寸 <em>点一张看大图 · 按 1-6 切表情 · 每套自带一个"代表表情"</em>
+      <span class="seg" id="bgToggle">
+        <button type="button" data-bg="dark" aria-pressed="true">深色卡片</button>
+        <button type="button" data-bg="app" aria-pressed="false">亮色 App</button>
+      </span>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================================
+   1. mat4 —— 列主序，跟 android.opengl.Matrix 同一套约定
+   ========================================================================= */
+const M4 = {
+  id(){ return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); },
+  perspective(fovyDeg, aspect, near, far){
+    const f = 1/Math.tan(fovyDeg*Math.PI/180/2), m = new Float32Array(16);
+    m[0]=f/aspect; m[5]=f; m[10]=(far+near)/(near-far); m[11]=-1;
+    m[14]=2*far*near/(near-far); return m;
+  },
+  lookAt(ex,ey,ez, cx,cy,cz, ux,uy,uz){
+    let zx=ex-cx, zy=ey-cy, zz=ez-cz, l=Math.hypot(zx,zy,zz);
+    zx/=l; zy/=l; zz/=l;
+    let xx=uy*zz-uz*zy, xy=uz*zx-ux*zz, xz=ux*zy-uy*zx;
+    l=Math.hypot(xx,xy,xz)||1; xx/=l; xy/=l; xz/=l;
+    const yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+    const m=new Float32Array(16);
+    m[0]=xx; m[4]=xy;  m[8]=xz;  m[12]=-(xx*ex+xy*ey+xz*ez);
+    m[1]=yx; m[5]=yy;  m[9]=yz;  m[13]=-(yx*ex+yy*ey+yz*ez);
+    m[2]=zx; m[6]=zy;  m[10]=zz; m[14]=-(zx*ex+zy*ey+zz*ez);
+    m[15]=1; return m;
+  },
+  mul(a,b){
+    const o=new Float32Array(16);
+    for(let c=0;c<4;c++)for(let r=0;r<4;r++){
+      let s=0; for(let k=0;k<4;k++) s+=a[k*4+r]*b[c*4+k];
+      o[c*4+r]=s;
+    } return o;
+  },
+  translate(m,x,y,z){ const t=M4.id(); t[12]=x;t[13]=y;t[14]=z; return M4.mul(m,t); },
+  scale(m,x,y,z){ const t=M4.id(); t[0]=x;t[5]=y;t[10]=z; return M4.mul(m,t); },
+  rotate(m,deg,ax,ay,az){
+    let l=Math.hypot(ax,ay,az); ax/=l; ay/=l; az/=l;
+    const a=deg*Math.PI/180, s=Math.sin(a), c=Math.cos(a), t=1-c, r=M4.id();
+    r[0]=t*ax*ax+c;    r[1]=t*ax*ay+s*az; r[2]=t*ax*az-s*ay;
+    r[4]=t*ax*ay-s*az; r[5]=t*ay*ay+c;    r[6]=t*ay*az+s*ax;
+    r[8]=t*ax*az+s*ay; r[9]=t*ay*az-s*ax; r[10]=t*az*az+c;
+    return M4.mul(m,r);
+  },
+};
+
+/* =========================================================================
+   2. 几何体 —— IcoSphere / UvSphere / Capsule / Torus 的逐行移植
+   ========================================================================= */
+function icoSphere(subdivisions){
+  const t=(1+Math.sqrt(5))/2;
+  const base=[-1,t,0, 1,t,0, -1,-t,0, 1,-t,0,
+               0,-1,t, 0,1,t, 0,-1,-t, 0,1,-t,
+               t,0,-1, t,0,1, -t,0,-1, -t,0,1];
+  const pos=[];
+  for(let i=0;i<12;i++){
+    const x=base[i*3],y=base[i*3+1],z=base[i*3+2], inv=1/Math.hypot(x,y,z);
+    pos.push(x*inv,y*inv,z*inv);
+  }
+  let faces=[0,11,5, 0,5,1, 0,1,7, 0,7,10, 0,10,11,
+             1,5,9, 5,11,4, 11,10,2, 10,7,6, 7,1,8,
+             3,9,4, 3,4,2, 3,2,6, 3,6,8, 3,8,9,
+             4,9,5, 2,4,11, 6,2,10, 8,6,7, 9,8,1];
+  const cache=new Map();
+  function mid(a,b){
+    const lo=Math.min(a,b), hi=Math.max(a,b), key=lo*100000+hi;
+    if(cache.has(key)) return cache.get(key);
+    let mx=(pos[a*3]+pos[b*3])/2, my=(pos[a*3+1]+pos[b*3+1])/2, mz=(pos[a*3+2]+pos[b*3+2])/2;
+    const inv=1/Math.hypot(mx,my,mz); mx*=inv; my*=inv; mz*=inv;
+    const idx=pos.length/3; pos.push(mx,my,mz); cache.set(key,idx); return idx;
+  }
+  for(let s=0;s<subdivisions;s++){
+    const next=[];
+    for(let r=0;r<faces.length;r+=3){
+      const a=faces[r],b=faces[r+1],c=faces[r+2];
+      const ab=mid(a,b), bc=mid(b,c), ca=mid(c,a);
+      next.push(a,ab,ca, b,bc,ab, c,ca,bc, ab,bc,ca);
+    }
+    faces=next; cache.clear();
+  }
+  const n=pos.length/3;
+  return {pos:new Float32Array(pos), nrm:new Float32Array(pos),
+          uv:new Float32Array(n*2), idx:new Uint16Array(faces)};
+}
+
+function uvSphere(wSeg,hSeg,radius=1){
+  const n=(wSeg+1)*(hSeg+1);
+  const pos=new Float32Array(n*3), nrm=new Float32Array(n*3), uv=new Float32Array(n*2);
+  let p=0,u=0;
+  for(let iy=0;iy<=hSeg;iy++){
+    const v=iy/hSeg, phi=v*Math.PI, sPhi=Math.sin(phi), cPhi=Math.cos(phi);
+    for(let ix=0;ix<=wSeg;ix++){
+      const th=(ix/wSeg)*2*Math.PI;
+      const x=-radius*Math.cos(th)*sPhi, y=radius*cPhi, z=radius*Math.sin(th)*sPhi;
+      pos[p]=x; pos[p+1]=y; pos[p+2]=z;
+      nrm[p]=x/radius; nrm[p+1]=y/radius; nrm[p+2]=z/radius;
+      uv[u]=ix/wSeg; uv[u+1]=1-v; p+=3; u+=2;
+    }
+  }
+  const raw=[], stride=wSeg+1;
+  for(let iy=0;iy<hSeg;iy++)for(let ix=0;ix<wSeg;ix++){
+    const a=iy*stride+ix+1, b=iy*stride+ix, c=(iy+1)*stride+ix, d=(iy+1)*stride+ix+1;
+    if(iy!==0) raw.push(a,b,d);
+    if(iy!==hSeg-1) raw.push(b,c,d);
+  }
+  return {pos,nrm,uv,idx:new Uint16Array(raw)};
+}
+
+function capsule(radius, cylH, capSegs=4, radialSegs=12){
+  const half=cylH/2, totalRings=2*(capSegs+1), verts=totalRings*(radialSegs+1);
+  const pos=new Float32Array(verts*3), nrm=new Float32Array(verts*3), uv=new Float32Array(verts*2);
+  let p=0,u=0,ring=0;
+  for(const sign of [1,-1]){
+    for(let i=0;i<=capSegs;i++){
+      const phi=sign>0 ? (i/capSegs)*(Math.PI/2) : Math.PI/2+(i/capSegs)*(Math.PI/2);
+      const sP=Math.sin(phi), cP=Math.cos(phi);
+      for(let j=0;j<=radialSegs;j++){
+        const th=(j/radialSegs)*2*Math.PI;
+        const nx=-Math.cos(th)*sP, ny=cP, nz=Math.sin(th)*sP;
+        pos[p]=radius*nx; pos[p+1]=radius*ny+sign*half; pos[p+2]=radius*nz;
+        nrm[p]=nx; nrm[p+1]=ny; nrm[p+2]=nz;
+        uv[u]=j/radialSegs; uv[u+1]=1-ring/(totalRings-1); p+=3; u+=2;
+      }
+      ring++;
+    }
+  }
+  const idx=[], stride=radialSegs+1;
+  for(let r=0;r<totalRings-1;r++)for(let s=0;s<radialSegs;s++){
+    const a=r*stride+s, b=r*stride+s+1, c=(r+1)*stride+s+1, d=(r+1)*stride+s;
+    idx.push(a,b,c, a,c,d);
+  }
+  return {pos,nrm,uv,idx:new Uint16Array(idx)};
+}
+
+function torus(radius, tube, radialSegs, tubularSegs, arc=2*Math.PI){
+  const verts=(radialSegs+1)*(tubularSegs+1);
+  const pos=new Float32Array(verts*3), nrm=new Float32Array(verts*3), uv=new Float32Array(verts*2);
+  let p=0,u=0;
+  for(let j=0;j<=radialSegs;j++){
+    const v=(j/radialSegs)*2*Math.PI, cV=Math.cos(v), sV=Math.sin(v);
+    for(let i=0;i<=tubularSegs;i++){
+      const uu=(i/tubularSegs)*arc, cU=Math.cos(uu), sU=Math.sin(uu);
+      const rr=radius+tube*cV;
+      const px=rr*cU, py=rr*sU, pz=tube*sV;
+      pos[p]=px; pos[p+1]=py; pos[p+2]=pz;
+      let nx=px-radius*cU, ny=py-radius*sU, nz=pz;
+      const inv=1/Math.hypot(nx,ny,nz);
+      nrm[p]=nx*inv; nrm[p+1]=ny*inv; nrm[p+2]=nz*inv;
+      uv[u]=i/tubularSegs; uv[u+1]=j/radialSegs; p+=3; u+=2;
+    }
+  }
+  const idx=[], stride=tubularSegs+1;
+  for(let j=0;j<radialSegs;j++)for(let i=0;i<tubularSegs;i++){
+    const a=j*stride+i, b=j*stride+i+1, c=(j+1)*stride+i+1, d=(j+1)*stride+i;
+    idx.push(a,b,c, a,c,d);
+  }
+  return {pos,nrm,uv,idx:new Uint16Array(idx)};
+}
+
+/**
+ * 椭圆底锥体，顶点在 +Y，底面在 y=0。耳朵用。
+ *
+ * z 方向的半径单独给（[rz]），因为一只猫耳是个"扁三角"：正面看要够宽，
+ * 侧面看要薄。差别全在这一点上——用正圆锥出来的是犄角。
+ */
+function cone(rx, rz, height, segs=20){
+  // 顶点数：侧面环(segs+1) + 顶点环(segs+1，为 UV 每段重复一个顶点)
+  //        + 底心(1) + 底环(segs+1) = 3*(segs+1)+1
+  // 少算一圈的话，越界写入会被类型化数组静默丢掉，出来的是半个锥体。
+  const n=3*(segs+1) + 1;
+  const pos=new Float32Array(n*3), nrm=new Float32Array(n*3), uv=new Float32Array(n*2);
+  const idx=[];
+  let p=0,u=0;
+  const put=(x,y,z,nx,ny,nz,uu,vv)=>{ pos[p]=x;pos[p+1]=y;pos[p+2]=z;
+    nrm[p]=nx;nrm[p+1]=ny;nrm[p+2]=nz; uv[u]=uu;uv[u+1]=vv; p+=3;u+=2; };
+  // 侧面：法线由 ∂P/∂t × ∂P/∂u 得来（椭圆情形下不能直接用位置当法线）
+  const base = 0;
+  for(let i=0;i<=segs;i++){
+    const a=i/segs*2*Math.PI, ca=Math.cos(a), sa=Math.sin(a);
+    let nx=height*rz*ca, ny=-rx*rz, nz=height*rx*sa;
+    const inv=1/Math.hypot(nx,ny,nz); nx*=inv; ny*=inv; nz*=inv;
+    put(rx*ca, 0, rz*sa, nx, ny, nz, i/segs, 0);
+  }
+  for(let i=0;i<=segs;i++){
+    const a=i/segs*2*Math.PI, ca=Math.cos(a), sa=Math.sin(a);
+    put(0, height, 0, height*rz*ca, -rx*rz, height*rx*sa, i/segs, 1);
+  }
+  // 底面（朝下）
+  const baseCenter = n-1;
+  put(0,0,0, 0,-1,0, 0.5,0.5);
+  for(let i=0;i<=segs;i++){
+    const a=i/segs*2*Math.PI;
+    put(rx*Math.cos(a), 0, rz*Math.sin(a), 0,-1,0, Math.cos(a)*0.5+0.5, Math.sin(a)*0.5+0.5);
+  }
+  for(let i=0;i<segs;i++){
+    const A=base+i, B=base+i+1;             // 侧面
+    idx.push(A, B, segs+1+i,  B, segs+1+i+1, segs+1+i);
+    const C=baseCenter+1+i;                 // 底面
+    idx.push(baseCenter, C+1, C);
+  }
+  return {pos,nrm,uv,idx:new Uint16Array(idx)};
+}
+
+/**
+ * 居中的楔子：把 [cone] 从 y=0..h 平移成 −h/2..h/2，好绕自己的中点转。
+ *
+ * 眉、尖牙、锯齿牙、怒符全用它 —— "一块可以随手缩放旋转的三角形"是这批设计
+ * 里唯一缺的东西。它们都走 `pSolid`（无光照、纯色），所以画的时候随便做非等比
+ * 缩放：法线不会被用坏，因为没有法线。
+ */
+function centeredCone(rx, rz, height, segs=14){
+  const m=cone(rx,rz,height,segs);
+  for(let i=1;i<m.pos.length;i+=3) m.pos[i]-=height*0.5;
+  return m;
+}
+
+/**
+ * 一只**张开**的嘴：半圆盘，面朝 +Z，弧在上半圆（跟 [torus] 那半环同一套约定，
+ * 所以共用一个 `mouthRotZ`）。
+ *
+ * 为什么必须新做一块几何：半环永远是一根**线** —— 管径加到 0.09 也只是一根粗
+ * 线，读出来是"嘴很厚"，不是"嘴张着"。张嘴要的是一个**面**。
+ * 这也是暴躁球那张脸唯一不能靠参数拿下的东西。
+ */
+function halfDisc(r, segs=28){
+  const n=segs+2;
+  const pos=new Float32Array(n*3), nrm=new Float32Array(n*3), uv=new Float32Array(n*2);
+  const idx=[];
+  let p=0,u=0;
+  const put=(x,y,nx,ny,uu,vv)=>{ pos[p]=x;pos[p+1]=y;pos[p+2]=0;
+    nrm[p]=nx;nrm[p+1]=ny;nrm[p+2]=1; uv[u]=uu;uv[u+1]=vv; p+=3;u+=2; };
+  put(0,0, 0,0, 0.5,0.5);                       // 圆心
+  for(let i=0;i<=segs;i++){
+    const a=Math.PI*(1-i/segs);                 // π → 0：上半圆，从左扫到右
+    put(Math.cos(a)*r, Math.sin(a)*r, 0,0, i/segs, 0);
+  }
+  for(let i=0;i<segs;i++) idx.push(0, 1+i, 1+i+1);
+  return {pos,nrm,uv,idx:new Uint16Array(idx)};
+}
+
+/* =========================================================================
+   3. GL 小工具
+   ========================================================================= */
+function compile(gl,type,src){
+  const s=gl.createShader(type);
+  gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))
+    throw new Error(gl.getShaderInfoLog(s)+"\n---\n"+src);
+  return s;
+}
+class Prog{
+  constructor(gl,vs,fs){
+    this.gl=gl;
+    const p=gl.createProgram();
+    gl.attachShader(p,compile(gl,gl.VERTEX_SHADER,vs));
+    gl.attachShader(p,compile(gl,gl.FRAGMENT_SHADER,fs));
+    gl.linkProgram(p);
+    if(!gl.getProgramParameter(p,gl.LINK_STATUS))
+      throw new Error(gl.getProgramInfoLog(p));
+    this.p=p; this.cache=new Map();
+  }
+  use(){ this.gl.useProgram(this.p); }
+  u(n){ const k="u:"+n; if(!this.cache.has(k)) this.cache.set(k,this.gl.getUniformLocation(this.p,n)); return this.cache.get(k); }
+  a(n){ const k="a:"+n; if(!this.cache.has(k)) this.cache.set(k,this.gl.getAttribLocation(this.p,n)); return this.cache.get(k); }
+}
+
+class GMesh{
+  constructor(gl,data){
+    this.gl=gl;
+    const n=data.pos.length/3, stride=8;
+    const inter=new Float32Array(n*stride);
+    for(let i=0;i<n;i++){
+      const j=i*stride;
+      inter[j]=data.pos[i*3]; inter[j+1]=data.pos[i*3+1]; inter[j+2]=data.pos[i*3+2];
+      inter[j+3]=data.nrm[i*3]; inter[j+4]=data.nrm[i*3+1]; inter[j+5]=data.nrm[i*3+2];
+      inter[j+6]=data.uv[i*2]; inter[j+7]=data.uv[i*2+1];
+    }
+    this.vbo=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.vbo);
+    gl.bufferData(gl.ARRAY_BUFFER,inter,gl.STATIC_DRAW);
+    this.ibo=gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.ibo);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,data.idx,gl.STATIC_DRAW);
+    this.count=data.idx.length;
+  }
+  bind(aPos,aNrm=-1,aUV=-1){
+    const gl=this.gl, S=8*4;
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.vbo);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.ibo);
+    if(aPos>=0){ gl.enableVertexAttribArray(aPos); gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,S,0); }
+    if(aNrm>=0){ gl.enableVertexAttribArray(aNrm); gl.vertexAttribPointer(aNrm,3,gl.FLOAT,false,S,12); }
+    if(aUV>=0){ gl.enableVertexAttribArray(aUV); gl.vertexAttribPointer(aUV,2,gl.FLOAT,false,S,24); }
+  }
+  draw(){ this.gl.drawElements(this.gl.TRIANGLES,this.count,this.gl.UNSIGNED_SHORT,0); }
+}
+
+class GPoints{
+  constructor(gl,capacity){
+    this.gl=gl; this.capacity=capacity;
+    this.data=new Float32Array(capacity*6);
+    this.vbo=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.vbo);
+    gl.bufferData(gl.ARRAY_BUFFER,capacity*6*4,gl.DYNAMIC_DRAW);
+  }
+  upload(){
+    const gl=this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.vbo);
+    gl.bufferSubData(gl.ARRAY_BUFFER,0,this.data);
+  }
+  bind(aPos,aCol){
+    const gl=this.gl, S=6*4;
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.vbo);
+    gl.enableVertexAttribArray(aPos); gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,S,0);
+    gl.enableVertexAttribArray(aCol); gl.vertexAttribPointer(aCol,3,gl.FLOAT,false,S,12);
+  }
+  draw(){ this.gl.drawArrays(this.gl.POINTS,0,this.capacity); }
+}
+
+/* =========================================================================
+   4. 表情表 —— 与 Mood.kt 的 FACE 表一一对应
+   ========================================================================= */
+function F(o){ return Object.assign({eyeArc:0,blush:0,spread:1,breath:0.022,gape:0,bubble:0},o); }
+
+/* 改动前的表 —— "现在"这个预设专用，做诚实的基线。 */
+const FACE_OLD = {
+  CALM:      F({c:0x9db4ff, eye:1.00, brow:0.00, smile:0.10, pulse:1.00, tilt:0.00, skew:0.00, jitter:0.00}),
+  HAPPY:     F({c:0x5eead4, eye:0.72, brow:-0.16,smile:0.62, pulse:1.25, tilt:0.04, skew:0.00, jitter:0.00, eyeArc:0.90, blush:0.70}),
+  CURIOUS:   F({c:0xf0abfc, eye:1.22, brow:-0.06,smile:0.14, pulse:1.15, tilt:0.17, skew:0.055,jitter:0.00}),
+  TENSE:     F({c:0xfb923c, eye:0.88, brow:0.30, smile:-0.20,pulse:1.95, tilt:0.00, skew:0.02, jitter:0.55}),
+  ANXIOUS:   F({c:0xfb7185, eye:1.26, brow:0.42, smile:-0.44,pulse:2.50, tilt:0.00, skew:0.03, jitter:1.00}),
+  CONCERNED: F({c:0xfbbf24, eye:1.10, brow:0.34, smile:-0.34,pulse:1.15, tilt:-0.05,skew:0.00, jitter:0.12}),
+  LISTENING: F({c:0x7dd3fc, eye:1.60, brow:-0.14,smile:0.16, pulse:1.70, tilt:-0.13,skew:0.00, jitter:0.00, breath:0.055, gape:0.12}),
+  HOLDING:   F({c:0xfacc15, eye:0.92, brow:0.48, smile:-0.18,pulse:0.72, tilt:0.00, skew:0.00, jitter:0.00, breath:0.018}),
+  THINKING:  F({c:0xc084fc, eye:0.40, brow:0.32, smile:-0.06,pulse:1.15, tilt:0.15, skew:0.08, jitter:0.00, breath:0.042}),
+  SPEAKING:  F({c:0x9db4ff, eye:1.05, brow:0.00, smile:0.20, pulse:1.50, tilt:0.00, skew:0.00, jitter:0.00}),
+  SEARCHING: F({c:0x7dd3fc, eye:0.84, brow:0.10, smile:0.06, pulse:1.60, tilt:0.13, skew:0.05, jitter:0.00, spread:1.16, breath:0.036}),
+  SUCCESS:   F({c:0x5eead4, eye:0.50, brow:-0.22,smile:0.80, pulse:1.30, tilt:0.00, skew:0.00, jitter:0.00, eyeArc:1.00, blush:0.95, spread:1.10}),
+  FAILED:    F({c:0xfb7185, eye:0.68, brow:0.45, smile:-0.50,pulse:1.10, tilt:-0.07,skew:0.02, jitter:0.22}),
+  SLEEPING:  F({c:0x64748b, eye:0.10, brow:0.06, smile:0.08, pulse:0.45, tilt:0.11, skew:0.00, jitter:0.00, eyeArc:0.85, spread:0.90}),
+};
+
+/* 改动后的表 —— 与 Mood.kt 的 FACE 逐字对齐，这样这里看到的就是装机后的样子。
+   smile 与 blush 已经把"基线"烘进表里了，不再有额外的全局加成。 */
+const FACE_NEW = {
+  CALM:      F({c:0x9db4ff, eye:1.00, brow:0.00, smile:0.26, pulse:1.00, tilt:0.00, skew:0.00, jitter:0.00, blush:0.38}),
+  HAPPY:     F({c:0x5eead4, eye:0.72, brow:-0.16,smile:0.68, pulse:1.25, tilt:0.04, skew:0.00, jitter:0.00, eyeArc:0.90, blush:0.85}),
+  CURIOUS:   F({c:0xf0abfc, eye:1.22, brow:-0.06,smile:0.28, pulse:1.15, tilt:0.17, skew:0.055,jitter:0.00, blush:0.72}),
+  TENSE:     F({c:0xfb923c, eye:0.88, brow:0.30, smile:-0.20,pulse:1.95, tilt:0.00, skew:0.02, jitter:0.55, blush:0.26}),
+  ANXIOUS:   F({c:0xfb7185, eye:1.26, brow:0.42, smile:-0.44,pulse:2.50, tilt:0.00, skew:0.03, jitter:1.00, blush:0.24}),
+  CONCERNED: F({c:0xfbbf24, eye:1.10, brow:0.34, smile:-0.34,pulse:1.15, tilt:-0.05,skew:0.00, jitter:0.12, blush:0.32}),
+  LISTENING: F({c:0x7dd3fc, eye:1.60, brow:-0.14,smile:0.28, pulse:1.70, tilt:-0.13,skew:0.00, jitter:0.00, blush:0.46, breath:0.055, gape:0.12}),
+  HOLDING:   F({c:0xfacc15, eye:0.92, brow:0.48, smile:-0.18,pulse:0.72, tilt:0.00, skew:0.00, jitter:0.00, blush:0.3, breath:0.018}),
+  THINKING:  F({c:0xc084fc, eye:0.40, brow:0.32, smile:0.04, pulse:1.15, tilt:0.15, skew:0.08, jitter:0.00, blush:0.3, breath:0.042}),
+  SPEAKING:  F({c:0x9db4ff, eye:1.05, brow:0.00, smile:0.32, pulse:1.50, tilt:0.00, skew:0.00, jitter:0.00, blush:0.44}),
+  SEARCHING: F({c:0x7dd3fc, eye:0.84, brow:0.10, smile:0.16, pulse:1.60, tilt:0.13, skew:0.05, jitter:0.00, blush:0.34, spread:1.16, breath:0.036}),
+  SUCCESS:   F({c:0x5eead4, eye:0.50, brow:-0.22,smile:0.86, pulse:1.30, tilt:0.00, skew:0.00, jitter:0.00, eyeArc:1.00, blush:1.0, spread:1.10}),
+  FAILED:    F({c:0xfb7185, eye:0.68, brow:0.45, smile:-0.50,pulse:1.10, tilt:-0.07,skew:0.02, jitter:0.22, blush:0.42}),
+  SLEEPING:  F({c:0x9db4ff, eye:0.10, brow:0.06, smile:0.16, pulse:0.45, tilt:0.11, skew:0.00, jitter:0.00, eyeArc:0.85, blush:0.16, spread:0.90, bubble:1}),
+};
+
+const MOODS = Object.keys(FACE_NEW);
+for(const T of [FACE_OLD, FACE_NEW]) for(const k in T) T[k].color = hex2rgb(T[k].c);
+function hex2rgb(h){ return [((h>>16)&255)/255, ((h>>8)&255)/255, (h&255)/255]; }
+
+/**
+ * 一份"脾气版"表情表：同样的 14 行，只是眉压得更死、眼缝更窄、笑收敛一点。
+ *
+ * 暴躁球用它。理由跟 SLEEPING 那一段是同一个道理的反面：一个**状态**如果只靠
+ * 某一行的数值来表达，那这个角色平时看起来就不像它自己。暴躁球如果要只在
+ * TENSE 那一行才凶，那它一天里大部分时间都是一颗普通的球 —— 而这套皮肤卖的
+ * 是"它就是这个脾气"。压过之后，CALM 和 TENSE 仍然差得出来（眉的角度、眼睛
+ * 的缝宽都还在动），只是这一整条曲线的**基线**被抬到了"正在忍着"。
+ *
+ * 注意 copy 出来是浅拷贝：`color` 数组是与 FACE_NEW 共享的引用，但这里没人改
+ * 它的内容（只改数值），所以安全。
+ */
+function tempered(src, mul){
+  const out={};
+  for(const k in src){
+    const o=Object.assign({}, src[k]);
+    o.brow  = src[k].brow * mul.brow + mul.browAdd;
+    o.eye   = Math.min(src[k].eye, mul.eyeCap);
+    o.smile = src[k].smile * mul.smile;
+    out[k]=F(o);
+  }
+  return out;
+}
+const FACE_GRUMPY = tempered(FACE_NEW, {brow:1.6, browAdd:0.30, eyeCap:0.78, smile:0.75});
+
+/* =========================================================================
+   5. 预设 —— 每个数都对应 Kotlin 里一个常量
+   ========================================================================= */
+const P_NOW = {
+  key:'now', label:'现在', tag:'近黑球 + 白胶囊眼 + 发光描边',
+  bodyBase:[0.102,0.137,0.220], tint:0.20, albedoMul:1.00, grad:0.00,
+  amb:1.00, diff:0.00, gloss:0.00, bodyScale:0.885,
+  eyeStyle:'plain', eyeColor:[1,1,1], pupilR:0, specR:0,
+  eyeR:0.075, eyeH:0.100, eyeX:0.300, eyeY:0.300,
+  faceZ:0.860, mouthR:0.240, mouthTube:0.036, mouthY:-0.340, mouthThick:0.00,
+  mouthMode:'mood', smileBoost:0.00, faces:FACE_OLD,
+  blushColor:[1,0.42,0.55],
+  blushMul:1.00, restBlush:0.00, blushAlpha:0.55, blushBlend:'add', blushSize:0.34, blushX:0.440, blushY:-0.120,
+  mouthStyle:'arc',
+  ears:false, earX:0.360, earY:0.700, earZ:0.360, earH:0.330, earW:0.155, earFlat:0.36, earTilt:0.24, earShade:0.86,
+  bubbleX:0.085, bubbleY:-0.030, bubbleR:0.085,
+  bubbleColor:[0.105,0.135,0.205], bubblePow:3.0, bubbleShine:26, bubbleInner:0.10,
+  outline:0.000, outlineColor:[0.085,0.085,0.115],
+  rimMode:'glow', rimGain:1.00, rimPow:2.6,
+};
+
+const P_JELLY = {
+  key:'jelly', label:'果冻球', tag:'糖果色光泽身体 + 大眼带瞳孔 + 腮红',
+  bodyBase:[0.055,0.072,0.130], tint:0.62, albedoMul:0.88, grad:0.60,
+  amb:0.66, diff:0.55, gloss:0.70, bodyScale:0.885,
+  eyeStyle:'pupil', eyeColor:[1,1,1], pupilR:0.070, specR:0.024,
+  eyeR:0.135, eyeH:0.050, eyeX:0.262, eyeY:0.175,
+  faceZ:0.876, mouthR:0.175, mouthTube:0.040, mouthY:-0.235, mouthThick:0.06,
+  mouthMode:'mood', smileBoost:0.00, faces:FACE_NEW,
+  blushColor:[1,0.42,0.55],
+  blushMul:1.00, restBlush:0.00, blushAlpha:0.85, blushBlend:'add', blushSize:0.44, blushX:0.400, blushY:-0.145,
+  mouthStyle:'arc',
+  ears:false, earX:0.360, earY:0.700, earZ:0.360, earH:0.330, earW:0.155, earFlat:0.36, earTilt:0.24, earShade:0.86,
+  bubbleX:0.085, bubbleY:-0.030, bubbleR:0.085,
+  bubbleColor:[0.920,0.950,1.000], bubblePow:3.0, bubbleShine:26, bubbleInner:0.10,
+  outline:0.000, outlineColor:[0.085,0.085,0.115],
+  rimMode:'glow', rimGain:1.15, rimPow:2.6,
+};
+
+const P_CREAM = {
+  key:'cream', label:'奶油球', tag:'奶油身体 + 深色豆豆眼 + 深色描边',
+  bodyBase:[0.955,0.965,0.985], tint:0.55, albedoMul:0.93, grad:0.42,
+  amb:0.66, diff:0.38, gloss:0.45, bodyScale:0.845,
+  eyeStyle:'spec', eyeColor:[0.105,0.135,0.205], pupilR:0, specR:0.040,
+  eyeR:0.122, eyeH:0.045, eyeX:0.262, eyeY:0.240,
+  faceZ:0.876, mouthR:0.170, mouthTube:0.038, mouthY:-0.230, mouthThick:0.05,
+  mouthMode:'deep', smileBoost:0.00, faces:FACE_NEW,
+  blushColor:[1,0.60,0.66],
+  blushMul:1.00, restBlush:0.00, blushAlpha:0.62, blushBlend:'alpha', blushSize:0.48, blushX:0.400, blushY:-0.142,
+  mouthStyle:'arc',
+  ears:false, earX:0.360, earY:0.700, earZ:0.360, earH:0.330, earW:0.155, earFlat:0.36, earTilt:0.24, earShade:0.86,
+  bubbleX:0.085, bubbleY:-0.030, bubbleR:0.085,
+  bubbleColor:[0.105,0.135,0.205], bubblePow:3.0, bubbleShine:26, bubbleInner:0.10,
+  outline:0.000, outlineColor:[0.085,0.085,0.115],
+  rimMode:'dark', rimGain:1.00, rimPow:5.6,
+};
+
+/* --- 猫耳球：同一颗果冻球，加一对耳朵和 ω 嘴 ---
+   耳朵是这张表里唯一"长出来"的几何，也是可爱的最大单笔加成：
+   圆的东西加一对尖角，读出来的立刻是动物而不是物件。 */
+const P_KITTY = {
+  key:'kitty', label:'猫耳球', tag:'果冻球 + 一对耳朵 + ω 嘴',
+  bodyBase:[0.055,0.072,0.130], tint:0.62, albedoMul:0.88, grad:0.60,
+  amb:0.66, diff:0.55, gloss:0.70, bodyScale:0.885,
+  eyeStyle:'pupil', eyeColor:[1,1,1], pupilR:0.070, specR:0.024,
+  eyeR:0.135, eyeH:0.050, eyeX:0.262, eyeY:0.175,
+  faceZ:0.876, mouthR:0.120, mouthTube:0.038, mouthY:-0.232, mouthThick:0.10,
+  mouthMode:'mood', smileBoost:0.00, faces:FACE_NEW,
+  blushColor:[1,0.42,0.55],
+  blushMul:1.00, restBlush:0.00, blushAlpha:0.85, blushBlend:'add',
+  blushSize:0.44, blushX:0.400, blushY:-0.145,
+  mouthStyle:'cat',
+  ears:true, earX:0.345, earY:0.690, earZ:0.300, earH:0.340,
+  earW:0.165, earFlat:0.34, earTilt:0.26, earShade:0.84,
+  bubbleX:0.085, bubbleY:-0.030, bubbleR:0.085,
+  bubbleColor:[0.105,0.135,0.205], bubblePow:3.0, bubbleShine:26, bubbleInner:0.10,
+  outline:0.000, outlineColor:[0.085,0.085,0.115],
+  rimMode:'glow', rimGain:1.15, rimPow:2.6,
+};
+
+/* --- 麻薯球：哑光白团子。可爱来自"软"，不来自"亮" ---
+   高光降到 0.08 —— 有高光就变成塑料球，没有才像糯米。眼睛是这批里最大的，
+   瞳孔吃掉眼宽 68%，两颗眼几乎贴在一起，嘴巴缩成一个小弧。 */
+const P_MOCHI = {
+  key:'mochi', label:'麻薯球', tag:'哑光糯米团 · 最大的一双眼睛 · 一块大软腮红',
+  bodyBase:[0.985,0.968,0.940], tint:0.38, albedoMul:0.90, grad:0.32,
+  amb:0.76, diff:0.26, gloss:0.08, bodyScale:0.885,
+  eyeStyle:'spec', eyeColor:[0.125,0.140,0.195], pupilR:0.000, specR:0.052,
+  eyeR:0.148, eyeH:0.040, eyeX:0.246, eyeY:0.186,
+  faceZ:0.876, mouthR:0.065, mouthTube:0.026, mouthY:-0.205, mouthThick:0.00,
+  mouthMode:'deep', smileBoost:0.00, faces:FACE_NEW,
+  blushColor:[1,0.60,0.66],
+  blushMul:1.00, restBlush:0.00, blushAlpha:0.55, blushBlend:'alpha',
+  blushSize:0.62, blushX:0.360, blushY:-0.150,
+  mouthStyle:'arc',
+  ears:false, earX:0.360, earY:0.700, earZ:0.360, earH:0.330,
+  earW:0.155, earFlat:0.36, earTilt:0.24, earShade:0.86,
+  bubbleX:0.085, bubbleY:-0.030, bubbleR:0.085,
+  bubbleColor:[0.105,0.135,0.205], bubblePow:3.0, bubbleShine:26, bubbleInner:0.10,
+  outline:0.000, outlineColor:[0.085,0.085,0.115],
+  rimMode:'dark', rimGain:0.55, rimPow:4.5,
+};
+
+/* --- 贴纸球：品牌吉祥物的做法 ---
+   没有渐变、没有高光、没有瞳孔高光点，只有一块饱和的平色加一条脆的深描边。
+   描边不是菲涅尔光晕，是"先画一圈放大的实心暗球、再把身体压上去"——
+   光晕是软的，贴纸要的是硬的。 */
+const P_STICKER = {
+  key:'sticker', label:'贴纸球', tag:'纯平色 + 一条脆的硬描边 · 吉祥物路线',
+  bodyBase:[0.175,0.140,0.320], tint:0.78, albedoMul:1.00, grad:0.18,
+  amb:0.94, diff:0.10, gloss:0.00, bodyScale:0.845,
+  eyeStyle:'pupil', eyeColor:[1,1,1], pupilR:0.062, specR:0.024,
+  eyeR:0.132, eyeH:0.046, eyeX:0.258, eyeY:0.176,
+  faceZ:0.876, mouthR:0.150, mouthTube:0.038, mouthY:-0.232, mouthThick:0.08,
+  mouthMode:'deep', smileBoost:0.00, faces:FACE_NEW,
+  blushColor:[1,0.42,0.55],
+  blushMul:1.00, restBlush:0.00, blushAlpha:0.52, blushBlend:'alpha',
+  blushSize:0.46, blushX:0.395, blushY:-0.150,
+  mouthStyle:'arc',
+  ears:false, earX:0.360, earY:0.700, earZ:0.360, earH:0.330,
+  earW:0.155, earFlat:0.36, earTilt:0.24, earShade:0.86,
+  bubbleX:0.085, bubbleY:-0.030, bubbleR:0.085,
+  bubbleColor:[0.105,0.135,0.205], bubblePow:3.0, bubbleShine:26, bubbleInner:0.10,
+  outline:0.055, outlineColor:[0.070,0.070,0.095],
+  rimMode:'dark', rimGain:0.00, rimPow:6.0,
+};
+
+/* --- 角落球：可爱来自"不闹" ---
+   它大部分时间就蹲在屏幕角上，所以给它一个最不起眼的脸：哑光、小一圈的眼、
+   淡到几乎没有的描边、几乎没有光。参考的是角落生物那一类——
+   不靠大和亮，靠"缩着"。 */
+const P_SUMIKKO = {
+  key:'sumikko', label:'角落球', tag:'哑光 · 小一圈的眼 · 几乎不发光',
+  bodyBase:[0.135,0.130,0.155], tint:0.30, albedoMul:0.86, grad:0.50,
+  amb:0.68, diff:0.45, gloss:0.10, bodyScale:0.885,
+  eyeStyle:'pupil', eyeColor:[0.860,0.850,0.815], pupilR:0.048, specR:0.017,
+  eyeR:0.098, eyeH:0.048, eyeX:0.196, eyeY:0.168,
+  faceZ:0.876, mouthR:0.062, mouthTube:0.026, mouthY:-0.198, mouthThick:0.00,
+  mouthMode:'mood', smileBoost:0.00, faces:FACE_NEW,
+  blushColor:[1,0.42,0.55],
+  blushMul:1.00, restBlush:0.00, blushAlpha:0.45, blushBlend:'add',
+  blushSize:0.42, blushX:0.330, blushY:-0.132,
+  mouthStyle:'arc',
+  ears:false, earX:0.360, earY:0.700, earZ:0.360, earH:0.330,
+  earW:0.155, earFlat:0.36, earTilt:0.24, earShade:0.86,
+  bubbleX:0.085, bubbleY:-0.030, bubbleR:0.085,
+  bubbleColor:[0.105,0.135,0.205], bubblePow:3.0, bubbleShine:26, bubbleInner:0.10,
+  outline:0.000, outlineColor:[0.085,0.085,0.115],
+  rimMode:'dark', rimGain:0.45, rimPow:6.0,
+};
+
+/* =========================================================================
+   5b. 性格 —— 这一批真正的东西
+   =========================================================================
+   上一批（小恶魔/独眼怪/骷髅/熔岩/史莱姆）被否掉，原因不在颜色，在**没有一个
+   部件在做表情**。翻一遍渲染管线就知道：`brow` 这一个数从头到尾只干了两件事 ——
+   把眼球转 0.4 弧度、上下挪一点点。屏幕上从来没有画过一根眉毛。
+   于是不管把身体调成多红、多油、多亮，脸还是同一张脸；而一张不变的脸，换什么
+   颜色都只是"同一只球穿了不同的衣服"。
+
+   这一批补上三个**部件**，邪恶才有地方住：
+
+     * **眉**（brow）—— 一块可以随手转角的楔子。所有信号里最强的一条。
+     * **牙**（fang）—— 同一块楔子缩到牙那么大。一张脸只要露一颗牙，读出来就是
+       "它想咬你"，而这件事跟颜色、跟身体亮不亮一点关系都没有。
+     * **张嘴**（open mouth）—— 一块半圆盘。半环永远是一根**线**，管径加粗也只
+       读成"嘴很厚"；要"嘴张着"就必须有一个面。
+
+   三条一起用，就有了这一页的规矩 ——
+
+       可爱住在**骨头**上（球径、眼大小、眼高低、眼距、腮红），一个数都不动；
+       邪恶住在**眉、眼、嘴**这三个件上。
+       颜色只回答"它是什么物种"，不回答"它坏不坏"。
+
+   所以下面五套新的骨架**全部等于现在装机那颗奶油球**：眼宽 0.122、眼睛高
+   0.240、眼距 0.262、腮红 0.48 —— 一个都没改。变的全是上面那三个件。
+   ========================================================================= */
+
+/* 新增旋钮的**中性值**。
+   全塞在这儿是为了让上面那批老预设（P_NOW/P_JELLY/P_CREAM…）一个字都不用改
+   —— Ball.setParams 会把这份默认值合进去。 */
+const LOOK_DEFAULTS = {
+  // 颜色：accent 是"这套皮肤自己的颜色"，accentMix=1 时完全盖掉心情色。
+  // 0.4~0.6 是"它有自己的一层色，但还是会随心情变"。
+  accent:null, accentMix:1.00,
+
+  // 眉：一块楔子。browTilt 正 = 内低外高（愤怒），负 = 内高外低（委屈）。
+  brow:0, browLen:0.145, browThick:0.034, browDepth:0.030,
+  browTilt:0.42, browSkew:0.00, browX:0.00, browY:0.180,
+  browDeep:0.32, browColor:null, browMood:0.55,
+
+  // 眼：eyeSquash 挤扁眼缝，eyeTilt 正 = 内眼角往下压（凶）。
+  eyeSquash:1.00, eyeTilt:0.00, pupilOffX:0.00, pupilOffY:0.00,
+
+  // 牙：fang = 几颗。fangFlip=0 尖朝上（虎牙），1 朝下（獠牙）。
+  fang:0, fangLen:0.052, fangThick:0.030, fangX:0.062, fangY:0.004,
+  fangFlip:0, fangColor:[0.985,0.985,0.965],
+
+  // 锯齿牙：张嘴时上下各一排。teethRows=1 只有上排，2 = 上下都有。
+  teeth:0, teethLen:0.032, teethThick:0.026, teethSpan:0.62, teethRows:1,
+
+  // 张嘴倍数：只对 mouthStyle==='open' 生效。意义是**高/宽比**。
+  gawp:0.62,
+
+  // 蒸汽：头顶两缕，复用鼻涕泡那个水滴着色器（白色）。
+  // steamY 必须**高过球顶**（bodyScale 0.845）：低于它就画在额头上了。
+  // 这一项是"看着像热气"和"看着像额头上贴了两块白斑"的全部区别。
+  steam:0, steamY:0.90, steamR:0.052,
+
+  // 怒符：四根刺的爆点，画在太阳穴上。
+  vein:0, veinX:0.315, veinY:0.400, veinLen:0.055, veinThick:0.024,
+
+  // 嘴角的小勾：坏笑全靠它把嘴角往上带。
+  ticks:0, tickLen:0.052, tickThick:0.026,
+
+  mouthStyle:'arc', demoMood:'CALM',
+};
+
+/* ---------------------------------------------------------------------
+   ① 小恶魔 ★ 主角 —— "很邪恶，但也很可爱"这句话的答案
+   --------------------------------------------------------------------- */
+/* 它坏在哪：眉（内低外高 0.46 弧度，粗 0.032，离眼睛只差 0.02）、一颗向上的
+   虎牙、以及嘴角的两个小勾。
+   它可爱在哪：**骨架就是奶油球**。眼宽 0.122 没动、眼睛还是那么低、腮红 0.5
+   还在、身体还是圆的、还长了一对短短的圆角。
+   所以它读出来是一颗"表情很坏的奶油球"，不是一颗"红色的怪球"。
+   颜色刻意**不用血红**：红是物种色，不是邪恶开关。血红身体在浅色 App 上会糊成
+   一团深色，而且就没有"从眉毛底下往上看"那个对比了。身体近黑紫 + 暖红描边光
+   —— 像一块炭，红只出现在它发光的地方。 */
+const P_IMP = {
+  key:'imp', label:'小恶魔 ★', tag:'斜眉 + 虎牙 + 坏笑 · 骨架和奶油球一样',
+  star:true, demoMood:'CALM',
+  accent:[1.00,0.34,0.26], accentMix:0.42,
+  bodyBase:[0.085,0.058,0.092], tint:0.58, albedoMul:1.00, grad:0.58,
+  amb:0.60, diff:0.50, gloss:0.88, bodyScale:0.845,
+  eyeStyle:'pupil', eyeColor:[1.00,0.975,0.940], pupilR:0.052, specR:0.019,
+  eyeR:0.122, eyeH:0.045, eyeX:0.262, eyeY:0.240,
+  faceZ:0.876, mouthR:0.185, mouthTube:0.036, mouthY:-0.238, mouthThick:0.03,
+  mouthMode:'deep', smileBoost:0.22, faces:FACE_NEW, mouthStyle:'arc',
+  // 眉：压到几乎贴着内眼角
+  brow:1, browTilt:0.46, browSkew:0.10, browLen:0.150, browThick:0.032,
+  browY:0.176, browDeep:0.28, browMood:0.45,
+  // 眼：跟着眉往里下角斜一点；瞳孔往上挪 —— "从眉毛底下往上看"
+  eyeSquash:0.86, eyeTilt:0.10, pupilOffY:0.16, pupilOffX:0.04,
+  // 牙：一颗，在嘴的右侧
+  fang:1, fangLen:0.050, fangThick:0.028, fangX:0.072, fangY:0.006,
+  fangFlip:0, ticks:1, tickLen:0.046, tickThick:0.024,
+  // 角：复用猫耳那个锥体，短、圆、往外撇
+  ears:true, earX:0.190, earY:0.670, earZ:0.280, earH:0.300,
+  earW:0.140, earFlat:0.66, earTilt:0.42, earShade:0.58,
+  blushColor:[1.00,0.34,0.40], blushMul:1.00, restBlush:0.00, blushAlpha:0.80,
+  blushBlend:'add', blushSize:0.50, blushX:0.395, blushY:-0.150,
+  outline:0.000, outlineColor:[0.085,0.085,0.115],
+  rimMode:'glow', rimGain:1.40, rimPow:2.30,
+  bubbleX:0.085, bubbleY:-0.030, bubbleR:0.085,
+  bubbleColor:[1,1,1], bubblePow:3.0, bubbleShine:26, bubbleInner:0.10,
+};
+
+/* ---------------------------------------------------------------------
+   ② 暴躁球 —— 烈子那条路：脸红着发火
+   --------------------------------------------------------------------- */
+/* 暴躁不是一种"颜色"，是一种**眼和嘴的形状**，所以这套全部押在三个件上：
+   两撇压到底的粗眉（0.66 弧度，几乎连成一条）、把眼睛横向挤扁到 0.42、一张
+   **张开的嘴** + 上下各四颗锯齿牙；再加头顶两缕蒸汽、眼角一个怒符。
+   可爱靠的是那两块腮红**没有关掉**（0.80，全批最高）—— 这正是"怒念的烈子"
+   的全部秘密：一张脸如果连血色都气没了，那是恐怖片，不是可爱。
+   它还有自己的表情表 [FACE_GRUMPY]：同样 14 行，眉压得更死、眼缝更窄 ——
+   所以它在**每一个**心情下都带着脾气，而 TENSE / ANXIOUS 还是比 CALM 凶。 */
+const P_GRUMPY = {
+  key:'grumpy', label:'暴躁球', tag:'张嘴锯齿牙 + 头顶冒烟 + 怒符 · 腮红照开',
+  demoMood:'TENSE',
+  accent:[1.00,0.44,0.22], accentMix:0.45,
+  bodyBase:[0.150,0.122,0.128], tint:0.70, albedoMul:0.98, grad:0.52,
+  amb:0.66, diff:0.42, gloss:0.55, bodyScale:0.815,
+  eyeStyle:'pupil', eyeColor:[1.00,0.970,0.930], pupilR:0.086, specR:0.018,
+  eyeR:0.132, eyeH:0.010, eyeX:0.250, eyeY:0.252,
+  faceZ:0.876, mouthR:0.158, mouthTube:0.040, mouthY:-0.252, mouthThick:0.02,
+  mouthMode:'deep', smileBoost:0.00, faces:FACE_GRUMPY, mouthStyle:'open',
+  gawp:0.72,
+  brow:1, browTilt:0.66, browSkew:0.00, browLen:0.148, browThick:0.040,
+  browY:0.166, browDeep:0.24, browMood:0.25,
+  eyeSquash:0.42, eyeTilt:0.16, pupilOffY:-0.06,
+  teeth:4, teethLen:0.038, teethThick:0.027, teethSpan:0.58, teethRows:2,
+  steam:1.00, steamY:0.90, steamR:0.050,
+  vein:1.00, veinX:0.318, veinY:0.398, veinLen:0.050, veinThick:0.022,
+  ears:false, earX:0.360, earY:0.700, earZ:0.360, earH:0.330,
+  earW:0.155, earFlat:0.36, earTilt:0.24, earShade:0.86,
+  blushColor:[1.00,0.28,0.26], blushMul:1.00, restBlush:0.00, blushAlpha:0.80,
+  blushBlend:'add', blushSize:0.58, blushX:0.372, blushY:-0.158,
+  outline:0.000, outlineColor:[0.085,0.085,0.115],
+  rimMode:'glow', rimGain:1.30, rimPow:2.60,
+  bubbleX:0.085, bubbleY:-0.030, bubbleR:0.085,
+  bubbleColor:[1,1,1], bubblePow:3.0, bubbleShine:26, bubbleInner:0.10,
+};
+
+/* ---------------------------------------------------------------------
+   ③ 腹黑球 —— 最省的一套，也是最"不怀好意"的一套
+   --------------------------------------------------------------------- */
+/* 它没有獠牙、没有角、没有蒸汽，只有**不对称**：一条眉挑起来、另一条压下去
+   （browSkew 0.62 —— 左右两条眉的角度差 1.24 弧度），一只眼半闭，嘴角单边翘，
+   瞳孔偏到眼角（看旁边，不看你）。
+   不对称之所以读作"心机"而不是"画歪了"：一条脸上的所有其他元素都是严格左右
+   对称的，唯一的例外就是有意为之。 */
+const P_SMUG = {
+  key:'smug', label:'腹黑球', tag:'一高一低的眉 + 单边翘的嘴 · 只有不对称',
+  demoMood:'CURIOUS',
+  accent:[0.74,0.64,1.00], accentMix:0.42,
+  bodyBase:[0.118,0.102,0.158], tint:0.60, albedoMul:0.98, grad:0.56,
+  amb:0.62, diff:0.48, gloss:0.72, bodyScale:0.845,
+  eyeStyle:'pupil', eyeColor:[0.980,0.975,1.000], pupilR:0.058, specR:0.020,
+  eyeR:0.126, eyeH:0.040, eyeX:0.268, eyeY:0.248,
+  faceZ:0.876, mouthR:0.160, mouthTube:0.034, mouthY:-0.244, mouthThick:0.04,
+  mouthMode:'deep', smileBoost:0.30, faces:FACE_NEW, mouthStyle:'arc',
+  brow:1, browTilt:0.20, browSkew:0.62, browLen:0.140, browThick:0.030,
+  browY:0.178, browDeep:0.32, browMood:0.30,
+  eyeSquash:0.74, eyeTilt:0.00, pupilOffX:0.34, pupilOffY:-0.08,
+  ticks:1, tickLen:0.050, tickThick:0.024,
+  ears:false, earX:0.360, earY:0.700, earZ:0.360, earH:0.330,
+  earW:0.155, earFlat:0.36, earTilt:0.24, earShade:0.86,
+  blushColor:[0.80,0.42,1.00], blushMul:1.00, restBlush:0.00, blushAlpha:0.70,
+  blushBlend:'add', blushSize:0.46, blushX:0.400, blushY:-0.148,
+  outline:0.000, outlineColor:[0.085,0.085,0.115],
+  rimMode:'glow', rimGain:1.05, rimPow:2.80,
+  bubbleX:0.085, bubbleY:-0.030, bubbleR:0.085,
+  bubbleColor:[1,1,1], bubblePow:3.0, bubbleShine:26, bubbleInner:0.10,
+};
+
+/* ---------------------------------------------------------------------
+   ④ 吸血鬼球 —— 牙在外面，血在脸上
+   --------------------------------------------------------------------- */
+/* 两颗从上唇**垂下来**的獠牙（fangFlip 1），加上一张苍白身体上的两块红腮 ——
+   苍白给了腮红一个存在的理由，腮红又把可爱度还回来。
+   眉只是浅浅两撇（0.22）：它不凶，它只是"有教养地坏"。
+   描边走**深红**而不是发光：深色描边压在浅色身体上，剪影是硬的，像一张贴纸。 */
+const P_VAMP = {
+  key:'vamp', label:'吸血鬼球', tag:'两颗下垂的獠牙 + 苍白身体 + 一点血色',
+  demoMood:'CALM',
+  accent:[0.62,0.06,0.14], accentMix:0.70,
+  bodyBase:[0.930,0.910,0.925], tint:0.30, albedoMul:0.96, grad:0.40,
+  amb:0.70, diff:0.30, gloss:0.78, bodyScale:0.845,
+  eyeStyle:'pupil', eyeColor:[0.600,0.055,0.105], pupilR:0.062, specR:0.020,
+  eyeR:0.126, eyeH:0.042, eyeX:0.262, eyeY:0.238,
+  faceZ:0.876, mouthR:0.165, mouthTube:0.032, mouthY:-0.236, mouthThick:0.03,
+  mouthMode:'deep', smileBoost:0.10, faces:FACE_NEW, mouthStyle:'arc',
+  brow:1, browTilt:0.22, browSkew:0.00, browLen:0.145, browThick:0.028,
+  browY:0.178, browDeep:0.30, browMood:0.40,
+  eyeSquash:0.94, eyeTilt:0.05, pupilOffY:0.05,
+  fang:2, fangLen:0.062, fangThick:0.030, fangX:0.074, fangY:-0.004, fangFlip:1,
+  ears:false, earX:0.360, earY:0.700, earZ:0.360, earH:0.330,
+  earW:0.155, earFlat:0.36, earTilt:0.24, earShade:0.86,
+  blushColor:[1.00,0.16,0.22], blushMul:1.00, restBlush:0.00, blushAlpha:0.62,
+  blushBlend:'alpha', blushSize:0.46, blushX:0.395, blushY:-0.150,
+  outline:0.000, outlineColor:[0.085,0.085,0.115],
+  rimMode:'dark', rimGain:1.10, rimPow:5.00,
+  bubbleX:0.085, bubbleY:-0.030, bubbleR:0.085,
+  bubbleColor:[0.600,0.055,0.105], bubblePow:3.0, bubbleShine:26, bubbleInner:0.10,
+};
+
+/* ---------------------------------------------------------------------
+   ⑤ 猫妖 —— 用最可爱的一张脸，干最坏的事
+   --------------------------------------------------------------------- */
+/* 这一套把可爱度顶到最大（全批最大的一双眼睛，眼宽 0.145），然后让它坏：
+   猫耳**往后压**（earZ 0.20 / earTilt 0.36，耳朵一后压就是要扑人了）、ω 嘴的
+   两个凹口里各塞一颗向上的小虎牙、眉只有 0.26 的浅斜。
+   它说明的是这批设计里最反直觉的一条：**可爱度是弹药，不是跟邪恶抢位置的东西**。
+   眼睛越大、身体越圆，那两颗牙就越能咬到人。 */
+const P_NEKO = {
+  key:'neko', label:'猫妖', tag:'最大的一双眼睛 + 后压的猫耳 + 两颗小虎牙',
+  demoMood:'HAPPY',
+  accent:[0.64,0.86,1.00], accentMix:0.38,
+  bodyBase:[0.118,0.118,0.168], tint:0.58, albedoMul:0.98, grad:0.56,
+  amb:0.62, diff:0.48, gloss:0.82, bodyScale:0.845,
+  eyeStyle:'pupil', eyeColor:[0.990,1.000,0.990], pupilR:0.058, specR:0.024,
+  eyeR:0.145, eyeH:0.030, eyeX:0.252, eyeY:0.212,
+  faceZ:0.876, mouthR:0.120, mouthTube:0.034, mouthY:-0.222, mouthThick:0.09,
+  mouthMode:'deep', smileBoost:0.20, faces:FACE_NEW, mouthStyle:'cat',
+  brow:1, browTilt:0.26, browSkew:0.05, browLen:0.135, browThick:0.028,
+  browY:0.176, browDeep:0.32, browMood:0.50,
+  eyeSquash:1.00, eyeTilt:0.06, pupilOffY:0.04,
+  fang:2, fangLen:0.040, fangThick:0.024, fangX:0.064, fangY:-0.002, fangFlip:0,
+  ears:true, earX:0.330, earY:0.640, earZ:0.200, earH:0.330,
+  earW:0.170, earFlat:0.32, earTilt:0.36, earShade:0.86,
+  blushColor:[1.00,0.56,0.64], blushMul:1.00, restBlush:0.00, blushAlpha:0.66,
+  blushBlend:'alpha', blushSize:0.50, blushX:0.392, blushY:-0.146,
+  outline:0.000, outlineColor:[0.085,0.085,0.115],
+  rimMode:'glow', rimGain:1.15, rimPow:2.60,
+  bubbleX:0.085, bubbleY:-0.030, bubbleR:0.085,
+  bubbleColor:[1,1,1], bubblePow:3.0, bubbleShine:26, bubbleInner:0.10,
+};
+
+/* --- ⑥ 奶油球 · 已经在你手上跑着，留作基线 ---
+   六格里唯一"零个新部件"的一张：没有眉、没有牙、嘴是那条弧。
+   把它放在最后，是为了让上面五套的差别看得见出处：同一具骨架，
+   加眉 / 加牙 / 换嘴，各自多出多少"坏"。 */
+const P_CREAM_BASE = Object.assign({}, P_CREAM, {
+  label:'奶油球 · 已落地', tag:'基线：没有眉、没有牙、嘴是一条弧',
+  demoMood:'CALM', star:false,
+});
+
+const PRESETS = [P_IMP, P_GRUMPY, P_SMUG, P_VAMP, P_NEKO, P_CREAM_BASE];
+const clone = o => JSON.parse(JSON.stringify(o));
+
+/* =========================================================================
+   6. Shader
+   ========================================================================= */
+const VS_SOLID = `
+  uniform mat4 uMVP;
+  attribute vec3 aPos;
+  void main(){ gl_Position = uMVP * vec4(aPos,1.0); }
+`;
+const FS_SOLID = `
+  precision mediump float;
+  uniform vec3 uColor;
+  uniform float uAlpha;
+  void main(){ gl_FragColor = vec4(uColor, uAlpha); }
+`;
+
+/* 身体：顶光渐变 + 主光 + 镜面高光。这是"果冻感"的全部来源。 */
+const VS_BODY = `
+  uniform mat4 uMVP; uniform mat4 uMV;
+  attribute vec3 aPos; attribute vec3 aNormal;
+  varying vec3 vN; varying vec3 vP;
+  void main(){
+    vN = normalize(mat3(uMV) * aNormal);
+    vec4 p = uMV * vec4(aPos,1.0);
+    vP = p.xyz;
+    gl_Position = uMVP * vec4(aPos,1.0);
+  }
+`;
+const FS_BODY = `
+  precision mediump float;
+  uniform vec3 uColor;
+  uniform float uAlpha;
+  uniform float uGrad;
+  uniform float uAmb;
+  uniform float uDiff;
+  uniform float uGloss;
+  varying vec3 vN; varying vec3 vP;
+  void main(){
+    vec3 n = normalize(vN);
+    vec3 V = normalize(-vP);
+    float vert = n.y * 0.5 + 0.5;
+    vec3 base = uColor * mix(1.0, mix(0.70, 1.14, vert), uGrad);
+    // 主光偏正上方。高光点落在额头 —— 压在眼睛上等于把眼睛的对比度
+    // 吃掉一半，而且 0.95 的强度会在 80dp 的球上糊出一块 30px 的白斑。
+    vec3 L = normalize(vec3(-0.48, 0.85, 0.20));
+    float diff = max(0.0, dot(n, L));
+    vec3 lit = base * (uAmb + uDiff * diff);
+    vec3 H = normalize(L + V);
+    float spec = pow(max(0.0, dot(n, H)), 90.0) * uGloss;
+    float edge = pow(1.0 - max(0.0, dot(n, V)), 3.0) * uGloss * 0.26;
+    gl_FragColor = vec4(lit + vec3(spec) + uColor * edge, uAlpha);
+  }
+`;
+
+/* 描边 / 光晕。uPow 小 → 柔和发光；大 → 紧的深色轮廓。
+   这一段必须与 EmotionBallRenderer.RIM_FS **逐字相同** ——
+   上一版这里少写了一条扫描光带，结果真机上出现了一条实验室永远看不见的
+   滚动色带，用户先发现。实验室的价值全在于它和真机一样。 */
+const VS_RIM = `
+  uniform mat4 uMVP; uniform mat4 uMV;
+  attribute vec3 aPos; attribute vec3 aNormal;
+  varying vec3 vN; varying vec3 vP; varying float vY;
+  void main(){
+    vN = normalize(mat3(uMV) * aNormal);
+    vec4 p = uMV * vec4(aPos,1.0);
+    vP = p.xyz; vY = aPos.y;
+    gl_Position = uMVP * vec4(aPos,1.0);
+  }
+`;
+const FS_RIM = `
+  precision mediump float;
+  uniform vec3 uColor;
+  uniform float uIntensity;
+  uniform float uScan;
+  uniform float uScanY;
+  uniform float uPow;
+  uniform float uCap;
+  varying vec3 vN; varying vec3 vP; varying float vY;
+  void main(){
+    float f = pow(1.0 - abs(dot(normalize(vN), normalize(-vP))), uPow);
+    float d = vY - uScanY;
+    float slope = d > 0.0 ? 7.5 : 4.2;
+    float band = pow(max(0.0, 1.0 - abs(d) * slope), 3.0);
+    gl_FragColor = vec4(uColor, min(f * uIntensity + band * uScan, uCap));
+  }
+`;
+
+const VS_PTS = `
+  uniform mat4 uMVP; uniform mat4 uMV;
+  uniform float uSize; uniform float uPointFactor;
+  attribute vec3 aPos; attribute vec3 aColor;
+  varying vec3 vColor;
+  void main(){
+    vec4 mvpos = uMV * vec4(aPos,1.0);
+    gl_Position = uMVP * vec4(aPos,1.0);
+    gl_PointSize = uSize * uPointFactor / -mvpos.z;
+    vColor = aColor;
+  }
+`;
+const FS_PTS = `
+  precision mediump float;
+  uniform float uAlpha;
+  varying vec3 vColor;
+  void main(){
+    vec2 c = gl_PointCoord - 0.5;
+    float d = length(c);
+    float a = smoothstep(0.5, 0.0, d);
+    gl_FragColor = vec4(vColor, a * uAlpha);
+  }
+`;
+
+/* =========================================================================
+   7. EmotionState 移植
+   ========================================================================= */
+const ACTION_SECONDS = {NONE:0, HOP:0.52, NOD:0.42, SHAKE:0.5, POP:0.46, RECOIL:0.55,
+                        STRETCH:1.6, LOOK_AROUND:1.9, WIGGLE:1.1, BOUNCE:0.9};
+
+class State{
+  constructor(){
+    this.nowColor = FACE_OLD.CALM.color.slice();
+    this.eye=1; this.brow=0; this.smile=0.1; this.tilt=0; this.skew=0; this.jitter=0;
+    this.open=0; this.eyeArc=0; this.blush=0; this.spread=1; this.lid=1;
+    // 鼻涕泡：amount 是随表情淡入淡出，scale 是它自己的一呼一吸
+    this.bubble=0; this.bubbleScale=1; this.bubblePhase=0;
+    this.think=0; this.busy=0;
+    this.rotX=0; this.rotY=0; this.rotZ=0; this.breathe=1;
+    this.breatheDepth=0.022; this.scaleX=1; this.scaleY=1; this.hopY=0;
+    this.eyeOffX=0; this.eyeOffY=0; this.eyeLRotZ=0; this.eyeRRotZ=0; this.eyeYScale=1;
+    this.mouthY=-0.34; this.mouthScaleY=0.16; this.mouthRotZ=Math.PI;
+    this.blinkNext=2.4; this.blinkLeft=0;
+    // 蒸汽 / 怒符 / 眉的小抖 —— 三个"活着的"相位。静止的怒符看起来像贴纸，
+    // 会跳一下的才像在发火。
+    this.steamPhase=0; this.veinBeat=0; this.browTwitch=0; this.t=0;
+    // 扫描光带：一条横线从下往上扫，一轮约 5.3 秒。think/listen 会让它变明显。
+    this.scanAngle=0; this.scanY=-2; this.scan=0; this.listen=0;
+    this.action='NONE'; this.actionT=0; this.actionDur=0;
+  }
+  trigger(a){ if(!a||a==='NONE') return; this.action=a; this.actionT=0; this.actionDur=ACTION_SECONDS[a]; }
+
+  tick(dt,t,mood,p){
+    const want=p.faces[mood], k=Math.min(1,dt*7);
+    this.eye+=(want.eye-this.eye)*k;
+    this.brow+=(want.brow-this.brow)*k;
+    this.smile+=(want.smile-this.smile)*k;
+    this.tilt+=(want.tilt-this.tilt)*k;
+    this.skew+=(want.skew-this.skew)*k;
+    this.jitter+=(want.jitter-this.jitter)*Math.min(1,dt*2.4);
+    this.eyeArc+=(want.eyeArc-this.eyeArc)*k;
+    this.blush+=(want.blush-this.blush)*k;
+    this.spread+=(want.spread-this.spread)*Math.min(1,dt*3.5);
+    for(let i=0;i<3;i++) this.nowColor[i]+=(want.color[i]-this.nowColor[i])*k;
+
+    this.think+=(((mood==='THINKING'||mood==='SEARCHING')?1:0)-this.think)*Math.min(1,dt*2.2);
+    const th=this.think;
+    this.busy=th;
+
+    // listen 在真机上是语音管线给的；这里用 LISTENING 表情近似
+    this.listen += (((mood==='LISTENING')?1:0)-this.listen)*Math.min(1,dt*3.4);
+    this.scanAngle += dt*(0.19 + th*0.55);
+    this.scanY = -1.35 + (this.scanAngle - Math.floor(this.scanAngle))*2.7;
+    this.scan = 0.08 + th*0.5 + this.listen*0.42 + this.open*0.12;
+
+    const gaze = th*(Math.sin(t*0.9)+Math.sin(t*1.31)*0.5);
+    const gazeY= th*(Math.sin(t*0.73)*0.6+Math.sin(t*1.07)*0.35);
+    const jx=(Math.sin(t*23.7)+Math.sin(t*37.1)*0.6)*this.jitter;
+    const jy=(Math.sin(t*29.3)+Math.sin(t*41.7)*0.6)*this.jitter;
+
+    const talk = (mood==='SPEAKING') ? 0.34+Math.sin(t*17)*0.16+Math.sin(t*29)*0.09 : want.gape;
+    this.open+=(Math.max(0,talk)-this.open)*Math.min(1,dt*22);
+
+    // 眨眼是"给睁着的眼睛合上眼皮"。屏幕上那只眼睛已经是 `^ ^` 弧的时候
+    // （eyeArc ≥ ARC_EYE_AT）没有眼皮可合，眨一下只是把弧抽动一下 ——
+    // 睡着的球每三秒抖一次就是这么来的。
+    const eyeShut=this.eyeArc>=ARC_EYE_AT;
+    this.blinkNext-=dt;
+    if(this.blinkNext<=0){
+      if(eyeShut){
+        // 顺带取消正在进行的那一次，并稍后重试：醒来后第一次眨眼
+        // 不用等满一整轮
+        this.blinkLeft=0; this.blinkNext=0.35;
+      } else {
+        this.blinkLeft=0.12;
+        const base=(this.listen>0.5?1.8:3.2)+Math.random()*2.6;
+        this.blinkNext=(base*(1+th*0.9))/(1+this.jitter*1.6);
+      }
+    }
+    let lid=1;
+    if(this.blinkLeft>0){ this.blinkLeft-=dt; lid=Math.abs(this.blinkLeft/0.06-1); }
+    this.lid=lid;
+
+    let sqx=0,sqy=0,hop=0,actRX=0,actRY=0;
+    if(this.action!=='NONE'){
+      this.actionT+=dt;
+      const pp=Math.min(1,this.actionT/this.actionDur);
+      const arch=Math.sin(pp*Math.PI);
+      switch(this.action){
+        case 'HOP':{ hop=arch*0.22;
+          const c=Math.max(0,1-pp/0.2)+Math.max(0,(pp-0.8)/0.2);
+          sqx=c*0.13; sqy=c*-0.17; break; }
+        case 'NOD': actRX=Math.sin(pp*2*Math.PI)*0.26; break;
+        case 'SHAKE': actRY=Math.sin(pp*3*Math.PI)*0.20; break;
+        case 'POP': sqx=arch*0.15; sqy=arch*0.15; hop=arch*0.06; break;
+        case 'RECOIL': sqx=arch*0.17; sqy=arch*-0.20; actRX=-arch*0.14; break;
+        case 'STRETCH':{ const e=Math.sin(pp*Math.PI);
+          sqx=-e*0.12; sqy=e*0.20; actRX=-e*0.08; break; }
+        case 'LOOK_AROUND': actRY=Math.sin(pp*2.5*Math.PI)*0.30; actRX=Math.sin(pp*1.25*Math.PI)*0.05; break;
+        case 'WIGGLE': actRY=Math.sin(pp*3*Math.PI)*0.14; break;
+        case 'BOUNCE':{ hop=Math.abs(Math.sin(pp*2*Math.PI))*0.09;
+          const c=Math.max(0,1-pp/0.15)+Math.max(0,(pp-0.85)/0.15);
+          sqx=c*0.07; sqy=c*-0.09; break; }
+      }
+      if(pp>=1) this.action='NONE';
+    }
+
+    this.breatheDepth+=(want.breath-this.breatheDepth)*Math.min(1,dt*3);
+    this.breathe=1+Math.sin(t*want.pulse)*this.breatheDepth+this.open*0.03;
+    this.scaleX=this.breathe*(1+sqx);
+    this.scaleY=this.breathe*(1+sqy);
+    this.hopY=hop;
+    this.rotY=Math.sin(t*0.22)*0.12+jx*0.012+gaze*0.09+actRY;
+    this.rotX=Math.sin(t*0.17)*0.06+jy*0.009-gazeY*0.05+actRX;
+    this.rotZ=this.tilt+th*Math.sin(t*0.51)*0.09;
+
+    const browR=this.brow+this.skew, browL=this.brow;
+    this.t=t;
+    // 眉和眼的位置。eyeTilt 是 look 自己的：正 = 内眼角往下压（凶），
+    // 和 brow 那 0.40 弧度叠加。眼神留白在这里：`gaze` 只在思考时才有，
+    // 所以"看旁边"这件事必须由 look 的 pupilOffX 去说。
+    this.eyeOffX=jx*0.014+gaze*0.075;
+    this.eyeOffY=-browL*0.06+gazeY*0.05;
+    this.eyeLRotZ=-browL*0.40 + p.eyeTilt;
+    this.eyeRRotZ= browR*0.40 - p.eyeTilt;
+
+    const sm=this.smile+p.smileBoost;
+    // eyeSquash：look 自己的挤眼倍数。捏扁眼缝是"凶"里最有效的一档 ——
+    // 它改的是**眼的形状**，而形状在 168dp 的窗口里比颜色活得久。
+    this.eyeYScale=Math.max(0.06, this.eye*this.lid*p.eyeSquash - sm*0.34);
+
+    // 三个相位。蒸汽慢（2.6s 一轮），怒符跳（0.55s/次，像心跳），
+    // 眉的小抖最快也最轻 —— 它只是让眉不像贴上去的。
+    this.steamPhase+=dt*0.62;
+    this.veinBeat +=dt*1.85;
+    this.browTwitch+=dt*1.35;
+
+    // 鼻涕泡。相位**故意不挂在呼吸上**：SLEEPING 的 pulse 是 0.45，
+    // 挂上去一轮 14 秒 —— 一个 14 秒不动的泡等于没有在动。
+    // 速率仍然跟着 pulse 走，"睡得越沉、泡越慢"这层关系还在。
+    this.bubble+=((want.bubble||0)-this.bubble)*Math.min(1,dt*2.2);
+    this.bubblePhase+=dt*(0.9+want.pulse*1.6);
+    this.bubbleScale=0.30+0.70*(0.5+0.5*Math.sin(this.bubblePhase));
+    this.mouthScaleY=0.16+this.open*1.5+Math.abs(sm)*0.5+p.mouthThick;
+    this.mouthY=p.mouthY+sm*0.06;
+    this.mouthRotZ=Math.PI+sm*0.9+this.skew*2.2;
+  }
+}
+
+/* =========================================================================
+   8. Ball
+   ========================================================================= */
+const CAM_Z=4.9, RIM=0.9;
+const EYE_LID_PIVOT=-0.125;
+/* 眼球胶囊在 z 上也有半径，瞳孔要画在它前面 */
+const EYE_FRONT=0.16;
+const EYE_ARC_SPAN=0.8*Math.PI, EYE_ARC_ROT_Z=Math.PI/2-EYE_ARC_SPAN/2, EYE_ARC_DROP=0.06;
+/* 超过这个值，屏幕上的眼睛就是那条 `^ ^` 弧，圆眼不是主角了。
+   两处共用：还要不要画瞳孔、还要不要眨眼。 */
+const ARC_EYE_AT=0.5;
+
+class Ball{
+  constructor(canvas,params){
+    this.cv=canvas;
+    this.gl=canvas.getContext('webgl',{alpha:true,antialias:true,premultipliedAlpha:true,depth:true});
+    if(!this.gl) throw new Error('这台机器没有 WebGL');
+    const gl=this.gl;
+    // 默认就停在 SLEEPING：这一页现在的主题是睡着那颗球
+    this.mood='SLEEPING';
+    this.st=new State();
+    this.autoFidget=true;
+
+    this.pSolid=new Prog(gl,VS_SOLID,FS_SOLID);
+/* 鼻涕泡。一个透明的水滴，不是一颗白球：
+     * 背面 discard —— 只留朝向相机的那半，否则前后面叠在一起，边缘会变成两倍厚；
+     * edge 是菲涅尔，在轮廓上收紧成一圈（水滴的边是折射，浅色球上用暗色边）；
+     * spec 是一个小高光点，落在左上，和球的主光同一个方向；
+     * uInner 是内部那层很薄的雾 —— 0 就完全透明。
+   uColor 按 look 给：浅色球用深色边，深色球用亮边。 */
+const VS_BUBBLE = `
+  uniform mat4 uMVP; uniform mat4 uMV;
+  attribute vec3 aPos; attribute vec3 aNormal;
+  varying vec3 vN; varying vec3 vP;
+  void main(){
+    vN = normalize(mat3(uMV) * aNormal);
+    vec4 mvpos = uMV * vec4(aPos,1.0);
+    vP = mvpos.xyz;
+    gl_Position = uMVP * vec4(aPos,1.0);
+  }
+`;
+const FS_BUBBLE = `
+  precision mediump float;
+  uniform vec3 uColor;
+  uniform float uAlpha;
+  uniform float uPow;
+  uniform float uShine;
+  uniform float uInner;
+  varying vec3 vN; varying vec3 vP;
+  void main(){
+    vec3 n = normalize(vN);
+    vec3 V = normalize(-vP);
+    float facing = dot(n, V);
+    if (facing <= 0.0) discard;
+    float edge = pow(1.0 - facing, uPow);
+    vec3 L = normalize(vec3(-0.45, 0.80, 0.60));
+    vec3 H = normalize(L + V);
+    float spec = pow(max(0.0, dot(n, H)), uShine);
+    float a = clamp(edge + uInner + spec, 0.0, 1.0);
+    vec3 c = mix(uColor, vec3(1.0), clamp(spec * 2.5, 0.0, 1.0));
+    gl_FragColor = vec4(c, a * uAlpha);
+  }
+`;
+
+    this.pBody =new Prog(gl,VS_BODY ,FS_BODY);
+    this.pRim  =new Prog(gl,VS_RIM  ,FS_RIM);
+    this.pBubble=new Prog(gl,VS_BUBBLE,FS_BUBBLE);
+    this.pPts  =new Prog(gl,VS_PTS  ,FS_PTS);
+
+    this.mBody=new GMesh(gl,icoSphere(4));
+    this.mRim =new GMesh(gl,uvSphere(40,28));
+    this.mDot =new GMesh(gl,icoSphere(2));
+    this.mArc =new GMesh(gl,torus(0.1,0.03,6,20,EYE_ARC_SPAN));
+    this.mBlush=new GPoints(gl,2);
+    // 性格那一批的三块新几何。三角形数和球体比可以忽略：
+    //   楔子 14 段（眉/尖牙/锯齿牙/嘴角勾/怒符都是它），半圆盘 28 段（张嘴）。
+    this.mWedge=new GMesh(gl,centeredCone(0.5,0.5,1.0,14));
+    this.mOpen =new GMesh(gl,halfDisc(1.0,28));
+
+    this.proj=M4.id(); this.view=M4.lookAt(0,0,CAM_Z,0,0,0,0,1,0);
+    this.pointFactor=400;
+    this.setParams(params);
+
+    this.fidNext=9+Math.random()*8;
+    this.resize();
+  }
+  setParams(params){
+    const changedSame = this.p && this.p.eyeR===params.eyeR &&
+      this.p.eyeH===params.eyeH && this.p.mouthR===params.mouthR &&
+      this.p.mouthTube===params.mouthTube;
+    // 合并中性值：老预设（P_NOW/P_JELLY/P_CREAM…）里没有性格那一批的字段，
+    // 靠这一行才不用去改它们。已给出的字段照旧覆盖默认值。
+    this.p=Object.assign({}, LOOK_DEFAULTS, clone(params));
+    if(!changedSame || !this.mEye){
+      this.mEye=new GMesh(this.gl,capsule(this.p.eyeR,this.p.eyeH,4,12));
+      this.mMouth=new GMesh(this.gl,torus(this.p.mouthR,this.p.mouthTube,8,24,Math.PI));
+      // 耳朵按预设的真实比例建，比例变了就重建 —— 这样绘制时只做旋转平移，
+      // 法线不会被非等比缩放搞坏（法线要的是逆转置，普通缩放是错的）。
+      this.mEar=new GMesh(this.gl,
+        cone(this.p.earW, this.p.earW*this.p.earFlat, this.p.earH, 20));
+    }
+  }
+  resize(){
+    const dpr=Math.min(2,window.devicePixelRatio||1);
+    const w=Math.max(1,Math.round(this.cv.clientWidth*dpr));
+    const h=Math.max(1,Math.round(this.cv.clientHeight*dpr));
+    if(this.cv.width!==w||this.cv.height!==h){ this.cv.width=w; this.cv.height=h; }
+    const gl=this.gl;
+    gl.viewport(0,0,this.cv.width,this.cv.height);
+    this.proj=M4.perspective(42,this.cv.width/this.cv.height,0.1,100);
+    this.pointFactor=this.cv.height/(2*Math.tan(42*Math.PI/180/2));
+  }
+
+  frame(dt,t){
+    const gl=this.gl, p=this.p;
+    this.st.tick(dt,t,this.mood,p);
+
+    if(this.autoFidget && this.st.action==='NONE'){
+      this.fidNext-=dt;
+      if(this.fidNext<=0){
+        const pool=['STRETCH','LOOK_AROUND','WIGGLE','BOUNCE','HOP'];
+        this.st.trigger(pool[Math.floor(Math.random()*pool.length)]);
+        this.fidNext=14+Math.random()*22;
+      }
+    }
+
+    gl.clearColor(0,0,0,0);
+    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+
+    let root=M4.id();
+    root=M4.translate(root,0,this.st.hopY,0);
+    root=M4.rotate(root,this.st.rotX*57.29578,1,0,0);
+    root=M4.rotate(root,this.st.rotY*57.29578,0,1,0);
+    root=M4.rotate(root,this.st.rotZ*57.29578,0,0,1);
+    root=M4.scale(root,this.st.scaleX,this.st.scaleY,this.st.scaleX);
+    this.root=root;
+    this.face=M4.translate(root,0,0,p.faceZ);
+
+    // 每套 look 可以带自己的**强调色**。表情表给的是"这一颗球现在什么心情"的
+    // 颜色（CALM 是淡蓝），身体上色、嘴、发光的描边、瞳孔都从它派生 —— 所以
+    // 想要一颗血红的恶魔，光调 look 是调不出来的：颜色不是 look 的。
+    //
+    // accentMix 是这一版的修正：上一版 accent 是全量覆盖，于是暴躁球在
+    // TENSE（橙）和 CALM（蓝）下长得一模一样 —— 等于把"心情"这条通道关了。
+    // 0.4 左右的意思是"它有自己的一层色，但心情还透得出来"。
+    // 落进 Kotlin 就是 BallLook 多一个可空 accent（不动一个字段也能活）。
+    let c=this.st.nowColor;
+    if(p.accent){
+      c=[c[0]+(p.accent[0]-c[0])*p.accentMix,
+         c[1]+(p.accent[1]-c[1])*p.accentMix,
+         c[2]+(p.accent[2]-c[2])*p.accentMix];
+    }
+
+    /* ---- 1. 身体 ---- */
+    const albedo=[0,0,0];
+    for(let i=0;i<3;i++) albedo[i]=(p.bodyBase[i]+(c[i]-p.bodyBase[i])*p.tint)*p.albedoMul;
+    this.albedo=albedo;
+
+    // 硬描边：先画一圈放大的实心暗球，再让身体压上去，中间留一条边。
+    // 关键在 depthMask(false) —— 描边球比身体大，整个包在身体外面，
+    // 如果它写了深度，后面画的身体深度更大，会被它自己那圈描边挡掉，
+    // 结果是一颗纯黑的球。不写深度，它就成了身体后面的一层衬底。
+    if(p.outline>0.001){
+      gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+      gl.depthMask(false);
+      const os=p.bodyScale+p.outline;
+      const om=M4.scale(root,os,os,os);
+      const omv=M4.mul(this.view,om), omvp=M4.mul(this.proj,omv);
+      this.pSolid.use();
+      gl.uniform1f(this.pSolid.u('uAlpha'),1);
+      gl.uniform3fv(this.pSolid.u('uColor'),p.outlineColor);
+      gl.uniformMatrix4fv(this.pSolid.u('uMVP'),false,omvp);
+      this.mBody.bind(this.pSolid.a('aPos'));
+      this.mBody.draw();
+      if(p.ears) this.drawEars(1+p.outline/p.earW, p.outlineColor);
+    }
+
+    let m=M4.scale(root,p.bodyScale,p.bodyScale,p.bodyScale);
+    let mv=M4.mul(this.view,m), mvp=M4.mul(this.proj,mv);
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(true);
+    this.pBody.use();
+    gl.uniformMatrix4fv(this.pBody.u('uMVP'),false,mvp);
+    gl.uniformMatrix4fv(this.pBody.u('uMV'),false,mv);
+    gl.uniform3fv(this.pBody.u('uColor'),albedo);
+    gl.uniform1f(this.pBody.u('uGrad'),p.grad);
+    gl.uniform1f(this.pBody.u('uAmb'),p.amb);
+    gl.uniform1f(this.pBody.u('uDiff'),p.diff);
+    gl.uniform1f(this.pBody.u('uGloss'),p.gloss);
+    gl.uniform1f(this.pBody.u('uAlpha'),1);
+    this.mBody.bind(this.pBody.a('aPos'),this.pBody.a('aNormal'));
+    this.mBody.draw();
+
+    if(p.ears) this.drawEars(1, null);
+
+    /* ---- 2. 五官 ---- */
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(true);
+    this.pSolid.use();
+    const aPos=this.pSolid.a('aPos');
+    // uAlpha 必须显式给 —— 片元是 vec4(uColor, uAlpha)，漏设就是 0，
+    // 混合后贡献为零，整条五官管线会静默地什么都不画。
+    gl.uniform1f(this.pSolid.u('uAlpha'),1);
+
+    const round=this.st.eyeYScale*(1-this.st.eyeArc);
+    const arc=this.st.eyeArc;
+    const eX=p.eyeX+this.st.eyeOffX, eY=p.eyeY+this.st.eyeOffY;
+    const pivotScale=round;
+
+    if(round>0.01){
+      for(const side of [-1,1]){
+        const rz = side<0 ? this.st.eyeLRotZ : this.st.eyeRRotZ;
+        this.faceElem(side*eX, eY, rz, round, 1, EYE_LID_PIVOT);
+        gl.uniformMatrix4fv(this.pSolid.u('uMVP'),false,this.mvp);
+        gl.uniform3fv(this.pSolid.u('uColor'),p.eyeColor);
+        this.mEye.bind(aPos); this.mEye.draw();
+      }
+    }
+
+    // 瞳孔 + 高光：跟着眼睛一起眨
+    // arc < 0.5：`^ ^` 眯眼时眼球已经塌成一条线，再挂个瞳孔就是脸上一个孤点。
+    if(p.eyeStyle!=='plain' && round>0.05 && arc<ARC_EYE_AT){
+      const pupilCol=[c[0]*0.20+0.045, c[1]*0.20+0.050, c[2]*0.20+0.075];
+      // 眼神偏移：pupilOffX/Y 是 look 自己的、常驻的。
+      // 这是"腹黑"和"从眉毛底下往上看"的机制 —— 表情表里的 gaze 只在思考时
+      // 才动，所以一个不思考但**看着别处**的眼神只能由 look 提供。
+      // y 要乘 round：眼缝被挤扁时，瞳孔的偏移也得跟着扁，否则它会跑出去。
+      const pOX=p.pupilOffX*p.eyeR, pOY=p.pupilOffY*p.eyeR*round;
+      for(const side of [-1,1]){
+        const ex=side*eX+pOX, ey=eY+pOY;
+        const rz = side<0 ? this.st.eyeLRotZ : this.st.eyeRRotZ;
+        if(p.eyeStyle==='pupil'){
+          const pr=p.pupilR;
+          // 三个坑一起来：pivotY 必须传 0（sy 是自己的半径，套眼睑铰链
+          // 补偿会把瞳孔推到脸颊上）；z 要压扁成片；z 还要抬到眼球前面
+          // —— 胶囊眼球在 z 上有半径，不抬就整颗瞳孔沉在眼球背面。
+          this.faceElem(ex-pr*0.12, ey-pr*0.20, rz, pr*round, pr, 0, pr*0.06, EYE_FRONT);
+          gl.uniformMatrix4fv(this.pSolid.u('uMVP'),false,this.mvp);
+          gl.uniform3fv(this.pSolid.u('uColor'),pupilCol);
+          this.mDot.bind(aPos); this.mDot.draw();
+          // 瞳孔里的白点。贴纸风不要它：有高光就有立体，扁平是它的全部意思。
+          const sr=p.specR;
+          if(sr>0.001){
+          this.faceElem(ex-pr*0.34, ey+pr*0.26, rz, sr*round, sr, 0, sr*0.06, EYE_FRONT+0.02);
+          gl.uniformMatrix4fv(this.pSolid.u('uMVP'),false,this.mvp);
+          gl.uniform3fv(this.pSolid.u('uColor'),[1,1,1]);
+          this.mDot.bind(aPos); this.mDot.draw();
+          }
+        } else if(p.specR>0.001) {
+          // 深色豆豆眼 + 一点白高光，落在眼睛的左上
+          const sr=p.specR;
+          this.faceElem(ex-p.eyeR*0.36, ey+p.eyeR*0.40, rz, sr*round, sr, 0, sr*0.06, EYE_FRONT);
+          gl.uniformMatrix4fv(this.pSolid.u('uMVP'),false,this.mvp);
+          gl.uniform3fv(this.pSolid.u('uColor'),[1,1,1]);
+          this.mDot.bind(aPos); this.mDot.draw();
+        }
+      }
+    }
+
+    // 弧形眼 ^ ^
+    if(arc>0.01){
+      const h=arc*this.st.lid;
+      for(const side of [-1,1]){
+        const rz = side<0 ? this.st.eyeLRotZ : this.st.eyeRRotZ;
+        this.faceElem(side*eX, eY-EYE_ARC_DROP, EYE_ARC_ROT_Z+rz, h, arc);
+        gl.uniformMatrix4fv(this.pSolid.u('uMVP'),false,this.mvp);
+        gl.uniform3fv(this.pSolid.u('uColor'),p.eyeColor);
+        this.mArc.bind(aPos); this.mArc.draw();
+      }
+    }
+
+    /* ---- 2b. 眉 ---- */
+    // 眉必须在眼睛之后画：它压在眼的上缘上，压住一点点才叫"压着眉毛"。
+    this.drawBrows(round,eX,eY,albedo);
+
+    /* ---- 2c. 嘴（含牙） ---- */
+    this.drawMouth(c,albedo);
+
+    /* ---- 2d. 怒符 ---- */
+    if(p.vein>0.01) this.drawVein();
+
+    /* ---- 2e. 蒸汽 ---- */
+    if(p.steam>0.01) this.drawSteam();
+
+    // 鼻涕泡：一个透明的水滴。不是实心圆片 —— 中间是透的，球体自己透出来，
+    // 只有轮廓一圈（折射边）和左上一个小高光。用整颗球而不是压扁的片，
+    // 因为菲涅尔要的就是"球面朝向"，压扁之后轮廓就没了。
+    if(this.st.bubble>0.01){
+      const br=p.bubbleR*this.st.bubbleScale*this.st.bubble;
+      let bm=M4.id();
+      bm=M4.translate(bm,p.bubbleX,p.bubbleY,0);
+      bm=M4.scale(bm,br,br,br);
+      const bmodel=M4.mul(this.face,bm);
+      const bmv=M4.mul(this.view,bmodel), bmvp=M4.mul(this.proj,bmv);
+      gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+      gl.depthMask(false);
+      this.pBubble.use();
+      gl.uniformMatrix4fv(this.pBubble.u('uMVP'),false,bmvp);
+      gl.uniformMatrix4fv(this.pBubble.u('uMV'),false,bmv);
+      gl.uniform3fv(this.pBubble.u('uColor'),p.bubbleColor);
+      gl.uniform1f(this.pBubble.u('uAlpha'),this.st.bubble);
+      gl.uniform1f(this.pBubble.u('uPow'),p.bubblePow);
+      gl.uniform1f(this.pBubble.u('uShine'),p.bubbleShine);
+      gl.uniform1f(this.pBubble.u('uInner'),p.bubbleInner);
+      this.mBody.bind(this.pBubble.a('aPos'),this.pBubble.a('aNormal'));
+      this.mBody.draw();
+      gl.depthMask(true);
+    }
+
+    /* ---- 3. 腮红 ---- */
+    // restBlush —— 静止脸也带一点血色。球一天里绝大多数时间是 CALM，
+    // 而"只有开心才有腮红"等于默认那张脸永远没有脸颊。
+    const bl=Math.min(1,(this.st.blush+p.restBlush)*p.blushMul);
+    if(bl>0.01){
+      const light = p.blushBlend==='alpha';
+      const d=this.mBlush.data;
+      for(let n=0;n<2;n++){
+        const j=n*6;
+        d[j]=n===0?-p.blushX:p.blushX;
+        d[j+1]=p.blushY; d[j+2]=-0.02;
+        d[j+3]=p.blushColor[0]; d[j+4]=p.blushColor[1]; d[j+5]=p.blushColor[2];
+      }
+      this.mBlush.upload();
+      mv=M4.mul(this.view,this.face); mvp=M4.mul(this.proj,mv);
+      gl.blendFunc(gl.SRC_ALPHA, light?gl.ONE_MINUS_SRC_ALPHA:gl.ONE);
+      gl.depthMask(false);
+      this.pPts.use();
+      gl.uniformMatrix4fv(this.pPts.u('uMVP'),false,mvp);
+      gl.uniformMatrix4fv(this.pPts.u('uMV'),false,mv);
+      gl.uniform1f(this.pPts.u('uPointFactor'),this.pointFactor);
+      gl.uniform1f(this.pPts.u('uSize'),p.blushSize);
+      gl.uniform1f(this.pPts.u('uAlpha'),bl*p.blushAlpha);
+      this.mBlush.bind(this.pPts.a('aPos'),this.pPts.a('aColor'));
+      this.mBlush.draw();
+    }
+
+    /* ---- 4. 描边 / 光晕 ---- */
+    m=M4.scale(root,RIM,RIM,RIM);
+    mv=M4.mul(this.view,m); mvp=M4.mul(this.proj,mv);
+    gl.depthMask(false);
+    this.pRim.use();
+    gl.uniformMatrix4fv(this.pRim.u('uMVP'),false,mvp);
+    gl.uniformMatrix4fv(this.pRim.u('uMV'),false,mv);
+    gl.uniform1f(this.pRim.u('uPow'),p.rimPow);
+    // 扫描是"光"在扫：只有发光描边那一路的 uColor 是亮色。深色描边那一路
+    // uColor 是暗部色，扫过去就是在球上滚一条黑带，看着像渲染坏了。
+    gl.uniform1f(this.pRim.u('uScanY'),this.st.scanY);
+    gl.uniform1f(this.pRim.u('uScan'), p.rimMode==='dark' ? 0 : this.st.scan);
+    if(p.rimMode==='dark'){
+      gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+      gl.uniform3fv(this.pRim.u('uColor'),[c[0]*0.34,c[1]*0.34,c[2]*0.42]);
+      gl.uniform1f(this.pRim.u('uIntensity'),p.rimGain*1.15);
+      gl.uniform1f(this.pRim.u('uCap'),0.82);
+    } else {
+      gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+      const thinkBeat=this.st.think*(0.5+Math.sin(t*1.9)*0.5);
+      const rimI=0.85+this.st.open*0.7+thinkBeat*0.55
+                 +Math.sin(t*p.faces[this.mood].pulse*2)*0.05;
+      gl.uniform3fv(this.pRim.u('uColor'),c);
+      gl.uniform1f(this.pRim.u('uIntensity'),rimI*p.rimGain);
+      gl.uniform1f(this.pRim.u('uCap'),1.0);
+    }
+    this.mRim.bind(this.pRim.a('aPos'),this.pRim.a('aNormal'));
+    this.mRim.draw();
+
+    gl.depthMask(true);
+  }
+
+  /**
+   * 一对耳朵。挂在 [root] 上，所以身体压扁、跳起来、歪头它都跟着 ——
+   * 长在头上的东西不该有自己的动作。
+   *
+   * [scaleMul] !== 1 时用纯色画（硬描边那一层）：描边不需要法线，
+   * 也就不必为放大后的比例再建一个网格。
+   */
+  drawEars(scaleMul, flatColor){
+    const gl=this.gl, p=this.p;
+    if(!this.mEar) return;
+    const flat = flatColor != null;
+    if(flat){
+      this.pSolid.use();
+      gl.uniform1f(this.pSolid.u('uAlpha'),1);
+      gl.uniform3fv(this.pSolid.u('uColor'),flatColor);
+    } else {
+      this.pBody.use();
+      gl.uniform1f(this.pBody.u('uAlpha'),1);
+      gl.uniform1f(this.pBody.u('uGrad'),p.grad);
+      gl.uniform1f(this.pBody.u('uAmb'),p.amb);
+      gl.uniform1f(this.pBody.u('uDiff'),p.diff);
+      gl.uniform1f(this.pBody.u('uGloss'),p.gloss);
+      const e=this.albedo||[0.5,0.5,0.5];
+      gl.uniform3f(this.pBody.u('uColor'),
+                   e[0]*p.earShade, e[1]*p.earShade, e[2]*p.earShade);
+    }
+    for(const side of [-1,1]){
+      let l=M4.id();
+      l=M4.translate(l, side*p.earX, p.earY, p.earZ);
+      // 往两边撇开：顶点从 +Y 转向 ∓x，所以左耳(+x 转角)往外
+      l=M4.rotate(l, -side*p.earTilt*57.29578, 0,0,1);
+      if(scaleMul!==1) l=M4.scale(l,scaleMul,scaleMul,scaleMul);
+      const model=M4.mul(this.root,l);
+      const mv=M4.mul(this.view,model), mvp=M4.mul(this.proj,mv);
+      if(flat){
+        gl.uniformMatrix4fv(this.pSolid.u('uMVP'),false,mvp);
+        this.mEar.bind(this.pSolid.a('aPos'));
+      } else {
+        gl.uniformMatrix4fv(this.pBody.u('uMVP'),false,mvp);
+        gl.uniformMatrix4fv(this.pBody.u('uMV'),false,mv);
+        this.mEar.bind(this.pBody.a('aPos'),this.pBody.a('aNormal'));
+      }
+      this.mEar.draw();
+    }
+  }
+
+  /**
+   * 一块楔子。眉、尖牙、锯齿牙、嘴角勾、怒符全是它。
+   *
+   * 走 `pSolid`（无光照、纯色）有两个好处，都不是省事而是**对**：
+   *   1. 可以随手做非等比缩放 —— 一块长 0.15、厚 0.03 的眉就是这么来的，
+   *      而带光照的网格非要等比重建或算法线逆转置不可；
+   *   2. 眉本来就不该有自己的高光。真实的眉是一道**沟**，不是一根亮条，
+   *      用身体反照率的 0.3 倍画它，读出来就是沟。
+   *
+   * [rotZ] 决定尖端朝哪：尖端方向 = (−sin, cos)。
+   */
+  drawWedge(x,y,rotZ,thick,len,depth,color){
+    const gl=this.gl;
+    let l=M4.id();
+    l=M4.translate(l,x,y,0);
+    l=M4.rotate(l,rotZ*57.29578,0,0,1);
+    l=M4.scale(l,thick,len,depth);
+    const model=M4.mul(this.face,l);
+    const mv=M4.mul(this.view,model), mvp=M4.mul(this.proj,mv);
+    this.pSolid.use();
+    gl.uniform1f(this.pSolid.u('uAlpha'),1);
+    gl.uniformMatrix4fv(this.pSolid.u('uMVP'),false,mvp);
+    gl.uniform3fv(this.pSolid.u('uColor'),color);
+    this.mWedge.bind(this.pSolid.a('aPos'));
+    this.mWedge.draw();
+  }
+
+  /**
+   * 两条眉 —— 这一批里唯一真正新增的"表情器官"，也是所有信号里最强的一条。
+   *
+   * 上一版之所以不管怎么调色都不像"坏"，根子就在这个函数不存在：`brow` 那个数
+   * 一直只在把眼球转 0.4 弧度，屏幕上没有一根眉毛。
+   *
+   * 角度约定（左右对称，正值都表示"更凶"）：
+   *   * 左眉绕 Z 转 `π + t`，右眉转 `π − t`，t > 0 时**内端低、外端高**，
+   *     也就是那张 `\ /` 的脸。t < 0 反过来，是 `／ ＼`，委屈。
+   *   * 表情表里的 `brow` 直接接到 t 上（[BallLook.browMood]），所以同一套皮肤
+   *     在 HOLDING 和 CALM 下的眉是不一样的；`skew` 只加到右眉，这就是让它
+   *     一高一低的那根线。
+   *   * 皱眉还会把眉**压低**：`brow` 越大，眉离眼睛越近。压低比转角更狠 ——
+   *     一条贴着眼的眉，读出来是"它在盯着你"。
+   */
+  drawBrows(round,eX,eY,albedo){
+    const p=this.p, st=this.st;
+    if(p.brow<=0.01 || p.browLen<=0.001) return;
+    // 眼睛成 `^ ^` 弧的时候收掉：`^ ^` 本身就是一张不需要眉毛的脸
+    // （SUCCESS / SLEEPING 都是），在一条弧上面挂两撇眉是鬼片。
+    if(st.eyeArc>=ARC_EYE_AT) return;
+
+    const bL=st.brow, bR=st.brow+st.skew;
+    // 极轻的小抖。静止的眉看起来像贴纸，会呼吸的才像长在脸上。
+    const tw=Math.sin(st.browTwitch)*0.013*(0.35+Math.min(1,bL));
+
+    const lift=EYE_LID_PIVOT*(1-round);         // 眼睑铰链把眼睛整体下移的那点
+    // 压眉：最多把眉到眼的距离压掉一半
+    const drop=Math.min(0.55, bL*p.browMood*0.55)*p.browY;
+    const baseY=eY+lift+p.browY-drop;
+
+    const tL=p.browTilt-p.browSkew+bL*p.browMood+tw;
+    const tR=p.browTilt+p.browSkew+bR*p.browMood-tw;
+    const col=p.browColor||[albedo[0]*p.browDeep, albedo[1]*p.browDeep, albedo[2]*p.browDeep];
+
+    this.drawWedge(-(eX+p.browX), baseY, Math.PI+tL, p.browThick, p.browLen, p.browDepth, col);
+    this.drawWedge( (eX+p.browX), baseY, Math.PI-tR, p.browThick, p.browLen, p.browDepth, col);
+  }
+
+  /** 嘴角上方那条**唇线**在 x 处的 y。
+   *  牙必须长在弧上，不能长在一条水平线上 —— 笑起来嘴角比中间高出一大截，
+   *  按水平线放牙，牙就悬在嘴外面的半空里。 */
+  lipY(x){
+    const p=this.p, st=this.st;
+    if(p.mouthStyle==='open') return st.mouthY;
+    if(p.mouthStyle==='cat'){
+      const mo=(p.mouthR+p.mouthTube)*0.5, side=x<0?-1:1;
+      const u=Math.min(1, Math.abs(Math.abs(x)-mo)/Math.max(1e-4,mo));
+      return st.mouthY - mo*st.mouthScaleY*Math.sqrt(Math.max(0,1-u*u));
+    }
+    const u=Math.min(1, Math.abs(x)/Math.max(1e-4,p.mouthR));
+    return st.mouthY - p.mouthR*st.mouthScaleY*Math.sqrt(Math.max(0,1-u*u));
+  }
+
+  /**
+   * 嘴，以及长在嘴上的牙。
+   *
+   * 三种嘴：
+   *   * `arc`  —— 半环，最省，也最中性。笑和哭都靠它转角。
+   *   * `cat`  —— 同一条半环画两次、各缩一半宽、并排拼起来，中间相接成 ω。
+   *   * `open` —— **半圆盘**（[halfDisc]）。这是唯一一个"面"。
+   *     半环永远是一根线，管径加到 0.09 也只是一根粗线，读出来是"嘴很厚"；
+   *     而暴躁要的是"嘴张着"，那必须是一块面。张嘴的上下比例由 [BallLook.gawp]
+   *     直接给（高度 = 宽度 × gawp），不再借 `mouthScaleY` —— 那个数里混着
+   *     笑容和呼吸，借它等于让"张多大"跟着心情漂。
+   */
+  drawMouth(c,albedo){
+    const gl=this.gl, p=this.p, st=this.st;
+    const aPos=this.pSolid.a('aPos');
+    const deep = p.mouthMode==='deep' ? 0.40 : 1.0;
+    const mouthCol=[c[0]*deep, c[1]*deep, c[2]*deep];
+    this.pSolid.use();
+    gl.uniform1f(this.pSolid.u('uAlpha'),1);
+    gl.uniform3fv(this.pSolid.u('uColor'),mouthCol);
+
+    const openH = p.mouthR*p.gawp*(0.88+st.open*0.5);
+
+    if(p.mouthStyle==='open'){
+      // 弧朝下、上唇是一条直线：上下唇之间那块**面**就是张开的嘴
+      this.faceElem(0, st.mouthY-openH*0.5, st.mouthRotZ, openH, p.mouthR);
+      gl.uniformMatrix4fv(this.pSolid.u('uMVP'),false,this.mvp);
+      this.mOpen.bind(aPos); this.mOpen.draw();
+    } else if(p.mouthStyle==='cat'){
+      const mo=(p.mouthR+p.mouthTube)*0.5;
+      for(const side of [-1,1]){
+        this.faceElem(side*mo, st.mouthY, st.mouthRotZ, st.mouthScaleY, 0.5);
+        gl.uniformMatrix4fv(this.pSolid.u('uMVP'),false,this.mvp);
+        this.mMouth.bind(aPos); this.mMouth.draw();
+      }
+    } else {
+      this.faceElem(0, st.mouthY, st.mouthRotZ, st.mouthScaleY);
+      gl.uniformMatrix4fv(this.pSolid.u('uMVP'),false,this.mvp);
+      this.mMouth.bind(aPos); this.mMouth.draw();
+    }
+
+    /* 锯齿牙：张嘴时的上下两排。它跟"张开"是一对 —— 只有洞没有牙，
+       读出来是"惊讶"；有牙，才读成"在吼"。 */
+    if(p.mouthStyle==='open' && p.teeth>0){
+      const span=2*p.mouthR*p.teethSpan, n=p.teeth|0;
+      gl.uniform3fv(this.pSolid.u('uColor'),p.fangColor);
+      for(let i=0;i<n;i++){
+        const t=n===1?0:(i/(n-1)-0.5)*2;             // −1..1
+        const x=t*span*0.5*(n===1?0:1);
+        // 上排：从上唇往下扎
+        this.drawWedge(x, st.mouthY-p.teethLen*0.5, Math.PI,
+                       p.teethThick, p.teethLen, p.teethThick, p.fangColor);
+        // 下排：从下唇往上扎，错开半格，才像咬合
+        if(p.teethRows>1){
+          const x2=((i+0.5)/n*2-1)*span*0.5;
+          this.drawWedge(x2, st.mouthY-openH*0.94+p.teethLen*0.5, 0,
+                         p.teethThick, p.teethLen, p.teethThick, p.fangColor);
+        }
+      }
+    }
+
+    /* 尖牙：一颗或两颗。
+       `fangFlip=0` 尖朝上（虎牙，从下唇探出来），1 尖朝下（獠牙，从上唇垂下来）。
+       一颗和两颗读出来完全是两种东西 —— 一颗是**调皮**，两颗是**掠食**。 */
+    if(p.fang>0){
+      const n=p.fang|0;
+      for(let i=0;i<n;i++){
+        const side = n===1 ? 1 : (i===0?-1:1);
+        const x=side*p.fangX;
+        // 牙根落在唇线上，所以笑起来嘴角抬高时牙也跟着走
+        const root=this.lipY(x)+p.fangY;
+        const y = p.fangFlip ? root-p.fangLen*0.5 : root+p.fangLen*0.5;
+        this.drawWedge(x, y, p.fangFlip?Math.PI:0,
+                       p.fangThick, p.fangLen, p.fangThick, p.fangColor);
+      }
+    }
+
+    /* 嘴角的小勾。坏笑的最后一块：嘴角本身往上卷一下。
+       左勾朝左上、右勾朝右上 —— 尖端方向 (−sin, cos)，所以左用 +角、右用 −角。 */
+    if(p.ticks>0.01){
+      const x=p.mouthR*0.96, y=this.lipY(p.mouthR*0.96)+p.tickThick*0.2;
+      this.drawWedge(-x, y, 0.66, p.tickThick, p.tickLen, p.browDepth, mouthCol);
+      this.drawWedge( x, y,-0.66, p.tickThick, p.tickLen, p.browDepth, mouthCol);
+    }
+  }
+
+  /**
+   * 怒符 —— 四根刺的爆点，画在太阳穴上。
+   *
+   * 这是一个**约定**而不是一个形状：漫画里画了几十年，看的人不需要想就知道是
+   * 生气。所以它比任何写实的青筋都划算。四根刺从中心往外、离中心有一点点空隙
+   * （刺的根不落在中心，中间留一个小洞），读出来才是"炸开"而不是"一团"。
+   * 会跳：`veinBeat` 让半径起伏 14%，静止的怒符像贴纸。
+   */
+  drawVein(){
+    const p=this.p, st=this.st;
+    const beat=0.86+0.14*Math.sin(st.veinBeat);
+    const col=[0.98,0.34,0.30];
+    const d=p.veinLen*0.60*beat;
+    for(let i=0;i<4;i++){
+      const phi=i*Math.PI/2+0.32;
+      this.drawWedge(p.veinX+Math.cos(phi)*d, p.veinY+Math.sin(phi)*d,
+                     phi-Math.PI/2,
+                     p.veinThick, p.veinLen*beat, p.veinThick, col);
+    }
+  }
+
+  /**
+   * 蒸汽：头顶两缕。
+   *
+   * 直接复用鼻涕泡那个水滴着色器，只把颜色换成白色、把内部薄雾关成 0 ——
+   * 一颗中间全透、只有轮廓的球，就是一团水汽。这比再造一个粒子系统省，
+   * 而且它跟泡一样会自动**干净地叠在**球体上（背面 discard + 菲涅尔边）。
+   * 每边两团，相位错开，一边往上飘一边变大、一边淡出。
+   */
+  drawSteam(){
+    const gl=this.gl, p=this.p, st=this.st;
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(false);
+    this.pBubble.use();
+    const aPos=this.pBubble.a('aPos'), aNrm=this.pBubble.a('aNormal');
+    gl.uniform3f(this.pBubble.u('uColor'),0.88,0.90,0.94);
+    gl.uniform1f(this.pBubble.u('uPow'),2.0);
+    gl.uniform1f(this.pBubble.u('uShine'),10);
+    gl.uniform1f(this.pBubble.u('uInner'),0.02);
+    for(const side of [-1,1]){
+      for(let k=0;k<2;k++){
+        const ph=((st.steamPhase+k*0.5+(side<0?0:0.22))%1+1)%1;
+        const a=p.steam*(1-ph)*(1-ph)*0.85;
+        if(a<0.012) continue;
+        const r=p.steamR*(0.45+0.95*ph);
+        const x=side*(0.20+p.steamR*0.6)+Math.sin(ph*6.283+side*1.7)*0.022;
+        const y=p.steamY+ph*0.26;
+        let bm=M4.id();
+        bm=M4.translate(bm,x,y,0.03);
+        bm=M4.scale(bm,r,r,r);
+        const bmodel=M4.mul(this.face,bm);
+        const bmv=M4.mul(this.view,bmodel), bmvp=M4.mul(this.proj,bmv);
+        gl.uniformMatrix4fv(this.pBubble.u('uMVP'),false,bmvp);
+        gl.uniformMatrix4fv(this.pBubble.u('uMV'),false,bmv);
+        gl.uniform1f(this.pBubble.u('uAlpha'),a);
+        this.mBody.bind(aPos,aNrm);
+        this.mBody.draw();
+      }
+    }
+    gl.depthMask(true);
+  }
+
+  /* face 空间里的一个元素：T * R * S，跟 setLocalFromFace 同序。
+     sz 默认跟随 sx —— 点状元素（瞳孔、高光）是各向同性的小球，
+     漏掉 z 会把单位球沿视线拉成一根柱，糊掉整颗球。 */
+  faceElem(x,y,rotZ,sy,sx=1,pivotY=0,sz=null,zOff=0){
+    let l=M4.id();
+    l=M4.translate(l,x,y+pivotY*(1-sy),zOff);
+    l=M4.rotate(l,rotZ*57.29578,0,0,1);
+    l=M4.scale(l,sx,sy,sz===null?1:sz);
+    const model=M4.mul(this.face,l);
+    const mv=M4.mul(this.view,model);
+    this.mvp=M4.mul(this.proj,mv);
+  }
+}
+
+/* =========================================================================
+   9. UI
+   ========================================================================= */
+let curPreset=P_IMP.key;
+const edited={};
+PRESETS.forEach(p=>edited[p.key]=clone(p));
+let stages=[];
+let heroes=[];
+
+function showErr(e){
+  const box=document.getElementById('err');
+  box.style.display='block';
+  box.textContent=String(e && e.stack || e);
+  console.error(e);
+}
+
+function buildStage(presetKey){
+  const p=PRESETS.find(q=>q.key===presetKey);
+  const cell=document.createElement('div');
+  cell.className='cell'; cell.dataset.k=presetKey;
+  cell.setAttribute('aria-pressed', presetKey===curPreset ? 'true':'false');
+  cell.innerHTML=`
+    <div class="stage dark">
+      <div class="badge">1:1</div>
+      <canvas></canvas>
+    </div>
+    <div class="cap"><b>${p.label}</b><span>${p.tag}</span></div>`;
+  cell.onclick=()=>setPreset(presetKey);
+  return {el:cell, cv:cell.querySelector('canvas'), key:presetKey, ball:null};
+}
+
+/** 网格的底子只是 CSS —— 画布本来就是透明的，切换不用重画。 */
+function setBg(bg){
+  stages.forEach(s=>{ s.el.querySelector('.stage').className='stage '+bg; });
+  document.querySelectorAll('#bgToggle button').forEach(b=>{
+    b.setAttribute('aria-pressed', b.dataset.bg===bg ? 'true':'false');
+  });
+}
+
+function build(){
+  const ci=document.getElementById('presets');
+  PRESETS.forEach(p=>{
+    const b=document.createElement('button');
+    b.type='button'; b.dataset.k=p.key;
+    b.innerHTML=`${p.label}<span class="tag">${p.tag}</span>`;
+    b.onclick=()=>setPreset(p.key);
+    ci.appendChild(b);
+  });
+
+  const ms=document.getElementById('mood');
+  MOODS.forEach(m=>{
+    const o=document.createElement('option'); o.value=m; o.textContent=m; ms.appendChild(o);
+  });
+  ms.value=CALM_MOOD;
+  ms.onchange=()=>{
+    stages.forEach(s=>s.ball.mood=ms.value);
+    heroes.forEach(h=>h.mood=ms.value);
+  };
+
+  // 网格：每个预设一个 1:1 画布。Ball 必须在挂进 DOM 之后建，
+  // 它要读 clientWidth 才知道画多大。
+  const grid=document.getElementById('grid');
+  PRESETS.forEach(p=>{
+    const st=buildStage(p.key);
+    grid.appendChild(st.el);
+    st.ball=new Ball(st.cv, edited[p.key]);
+    st.ball.mood=p.demoMood||CALM_MOOD;
+    stages.push(st);
+  });
+
+  // 放大区：同一个预设、两种底子，各一个画布。
+  heroes=[...document.querySelectorAll('.heroCv')].map(cv=>{
+    const b=new Ball(cv, edited[curPreset]);
+    b.mood=PRESETS.find(q=>q.key===curPreset).demoMood||CALM_MOOD;
+    return b;
+  });
+
+  document.querySelectorAll('#bgToggle button').forEach(b=>{
+    b.onclick=()=>setBg(b.dataset.bg);
+  });
+
+  bindSliders();
+  syncUI();
+  requestAnimationFrame(loop);
+}
+
+/* 这台球最常待的表情。选预设时也把表情切到它的"代表表情" ——
+   暴躁球的脾气只在 TENSE 那一行上是看不出来的，得让它真的在那个心情里。 */
+const CALM_MOOD='CALM';
+
+function setPreset(key){
+  curPreset=key;
+  const p=PRESETS.find(q=>q.key===key);
+  const mood=(p&&p.demoMood)||CALM_MOOD;
+  const ms=document.getElementById('mood');
+  ms.value=mood;
+  stages.forEach(s=>s.ball.mood=mood);
+  heroes.forEach(h=>h.mood=mood);
+  syncUI();
+}
+
+const SLIDERS=[
+  ['s-eyeR','eyeR','v-eyeR',v=>v.toFixed(3)],
+  ['s-eyeX','eyeX','v-eyeX',v=>v.toFixed(3)],
+  ['s-eyeY','eyeY','v-eyeY',v=>v.toFixed(3)],
+  ['s-tint','tint','v-tint',v=>v.toFixed(2)],
+  ['s-mul','albedoMul','v-mul',v=>v.toFixed(2)],
+  ['s-gloss','gloss','v-gloss',v=>v.toFixed(2)],
+  ['s-blush','blushMul','v-blush',v=>v.toFixed(2)],
+  ['s-smile','smileBoost','v-smile',v=>v.toFixed(2)],
+  ['s-bubR','bubbleR','v-bubR',v=>v.toFixed(3)],
+  ['s-bubY','bubbleY','v-bubY',v=>v.toFixed(3)],
+  ['s-bubIn','bubbleInner','v-bubIn',v=>v.toFixed(2)],
+  // 性格那三组
+  ['s-browTilt','browTilt','v-browTilt',v=>v.toFixed(2)],
+  ['s-browSkew','browSkew','v-browSkew',v=>v.toFixed(2)],
+  ['s-browThick','browThick','v-browThick',v=>v.toFixed(3)],
+  ['s-browY','browY','v-browY',v=>v.toFixed(3)],
+  ['s-brow','brow','v-brow',v=>v.toFixed(2)],
+  ['s-eyeSquash','eyeSquash','v-eyeSquash',v=>v.toFixed(2)],
+  ['s-eyeTilt','eyeTilt','v-eyeTilt',v=>v.toFixed(2)],
+  ['s-fang','fang','v-fang',v=>String(Math.round(v))],
+  ['s-fangLen','fangLen','v-fangLen',v=>v.toFixed(3)],
+  ['s-fangFlip','fangFlip','v-fangFlip',v=>v>0.5?'朝下':'朝上'],
+  ['s-teeth','teeth','v-teeth',v=>String(Math.round(v))],
+  ['s-gawp','gawp','v-gawp',v=>v.toFixed(2)],
+  ['s-steam','steam','v-steam',v=>v.toFixed(2)],
+  ['s-vein','vein','v-vein',v=>v.toFixed(2)],
+];
+
+function bindSliders(){
+  SLIDERS.forEach(([sid,key,vid,fmt])=>{
+    const s=document.getElementById(sid);
+    s.oninput=()=>{
+      const v=parseFloat(s.value);
+      edited[curPreset][key]=v;
+      document.getElementById(vid).textContent=fmt(v);
+      applyAll();
+    };
+  });
+  document.getElementById('reset').onclick=()=>{
+    edited[curPreset]=clone(PRESETS.find(p=>p.key===curPreset));
+    applyAll(); syncUI();
+  };
+}
+
+function syncUI(){
+  document.querySelectorAll('#presets button').forEach(b=>{
+    b.setAttribute('aria-pressed', b.dataset.k===curPreset ? 'true':'false');
+  });
+  stages.forEach(s=>s.el.setAttribute('aria-pressed', s.key===curPreset ? 'true':'false'));
+  // 合并中性值再读：预设表里没写的字段（比如一把 arc 嘴的预设不需要 gawp）
+  // 也能在滑块上显示成一个数，而不是 undefined。
+  const p=Object.assign({}, LOOK_DEFAULTS, edited[curPreset]);
+  SLIDERS.forEach(([sid,key,vid,fmt])=>{
+    document.getElementById(sid).value=p[key];
+    document.getElementById(vid).textContent=fmt(p[key]);
+  });
+  applyAll();
+}
+
+function applyAll(){
+  stages.forEach(s=>s.ball.setParams(edited[s.key]));
+  heroes.forEach(h=>h.setParams(edited[curPreset]));
+}
+
+let last=performance.now(), t0=last;
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  const t=(now-t0)/1000;
+  try{
+    stages.forEach(s=>s.ball.frame(dt,t));
+    heroes.forEach(h=>h.frame(dt,t));
+  }catch(e){ showErr(e); return; }
+  requestAnimationFrame(loop);
+}
+
+try{
+  build();
+  window.addEventListener('resize',()=>{ stages.forEach(s=>s.ball.resize()); heroes.forEach(h=>h.resize()); });
+  // 给测量脚本用：把渲染器和矩阵栈暴露出去，好从画布上量实际像素。
+  window.LAB={Ball,M4,FACE_OLD,FACE_NEW,FACE_GRUMPY,LOOK_DEFAULTS,PRESETS,edited,version:'v40',
+              get stages(){return stages}, get heroes(){return heroes}};
+  window.__ready=true;
+}catch(e){ showErr(e); }
+</script>
+</body>
+</html>

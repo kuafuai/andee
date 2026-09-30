@@ -1,0 +1,452 @@
+<resources>
+    <string name="app_name">Andee</string>
+    <!--
+        Shown under the service name in Settings → Accessibility, and again in
+        the confirmation dialog. It is the one place the user is asked to hand
+        over screen access, so it says what Andee does with it in their own
+        language rather than naming the API.
+    -->
+    <string name="accessibility_service_description">开启后 Andee 才能看到屏幕上有什么，并代你点按、滑动、输入。桌面上会多一颗悬浮小球：点一下跟它说话，长按展开对话记录。</string>
+
+    <!-- The notification listener, named in system settings. -->
+    <string name="notification_relay_label">Andee 通知读取</string>
+
+    <!--
+        The settings sheet. Default language is Chinese: this file is `values/`
+        so an unmatched locale falls back here, and the app has shipped Chinese
+        from the start. `values-en/` mirrors it key for key — a key added here
+        and not there silently shows Chinese on an English tablet.
+
+        Not every Chinese literal in the app belongs in here. The policy — what
+        the user reads versus what the model reads versus what matches system
+        text — is written out at the top of `values-en/strings.xml`; read that
+        before adding a string or "fixing" a deliberate omission.
+    -->
+    <string name="settings_title">设置</string>
+    <string name="settings_default_device_name">这台设备</string>
+    <string name="settings_factory_reset">恢复出厂设置</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_save">保存</string>
+    <string name="settings_factory_reset_confirm_title">恢复出厂设置？</string>
+    <string name="settings_factory_reset_list_intro">下面这些会被删掉，删了就找不回来：</string>
+    <string name="settings_factory_reset_after">设备会回到刚装好的样子：需要重新填 key，唤醒词要重新录。</string>
+    <string name="settings_factory_reset_back">不，返回</string>
+    <string name="settings_factory_reset_confirm">确认清空</string>
+    <!-- The three destructive buttons sit together at the foot of the 诊断
+         section, not in the footer beside 取消/保存: a destructive control
+         beside the card's two ways out reads as a third way out. -->
+    <string name="settings_clear_chat">清空聊天记录</string>
+    <string name="settings_clear_chat_confirm_title">清空聊天记录？</string>
+    <string name="settings_clear_chat_confirm_body">对话记录和它生成过的页面会删掉，这场对话聊过的内容它也会忘掉。小本本不受影响。</string>
+    <string name="settings_clear_chat_confirm">确认清空</string>
+    <!-- 小本本是跨对话留下来的东西，所以和清空聊天记录是两件事，各清各的。 -->
+    <string name="settings_clear_notes">清空小本本</string>
+    <string name="settings_clear_notes_confirm_title">清空小本本？</string>
+    <string name="settings_clear_notes_confirm_body">它记下的事、你的偏好、还没到点的提醒，都会删掉，找不回来。这场聊天记录不受影响。</string>
+    <string name="settings_clear_notes_confirm">确认清空</string>
+    <string name="settings_section_brain">大脑</string>
+    <string name="settings_brain_panel_note">关掉这个面板就生效，不用重开无障碍服务。</string>
+    <string name="settings_brain_cloud">云端</string>
+    <string name="settings_brain_local">本机</string>
+    <string name="settings_hub_url">Hub 地址</string>
+    <!-- The hub URL box is empty on a fresh install — the hint is what the
+         user sees in that empty box, so it is the pitch, not the format. -->
+    <string name="settings_hub_url_hint">链接你的云端Agent</string>
+    <string name="settings_device_name">设备名</string>
+    <string name="settings_device_name_hint">Hub 那边怎么称呼这台设备</string>
+    <string name="settings_brain_cloud_note">大脑在你自己搭的 Hub 那边，这台设备只负责动手。</string>
+    <string name="settings_llm_model">模型</string>
+    <string name="settings_llm_base_url">接口地址</string>
+    <string name="settings_llm_thinking">深度思考</string>
+    <string name="common_on">开</string>
+    <string name="common_off">关</string>
+    <string name="settings_llm_effort">思考强度</string>
+    <string name="common_high">高</string>
+    <string name="common_medium">中</string>
+    <string name="common_low">低</string>
+    <string name="settings_brain_local_note">设备自己跑 agent loop，不连 Hub。没有 Key 就不会接管。</string>
+    <string name="settings_section_wake">语音唤醒</string>
+    <string name="settings_wake_enrolled">已录入 —— 亮屏时说「嘿 Andee」就行</string>
+    <string name="settings_wake_not_enrolled">未录入 —— 录一次才能语音唤醒</string>
+    <string name="settings_wake_record">录入</string>
+    <string name="common_clear">清除</string>
+    <string name="settings_section_vault">保险箱</string>
+    <string name="settings_vault_empty_note">还没有存账号 —— 存了之后，Andee 办事时可以直接用它们登录</string>
+    <string name="settings_vault_count_note">已存 %1$d 个账号 —— 手机号邮箱大脑读得到，密码只由设备替你敲进输入框</string>
+    <string name="settings_vault_manage">管理</string>
+    <string name="settings_section_voice">语音（火山引擎）</string>
+    <string name="settings_voice_factory_note">源码不带密钥。填上自己的 Key 才听得见、说得出;下面几行留空用默认地址即可。</string>
+    <string name="settings_voice_api_key">火山 API Key</string>
+    <string name="settings_voice_api_key_hint">火山引擎语音服务的 Key,听和说都靠它</string>
+    <string name="settings_voice_in_use">现在用的</string>
+    <string name="settings_voice_in_use_own">你自己填的那个火山账号</string>
+    <string name="settings_voice_in_use_factory">还没填,听和说都用不了</string>
+    <string name="settings_voice_asr_endpoint">识别地址</string>
+    <string name="settings_voice_asr_resource_id">识别资源 ID</string>
+    <string name="settings_voice_tts_endpoint">合成地址</string>
+    <string name="settings_voice_tts_resource_id">合成资源 ID</string>
+    <string name="settings_voice_tts_sample_rate">合成采样率</string>
+    <string name="settings_section_diagnostics">诊断</string>
+    <string name="settings_grounding">接地采集</string>
+    <string name="settings_grounding_note">把坐标点击和截图记到 files/grounding 供离线分析 —— 它会拍下你当时在做的事。改完要重开无障碍服务才生效。</string>
+    <string name="settings_device_id">设备 ID</string>
+    <string name="settings_section_notebook">小本本</string>
+    <string name="settings_notebook_sweep_note">聊完静下来之后，它会自己回头看一眼：该记的记下、该跟的排上。默认开着 —— 「它记得住」就是这么来的。关掉之后不再花你的 key 做这件事。</string>
+    <string name="settings_notebook_quiet_minutes">静默多久算聊完（分钟）</string>
+    <string name="settings_notebook_daily_cap">每天最多复盘几次</string>
+    <string name="settings_notebook_today">今天 / 攒到现在</string>
+    <string name="settings_notebook_stats">复盘 %1$d 次（约 %2$d tokens）· 记住 %3$d 条 · 还欠着 %4$d 件事</string>
+    <string name="settings_notebook_dump">本子里写了什么</string>
+    <string name="settings_notebook_dump_hint">只读。长按可以选中复制。</string>
+    <string name="settings_notebook_dump_truncated">…（还有 %1$d 个字符没显示）</string>
+    <string name="settings_section_typing">打字</string>
+    <string name="settings_typing_no_ime">这台设备上只有 ADBKeyboard（它没有键盘界面），所以现在打不了字。去系统设置里启用一个输入法，这里就会出现。</string>
+    <string name="settings_typing_current">你现在的输入法</string>
+    <string name="settings_typing_note">平时就是你自己的输入法 —— 任何 App 里都能正常打字。我替你打字时会临时切到 ADBKeyboard（它没有键盘界面，只能这么用），打完立刻切回来。</string>
+    <string name="common_show">显示</string>
+    <string name="common_hide">隐藏</string>
+
+    <!-- The pinned gesture tips at the bottom of the full card. The swipe hint
+         is last because it is the one gesture that only exists unfolded — the
+         folded ball reads a horizontal flick as a move instead. -->
+    <string name="window_tips">点小球说话 · 双击打字 · 三连击停止 · 滑动切换性格</string>
+
+    <!-- The 恢复出厂设置 confirmation list: one line per thing wiped.
+         Kept beside config/FactoryReset.kt, which walks them in this order. -->
+    <string name="factory_reset_target_keys">火山 key、DeepSeek key，以及所有语音与大脑的设置</string>
+    <string name="factory_reset_target_notebook">小本本：记住的事、答应过还没办的事</string>
+    <string name="factory_reset_target_vault">保险箱里存的账号密码和银行卡</string>
+    <string name="factory_reset_target_wake">唤醒词的录音（要重新录一遍）</string>
+    <string name="factory_reset_target_history">对话历史，和它生成过的页面</string>
+    <string name="factory_reset_target_web">内置页面留下的 cookie 与本地存储</string>
+    <string name="factory_reset_target_grounding">接地采集存下的截图与日志</string>
+    <string name="vault_title">保险箱</string>
+    <string name="vault_edit_title">编辑账号</string>
+    <string name="vault_intro">存在这里的账号,Andee 办事时可以直接用来登录。\n密码只会被它替你敲进输入框,不会交给远端的大脑。</string>
+    <string name="vault_empty">还没有存任何账号。</string>
+    <string name="vault_add_account">+ 新增账号</string>
+    <string name="vault_password_saved">密码 已存</string>
+    <string name="vault_summary_empty">(空)</string>
+    <string name="vault_delete">删除</string>
+    <string name="vault_field_name">名称</string>
+    <string name="vault_field_name_hint">飞书 / 公司邮箱 —— 大脑按这个名字找</string>
+    <string name="vault_field_phone">手机号</string>
+    <string name="vault_field_email">邮箱</string>
+    <string name="vault_field_username">用户名</string>
+    <string name="vault_field_password">密码</string>
+    <string name="vault_password_note">密码只会被敲进输入框,不会返回给大脑。</string>
+    <string name="vault_field_note">备注</string>
+    <string name="vault_field_note_hint">「用手机验证码登录」之类的提示,大脑读得到</string>
+    <string name="vault_section_card">银行卡(可选)</string>
+    <string name="vault_card_note">卡号、有效期、安全码和密码一样,只会被敲进输入框,不会返回给大脑。支付宝 / 微信 / 银行 App 的支付键盘是它们自己画的,敲不进去 —— 这里填的是网页或 App 的结账表单、绑卡页。付款本身仍然由你来确认。</string>
+    <string name="vault_field_card_holder">持卡人</string>
+    <string name="vault_field_card_holder_hint">卡上印的名字,大脑读得到</string>
+    <string name="vault_field_card_number">卡号</string>
+    <string name="vault_field_card_expiry">有效期</string>
+    <string name="vault_field_card_expiry_hint">MM/YY</string>
+    <string name="vault_field_card_cvv">安全码 CVV</string>
+    <string name="vault_label_card_last4">尾号</string>
+    <string name="vault_error_name_required">名称不能为空</string>
+    <string name="wake_title">教我认「嘿 Andee」</string>
+    <string name="wake_instructions">点「开始」，然后像平时叫我那样说一遍「嘿 Andee」，说完会自动停。一共要说 %1$d 次 —— 别刻意念得比平时清楚，不然平时那样叫我反而认不出来。</string>
+    <string name="wake_progress">%1$d / %2$d</string>
+    <string name="wake_status_enrolled">已经录过了，再录一次会覆盖。</string>
+    <string name="wake_status_not_enrolled">还没录过。</string>
+    <string name="wake_close">关闭</string>
+    <string name="wake_start">开始</string>
+    <string name="wake_listening">听着…</string>
+    <string name="wake_speak_now">说吧 —— 「嘿 Andee」</string>
+    <string name="wake_retry">再来一次</string>
+    <string name="wake_not_heard">没听清 —— 离近一点，说完等半秒再看屏幕。</string>
+    <string name="wake_say_again">再说一次</string>
+    <string name="wake_received">收到（%1$d 毫秒）。还差 %2$d 次。</string>
+    <string name="wake_rerecord">重录</string>
+    <string name="wake_done">好了，亮屏的时候叫我一声「嘿 Andee」就行。（阈值 %1$s）</string>
+    <!-- device/LookActivity.kt -->
+    <string name="dev_look_focusing">正在对焦…</string>
+    <string name="dev_look_seen">看到了</string>
+    <string name="dev_look_unclear">没看清</string>
+    <string name="dev_look_resting">正在看…</string>
+    <string name="dev_look_resting_front">前置 · 正在看…</string>
+    <string name="dev_camera_unavailable">摄像头打不开</string>
+    <!-- device/ScanActivity.kt -->
+    <string name="dev_scan_align">对准二维码 / 条形码</string>
+    <!-- device/NotificationRelayService.kt: the signboard shown when a
+    message app pings. The app name is passed in, not translated here. -->
+    <string name="dev_notif_card_title">收到%1$s消息</string>
+    <string name="dev_notif_card_unread">收到%1$s消息（%2$d 条未读）</string>
+    <string name="dev_notif_card_look">帮我看看</string>
+    <string name="dev_notif_card_ignore">忽略</string>
+    <!-- device/PermissionsController.kt: the one sentence the brain reads
+    aloud, plus the per-grant phrase it is built from. -->
+    <string name="dev_perm_feature_location">位置(在哪/导航)</string>
+    <string name="dev_perm_feature_steps">运动步数</string>
+    <string name="dev_perm_feature_contacts">通讯录(打电话找人)</string>
+    <string name="dev_perm_feature_call_phone">直接拨号</string>
+    <string name="dev_perm_feature_call_log">通话记录</string>
+    <string name="dev_perm_feature_sms">读短信(验证码)</string>
+    <string name="dev_perm_feature_sms_send">发短信</string>
+    <string name="dev_perm_feature_calendar">日历(日程提醒)</string>
+    <string name="dev_perm_feature_calendar_write">写日历(记日程)</string>
+    <string name="dev_perm_feature_notifications">通知感知(微信来消息我知道)</string>
+    <string name="dev_perm_feature_overlay">悬浮窗(我的脸)</string>
+    <string name="dev_perm_say_prefix">需要开启: %1$s。</string>
+    <string name="dev_perm_say_sep">、</string>
+    <string name="dev_perm_say_runtime">会弹窗,点允许即可。</string>
+    <string name="dev_perm_say_notification">会打开通知使用权设置,找到这个应用打开开关。</string>
+    <string name="history_empty">还没有对话</string>
+    <string name="history_role_you">你 · %1$s</string>
+    <string name="history_role_assistant">助手 · %1$s</string>
+    <string name="history_role_error">出错 · %1$s</string>
+    <string name="history_role_page_open">界面 · %1$s · 点击重新打开</string>
+    <string name="history_role_page_cleared">界面 · %1$s · 已清理</string>
+    <string name="html_default_title">AI 界面</string>
+    <string name="textpage_role_you">你</string>
+    <string name="textpage_role_assistant">助手</string>
+    <string name="textpage_role_error">出错</string>
+    <string name="textpage_role_page">界面</string>
+    <string name="card_ack">知道了</string>
+    <string name="bubble_tap_to_talk">点击说话</string>
+    <string name="input_hint">打字跟它说…</string>
+    <string name="input_send">发送</string>
+    <string name="cam_close">✕ 完成</string>
+
+    <!--
+        ScreenBodyService.kt: the lines this file shows on its own — the ball's
+        chrome, and the cards it pops when the microphone or the brain is not
+        there.
+
+        Every one of these is display-only. The neighbouring Chinese in that
+        file is *not*: `meetingMinutesQuery`, `callSummaryQuery`, the
+        `LocalBrain.note` stage direction and the todo wake-up prompts are text
+        written **to the model**, and the language of a prompt decides the
+        language of the answer. They are deliberately left alone — an English
+        interface must not become a Chinese reply. See the note at the top of
+        `values-en/strings.xml`.
+
+        `%1$s`/`%1$d` are substitutions, not literal text. `ADBKeyboard` and
+        `key` stay as they are: they are the name of an app and of a field in
+        the settings card, and neither is translated on either side.
+    -->
+    <string name="svc_call_in_progress">通话中，等挂断了再跟我说吧</string>
+    <string name="svc_no_typable_ime">这台设备上只有 ADBKeyboard（它没有键盘界面），打不了字。\n去系统设置里启用一个输入法就行。</string>
+    <string name="svc_voice_error_line">语音：%1$s</string>
+    <string name="svc_voice_failed">语音用不了了。\n%1$s</string>
+    <!--
+        The two buttons off the failure cards, and the shared dismiss. They are
+        compared by identity in the code that builds them, so the label a
+        handler tests against and the label the user reads are always the same
+        lookup — see `reportVoiceFailure`.
+    -->
+    <string name="svc_btn_type_instead">打字说</string>
+    <string name="svc_btn_open_settings">打开设置</string>
+    <string name="svc_listening_again">（继续听…）</string>
+    <string name="svc_stopped">已停止</string>
+    <!--
+        The two parenthesised rows dropped into the scrollback when a recording
+        winds itself up. They read as a stage direction on purpose, mirroring
+        the shape the brain is handed — but they are only ever displayed:
+        `ChatHistory` is read by `HistoryListView` and nothing else, and the
+        model is given `meetingMinutesQuery`/`callSummaryQuery` instead.
+    -->
+    <string name="svc_meeting_ended_line">（会议记录结束，共 %1$d 字，正在整理纪要…）</string>
+    <string name="svc_call_ended_line">（通话结束，共 %1$d 字，正在整理…）</string>
+    <string name="svc_no_brain_hub">还没有接上大脑，我说不上话。</string>
+    <string name="svc_no_brain_local">本地大脑还没配 key，我说不上话。</string>
+
+    <!--
+        config/Notebook.kt — the read-only dump the settings sheet renders. The
+        values that end in a space or a newline are quoted, which is what keeps
+        aapt from trimming them. The *other* strings in Notebook (the "name 不能
+        为空" family) are tool results written to the model and stay Chinese.
+    -->
+    <string name="notebook_dump_header">"小本本 · 记忆 %1$d 条\n"</string>
+    <string name="notebook_dump_sort_note">"（下面按类型和最近更新排列，只读）\n\n"</string>
+    <string name="notebook_dump_empty_memories">"（还没有记下任何东西）\n"</string>
+    <string name="notebook_dump_expired">"  [已过期]"</string>
+    <string name="notebook_dump_source">" · 来源 "</string>
+    <string name="notebook_dump_hits">" · 被查过 %1$d 次\n\n"</string>
+    <string name="notebook_dump_todos_header">"\n待办 %1$d 条\n\n"</string>
+    <string name="notebook_dump_empty_todos">"（没有）\n"</string>
+    <string name="notebook_dump_recurring">周期 %1$s</string>
+    <string name="notebook_dump_next">" · 下次 "</string>
+    <string name="notebook_dump_last_error">"   上次出错："</string>
+
+    <!--
+        config/Scheduler.kt. `sched_channel_name` and `sched_channel_desc` are
+        the notification channel; see the KDoc on `channelName` for why a
+        language change does not reach a channel that already exists.
+    -->
+    <string name="sched_channel_name">答应过的事</string>
+    <string name="sched_channel_desc">到点了但我醒不过来时，先把话说清楚</string>
+    <string name="sched_notify_recurring">周期待办：%1$s</string>
+    <string name="sched_notify_title">我当时答应过你</string>
+    <string name="sched_notify_body">%1$s\n\n（到点的时候我没有在运行，所以没能替你去办。打开无障碍服务之后我会接着办。）</string>
+
+    <!-- net/CommandDispatcher.kt — the three lines from it a user can see. -->
+    <string name="cmd_vault_filling">正在填入「%1$s」的%2$s…</string>
+    <string name="cmd_ask_yes">好的</string>
+    <string name="cmd_ask_no">不用</string>
+
+    <!-- The subtitle while the mic is open, before a word has landed. -->
+    <string name="asr_listening">听着…</string>
+
+    <!--
+        MeetingRecorder: the live header while a recording runs. Two numbers,
+        so `%1$d` is minutes and `%2$02d` is zero-padded seconds — keep the
+        order if you reword it.
+    -->
+    <string name="meeting_live_head">会议记录中 %1$d:%2$02d · 点球结束</string>
+
+    <!--
+        The two names for a recording that never named itself.
+
+        `meeting_default_title` is written by `MeetingRecorder.start` and read
+        back by `ScreenBodyService.meetingMinutesQuery` — one key for both, on
+        purpose: the brain is handed the title and the page is laid out under
+        the same one, so two literals that drifted apart would show up as a page
+        titled one thing and a brain told another.
+
+        `call_default_scene` is the `callSummaryQuery` twin, for an extension
+        that registered without a `scene`.
+
+        Both were Kotlin literals until now, which is the same bug in two
+        places: the value does reach the screen (it becomes the page title the
+        minutes or the summary is laid out under), so on an English tablet it
+        read Chinese. They follow the interface language like every other
+        displayed string — see `AppLocale`, and the header of
+        `values-en/strings.xml`.
+    -->
+    <string name="meeting_default_title">会议记录</string>
+    <string name="call_default_scene">通话</string>
+
+    <!--
+        LocalBrain, the half of it the user sees.
+
+        This class is a genuine split and it is not obvious from the file: its
+        `onProgress` and `onFinal` strings become the ball's subtitle and a row
+        in the scrollback, so they belong here — while its `toolMessage` and
+        tool-result strings are read by the model and belong nowhere near this
+        file. `brain_error`, `brain_repeat_stop` and `narrate_default` carry a
+        tool or exception name through `%1$s`; that name is an identifier and
+        stays as it is in both languages.
+    -->
+    <string name="brain_no_key">本地大脑还没配 API key —— 长按小球打开设置，把 DeepSeek 的 key 填进「大脑」那一栏。</string>
+    <string name="brain_error">我这边出错了：%1$s</string>
+    <string name="brain_no_result">我这轮没拿到结果，你再说一遍试试。</string>
+    <string name="brain_repeat_stop">我一直在重复同一个动作（%1$s），停下来了 —— 这条路走不通，换个说法或者你来操作一下。</string>
+    <string name="brain_max_steps">这件事我做了 %1$d 步还没办完，先停下来问你一句：要不要换个路子，或者你来接手？</string>
+    <!--
+        `narrate()`: the one-line subtitle for a tool the model called without
+        saying anything. Chinese and English here are deliberately terse —
+        they are read at a glance while a task is running, not read carefully.
+    -->
+    <string name="narrate_get_screen">读一下屏幕…</string>
+    <string name="narrate_screenshot">看一眼屏幕…</string>
+    <string name="narrate_tap">点一下…</string>
+    <string name="narrate_long_press">长按…</string>
+    <string name="narrate_swipe">滑动…</string>
+    <string name="narrate_type">输入文字…</string>
+    <string name="narrate_submit">提交…</string>
+    <string name="narrate_wait">等一下…</string>
+    <string name="narrate_launch">打开…</string>
+    <string name="narrate_system">操作系统按键…</string>
+    <string name="narrate_show_html">把结果放到屏幕上…</string>
+    <string name="narrate_camera">看一眼…</string>
+    <string name="narrate_dog">动一下腿…</string>
+    <string name="narrate_default">正在 %1$s…</string>
+
+    <!--
+      开机自检。发现由 device/SelfCheck 产出(设备侧、只有一个来源)，
+      ScreenBodyService 拿它弹一张卡、ui/SelfCheckActivity 拿它渲染成一页。
+      文案分两层:title 说「在查什么」，detail 说「查到什么、坏了会怎样」——
+      后者才是用户能读懂的那半，所以每条都写症状而不是写参数名。
+    -->
+    <string name="check_title_accessibility">无障碍服务</string>
+    <string name="check_title_overlay">悬浮窗权限</string>
+    <string name="check_title_network">网络</string>
+    <string name="check_title_brain">大脑</string>
+    <string name="check_title_model">模型连通</string>
+    <string name="check_title_microphone">麦克风</string>
+    <string name="check_title_notifications">通知使用权</string>
+    <string name="check_title_adb_keyboard">ADB 键盘</string>
+    <string name="check_title_secure_settings">免 root 输入</string>
+    <string name="check_title_voice_key">语音密钥</string>
+    <string name="check_title_voice_host">语音服务可达</string>
+    <string name="check_title_wake">唤醒词</string>
+    <string name="check_title_battery">后台运行</string>
+    <string name="check_title_disk">存储空间</string>
+
+    <string name="check_detail_accessibility_on">已开启，球和屏幕操作都在跑。</string>
+    <string name="check_detail_accessibility_off">没开。球、语音、点按滑动全都不存在 —— 这条不开，后面几条都不用看。</string>
+    <string name="check_detail_overlay_on">已允许，球能画出来。</string>
+    <string name="check_detail_overlay_off">没开。球和卡片都画不出来，而服务在后台其实跑得好好的 —— 所以看起来像「什么都没发生」。</string>
+    <string name="check_detail_network_on">已联网。</string>
+    <string name="check_detail_network_off">没联网。语音识别、语音合成、模型调用全都走网络。</string>
+    <string name="check_detail_brain_on">已配置。</string>
+    <string name="check_detail_brain_hub_missing">云端大脑地址是空的 —— 还不知道该把你说的话送去哪。</string>
+    <string name="check_detail_brain_key_missing">本地大脑没填 API Key，问了也不会有回答。</string>
+    <string name="check_detail_model_cloud">云端大脑，模型不在这台设备上。</string>
+    <string name="check_detail_model_no_key">还没填 Key，填了才测得了。</string>
+    <string name="check_detail_checking">检查中…</string>
+    <string name="check_detail_skipped_offline">没网，先不测。</string>
+    <string name="check_detail_model_ok">%1$s 通了。</string>
+    <string name="check_detail_model_throttled">连上了，但被限流（HTTP 429）。配置是对的，过一会儿会自己恢复。</string>
+    <string name="check_detail_model_url">连不上：%1$s</string>
+    <string name="check_detail_model_key">Key 被拒：%1$s</string>
+    <string name="check_detail_model_name">模型名「%1$s」不在服务端列表里。这台服务上有的：%2$s</string>
+    <string name="check_detail_model_other">%1$s</string>
+    <string name="check_detail_notif_on">已授权，监听器也连着。</string>
+    <string name="check_detail_notif_zombie">系统显示「已授权」，但监听器没连上，通知会被静默丢掉。\n这条得关掉再打开一次才行 —— 只打开不生效。</string>
+    <string name="check_detail_notif_off">没开。来电播报和通知转发都收不到。</string>
+    <string name="check_detail_adb_kb_on">已启用，能替你往别的应用里打字。</string>
+    <string name="check_detail_adb_kb_off">装了但没启用。去系统设置里把它打开就行 —— 它自己没有键盘界面，启用它不影响你平时打字。</string>
+    <string name="check_detail_adb_kb_missing">没装。替你打字、填表都靠它（ADBKeyboard），所以这类事现在做不了。点右边下载装上，回来这条就只剩「启用」一步。</string>
+    <string name="check_detail_secure_on">已授权，能往别的应用里打字。</string>
+    <string name="check_detail_secure_missing">没授权，往别的应用里打字（type_text）用不了。这条在设置里没有开关 —— 只能插上线用 adb 给。</string>
+    <string name="check_detail_mic_on">已允许。</string>
+    <string name="check_detail_mic_off">没允许。点球不会有任何反应 —— 这是最不像权限问题的一条。</string>
+    <string name="check_detail_voice_key_ok">已填。识别和合成用它连火山。</string>
+    <string name="check_detail_voice_key_missing">还没填。源码里不带密钥，得你自己去火山引擎开一个语音服务，把 API Key 填进 ⚙ 的「语音密钥」。没有它，听和说都连不上——报出来的却是连接超时，看着像网络坏了。其余功能照常。</string>
+    <string name="check_detail_voice_host_ok">%1$s 可达。</string>
+    <string name="check_detail_voice_host_bad">连不上 %1$s：%2$s。识别和合成都会超时。</string>
+    <string name="check_detail_wake_on">已录入，亮屏时喊得醒。</string>
+    <string name="check_detail_wake_off">还没录。不录也能用，只是喊不醒 —— 得点球。</string>
+    <string name="check_detail_battery_on">已在白名单，待办闹钟不会被推迟。</string>
+    <string name="check_detail_battery_off">不在电池优化白名单里。点右边「去开启」，系统会问「是否忽略电池优化？」，选「忽略」就好。\n厂商自己的「应用启动管理 / 后台运行」是另一套，在那里怎么改这项都是红的。息屏后待办提醒会晚到，唤醒词也会停。</string>
+    <string name="check_detail_disk_ok">剩余 %1$d MB。</string>
+    <string name="check_detail_disk_low">只剩 %1$d MB，再占下去会开始丢截图和页面。</string>
+    <string name="check_detail_disk_full">只剩 %1$d MB，基本写不进东西了。</string>
+    <string name="check_detail_disk_unknown">读不出来。</string>
+
+    <string name="check_fix_settings">去开启</string>
+    <!-- 通知使用权在「僵尸」态时那个开关本来就显示成已打开，所以这个门不是
+         「去开启」。见 SelfCheck.Fix.Screen.label。 -->
+    <string name="check_fix_repower">关闭再打开</string>
+    <string name="check_fix_download">去下载</string>
+    <string name="check_fix_allow">允许</string>
+    <string name="check_fix_app_settings">打开设置</string>
+    <string name="check_fix_adb_lead">这条只能在电脑上用 adb 执行：</string>
+    <string name="check_fix_no_screen">这台设备上没有这个设置页面。得自己在系统设置里找一下。</string>
+    <string name="check_page_title">自检</string>
+    <string name="check_page_lead">这台设备现在的状态。</string>
+    <string name="check_page_ok_title">一切正常</string>
+    <string name="check_page_ok_note">都配好了，去点球说话吧。</string>
+    <string name="check_page_recheck">重新检查</string>
+    <!-- 卡片的出口，两处都用它：头部的 ✕ 和底部的实心按钮。故意和设置卡
+         「完成」是同一个词 —— 这就是同一张卡。 -->
+    <string name="check_page_done">完成</string>
+    <string name="check_page_issues">%1$d 项需要处理</string>
+    <string name="check_page_notes_lead">下面几条仅供参考，不影响使用。</string>
+    <string name="check_page_no_service">无障碍还没开，设置面板暂时打不开。</string>
+    <string name="check_card_title">有 %1$d 项需要处理</string>
+    <string name="check_card_open">去处理</string>
+    <string name="check_card_ack">知道了</string>
+
+    <!-- 球球的几种样子。用户在全屏卡片上左右滑动球球来换，换到哪个就用字幕
+         报一下名字 —— 这个名字是给人看的，所以是资源，而不是 BallLook.name
+         （那个是给日志和 diff 看的）。 -->
+    <string name="ball_look_cream">奶油</string>
+    <string name="ball_look_bajie">八戒</string>
+    <string name="ball_look_imp">小恶魔</string>
+</resources>

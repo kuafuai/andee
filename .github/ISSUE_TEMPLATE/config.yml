@@ -1,0 +1,30 @@
+# Issue routing. Modelled on how large projects keep their tracker usable: the tracker
+# is for reproducible defects, everything else goes somewhere that fits it better.
+#
+# Two repository settings have to be on for these links to work, and nothing in the
+# repo can turn them on:
+#   1. GitHub Discussions (Settings → Features → Discussions) with a "Q&A" category.
+#      Without it, `blank_issues_enabled: false` leaves a user with a bug that is not
+#      a bug and nowhere to put it.
+#   2. Private vulnerability reporting (Settings → Security → Private vulnerability
+#      reporting). Until it is on, the first contact link 404s. See SECURITY.md.
+
+# Blank issues are off on purpose: an empty text box produces unreproducible reports.
+blank_issues_enabled: false
+
+contact_links:
+  - name: "\U0001F510 Security vulnerability"
+    url: 'https://github.com/kuafuai/andee/security/advisories/new'
+    about: Report vulnerabilities privately. Never open a public issue for a security problem — this app asks for a lot of sensitive Android permissions, and a public report is a roadmap for abuse. See SECURITY.md.
+
+  - name: "\U0001F4AC Question or setup help"
+    url: 'https://github.com/kuafuai/andee/discussions/categories/q-a'
+    about: "Not a bug — a question. \"Accessibility service keeps turning itself off\", \"which ROMs are known to work\", \"how do I build this\" all belong here."
+
+  - name: "\U0001F512 Permission justification"
+    url: 'https://github.com/kuafuai/andee/blob/main/docs/permissions.md'
+    about: Why the app asks for SMS, call log, contacts, and accessibility — what each one buys, and what happens if you refuse it. Read before filing a permission-related issue.
+
+  - name: "\u26A0\uFE0F \"It did something I did not want\""
+    url: 'https://github.com/kuafuai/andee/blob/main/DISCLAIMER.md'
+    about: "It spent money, sent the wrong message, or acted on a misreading. That is the documented behaviour of a tool that taps and types on your behalf — see DISCLAIMER.md and docs/acceptable-use.md. This is a different thing from a vulnerability, which is when a *third party* can steer it: that one goes to the security channel above."
