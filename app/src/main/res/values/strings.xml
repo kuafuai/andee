@@ -385,8 +385,8 @@
     <string name="check_detail_network_on">已联网。</string>
     <string name="check_detail_network_off">没联网。语音识别、语音合成、模型调用全都走网络。</string>
     <string name="check_detail_brain_on">已配置。</string>
-    <string name="check_detail_brain_hub_missing">云端大脑地址是空的 —— 还不知道该把你说的话送去哪。</string>
-    <string name="check_detail_brain_key_missing">本地大脑没填 API Key，问了也不会有回答。</string>
+    <string name="check_detail_brain_hub_missing">还没填。现在用的是云端大脑，得把你自己搭的 Hub 地址填进 ⚙ →「大脑」→「Hub 地址」。没有它，你说的话没地方送，问了不会有回答，屏幕也不会动。想让这台设备自己想，就在同一处把大脑切成「本机」。</string>
+    <string name="check_detail_brain_key_missing">还没填。现在用的是本机大脑，得你自己去 DeepSeek 开一个，把 Key 填进 ⚙ →「大脑」→「DeepSeek Key」。没有它，你说的话我收得到，却答不出、也动不了手。</string>
     <string name="check_detail_model_cloud">云端大脑，模型不在这台设备上。</string>
     <string name="check_detail_model_no_key">还没填 Key，填了才测得了。</string>
     <string name="check_detail_checking">检查中…</string>
@@ -412,7 +412,7 @@
     <string name="check_detail_mic_on">已允许。</string>
     <string name="check_detail_mic_off">没允许。点球不会有任何反应 —— 这是最不像权限问题的一条。</string>
     <string name="check_detail_voice_key_ok">已填。识别和合成用它连火山。</string>
-    <string name="check_detail_voice_key_missing">还没填。源码里不带密钥，得你自己去火山引擎开一个语音服务，把 API Key 填进 ⚙ 的「语音密钥」。没有它，听和说都连不上——报出来的却是连接超时，看着像网络坏了。其余功能照常。</string>
+    <string name="check_detail_voice_key_missing">还没填。源码里不带密钥，得你自己去火山引擎开一个语音服务，把 Key 填进 ⚙ →「语音（火山引擎）」→「火山 API Key」。没有它，听和说都连不上 —— 报出来的却是连接超时，看着像网络坏了。其余功能照常。</string>
     <string name="check_detail_voice_host_ok">%1$s 可达。</string>
     <string name="check_detail_voice_host_bad">连不上 %1$s：%2$s。识别和合成都会超时。</string>
     <string name="check_detail_wake_on">已录入，亮屏时喊得醒。</string>
@@ -443,7 +443,7 @@
     <string name="check_page_done">完成</string>
     <string name="check_page_issues">%1$d 项需要处理</string>
     <string name="check_page_notes_lead">下面几条仅供参考，不影响使用。</string>
-    <string name="check_page_no_service">无障碍还没开，设置面板暂时打不开。</string>
+    <string name="check_page_no_overlay">设置面板是一张悬浮窗画出来的 —— 先把下面那条「悬浮窗」开起来，再回来填。</string>
     <string name="check_card_title">有 %1$d 项需要处理</string>
     <string name="check_card_open">去处理</string>
     <string name="check_card_ack">知道了</string>

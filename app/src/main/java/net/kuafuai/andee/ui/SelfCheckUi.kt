@@ -171,17 +171,19 @@ class SelfCheckUi(
     private var last: List<SelfCheck.Finding>? = null
 
     /**
-     * Whether the assistant's own service is up, read off the list each time it
-     * is drawn rather than asked of [net.kuafuai.andee.ScreenBodyService]
-     * separately.
+     * Whether there is a settings sheet to open at all — the difference between
+     * 打开设置 opening a card and 打开设置 doing nothing.
      *
-     * Our settings sheet is an overlay that service owns, so this is the
-     * difference between 打开设置 opening a card and 打开设置 doing nothing —
-     * and [SelfCheck]'s `accessibility` row *is* the statement "that service is
-     * not running". One source of truth; a second test here could only ever
-     * disagree with the red row directly above it.
+     * Asked of the caller rather than inferred from the `accessibility` row,
+     * which is what this used to do. That inference was true while only the
+     * service could raise our sheet; it stopped being true when
+     * [SelfCheckActivity] learned to raise its own, and an inference is exactly
+     * the wrong shape for a capability its owner already knows. The rows this
+     * gates — 大脑 and 语音密钥 — are the two a user configures *before* the
+     * assistant works, so suppressing their one button on a page reached with
+     * the service off is suppressing it in the case it exists for.
      */
-    private var serviceUp = true
+    private val canOpenSettings = onOpenSettings != null
 
     fun isShowing(): Boolean = root != null
 
@@ -345,18 +347,16 @@ class SelfCheckUi(
         last = found
         val attention = found.filter { SelfCheck.needsAttention(it) }
         val rest = found.filterNot { SelfCheck.needsAttention(it) }
-        // Before any row is built: [fixButton] reads this per row.
-        serviceUp = found.none { it.id == "accessibility" && it.level == SelfCheck.Level.FAIL }
 
         hero?.removeAllViews()
         hero?.addView(summary(attention.size))
-        // The one case where the card has to say it cannot help: our own
-        // settings sheet lives in the service, so with the service off there is
-        // nowhere for 打开设置 to go. Say that instead of showing a button that
-        // would do nothing — and note the row itself has no button either, see
-        // [fixButton]. Only reachable in host mode: the window host *is* the
-        // service, so if it is drawing this at all, accessibility is on.
-        if (!serviceUp) hero?.addView(note(lctx.getString(R.string.check_page_no_service)))
+        // The one case where the card has to say it cannot help: our sheet is an
+        // overlay either way, so with the overlay grant missing there is nowhere
+        // for 打开设置 to go. Say that instead of showing a button that would do
+        // nothing — and note the row itself has no button either, see
+        // [fixButton]. Only reachable in host mode: the window host is already
+        // drawing overlays, so if it is drawing this at all the grant is there.
+        if (!canOpenSettings) hero?.addView(note(lctx.getString(R.string.check_page_no_overlay)))
 
         rows?.removeAllViews()
         attention.forEach { rows?.addView(row(it)) }
@@ -693,10 +693,10 @@ class SelfCheckUi(
      * colour is this app's established "this is tappable" mark.
      */
     private fun fixButton(f: SelfCheck.Finding): TextView? {
-        // Ours, and unreachable: see [serviceUp]. The note above the list has
-        // already said so, and a button that does nothing is worse than no
+        // Ours, and unreachable: see [canOpenSettings]. The note above the list
+        // has already said so, and a button that does nothing is worse than no
         // button — it is the exact failure this list exists to avoid.
-        if (f.fix is SelfCheck.Fix.OurSettings && !serviceUp) return null
+        if (f.fix is SelfCheck.Fix.OurSettings && !canOpenSettings) return null
         val label = when (val fix = f.fix) {
             // Zero means "the action's own word"; a fix instance gets to
             // override it when 去开启 would name the wrong errand — see

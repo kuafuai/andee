@@ -2,8 +2,11 @@ package net.kuafuai.andee.ui
 
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.ImageView
 import net.kuafuai.andee.ScreenBodyService
+import net.kuafuai.andee.config.FactoryReset
+import net.kuafuai.andee.config.Notebook
 import net.kuafuai.andee.config.VoiceConfig
 import net.kuafuai.andee.i18n.AppLocale
 
@@ -121,6 +124,12 @@ class SelfCheckActivity : StageActivity() {
      */
     private var paintedLang = ""
 
+    /**
+     * Our settings sheet while it is up — see [openOwnSettings]. Held only so a
+     * second tap on 打开设置 does not stack a second window on the first.
+     */
+    private var settings: SettingsUi? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -172,13 +181,25 @@ class SelfCheckActivity : StageActivity() {
             context = this,
             host = stage,
             onDismiss = { leave() },
+            // The two rows a first-run user actually has to act on — 大脑 and
+            // 语音密钥 — are `Fix.OurSettings`, and this page used to draw them
+            // with no button at all on the argument that the sheet belongs to the
+            // service. It does not: `SettingsUi` is a plain overlay built from a
+            // Context, and the grant it needs is one of the rows right here. So
+            // the door exists whenever that grant does, and only the
+            // overlay-refused case falls back to words — see
+            // [SelfCheckUi.canOpenSettings] and [openOwnSettings].
+            onOpenSettings = if (Settings.canDrawOverlays(this)) {
+                { openOwnSettings() }
+            } else {
+                null
+            },
             // The card's picker writes the preference and repaints itself, but
             // this Activity is what *remembers* the language on screen —
             // otherwise the next [onResume] would read a mismatch it caused
-            // itself and swap the whole card for nothing. Both callbacks
-            // [SelfCheckUi] offers exist to tell the *service* something (open
-            // our sheet, repaint the ball), and the service is exactly what is
-            // missing on this path, which is what leaves this one free.
+            // itself and swap the whole card for nothing. The other callback
+            // [SelfCheckUi] offers used to exist only to tell the service
+            // something, which is what left this one free.
             onLocaleChanged = { paintedLang = VoiceConfig.uiLanguage(this) },
         )
         // Local half first and it is not an optimisation: `local` is what the
@@ -194,6 +215,57 @@ class SelfCheckActivity : StageActivity() {
     }
 
     /**
+     * The settings sheet, raised by this page rather than by the service.
+     *
+     * This is the path where there is no service — that is the whole reason the
+     * page is on screen — so `ScreenBodyService.openSettingsForUser` has nobody
+     * to ask. `SettingsUi` never needed one: it is a `TYPE_APPLICATION_OVERLAY`
+     * built from a Context, and it lands on top of this Activity exactly as it
+     * lands on top of the assistant's card.
+     *
+     * The three wipes are the only thing the service was carrying, and each is
+     * one static call plus a brain rebuild — so here they are just the static
+     * call, because there is no brain to rebuild. That is not a degraded version
+     * of `ScreenBodyService.clearChatHistory`: what that method's second half is
+     * *for* is a model still holding the conversation, and on this path nothing
+     * is.
+     *
+     * Two sheets can never exist at once. The only way to this page is
+     * [onCreate] falling through, which happens when the service is absent or
+     * has no overlay — and in the second case `canDrawOverlays` is false too, so
+     * this is not even offered.
+     *
+     * Repainting on dismiss rather than trusting [onResume]: an overlay does not
+     * pause the Activity underneath it, so a language changed inside the sheet
+     * would otherwise leave this card in the old one until something else
+     * happened to resume it.
+     */
+    private fun openOwnSettings() {
+        if (settings?.isShowing() == true) return
+        val s = SettingsUi(
+            context = this,
+            onDismiss = {
+                settings = null
+                paintedLang = VoiceConfig.uiLanguage(this)
+                // Re-run the list, not just repaint it: the user came here to
+                // fill in a key, and the row they were sent from is exactly the
+                // one that should be green when they get back. [SelfCheckUi.start]
+                // is what 重新检查 calls.
+                if (::ui.isInitialized) ui.start()
+            },
+            onFactoryReset = { FactoryReset.wipe(this) },
+            onClearChat = { ChatHistory.wipe(this) },
+            onClearNotes = { Notebook.wipe(this) },
+            onLocaleChanged = {
+                paintedLang = VoiceConfig.uiLanguage(this)
+                if (::ui.isInitialized) ui.repaintForLanguage()
+            },
+        )
+        settings = s
+        s.show()
+    }
+
+    /**
      * Catch a language change that did not come from this card's picker.
      *
      * This Activity paints nothing itself any more, so what it keeps
@@ -203,13 +275,13 @@ class SelfCheckActivity : StageActivity() {
      * itself and hands the new value over through `onLocaleChanged` — so what
      * lands here is a change made somewhere this page cannot see.
      *
-     * Narrow today and kept on purpose: the 打开设置 row that used to make this
-     * reachable from inside the card is gone from this host by construction (it
-     * needs the service, and this is the service-is-off page), so the remaining
-     * path is a change written while the user was off in a system screen. It is
-     * one `SharedPreferences` read per resume — [AppLocale] deliberately does
-     * not cache, see its doc — and it is the check that stops mattering the day
-     * a door out of this page is added back.
+     * Narrower than it looks, and deliberately kept anyway. The two doors out of
+     * the card that *can* move the language — its own picker, and the settings
+     * sheet at [openOwnSettings] — both hand the new value back directly, and the
+     * sheet is an overlay that never pauses this Activity, so neither arrives
+     * here. What is left is a change written while the user was off in a system
+     * screen. It is one `SharedPreferences` read per resume — [AppLocale]
+     * deliberately does not cache, see its doc.
      *
      * `paintedLang` is set in [onCreate] before the first resume, so this cannot
      * fire on open. Guarded on [ui] for the *other* path through [onCreate]: the
@@ -225,6 +297,11 @@ class SelfCheckActivity : StageActivity() {
     }
 
     override fun onDestroy() {
+        // Our sheet is a window, not a child of this Activity, so nothing takes
+        // it down with us — an Activity destroyed with it up would leave an
+        // orphan overlay on screen with no way to close it.
+        settings?.hide()
+        settings = null
         // Guarded because this also runs when onCreate threw before the card was
         // built, and dying is not a good moment to throw a second exception.
         if (::ui.isInitialized) ui.destroy()

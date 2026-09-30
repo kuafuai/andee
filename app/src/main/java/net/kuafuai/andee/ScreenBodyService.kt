@@ -2006,12 +2006,12 @@ class ScreenBodyService : AccessibilityService() {
      * fighting this one for the keyboard. Posted to the main thread because
      * `SettingsUi.show` adds a window.
      *
-     * A null service means no sheet — the caller's row is then a dead button,
-     * which is why [net.kuafuai.andee.ui.SelfCheckUi] draws no 打开设置 row at
-     * all when the accessibility check is red (see its `serviceUp`), and says so
-     * in words instead. Guarded on [window] rather than on any "am I
-     * alive" flag: a sheet over a service that never got its overlay attached
-     * has nothing to sit on, and the add would throw.
+     * A null service means no sheet from *here*, which is why
+     * [net.kuafuai.andee.ui.SelfCheckActivity] raises its own on the path where
+     * this class does not exist — see its `openOwnSettings`. Guarded on
+     * [window] rather than on any "am I alive" flag: a sheet over a service
+     * that never got its overlay attached has nothing to sit on, and the add
+     * would throw.
      */
     fun openSettingsForUser() {
         ui.post { if (::window.isInitialized) openSettings() }

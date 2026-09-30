@@ -330,8 +330,8 @@
     <string name="check_detail_network_on">Online.</string>
     <string name="check_detail_network_off">Offline. Speech recognition, speech synthesis and every model call go over the network.</string>
     <string name="check_detail_brain_on">Configured.</string>
-    <string name="check_detail_brain_hub_missing">The cloud address is empty — nothing knows where to send what you say.</string>
-    <string name="check_detail_brain_key_missing">The on-device assistant has no API key, so asking it anything gets no answer.</string>
+    <string name="check_detail_brain_hub_missing">Not set. The brain is set to the cloud, so the address of your own hub goes in ⚙ → “Brain” → “Hub URL”. Without it there is nowhere to send what you say: no answers, and nothing on screen moves. To have this device think for itself, switch the brain to “On-device” in the same place.</string>
+    <string name="check_detail_brain_key_missing">Not set. The brain is set to run on this device, so open a DeepSeek account of your own and put the key in ⚙ → “Brain” → “DeepSeek Key”. Without it, what you say arrives and nothing can be answered or acted on.</string>
     <string name="check_detail_model_cloud">Cloud assistant — the model is not on this device.</string>
     <string name="check_detail_model_no_key">No key yet. Fill one in and this becomes testable.</string>
     <string name="check_detail_checking">Checking…</string>
@@ -357,7 +357,7 @@
     <string name="check_detail_mic_on">Allowed.</string>
     <string name="check_detail_mic_off">Not allowed. Tapping the ball does nothing at all — the failure that least resembles a permission problem.</string>
     <string name="check_detail_voice_key_ok">Set. Recognition and synthesis use it to reach Volcengine.</string>
-    <string name="check_detail_voice_key_missing">Not set. The source ships without a key — open a Volcengine Speech service of your own and put its API key in ⚙ under “Voice API key”. Without it, hearing and speaking cannot connect, and what you get back is a connection timeout that looks like a network fault. Everything else works.</string>
+    <string name="check_detail_voice_key_missing">Not set. The source ships without a key — open a Volcengine Speech service of your own and put the key in ⚙ → “Speech (Volcengine)” → “Volcengine API key”. Without it, hearing and speaking cannot connect, and what you get back is a connection timeout that looks like a network fault. Everything else works.</string>
     <string name="check_detail_voice_host_ok">%1$s is reachable.</string>
     <string name="check_detail_voice_host_bad">Could not reach %1$s: %2$s. Both recognition and synthesis will time out.</string>
     <string name="check_detail_wake_on">Taught, and it wakes while the screen is on.</string>
@@ -389,7 +389,7 @@
     <string name="check_page_done">Done</string>
     <string name="check_page_issues">%1$d to sort out</string>
     <string name="check_page_notes_lead">The rest is just for reference and changes nothing.</string>
-    <string name="check_page_no_service">Accessibility is off, so the assistant’s settings cannot be opened from here yet.</string>
+    <string name="check_page_no_overlay">The settings sheet is drawn as a floating window — turn on “Draw over other apps” below first, then come back and fill these in.</string>
     <string name="check_card_title">%1$d thing(s) need attention</string>
     <string name="check_card_open">Fix it</string>
     <string name="check_card_ack">Got it</string>
