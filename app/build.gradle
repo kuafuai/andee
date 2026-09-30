@@ -3,9 +3,27 @@ plugins {
     id 'org.jetbrains.kotlin.android' version '1.9.22'
 }
 
+def localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) {
+    localPropsFile.withInputStream { localProps.load(it) }
+}
+static def escapeStringLiteral(String value) {
+    if (value == null) return '""'
+    return '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"'
+}
+def buildConfigString = { String key ->
+    escapeStringLiteral(localProps.getProperty(key, ''))
+}
+
 android {
     namespace 'net.kuafuai.andee'
     compileSdk 34
+
+    buildFeatures {
+        // AGP 8 默认关掉了。开出来就能用 BuildConfig.XXX。
+        buildConfig true
+    }
 
     defaultConfig {
         applicationId "net.kuafuai.andee"
@@ -15,6 +33,11 @@ android {
         versionName "1.0.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField "String", "ASR_ENDPOINT",      buildConfigString('ASR_ENDPOINT')
+        buildConfigField "String", "TTS_ENDPOINT",      buildConfigString('TTS_ENDPOINT')
+        buildConfigField "String", "API_KEY",      buildConfigString('API_KEY')
+        buildConfigField "String", "LLM_BASE_URL",      buildConfigString('LLM_BASE_URL')
     }
 
     buildTypes {

@@ -1,6 +1,7 @@
 package net.kuafuai.andee.config
 
 import android.content.Context
+import net.kuafuai.andee.BuildConfig
 import java.util.UUID
 
 
@@ -134,11 +135,11 @@ data class VoiceConfig(
             }
             return BrainConfig(
                 mode = mode,
-                apiKey = p.getString("llm_api_key", "").orEmpty().trim(),
+                apiKey = p.getString("llm_api_key", "").orEmpty().trim().ifEmpty { BuildConfig.API_KEY },
                 // trimEnd('/') because the client appends "/chat/completions"
                 // and a trailing slash from the settings field would produce a
                 // double slash, which some gateways 404 on.
-                baseUrl = p.getString("llm_base_url", DEFAULT_LLM_BASE_URL)
+                baseUrl = p.getString("llm_base_url", BuildConfig.LLM_BASE_URL)
                     .orEmpty().trim().trimEnd('/').ifEmpty { DEFAULT_LLM_BASE_URL },
                 model = p.getString("llm_model", DEFAULT_LLM_MODEL)
                     .orEmpty().trim().ifEmpty { DEFAULT_LLM_MODEL },
@@ -205,11 +206,11 @@ data class VoiceConfig(
                 // Empty in prefs → [API_KEY], which is itself empty in the
                 // public source. Trim before the fallback so a field cleared to
                 // spaces behaves like a cleared field.
-                apiKey = p.getString("api_key", "").orEmpty().trim().ifEmpty { API_KEY },
-                asrEndpoint = p.getString("asr_endpoint", DEFAULT_ASR_ENDPOINT)!!,
+                apiKey = p.getString("api_key", "").orEmpty().trim().ifEmpty { BuildConfig.API_KEY },
+                asrEndpoint = p.getString("asr_endpoint", BuildConfig.ASR_ENDPOINT)!!,
                 asrResourceId = p.getString("asr_resource_id", DEFAULT_ASR_RESOURCE)!!,
                 asrUid = uid,
-                ttsEndpoint = p.getString("tts_endpoint", DEFAULT_TTS_ENDPOINT)!!,
+                ttsEndpoint = p.getString("tts_endpoint", BuildConfig.TTS_ENDPOINT)!!,
                 ttsResourceId = p.getString("tts_resource_id", DEFAULT_TTS_RESOURCE)!!,
                 // The voice follows the ball's look; [TTS_SPEAKER] is the
                 // fallback for looks that don't name one.
