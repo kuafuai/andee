@@ -324,7 +324,7 @@
     <string name="check_title_disk">Storage</string>
 
     <string name="check_detail_accessibility_on">On. The ball and every screen action are running.</string>
-    <string name="check_detail_accessibility_off">Off. No ball, no voice, no tapping or swiping — with this one off, the rest of this list does not matter yet.</string>
+    <string name="check_detail_accessibility_off">Off. No ball, no voice, no tapping or swiping — with this one off, the rest of this list does not matter yet. The switch lives under "Downloaded apps" in the accessibility settings, not on the first screen.</string>
     <string name="check_detail_overlay_on">Allowed. The ball can be drawn.</string>
     <string name="check_detail_overlay_off">Off. Neither the ball nor any card can be drawn, while the service runs perfectly well in the background — which is why it looks like nothing happened at all.</string>
     <string name="check_detail_network_on">Online.</string>
