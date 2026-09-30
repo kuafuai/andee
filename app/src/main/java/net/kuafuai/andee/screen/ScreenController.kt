@@ -592,7 +592,17 @@ class ScreenController(
      * [typeViaAdbKeyboard].
      */
     fun typeText(text: String, id: String?, secret: Boolean): JSONObject {
-        // ── 输入通道(2026-09-20 定版):ADBKeyboard IME 广播单通道 ──
+        // ── 输入通道:无障碍输入法优先,ADBKeyboard 兜底(2026-09-30) ──
+        //
+        // 首选 [A11yIme]:API 33 起,声明了 flagInputMethodEditor 的无障碍
+        // 服务自己就能 commitText 到焦点编辑器 —— 和键盘同一条 InputConnection,
+        // 但**不是**一个输入法:不用装、不用启用、不用切,用户自己的键盘
+        // 全程还在。它排第一位是因为下面那条路要求用户有一台电脑(见
+        // [typeViaA11yIme])。兜底仍是 ADBKeyboard,给 API 30–32 和
+        // 这条路够不着的编辑器 —— 打字静默失效这件事这个项目已经付过
+        // 两次代价了。
+        //
+        // 以下是 ADBKeyboard 那条路的原始记录(2026-09-20 定版),照旧有效:
         //
         // 实测依据(当天 bolt.new 两设备全量对比):
         //   - SET_TEXT/剪贴板PASTE:Radix 表单串字段,CodeMirror 全灭,
@@ -616,7 +626,47 @@ class ScreenController(
             throw IllegalStateException("no input focus (tap into an input field first)")
         }
         runCatching { if (focused !== root) focused.recycle() }
-        return typeViaAdbKeyboard(text, secret)
+        return typeViaA11yIme(text, secret) ?: typeViaAdbKeyboard(text, secret)
+    }
+
+    /**
+     * 首选通道:本服务自己的无障碍输入法([A11yIme])。
+     *
+     * 返回 null = **这条路不通、且一个字都没打**(API < 33、当前没有
+     * 焦点编辑器、自绘编辑器拿不到 InputConnection),交给
+     * [typeViaAdbKeyboard] 兜底。返回非 null = 已经 commit 过,成功与
+     * 否都在这里定论,绝不能再兜底一次 —— 那是真正会输两遍的情况。
+     *
+     * 它排在 ADBKeyboard 前面的理由不是快(虽然省掉了借还输入法的
+     * ~0.75s),是**用户不需要电脑**:ADB 通道要侧载一个第三方 APK,
+     * 还要 `adb shell pm grant … WRITE_SECURE_SETTINGS` 才能改默认输入
+     * 法。没有电脑的用户在那条路上一个字也打不了。
+     */
+    private fun typeViaA11yIme(text: String, secret: Boolean): JSONObject? {
+        val got = A11yIme.replace(service, text) ?: return null
+        val ok = got == text
+        return JSONObject()
+            .put("performed", ok)
+            .put("via", A11yIme.VIA)
+            .put("len", text.length)
+            .apply {
+                if (ok) {
+                    if (!secret) put("text", got)
+                } else if (secret) {
+                    put(
+                        "error",
+                        "committed through the accessibility IME but the field holds " +
+                            "${got.length} chars instead of ${text.length} — " +
+                            "verify with a screenshot",
+                    )
+                } else {
+                    put(
+                        "error",
+                        "committed through the accessibility IME but the field reads " +
+                            "'${got.take(30)}' — verify with a screenshot",
+                    )
+                }
+            }
     }
 
     /**
@@ -802,9 +852,21 @@ class ScreenController(
                 val performed = target.performAction(
                     AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id
                 )
+                // A WebView's editor often reports the action but does not act on
+                // it. [A11yIme.editorAction] asks the editor's own EditorInfo what
+                // it is (Send / Search / Next) and fires that, which is what its
+                // listener is registered for. Second rather than first because
+                // ACTION_IME_ENTER needs no focused *input connection* and covers
+                // the `id`-addressed case this method also serves.
+                val viaIme = if (!performed && id == null) {
+                    A11yIme.editorAction(service)
+                } else {
+                    false
+                }
                 return JSONObject()
-                    .put("performed", performed)
+                    .put("performed", performed || viaIme)
                     .put("target_id", target.viewIdResourceName)
+                    .apply { if (viaIme) put("via", A11yIme.VIA) }
             } finally {
                 if (target !== root) target.recycle()
             }

@@ -54,15 +54,17 @@ The "What you get" column is the copy the app actually shows (`dev_perm_feature_
 | Notifications<br>`POST_NOTIFICATIONS` | Remind you on time | Due-task reminders | No reminder at the due time, **but the task is not lost** |
 | Boot<br>`RECEIVE_BOOT_COMPLETED` | Tasks survive a reboot | Rebuilding the `AlarmManager` alarms | After a reboot, due tasks stop reminding |
 | Battery optimisation exemption<br>`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | Reminders arrive on time | Task scheduling | With the screen off, reminders arrive late |
-| Write secure settings<br>`WRITE_SECURE_SETTINGS` | Switch the input method (needed to type) | Prerequisite step for `type_text` | **`type_text` fails outright**, and tells you exactly why. It will not pretend to succeed |
+| Write secure settings<br>`WRITE_SECURE_SETTINGS` | Switch the input method, for the spare typing route | Prerequisite for the ADBKeyboard fallback | Nothing on Android 13 and above — typing goes through the accessibility input method. On Android 12 and below, **`type_text` fails outright**, and tells you exactly why. It will not pretend to succeed |
 
+> On **Android 13 and above you do not need this.** The app types through its own accessibility service's input connection: nothing to install, no keyboard to switch to, and your own keyboard stays active throughout.
+>
 > `WRITE_SECURE_SETTINGS` is the odd one out: it **does not take effect on install — you must grant it manually over adb**:
 >
 > ```bash
 > adb shell pm grant net.kuafuai.andee android.permission.WRITE_SECURE_SETTINGS
 > ```
 >
-> That is a platform restriction, not a choice this app made. You can use it without granting this; you just cannot type.
+> That is a platform restriction, not a choice this app made. On Android 12 and below it is what typing needs; above that it only matters for the fallback route, which is used when an editor refuses the normal channel.
 
 ---
 

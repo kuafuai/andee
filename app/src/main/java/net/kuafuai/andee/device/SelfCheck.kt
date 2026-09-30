@@ -1,6 +1,7 @@
 package net.kuafuai.andee.device
 
 import android.Manifest
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -8,6 +9,7 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.os.Build
 import android.os.PowerManager
 import android.os.StatFs
 import android.provider.Settings
@@ -168,6 +170,7 @@ object SelfCheck {
      */
     fun run(context: Context, probe: Boolean = true): List<Finding> {
         val online = isOnline(context)
+        val a11yIme = imeChannelOpen()
         return listOf(
             accessibility(context),
             overlay(context),
@@ -176,8 +179,9 @@ object SelfCheck {
             backend(context, probe, online),
             microphone(context),
             notificationAccess(context),
-            adbKeyboard(context),
-            secureSettings(context),
+            typingChannel(context),
+            adbKeyboard(context, a11yIme),
+            secureSettings(context, a11yIme),
             voiceKey(context),
             voiceReach(probe, online),
             wakePhrase(context),
@@ -449,7 +453,55 @@ object SelfCheck {
     }
 
     /**
-     * ADBKeyboard — the headless IME every `type_text` goes through.
+     * Which of the two typing channels is actually in play.
+     *
+     * The primary one is our own accessibility service acting as an input method
+     * ([net.kuafuai.andee.screen.A11yIme]) — API 33+, nothing for the user to
+     * install, enable, switch or plug a cable in for. When it is there, the two
+     * rows below it describe a fallback and stop being errands; when it is not,
+     * they are the only way the assistant can type and go back to being warnings.
+     *
+     * So this row is the *reason* those two change colour, which is why it is
+     * [Level.NOTE] in both directions and never an errand itself: there is
+     * nothing a user can do about an Android 12 tablet, and a red row with no
+     * fix is the thing this page exists to avoid.
+     *
+     * Asked of the **running service's** `serviceInfo` rather than of
+     * `Build.VERSION`, because the flag is what the platform granted, not what
+     * the manifest asked for. With the service down the question is moot — the
+     * `accessibility` row above is already red and nothing can type at all — and
+     * the answer defaults to the version check so the fallback rows still read
+     * correctly on the launcher's copy of this page.
+     */
+    private fun typingChannel(context: Context): Finding {
+        val on = imeChannelOpen()
+        return Finding(
+            id = "typing_channel",
+            title = R.string.check_title_typing_channel,
+            level = Level.NOTE,
+            detail = if (on) R.string.check_detail_typing_a11y
+            else R.string.check_detail_typing_adb,
+            fix = Fix.Nothing,
+        )
+    }
+
+    /**
+     * Whether the accessibility input-method channel is open.
+     *
+     * Shared by [typingChannel] and the two fallback rows so they cannot
+     * disagree about the same fact — the failure a second copy of this test
+     * would have within a week.
+     */
+    private fun imeChannelOpen(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
+        val info = runCatching {
+            net.kuafuai.andee.ScreenBodyService.get()?.serviceInfo
+        }.getOrNull() ?: return true
+        return info.flags and AccessibilityServiceInfo.FLAG_INPUT_METHOD_EDITOR != 0
+    }
+
+    /**
+     * ADBKeyboard — the headless IME the **fallback** `type_text` goes through.
      *
      * `ScreenController.typeViaAdbKeyboard` has exactly one channel: a broadcast
      * to `com.android.adbkeyboard`, which must be an *enabled* IME for the
@@ -464,26 +516,34 @@ object SelfCheck {
      * but off → enable it; enabled → [Level.OK]. Two rows would leave a
      * permanently red "not installed" beside a green "enabled".
      *
-     * **[Level.WARN], matching [secureSettings] beside it.** Same capability,
-     * same blast radius: only typing into other apps is lost, everything else on
-     * this page still works. The two rows have to agree about how bad the same
-     * broken feature is, or the list teaches the user to distrust its colours.
+     * **[Level.NOTE] once [typingChannel] is open, [Level.WARN] when it is
+     * not** — and that split is the whole point of [a11yIme] being a parameter.
+     * This used to be an unconditional WARN, from a time when it was the only
+     * channel: a user with no computer was told to go get one, for a capability
+     * the device now has by itself. Downgraded rather than deleted because
+     * API 30–32 and any editor the primary channel cannot reach still land here,
+     * and a silently missing fallback is how typing breaks twice.
      *
      * The download is [ADB_KEYBOARD_APK] and the enable step is
      * `INPUT_METHOD_SETTINGS`, which is the screen that lists keyboards with the
      * toggle that actually turns this one on — not `showInputMethodPicker`,
      * which `ImeSwitch` refuses on purpose.
      */
-    private fun adbKeyboard(context: Context): Finding {
+    private fun adbKeyboard(context: Context, a11yIme: Boolean): Finding {
         val installed = net.kuafuai.andee.ui.ImeSwitch.brainInstalled(context)
         val enabled = installed &&
             net.kuafuai.andee.ui.ImeSwitch.brainEnabled(context)
         return Finding(
             id = "adb_keyboard",
             title = R.string.check_title_adb_keyboard,
-            level = if (enabled) Level.OK else Level.WARN,
+            level = when {
+                enabled -> Level.OK
+                a11yIme -> Level.NOTE
+                else -> Level.WARN
+            },
             detail = when {
                 enabled -> R.string.check_detail_adb_kb_on
+                a11yIme -> R.string.check_detail_adb_kb_spare
                 installed -> R.string.check_detail_adb_kb_off
                 else -> R.string.check_detail_adb_kb_missing
             },
@@ -496,26 +556,35 @@ object SelfCheck {
     }
 
     /**
-     * `WRITE_SECURE_SETTINGS`, which `type_text` needs.
+     * `WRITE_SECURE_SETTINGS`, which the **fallback** `type_text` needs.
      *
      * The one row with no button on purpose. It is
-     * `signature|privileged|development`: `pm grant` over adb is the only way,
-     * and this tablet's provisioning already does it. When it goes missing — a
-     * factory reset, a new tablet — the honest answer is "plug the cable in",
-     * not a Settings screen that does not contain the switch.
+     * `signature|privileged|development`: `pm grant` over adb is the only way.
+     * When it goes missing — a factory reset, a new tablet — the honest answer
+     * is "plug the cable in", not a Settings screen that does not contain the
+     * switch.
      *
-     * [Level.WARN] rather than FAIL because everything except typing into other
-     * apps still works without it.
+     * [Level.NOTE] / [Level.WARN] on the same rule as [adbKeyboard], and for the
+     * same reason: this grant only ever existed to let the device swap its own
+     * default IME for one tool call, and with [typingChannel] open there is no
+     * IME to swap.
      */
-    private fun secureSettings(context: Context): Finding {
+    private fun secureSettings(context: Context, a11yIme: Boolean): Finding {
         val on = context.checkSelfPermission(WRITE_SECURE_SETTINGS) ==
             PackageManager.PERMISSION_GRANTED
         return Finding(
             id = "secure_settings",
             title = R.string.check_title_secure_settings,
-            level = if (on) Level.OK else Level.WARN,
-            detail = if (on) R.string.check_detail_secure_on
-            else R.string.check_detail_secure_missing,
+            level = when {
+                on -> Level.OK
+                a11yIme -> Level.NOTE
+                else -> Level.WARN
+            },
+            detail = when {
+                on -> R.string.check_detail_secure_on
+                a11yIme -> R.string.check_detail_secure_spare
+                else -> R.string.check_detail_secure_missing
+            },
             fix = if (on) {
                 Fix.Nothing
             } else {

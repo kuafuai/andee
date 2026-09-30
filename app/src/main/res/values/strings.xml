@@ -369,6 +369,7 @@
     <string name="check_title_model">模型连通</string>
     <string name="check_title_microphone">麦克风</string>
     <string name="check_title_notifications">通知使用权</string>
+    <string name="check_title_typing_channel">打字通道</string>
     <string name="check_title_adb_keyboard">ADB 键盘</string>
     <string name="check_title_secure_settings">免 root 输入</string>
     <string name="check_title_voice_key">语音密钥</string>
@@ -399,11 +400,15 @@
     <string name="check_detail_notif_on">已授权，监听器也连着。</string>
     <string name="check_detail_notif_zombie">系统显示「已授权」，但监听器没连上，通知会被静默丢掉。\n这条得关掉再打开一次才行 —— 只打开不生效。</string>
     <string name="check_detail_notif_off">没开。来电播报和通知转发都收不到。</string>
+    <string name="check_detail_typing_a11y">走无障碍输入法：我自己就能往输入框里打字，不用装键盘、不用改默认输入法、也不用插电脑。你自己的键盘全程照用。</string>
+    <string name="check_detail_typing_adb">这个系统版本（低于 Android 13）没有无障碍输入法，打字得走下面的 ADB 键盘，所以那两条要备齐。</string>
     <string name="check_detail_adb_kb_on">已启用，能替你往别的应用里打字。</string>
+    <string name="check_detail_adb_kb_spare">现在打字走无障碍输入法，用不着它了。留着当备用：碰上它打不进去的输入框，会自动换回这条路 —— 那时候得先装上。</string>
     <string name="check_detail_adb_kb_off">装了但没启用。去系统设置里把它打开就行 —— 它自己没有键盘界面，启用它不影响你平时打字。</string>
     <string name="check_detail_adb_kb_missing">没装。替你打字、填表都靠它（ADBKeyboard），所以这类事现在做不了。点右边下载装上，回来这条就只剩「启用」一步。</string>
     <string name="check_detail_secure_on">已授权，能往别的应用里打字。</string>
     <string name="check_detail_secure_missing">没授权，往别的应用里打字（type_text）用不了。这条在设置里没有开关 —— 只能插上线用 adb 给。</string>
+    <string name="check_detail_secure_spare">没授权，不过不影响打字 —— 现在走的是无障碍输入法。它只给上面那条备用通道用，没有也行。</string>
     <string name="check_detail_mic_on">已允许。</string>
     <string name="check_detail_mic_off">没允许。点球不会有任何反应 —— 这是最不像权限问题的一条。</string>
     <string name="check_detail_voice_key_ok">已填。识别和合成用它连火山。</string>

@@ -54,15 +54,17 @@
 | 通知栏<br>`POST_NOTIFICATIONS` | 到点提醒你 | 待办到期的提醒 | 到点不提醒，**但待办不会丢** |
 | 开机自启<br>`RECEIVE_BOOT_COMPLETED` | 重启后待办还在 | 重建 `AlarmManager` 闹钟 | 重启后待办不再提醒 |
 | 电池优化豁免<br>`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | 到点提醒准时 | 待办定时 | 息屏状态下提醒会迟到 |
-| 改系统设置<br>`WRITE_SECURE_SETTINGS` | 换输入法（打字用） | `type_text` 前置步骤 | **`type_text` 直接失败**，并明确告诉你失败原因，不会假装成功 |
+| 改系统设置<br>`WRITE_SECURE_SETTINGS` | 换输入法（备用打字通道用） | ADBKeyboard 兜底通道的前置步骤 | Android 13 及以上没影响 —— 打字走的是无障碍输入法。Android 12 及以下则 **`type_text` 直接失败**，并明确告诉你失败原因，不会假装成功 |
 
+> **Android 13 及以上不需要这条。** 应用用自己无障碍服务的输入连接打字：不用装键盘、不用切默认输入法，你自己的键盘全程照用。
+>
 > `WRITE_SECURE_SETTINGS` 是特殊的一个：它**装完不生效，必须用 adb 手动授予**：
 >
 > ```bash
 > adb shell pm grant net.kuafuai.andee android.permission.WRITE_SECURE_SETTINGS
 > ```
 >
-> 这是系统限制，不是应用的选择。不授予也能用，只是打不了字。
+> 这是系统限制，不是应用的选择。Android 12 及以下打字靠它；以上版本它只给兜底通道用 —— 碰上正常通道进不去的输入框才会走到。
 
 ---
 

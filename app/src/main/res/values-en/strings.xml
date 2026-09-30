@@ -314,6 +314,7 @@
     <string name="check_title_model">Model</string>
     <string name="check_title_microphone">Microphone</string>
     <string name="check_title_notifications">Notification access</string>
+    <string name="check_title_typing_channel">Typing channel</string>
     <string name="check_title_adb_keyboard">ADB keyboard</string>
     <string name="check_title_secure_settings">Typing without root</string>
     <string name="check_title_voice_key">Voice API key</string>
@@ -344,11 +345,15 @@
     <string name="check_detail_notif_on">Granted, and the listener is bound.</string>
     <string name="check_detail_notif_zombie">Settings says “granted”, but the listener is not bound — notifications are being dropped silently.\nThis one only comes back if you turn it off and then on again; leaving it on does nothing.</string>
     <string name="check_detail_notif_off">Off. Call announcements and forwarded notifications never arrive.</string>
+    <string name="check_detail_typing_a11y">Through the accessibility input method: I can type into a field myself — no keyboard to install, no default input method to change, no computer to plug in. Your own keyboard stays active throughout.</string>
+    <string name="check_detail_typing_adb">This Android version (below 13) has no accessibility input method, so typing goes through the ADB keyboard below — both of those rows have to be in place.</string>
     <string name="check_detail_adb_kb_on">Enabled. It can type into other apps for you.</string>
+    <string name="check_detail_adb_kb_spare">Not needed now — typing goes through the accessibility input method. It stays as the spare: a field that channel cannot reach falls back to this one, and it has to be installed by then.</string>
     <string name="check_detail_adb_kb_off">Installed but not enabled. Turn it on in system settings — it has no keyboard UI of its own, so enabling it does not get in the way of typing yourself.</string>
     <string name="check_detail_adb_kb_missing">Not installed. Typing and filling in forms for you go through it (ADBKeyboard), so that does not work yet. Download it with the button here — when you come back this row is a one-tap enable.</string>
     <string name="check_detail_secure_on">Granted. Typing into other apps works.</string>
     <string name="check_detail_secure_missing">Not granted, so typing into other apps (type_text) is unavailable. There is no switch for this in Settings — it can only be given over adb with the cable plugged in.</string>
+    <string name="check_detail_secure_spare">Not granted, and typing works anyway — it goes through the accessibility input method. This is only needed by the spare channel above.</string>
     <string name="check_detail_mic_on">Allowed.</string>
     <string name="check_detail_mic_off">Not allowed. Tapping the ball does nothing at all — the failure that least resembles a permission problem.</string>
     <string name="check_detail_voice_key_ok">Set. Recognition and synthesis use it to reach Volcengine.</string>
