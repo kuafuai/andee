@@ -904,6 +904,10 @@ class FloatingWindowUi(
      * Not worth arguing with. One `getLocationOnScreen` says what the device
      * actually does, and subtracting it makes the same arithmetic correct on
      * both.
+     *
+     * **It belongs to the folded geometry and to nothing else** — see
+     * [refreshWinYOrigin], which is the whole reason this is not simply read
+     * whenever it is wanted.
      */
     private var winYOrigin = 0
 
@@ -911,12 +915,31 @@ class FloatingWindowUi(
      * Re-measure [winYOrigin]. Needs the window laid out and *not* mid-slide,
      * or `p.y` and the on-screen location come from different frames.
      *
+     * **Only ever measured while the window is the corner square**, because the
+     * offset is a property of the *geometry* and not of the window type. On this
+     * Honor phone, measured through `BallGeom`: as a `MATCH_PARENT` card the
+     * frame starts at `126` with `p.y = 0`, so the offset reads as the status
+     * bar height; as the 168 dp square it reads `0`, because an explicitly sized
+     * and positioned `FLAG_LAYOUT_NO_LIMITS` window really is placed in display
+     * coordinates. `FLAG_LAYOUT_IN_SCREEN` does not close that gap — a
+     * MATCH_PARENT overlay still resolves against the content frame.
+     *
+     * [enterCompact] used to take the measurement in the card's own frame, one
+     * line before shrinking to the square, and then spend it on the square's
+     * `p.y`. That is the bug behind "球球悬在底部上面": every value here is
+     * subtracted from a screen Y, so a 126 that belonged to the outgoing frame
+     * lifted the folded ball 126 px clear of the edge its paws are drawn to
+     * grip. The ledge was right whenever [applyPerch] happened to re-measure
+     * afterwards and wrong whenever the fold arrived already perched — which is
+     * the ordinary case, since a task starts before its first `screen.*` call.
+     *
      * Main thread only.
      */
     private fun refreshWinYOrigin() {
         val v = root ?: return
         val p = params ?: return
         if (v.width == 0 || slide?.isRunning == true) return
+        if (p.width == WindowManager.LayoutParams.MATCH_PARENT) return
         val loc = IntArray(2)
         v.getLocationOnScreen(loc)
         winYOrigin = loc[1] - p.y
@@ -925,17 +948,6 @@ class FloatingWindowUi(
     /** Resting compact `p.y`: bottom-right of the *visible* area. Main thread only. */
     private fun compactHomeY(): Int =
         bottomEdge() - dp(COMPACT_DP) - dp(COMPACT_MARGIN_DP) - winYOrigin
-
-    /**
-     * [winYOrigin], for the other overlays this process puts on screen.
-     *
-     * It is a property of the window *type*, not of this window, so anything
-     * else adding a `TYPE_APPLICATION_OVERLAY` at `Gravity.TOP` — CardUi — has
-     * to subtract the same thing to turn a screen Y into a `p.y`. Measured here
-     * only because this is the window that is always up and therefore always
-     * measurable. Main thread only.
-     */
-    fun overlayYOrigin(): Int = winYOrigin
 
     /**
      * The assistant is working: sink the corner ball half-way below the bottom
@@ -1583,9 +1595,6 @@ class FloatingWindowUi(
         fullGeometry = intArrayOf(p.x, p.y, p.width, p.height)
         val side = dp(COMPACT_DP)
         val dm = context.resources.displayMetrics
-        // Measured while the window is still in its old geometry, which is the
-        // only moment `p.y` and the on-screen location agree.
-        refreshWinYOrigin()
         p.width = side
         p.height = side
         // X is normally the resting corner, a thumb's width in (see
@@ -1606,6 +1615,34 @@ class FloatingWindowUi(
         applyCompactAppearance()
         syncWorking()
         retimeStroll()
+        // Everything above is placed from whatever [winYOrigin] the *last* fold
+        // measured, because the square's own frame does not exist until this one
+        // has been laid out. Re-measure as soon as it does.
+        ui.post { reseatCompact() }
+    }
+
+    /**
+     * Re-place the folded ball against a freshly measured [winYOrigin].
+     *
+     * A no-op unless the number actually moved, which is every fold but the
+     * first on a device whose folded frame is offset from the display — and on
+     * the ones where it is not offset at all, every fold. It exists so that
+     * [enterCompact] does not have to depend on a measurement having been taken
+     * earlier: [show] takes one, but it bails on a view that is not laid out
+     * yet, and the first fold arrives moments later.
+     *
+     * Main thread only.
+     */
+    private fun reseatCompact() {
+        val v = root ?: return
+        val p = params ?: return
+        if (!compact || signboard != null || p.width != dp(COMPACT_DP)) return
+        val before = winYOrigin
+        refreshWinYOrigin()
+        if (winYOrigin == before) return
+        homeY = compactHomeY()
+        p.y = if (perchApplied) perchY() else homeY
+        runCatching { wm.updateViewLayout(v, p) }
     }
 
     /** Main thread only. */
