@@ -105,3 +105,32 @@ object OwnCard {
         depth.updateAndGet { if (it > 0) it - 1 else 0 }
     }
 }
+
+/**
+ * Whether the assistant's own card is unfolded over the whole display.
+ *
+ * A second way to get zero nodes, by a different mechanism than [OwnCard] and
+ * with a different answer. The card is `FLAG_NOT_FOCUSABLE`, so it never
+ * becomes the active window and the app behind it stays focused and keeps its
+ * root — but it *covers* the display, and every node of an occluded window
+ * reports `isVisibleToUser == false`. [ScreenController.buildNode] drops those
+ * before it counts them, so `nodes_total` is 0 with a perfectly healthy tree
+ * underneath. Measured on this device: with the card unfolded, Chrome's window
+ * is present, `active`, `focused`, `root: true` and yields 0 nodes; folding the
+ * card returns 75 from the same screen.
+ *
+ * It exists because that is the same signature [ScreenController.reviveNote]
+ * reads as a stale accessibility connection, and it sent a user off to toggle a
+ * permission that was working fine — the dump has to be able to say the real
+ * reason. Normally unreachable now that [net.kuafuai.andee.net.CommandDispatcher]
+ * waits for the fold to land, so a dump that still sees this is either a passive
+ * observer (`driving = false`) or the fold failing, and both want naming rather
+ * than a guess about accessibility.
+ *
+ * Set by [FloatingWindowUi] alone, from every place that changes whether the
+ * card is on screen at full size.
+ */
+object FullscreenCard {
+    @Volatile
+    var covering: Boolean = false
+}

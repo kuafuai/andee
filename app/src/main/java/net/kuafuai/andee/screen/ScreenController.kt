@@ -1125,6 +1125,32 @@ class ScreenController(
     }
 
     /**
+     * Whether the window in front reports itself as visible to us **right
+     * now** — the one question [net.kuafuai.andee.net.CommandDispatcher]'s fold
+     * has to be able to wait on.
+     *
+     * A fullscreen overlay of ours occludes the app, and every node of an
+     * occluded window answers `isVisibleToUser == false`; [buildNode] drops
+     * those before it counts them, so the whole tree reads as empty. Folding
+     * the card fixes it, but `updateViewLayout` only *asks* — the system
+     * recomputes occlusion a frame or two later, measured here at ~140 ms after
+     * the fold call has already returned. A dump that beats that recomputation
+     * gets zero nodes from a healthy screen.
+     *
+     * False is deliberately also the answer when there is no root at all: the
+     * caller polls to a deadline, and a screen mid-transition is worth the same
+     * short wait as one still being uncovered.
+     */
+    fun activeWindowVisible(): Boolean {
+        val root = runCatching { service.rootInActiveWindow }.getOrNull() ?: return false
+        return try {
+            runCatching { root.isVisibleToUser }.getOrDefault(false)
+        } finally {
+            runCatching { root.recycle() }
+        }
+    }
+
+    /**
      * Dump the active window's UI tree, with enough diagnostics that an empty
      * tree can say *why* it is empty.
      *
@@ -1683,16 +1709,20 @@ class ScreenController(
      * if the capture failed, say so instead of promising an image that is not
      * there.
      *
-     * The branches are not all the same verdict. Only the first three are
+     * The branches are not all the same verdict. Only the first four are
      * genuinely empty; the last has nodes that simply have no names, and since
      * [rebuildIndexAndList] started rendering nesting and centres for every
      * node rather than sorting the labelled ones to the top, that case still
      * has a usable outline and must not be told to tap by coordinate.
      *
-     * [reviveNote] is appended to the first two only — the two that mean "no
-     * nodes AT ALL". That is the whole discrimination: a self-drawn pane still
-     * reports its containers, so a mini-program never reaches those branches
-     * and never nags the user about restarting anything.
+     * [reviveNote] is appended to the two genuinely-empty branches only — the
+     * two that mean "no nodes AT ALL" and have no other explanation. That is
+     * the whole discrimination: a self-drawn pane still reports its containers,
+     * so a mini-program never reaches those branches and never nags the user
+     * about restarting anything. The two branches ahead of them are the cases
+     * where a window of *ours* explains the zero, and they must not carry it —
+     * that note asks for a permission toggle, and asking for one when nothing
+     * is wrong is how this last went wrong.
      */
     private fun annotate(out: JSONObject, verbose: Boolean) {
         if (verbose) return
@@ -1720,6 +1750,21 @@ class ScreenController(
                         "close it, or say in plain words that you need the settings card closed " +
                         "before you can carry on. Do not tap blindly: the taps would land on " +
                         "whatever is behind the card.",
+                )
+
+            // Same zero, a different window of ours, and a different answer:
+            // the big card is not focusable, so the app below is still active
+            // and still has a root — it is merely *covered*, and an occluded
+            // window reports every node invisible. Nothing about accessibility
+            // is wrong here, so this has to come ahead of [reviveNote] too.
+            total == 0 && net.kuafuai.andee.ui.FullscreenCard.covering ->
+                out.put(
+                    "hint",
+                    "Andee's own card is unfolded over the whole screen, so the app behind it " +
+                        "is covered and reports every node as not visible — that is why this is " +
+                        "empty, and nothing is broken. Folding the card is automatic before any " +
+                        "screen tool, so retry this call once and it should read normally. Do " +
+                        "not tell the user to restart anything, and do not tap blindly.",
                 )
 
             out.has("error") && total == 0 ->

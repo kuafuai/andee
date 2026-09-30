@@ -399,6 +399,7 @@ class FloatingWindowUi(
             wm.addView(v, p)
             root = v
             params = p
+            syncCover()
             applyCompactAppearance()
             // Only now can [winYOrigin] be measured, and the resting position
             // depends on it — the y above is a first guess that is correct only
@@ -689,6 +690,7 @@ class FloatingWindowUi(
             root = null
             params = null
             ball = null
+            syncCover()
             true
         } catch (_: Throwable) {
             false
@@ -875,9 +877,23 @@ class FloatingWindowUi(
         ui.post {
             if (this.compact == compact) return@post
             this.compact = compact
+            syncCover()
             if (compact) enterCompact() else exitCompact()
             applyWindow()
         }
+    }
+
+    /**
+     * Publish "this window is covering the display" for the two readers that
+     * cannot be handed a reference to it — see [FullscreenCard].
+     *
+     * Derived from both facts rather than mirrored off [setCompact], because
+     * [hide] leaves `compact` alone: a card torn down while unfolded would
+     * otherwise keep claiming to cover a screen it is no longer on. Main thread
+     * only, like everything that touches these two fields.
+     */
+    private fun syncCover() {
+        FullscreenCard.covering = root != null && !compact
     }
 
     /**

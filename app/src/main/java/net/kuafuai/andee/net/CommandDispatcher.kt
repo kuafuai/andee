@@ -1060,11 +1060,17 @@ class CommandDispatcher(
     }
 
     private fun ensureCompact() {
-        val wait = !compacted
+        // The window, not the cache. [compacted] is written on the main thread
+        // by everything that folds, but the card can be unfolded by paths that
+        // never come back through here — birth, `ensureOverlays`, a card that
+        // was hidden and re-shown — and a cache that says "already folded"
+        // about a fullscreen card leaves it covering the app for the whole tool
+        // call. `isCompact()` is a field read, so asking is free.
+        val wait = !compacted || !window.isCompact()
         val settled = CountDownLatch(1)
         ui.post {
             touchBusy()
-            if (!compacted) {
+            if (wait) {
                 window.setCompact(true)
                 compacted = true
                 // Counted down a turn later rather than inline: `setCompact`
@@ -1079,7 +1085,37 @@ class CommandDispatcher(
         }
         // Bounded, and only a hint: a busy main thread costs us the wait, not
         // the command.
-        if (wait) runCatching { settled.await(COMPACT_SETTLE_MS, TimeUnit.MILLISECONDS) }
+        if (!wait) return
+        runCatching { settled.await(COMPACT_SETTLE_MS, TimeUnit.MILLISECONDS) }
+        awaitUncovered()
+    }
+
+    /**
+     * Wait for the *system* to notice the fold, which is a separate event from
+     * the fold itself and the one that actually matters.
+     *
+     * `updateViewLayout` only asks; occlusion is recomputed a frame or two
+     * later. Until it is, the app behind the card still reports every node as
+     * `isVisibleToUser == false` and the dump comes back with zero nodes from a
+     * screen that is fine — the same signature as a stale accessibility
+     * connection, which is how this shipped as "WeChat's tree cannot be read
+     * any more" and sent the user off to toggle a permission that was working.
+     *
+     * A poll rather than a longer sleep, for the same reason the typing readback
+     * is one: the settle is a few tens of ms when the main thread is free and
+     * much longer when it is not, and paying the worst case on every tool call
+     * is a tax on all of them. Bounded, and a miss is not fatal — the dump's own
+     * hint can then name the card (see [net.kuafuai.andee.ui.FullscreenCard]).
+     *
+     * Only reached when a fold actually happened, so the usual path — a card
+     * that was already folded, which is most of a task — pays nothing.
+     */
+    private fun awaitUncovered() {
+        val deadline = System.currentTimeMillis() + UNCOVER_BUDGET_MS
+        while (!screen.activeWindowVisible()) {
+            if (System.currentTimeMillis() >= deadline) return
+            runCatching { Thread.sleep(UNCOVER_POLL_MS) }
+        }
     }
 
     /**
@@ -1308,6 +1344,17 @@ class CommandDispatcher(
 
         /** How long to let the main thread take to apply the fold. */
         const val COMPACT_SETTLE_MS = 200L
+
+        /**
+         * And how long to then let the *system* take to notice it — see
+         * [awaitUncovered]. Measured on this tablet at 4 polls / ~140 ms,
+         * repeatably, against the handful of milliseconds the fold itself takes
+         * to return: that gap is the whole bug. The budget is several times the
+         * measurement because overrunning it costs an empty tree, and it is paid
+         * once per unfold rather than per tool call.
+         */
+        const val UNCOVER_BUDGET_MS = 600L
+        const val UNCOVER_POLL_MS = 30L
 
         /**
          * Not a timeout on thinking — [setBusy] has none, on purpose. This only
