@@ -1478,6 +1478,7 @@ class ScreenBodyService : AccessibilityService() {
 
             "call.summary" -> {
                 val summaryQuery = callSummaryQuery(data)
+                val brain = localBrain
                 // Display-only, same as the meeting twin above: the brain gets
                 // `callSummaryQuery`, the card gets this.
                 net.kuafuai.andee.ui.ChatHistory.addUser(
@@ -1494,11 +1495,19 @@ class ScreenBodyService : AccessibilityService() {
                     runCatching { client?.sendEvent("asr.final", event) }
                     runCatching { server?.broadcastEvent("asr.final", event) }
                 }.start()
-                if (client != null || (server?.clientCount() ?: 0) > 0) {
+                if (client != null || brain != null || (server?.clientCount() ?: 0) > 0) {
                     ui.post {
                         acceptBrainOutput = true
                         dispatcher.beginTask()
                         window.setState(FloatingWindowUi.State.THINKING)
+                        // The local brain was missing here while the KDoc above
+                        // said this works the same way as the meeting recorder.
+                        // It did not: the event goes to the hub, the local brain
+                        // has no event channel, so on a local-brain device a
+                        // call ended with the ball lit and the transcript going
+                        // nowhere. After the gate opens, for the same reason the
+                        // meeting twin says.
+                        brain?.submit(summaryQuery)
                     }
                 }
             }
@@ -1947,6 +1956,87 @@ class ScreenBodyService : AccessibilityService() {
      */
     fun dispatcherForNotification(): CommandDispatcher? =
         if (::dispatcher.isInitialized) dispatcher else null
+
+    /**
+     * The user tapped 看看 on a notification signboard. Main thread only — the
+     * relay hops there before raising the card, and this touches [window].
+     *
+     * The routing lives here rather than in the relay for the same reason
+     * [dispatcherForNotification] does: the relay has no wiring of its own, and
+     * both halves of what this has to do are private to this class.
+     *
+     * It used to be the relay's own two lines and they reached the **hub only**
+     * — `BodyWsClient.current ?: return`. On a device running the local brain,
+     * which is the out-of-box default, a tap therefore lit the ball and then
+     * returned having told nothing, and the glow stayed on until the 5-minute
+     * backstop. That is the one outcome the signboard exists to prevent: the
+     * user is the spam filter here, so this is the notification they explicitly
+     * asked about.
+     *
+     * The two brains are reached differently, for the reason the meeting
+     * recorder reaches them differently. The hub keeps the `notification` event
+     * kind it was already taught. The local brain has no event plumbing to be
+     * taught *or* to go missing, so it takes the same facts as prose through
+     * `submit` — see [meetingMinutesQuery] for what that costs, and
+     * [notificationLookQuery] for the text written to be true when read that
+     * way.
+     *
+     * Lighting the ball moved in here with the routing and gained the guard it
+     * never had: nobody listening means nobody is thinking about it, exactly as
+     * in [onAsrFinal].
+     */
+    fun notificationLookRequested(n: JSONObject) {
+        val client = hubClient
+        val brain = localBrain
+        // Off the caller's thread, same as every other event: a WebSocket send
+        // blocks once the outbound buffer fills, and this one is on the main
+        // thread. Hub only, like `task.stop` and unlike `asr.final` — a 9008
+        // client is a passive observer by design and this is a request.
+        if (client != null) {
+            Thread { runCatching { client.sendEvent("notification", n) } }.start()
+        }
+        if (client == null && brain == null) {
+            // Nothing can answer. Say so here rather than lighting a glow that
+            // nothing will put out — which is what this method was written for.
+            android.util.Log.i("Body", "notification 看看 tapped, but no brain is listening")
+            return
+        }
+        // Display-only and in the interface language, same split as the meeting
+        // and call twins: the brain gets the query, the history card gets this.
+        net.kuafuai.andee.ui.ChatHistory.addUser(
+            AppLocale.str(this, R.string.svc_notification_look_line, n.optString("app"))
+        )
+        acceptBrainOutput = true
+        dispatcher.beginTask()
+        window.setState(FloatingWindowUi.State.THINKING)
+        // After the gate opens, not before — see the meeting twin: the local
+        // brain answers on its own thread, and a stop still pending from the
+        // turn before would otherwise swallow the answer.
+        brain?.submit(notificationLookQuery(n))
+    }
+
+    /**
+     * What the local brain is handed when the user taps 看看.
+     *
+     * Prompt, not a log line, and English with the rest of the model-facing set
+     * — see [notifyPageClosed]. It arrives as something the user said, so it is
+     * written as the user's own request: they looked at a signboard naming this
+     * app and chose to act on it, which is the one fact the raw notification
+     * JSON cannot carry.
+     */
+    private fun notificationLookQuery(n: JSONObject): String {
+        val count = n.optInt("count", 1)
+        val unread = if (count > 1) " ($count unread, the latest shown below)" else ""
+        return buildString {
+            append("A notification just came in from ${n.optString("app")}$unread ")
+            append("and I asked you to look at it.\n")
+            append("Title: ${n.optString("title")}\nMessage: ${n.optString("latest")}\n")
+            append("App package: ${n.optString("pkg")}\n\n")
+            append("Deal with it: if it needs a reply, open the app and reply; ")
+            append("if it only needs telling me about, say it in one sentence. ")
+            append("Ask me first before anything that cannot be undone.")
+        }
+    }
 
     /**
      * The ball's window, for CardUi — signboards anchor to where the ball

@@ -248,6 +248,7 @@
     <string name="svc_stopped">Stopped</string>
     <string name="svc_meeting_ended_line">(Meeting recording ended — %1$d characters, drafting the minutes…)</string>
     <string name="svc_call_ended_line">(Call ended — %1$d characters, summarising…)</string>
+    <string name="svc_notification_look_line">(%1$s has a message — I tapped "Take a look"…)</string>
     <string name="svc_no_brain_hub">No brain is connected yet, so I can\'t speak.</string>
     <string name="svc_no_brain_local">The local brain has no key yet, so I can\'t speak.</string>
 

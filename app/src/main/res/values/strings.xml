@@ -251,6 +251,7 @@
     -->
     <string name="svc_meeting_ended_line">（会议记录结束，共 %1$d 字，正在整理纪要…）</string>
     <string name="svc_call_ended_line">（通话结束，共 %1$d 字，正在整理…）</string>
+    <string name="svc_notification_look_line">（%1$s 来消息了，我点了「看看」…）</string>
     <string name="svc_no_brain_hub">还没有接上大脑，我说不上话。</string>
     <string name="svc_no_brain_local">本地大脑还没配 key，我说不上话。</string>
 

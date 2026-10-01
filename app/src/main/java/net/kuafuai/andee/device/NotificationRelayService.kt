@@ -21,9 +21,12 @@ import org.json.JSONObject
  *
  * Delivery is BOTH:
  *  - pull: `device.notifications` reads the ring (with since_ms increments)
- *  - push: qualifying notifications are ALSO forwarded to the hub as
- *    `notification` events — the same channel asr.final rides, so the brain
- *    receives them as inbound messages. The hub side needs zero changes.
+ *  - push: a qualifying notification the user taps 看看 on is ALSO handed to
+ *    whichever brain is running, by `ScreenBodyService.notificationLookRequested`
+ *    — as a `notification` event over the hub (the channel asr.final rides, so
+ *    the hub side needs zero changes) and as prose to the local brain, which has
+ *    no event channel to be taught. Routing it there rather than from here is
+ *    what fixed a tap that lit the ball and reached nothing; see that method.
  *
  * Push FILTERING (the part that decides whether the brain gets interrupted):
  * message apps (chat/SMS/mail) push immediately — a human is trying to reach
@@ -242,15 +245,16 @@ class NotificationRelayService : NotificationListenerService() {
                 // 5-minute leak-guard backstop applies too: if the brain
                 // never answers, the glow still goes out by itself.
                 //
-                // Order matters: this runs inside CardUi's close, which
-                // still has hideSignboard pending behind it. Lighting the
-                // task first (perchedByTask=true) is what tells
-                // hideSignboard "the ledge is wanted", so the shrink-then-
-                // slide there happens as one motion instead of the ball
-                // settling home first and hopping after.
-                net.kuafuai.andee.ScreenBodyService.get()
-                    ?.dispatcherForNotification()?.beginTask()
-                Pusher.forward(n)
+                // Lighting it is the service's job now, together with the
+                // routing — it used to be these two lines, and the second one
+                // reached the hub and nothing else, so on a local-brain device
+                // the first one lit a glow that nothing would put out. See
+                // `ScreenBodyService.notificationLookRequested`, which also
+                // keeps the ordering this comment used to explain: the task is
+                // lit before `CardUi`'s pending `hideSignboard` runs, which is
+                // what tells it "the ledge is wanted" so the shrink-then-slide
+                // happens as one motion.
+                net.kuafuai.andee.ScreenBodyService.get()?.notificationLookRequested(n)
             }
         }
     }
@@ -276,14 +280,6 @@ class NotificationRelayService : NotificationListenerService() {
         "com.android.mms", "com.android.messaging", // 短信(含验证码)
         "com.gmail", "com.sina.weibo",
     )
-
-    /** Forwards to the hub over the shared WS client, if it's connected. */
-    private object Pusher {
-        fun forward(n: JSONObject) {
-            val client = net.kuafuai.andee.net.BodyWsClient.current ?: return
-            client.sendEvent("notification", n)
-        }
-    }
 
     object Store {
         private const val CAP = 50
