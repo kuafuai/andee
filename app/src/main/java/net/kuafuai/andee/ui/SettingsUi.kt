@@ -363,6 +363,7 @@ class SettingsUi(
         brainSection(form)
         voiceSection(form)
         notebookSection(form)
+        notifySection(form)
         wakeSection(form)
         typingSection(form)
         vaultSection(form)
@@ -879,6 +880,42 @@ class SettingsUi(
             setOpen = { notebookOpen = it },
         )
         dump.addView(notebookDumpView(), matchWrap())
+    }
+
+    /**
+     * Which notifications the device may think about by itself.
+     *
+     * One setting, three tiers, and the reason it is not a per-app checklist is
+     * that the question has three honest answers and a list of installed apps
+     * has none of them: a checklist is a screen nobody finishes, and it goes
+     * stale the next time the user installs something.
+     *
+     * It sits here rather than in 诊断 because it is the same kind of setting as
+     * the notebook sweep directly above — both are the device choosing to spend
+     * the user's key on something nobody asked for out loud — and a user who is
+     * deciding how chatty this thing is allowed to be should find both decisions
+     * in one place.
+     */
+    private fun notifySection(form: LinearLayout) {
+        val panel = group(form, lctx.getString(R.string.settings_section_notify))
+        // 关 leftmost, which is the fallback for an unrecognised saved value —
+        // the same direction VoiceConfig.notifyScope reads in, and deliberately
+        // *not* the same as its default. An unset preference is a device nobody
+        // configured and gets 聊天类; an unreadable one is a value this build
+        // does not understand and gets nothing. See that method.
+        segmented(
+            panel,
+            "notify",
+            listOf(
+                VoiceConfig.NOTIFY_OFF to lctx.getString(R.string.common_off),
+                VoiceConfig.NOTIFY_CHAT to lctx.getString(R.string.settings_notify_chat),
+                VoiceConfig.NOTIFY_ALL to lctx.getString(R.string.settings_notify_all),
+            ),
+        )
+        note(
+            panel,
+            lctx.getString(R.string.settings_notify_note),
+        )
     }
 
     /**

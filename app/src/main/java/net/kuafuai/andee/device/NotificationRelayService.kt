@@ -21,21 +21,49 @@ import org.json.JSONObject
  *
  * Delivery is BOTH:
  *  - pull: `device.notifications` reads the ring (with since_ms increments)
- *  - push: a qualifying notification the user taps 看看 on is ALSO handed to
- *    whichever brain is running, by `ScreenBodyService.notificationLookRequested`
- *    — as a `notification` event over the hub (the channel asr.final rides, so
- *    the hub side needs zero changes) and as prose to the local brain, which has
- *    no event channel to be taught. Routing it there rather than from here is
- *    what fixed a tap that lit the ball and reached nothing; see that method.
+ *  - push: a qualifying notification is handed to whichever brain is running,
+ *    by `ScreenBodyService.notificationLookRequested` — as a `notification`
+ *    event over the hub (the channel asr.final rides, so the hub side needs
+ *    zero changes) and as prose to the local brain, which has no event channel
+ *    to be taught. Routing it there rather than from here is what fixed a tap
+ *    that lit the ball and reached nothing; see that method.
  *
- * Push FILTERING (the part that decides whether the brain gets interrupted):
- * message apps (chat/SMS/mail) push immediately — a human is trying to reach
- * the user, which is exactly what "proactive" means. Everything else
- * (updates, news, system junk) only lands in the ring; if the brain wants
- * ambient awareness it can poll. Constant popups would train the user to
- * ignore the ball, which is worse than not pushing at all.
+ * **The device forms its own opinion first.** This used to end in a card for
+ * every qualifying notification — honest ("the user is the spam filter") and
+ * also a tap on every message for the rest of their life, which trains people
+ * to dismiss the ball unread. A notification that clears the gauntlet below now
+ * goes to [net.kuafuai.andee.brain.NotificationTriage], and the card is what
+ * happens when that cannot decide.
+ *
+ * The gauntlet, in order, and each stage exists because of a different cost:
+ *
+ *  1. **[inScope]** — the user's setting. Three tiers; 关 means the ring buffer
+ *     and nothing else.
+ *  2. **[isStructural]** — only in the 全部 tier. Progress bars and group
+ *     summaries are a status display, not an event.
+ *  3. **[offerForTriage]** — a [SETTLE_MS] debounce per package. A group chat
+ *     posts one notification per message; the last one of a burst is the only
+ *     one worth reading.
+ *  4. **[deliver]** — not while a task is running (the brain is mid-job on this
+ *     very screen), and not past [Budget]'s hourly cap.
+ *
+ * Only then is a model call spent. Everything upstream of that line is free;
+ * everything downstream is the user's API key.
  */
 class NotificationRelayService : NotificationListenerService() {
+
+    /**
+     * The debounce runs here, and so does [deliver].
+     *
+     * Not a new thread: [offerForTriage]'s whole job is to let a later
+     * notification cancel an earlier one, which needs the two to be ordered
+     * against each other, and a `Handler` is the cheapest ordering there is.
+     * Nothing on it blocks — [deliver] hands the model call to a worker.
+     */
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /** Package → the settle timer waiting on it. [main] only. */
+    private val pending = HashMap<String, Runnable>()
 
     /**
      * Bound *right now*, which is the only question worth asking — see
@@ -185,36 +213,130 @@ class NotificationRelayService : NotificationListenerService() {
             .put("latest", headline.take(160))
             .put("when", sbn.postTime)
         Store.add(n)
-        if (sbn.packageName in PUSH_PKGS) {
-            // One hop to the main thread, where the task flag and CardUi both
-            // live. onNotificationPosted arrives on a binder thread; reading
-            // dispatcher state cross-thread is exactly the kind of stale read
-            // the hop exists to avoid.
-            net.kuafuai.andee.ui.CardUi.post {
-                if (net.kuafuai.andee.ScreenBodyService.get()
-                        ?.dispatcherForNotification()?.isTaskActive() == true
-                ) {
-                    // A task is running: the ball is busy gripping the ledge
-                    // and the brain is mid-job on this very screen. A
-                    // signboard now would yank the window out from under the
-                    // perch and queue the user's answer against the task's
-                    // own actions. The message stays in the ring buffer
-                    // (device.notifications) — it gets read when the job is
-                    // done, not in the middle of it.
-                    return@post
-                }
-                showSignboardFor(sbn, n)
+        if (!inScope(sbn)) return
+        offerForTriage(n)
+    }
+
+    /**
+     * Is this notification one the device is allowed to think about?
+     *
+     * Scope only — *what* happens to it is
+     * [net.kuafuai.andee.brain.NotificationTriage]'s call. Three tiers, because
+     * the honest answers to "which apps?" are "none", "the ones a person
+     * writes to you from", and "everything"; a per-app checklist is a screen
+     * nobody finishes and a list that goes stale the next time the user
+     * installs something.
+     */
+    private fun inScope(sbn: StatusBarNotification): Boolean =
+        when (net.kuafuai.andee.config.VoiceConfig.notifyScope(this)) {
+            net.kuafuai.andee.config.VoiceConfig.NOTIFY_OFF -> false
+            net.kuafuai.andee.config.VoiceConfig.NOTIFY_CHAT -> sbn.packageName in PUSH_PKGS
+            else -> !isStructural(sbn)
+        }
+
+    /**
+     * Notifications that are a *status display* rather than an event, filtered
+     * out of the 全部 tier.
+     *
+     * Not taste, and not a blocklist of apps: these are the ones the platform
+     * itself marks as not-an-event. An ongoing notification is a thing that is
+     * *still happening* — a download, a music player, a foreground service, our
+     * own ball — and it re-posts every time its progress bar moves, so a device
+     * watching "everything" would otherwise triage a file copy forty times.
+     * A group summary is a duplicate of children we are already seeing.
+     *
+     * `CATEGORY_CALL` is in here for a different reason: a ringing phone is
+     * genuinely an event, and it is one [CallState] and the wake-word gate
+     * already handle between them. The brain reading out "someone is calling
+     * you" over the top of the ringtone helps nobody.
+     *
+     * The 聊天类 tier does not consult this — [PUSH_PKGS] is already the
+     * narrower statement, and a chat app that marks a message ongoing (some do,
+     * for a pinned conversation) should still get through.
+     */
+    private fun isStructural(sbn: StatusBarNotification): Boolean {
+        val flags = sbn.notification.flags
+        if (flags and Notification.FLAG_ONGOING_EVENT != 0) return true
+        if (flags and Notification.FLAG_GROUP_SUMMARY != 0) return true
+        return sbn.notification.category in STRUCTURAL_CATEGORIES
+    }
+
+    /**
+     * Hold a notification briefly, then hand the newest one over.
+     *
+     * **The wait is the point, not a politeness.** A group chat does not post
+     * one notification, it posts one per message, each re-using the same key
+     * and carrying a higher unread count than the last. Triaging each would
+     * spend a model call per message to answer a question that gets a better
+     * answer by waiting: the final post of a burst carries the whole thread's
+     * count and its latest line, which is what the user would want read out
+     * anyway. So a later notification from the same package **replaces** the
+     * pending one rather than queueing behind it.
+     *
+     * Per package, not globally: two people messaging on two apps are two
+     * things to know about, and coalescing them would lose one.
+     *
+     * Debounce state is main-thread-only; [onNotificationPosted] arrives on a
+     * binder thread, hence the hop.
+     */
+    private fun offerForTriage(n: JSONObject) {
+        val pkg = n.optString("pkg")
+        main.post {
+            pending.remove(pkg)?.let { main.removeCallbacks(it) }
+            val fire = Runnable {
+                pending.remove(pkg)
+                deliver(n)
             }
+            pending[pkg] = fire
+            main.postDelayed(fire, SETTLE_MS)
         }
     }
 
-    private fun showSignboardFor(
-        sbn: StatusBarNotification,
-        n: JSONObject,
-    ) {
-        // Card-first, not brain-first: a quiet signboard asking the user
-        // beats waking the brain on every ping. Only a tap on 看看
-        // actually forwards to the brain — the user is the spam filter.
+    /**
+     * The burst has settled. Main thread.
+     *
+     * Everything with a brain in it is the service's
+     * ([net.kuafuai.andee.ScreenBodyService.handleNotification]) and everything
+     * about the card is still ours, which is the same division of labour
+     * `notificationLookRequested` already established. `handled == false` means
+     * the device could form no opinion — then the signboard goes up and the user
+     * decides, exactly as this service did before any of this existed.
+     */
+    private fun deliver(n: JSONObject) {
+        val svc = net.kuafuai.andee.ScreenBodyService.get()
+        if (svc?.dispatcherForNotification()?.isTaskActive() == true) {
+            // A task is running: the ball is busy gripping the ledge and the
+            // brain is mid-job on this very screen. Interrupting it now — with a
+            // signboard, or worse by starting a second turn — would yank the
+            // window out from under the perch and queue work against the task's
+            // own actions. The message stays in the ring buffer
+            // (device.notifications) and gets read when the job is done.
+            android.util.Log.i("Body", "notification held: a task is running (${n.optString("app")})")
+            return
+        }
+        if (!Budget.take()) {
+            // Over the cap: ring buffer only, and said out loud in the log
+            // because a user whose messages stopped being read deserves a reason
+            // to be findable. The cap is what stops a pathological app from
+            // turning the user's API key into a subscription.
+            android.util.Log.w(
+                "Body",
+                "notification triage at the hourly cap; ring buffer only (${n.optString("app")})",
+            )
+            return
+        }
+        // The triage is a network round trip, so it cannot happen here.
+        Thread {
+            val handled = runCatching { svc?.handleNotification(n) }.getOrNull() ?: false
+            if (!handled) net.kuafuai.andee.ui.CardUi.post { showSignboardFor(n) }
+        }.start()
+    }
+
+    private fun showSignboardFor(n: JSONObject) {
+        // The fallback, not the default anymore: a quiet signboard for the
+        // notifications the device could form no opinion about. Only a tap on
+        // 看看 forwards to the brain — on this path the user is still the spam
+        // filter, which is what the whole service used to be.
         //
         // The labels come from [lctx] because this is a Service: per-app locale
         // does not reach a Service-owned window, so the signboard is built in
@@ -223,7 +345,7 @@ class NotificationRelayService : NotificationListenerService() {
         val lctx = AppLocale.wrap(this)
         val latest = n.optString("latest")
         val count = n.optInt("count", 1)
-        val appLabel = appLabel(sbn.packageName)
+        val appLabel = n.optString("app")
         val cardTitle = if (count > 1) {
             lctx.getString(R.string.dev_notif_card_unread, appLabel, count)
         } else {
@@ -269,7 +391,16 @@ class NotificationRelayService : NotificationListenerService() {
         else -> pkg.substringAfterLast('.')
     }
 
-    /** Who is allowed to interrupt the brain. Chat first; trim by taste. */
+    /**
+     * The 聊天类 tier: apps a *person* writes to the user from.
+     *
+     * This is the default scope, and the reason it is a hardcoded list rather
+     * than a per-app screen the user fills in is that the question it answers is
+     * "which apps carry a human on the other end", which does not change when
+     * they install something. The 全部 tier is there for everyone who disagrees.
+     *
+     * [isStructural] is deliberately *not* applied to this tier — see its KDoc.
+     */
     private val PUSH_PKGS = setOf(
         "com.tencent.mm",            // 微信
         "com.tencent.mobileqq",      // QQ
@@ -306,6 +437,76 @@ class NotificationRelayService : NotificationListenerService() {
     }
 
     companion object {
+
+        /**
+         * How long a package's burst is allowed to settle before the newest
+         * notification in it is triaged. See [offerForTriage].
+         *
+         * Three seconds is a compromise between two things that both hurt. Too
+         * short and a twelve-message burst costs twelve model calls and reads
+         * out the second message of a conversation. Too long and the user has
+         * already picked the tablet up and read it themselves, which makes the
+         * device's announcement an echo.
+         */
+        private const val SETTLE_MS = 3_000L
+
+        /**
+         * `Notification.category` values that mean "this is a status display",
+         * dropped from the 全部 tier by [isStructural].
+         *
+         * `CATEGORY_CALL` is in here for a different reason than the rest: a
+         * ringing phone genuinely is an event, and it is one [CallState] and the
+         * wake-word gate already handle between them.
+         */
+        private val STRUCTURAL_CATEGORIES = setOf(
+            Notification.CATEGORY_PROGRESS,
+            Notification.CATEGORY_SERVICE,
+            Notification.CATEGORY_TRANSPORT,
+            Notification.CATEGORY_SYSTEM,
+            Notification.CATEGORY_CALL,
+        )
+
+        /**
+         * A ceiling on how many notifications an hour may be triaged.
+         *
+         * **This is about the user's money, not about taste.** Everything
+         * upstream of [deliver] is free; a triage is a request to a paid
+         * endpoint. The debounce handles a chatty group, and the scope setting
+         * handles a chatty device, but neither bounds the case this is for: one
+         * app with a bug, re-posting a distinct notification in a loop at three
+         * in the morning, against a key that bills per call. Without a cap that
+         * is a subscription the user did not buy.
+         *
+         * A fixed window rather than a sliding one, deliberately: the question
+         * being answered is "has something gone wrong", and a window boundary
+         * that lets a burst through at :59 and again at :00 is not a failure of
+         * that question. A ring of timestamps would be more accurate about a
+         * thing nobody needs accuracy about.
+         *
+         * Running out is not an error — the notification is still in the ring
+         * buffer and `device.notifications` still reads it back. It is the
+         * *opinion* that is skipped, not the record.
+         *
+         * [deliver] is the only caller and it runs on [main], so no lock.
+         */
+        private object Budget {
+            private const val PER_HOUR = 30
+            private const val WINDOW_MS = 60 * 60 * 1000L
+            private var windowStart = 0L
+            private var used = 0
+
+            /** Claim one. False means the cap is reached for this window. */
+            fun take(): Boolean {
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (now - windowStart >= WINDOW_MS) {
+                    windowStart = now
+                    used = 0
+                }
+                if (used >= PER_HOUR) return false
+                used++
+                return true
+            }
+        }
 
         /**
          * Whether the system currently has us bound. Not derivable from the

@@ -122,6 +122,10 @@
     <string name="settings_notebook_dump">What is in the book</string>
     <string name="settings_notebook_dump_hint">Read-only. Long-press to select and copy.</string>
     <string name="settings_notebook_dump_truncated">… (%1$d more characters not shown)</string>
+    <string name="settings_section_notify">Notifications</string>
+    <string name="settings_notify_chat">Chat apps</string>
+    <string name="settings_notify_all">Everything</string>
+    <string name="settings_notify_note">When a message arrives it decides for itself whether it is worth your attention: lets the noise go, says the useful part out loud, handles what needs handling. \"Chat apps\" means the ones with a person on the other end — WeChat, QQ, DingTalk, Lark, SMS. \"Everything\" watches the rest too, minus progress bars and permanent notifications. It only puts a card up when it cannot decide. Off means nothing interrupts you — the messages are all still there, and you can ask about them whenever.</string>
     <string name="settings_section_typing">Typing</string>
     <string name="settings_typing_no_ime">ADBKeyboard is the only keyboard on this device and it has no keyboard UI, so nothing can be typed right now. Enable one in system settings and it will show up here.</string>
     <string name="settings_typing_current">Your keyboard</string>
@@ -249,6 +253,7 @@
     <string name="svc_meeting_ended_line">(Meeting recording ended — %1$d characters, drafting the minutes…)</string>
     <string name="svc_call_ended_line">(Call ended — %1$d characters, summarising…)</string>
     <string name="svc_notification_look_line">(%1$s has a message — I tapped "Take a look"…)</string>
+    <string name="svc_notification_auto_line">(%1$s has a message — taking a look myself…)</string>
     <string name="svc_no_brain_hub">No brain is connected yet, so I can\'t speak.</string>
     <string name="svc_no_brain_local">The local brain has no key yet, so I can\'t speak.</string>
 

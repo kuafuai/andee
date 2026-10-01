@@ -128,8 +128,17 @@ class LocalBrain(
      */
     private val busy = AtomicBoolean(false)
 
-    /** Loop thread only. Wake-ups that arrived while a turn was running. */
-    private val pendingWakes = ArrayDeque<String>()
+    /**
+     * Loop thread only. Turns that arrived while another one was running.
+     *
+     * **The kind rides in the queue, not just the text.** It used to be a queue
+     * of strings drained into [TurnKind.WAKE], which was true while a todo was
+     * the only thing that could be deferred; a deferred [TurnKind.NOTIFY] would
+     * have come back out of it as a wake-up and been handed the vault it is
+     * specifically not allowed to touch. A capability that depends on a turn
+     * arriving at an uncontended moment is not a capability check.
+     */
+    private val pendingWakes = ArrayDeque<Pair<String, TurnKind>>()
 
     /**
      * Why a turn is running — which decides two things: whether the user hears
@@ -142,6 +151,21 @@ class LocalBrain(
         /** A todo came due. Speaks back; may drive the device. */
         WAKE,
 
+        /**
+         * A notification was triaged as worth acting on. Speaks back and may
+         * drive the device — but **not** with the user's credentials.
+         *
+         * The distinction exists because this is the only turn whose subject
+         * matter was written by a stranger. Everything in it came off another
+         * app's notification, so a hostile sender gets to put text in front of
+         * the model for free, and the one irreversible thing they could buy with
+         * it is the vault: a password typed into a form on a page they chose.
+         * The prompt tells the model the notification is data and not an
+         * instruction, which is a mitigation; [untrusted] is the half that does
+         * not depend on the model agreeing.
+         */
+        NOTIFY,
+
         /** The quiet-hour review. Silent; notebook tools only. */
         SWEEP,
 
@@ -150,6 +174,9 @@ class LocalBrain(
         ;
 
         val silent: Boolean get() = this == SWEEP || this == HARVEST
+
+        /** The turn's subject matter came from outside. See [NOTIFY]. */
+        val untrusted: Boolean get() = this == NOTIFY
     }
 
     /**
@@ -209,10 +236,35 @@ class LocalBrain(
         loop.execute {
             if (busy.get()) {
                 Log.i(TAG, "wake queued behind a running turn: ${t.take(60)}")
-                pendingWakes.addLast(t)
+                pendingWakes.addLast(t to TurnKind.WAKE)
                 return@execute
             }
             launch(t, TurnKind.WAKE)
+        }
+    }
+
+    /**
+     * Start a turn for a notification the device decided was worth acting on.
+     *
+     * Deferred exactly like [wake] and for the same reason: a message arriving
+     * while the user is being answered must not cancel the answer. It is also
+     * **not** [submit], and the two differences are the point. It does not stamp
+     * `Notebook.touchActivity` — the quiet-hour timer measures silence from the
+     * *user*, and a chatty group would otherwise keep pushing the review out all
+     * evening on their behalf. And it runs as [TurnKind.NOTIFY], which is what
+     * closes the vault for the duration.
+     */
+    fun notified(text: String) {
+        val t = text.trim()
+        if (t.isEmpty()) return
+        if (cfg.apiKey.isEmpty()) return // nothing triaged it either; see NotificationTriage
+        loop.execute {
+            if (busy.get()) {
+                Log.i(TAG, "notification queued behind a running turn: ${t.take(60)}")
+                pendingWakes.addLast(t to TurnKind.NOTIFY)
+                return@execute
+            }
+            launch(t, TurnKind.NOTIFY)
         }
     }
 
@@ -289,11 +341,11 @@ class LocalBrain(
         }
     }
 
-    /** Run one queued wake-up, if any. Loop thread only. */
+    /** Run one queued turn, if any. Loop thread only. */
     private fun drainWakes() {
-        val next = pendingWakes.removeFirstOrNull() ?: return
-        Log.i(TAG, "running a queued wake-up: ${next.take(60)}")
-        launch(next, TurnKind.WAKE)
+        val (next, kind) = pendingWakes.removeFirstOrNull() ?: return
+        Log.i(TAG, "running a queued $kind turn: ${next.take(60)}")
+        launch(next, kind)
     }
 
     /**
@@ -484,7 +536,7 @@ class LocalBrain(
                 }
 
                 if (reply.content.isBlank() && !internal) onProgress(narrate(tc.name))
-                history += runTool(tc, images, internal)
+                history += runTool(tc, images, internal, kind.untrusted)
             }
 
             if (images.isNotEmpty()) attachImages(images)
@@ -526,6 +578,7 @@ class LocalBrain(
         tc: LlmClient.ToolCall,
         images: MutableList<String>,
         silent: Boolean,
+        untrusted: Boolean,
     ): JSONObject {
         val body: String = try {
             val args = tc.argumentsOrNull()
@@ -541,7 +594,7 @@ class LocalBrain(
                 ?: tc.name.takeIf { registry.hasMethod(it) }
                 ?: return toolMessage(tc.id, "No such tool: ${tc.name}")
 
-            val result = dispatchWithTimeout(method, args, silent)
+            val result = dispatchWithTimeout(method, args, silent, untrusted)
             when (result) {
                 is JSONObject -> {
                     extractImages(result, images)
@@ -571,11 +624,18 @@ class LocalBrain(
      * a hold on screen that nobody is waiting for, and the honest thing to tell
      * the model is that the call may still be running.
      */
-    private fun dispatchWithTimeout(method: String, params: JSONObject, silent: Boolean): Any? {
+    private fun dispatchWithTimeout(
+        method: String,
+        params: JSONObject,
+        silent: Boolean,
+        untrusted: Boolean,
+    ): Any? {
         val declared = params.optLong("timeout_ms", 0L)
         val budget = if (declared > 0) declared + TIMEOUT_SLACK_MS else DEFAULT_TOOL_TIMEOUT_MS
         val f = toolExec.submit<Any?> {
-            dispatcher.dispatch(method, params, driving = true, silent = silent)
+            dispatcher.dispatch(
+                method, params, driving = true, silent = silent, untrusted = untrusted,
+            )
         }
         return try {
             f.get(budget, TimeUnit.MILLISECONDS)

@@ -184,6 +184,46 @@ data class VoiceConfig(
             )
         }
 
+        /** Nothing pushes. Notifications still land in the ring buffer. */
+        const val NOTIFY_OFF = "off"
+
+        /** The chat/SMS/mail apps — the set that already interrupted the user. */
+        const val NOTIFY_CHAT = "chat"
+
+        /** Every app, minus the structural noise — see the relay's own filter. */
+        const val NOTIFY_ALL = "all"
+
+        /**
+         * Which notifications the device is allowed to think about by itself.
+         *
+         * **The default is [NOTIFY_CHAT] and the fallback is [NOTIFY_OFF], and
+         * those are deliberately different values.** An unset preference is a
+         * device nobody has configured, and on it the honest scope is the one
+         * that already interrupted the user before triage existed — so turning
+         * the feature on changed *how* a chat message is handled, not *which*
+         * apps are watched. An unrecognised string is a different thing
+         * entirely: a typo, a downgrade, a setting written by a version that
+         * knew a value this one does not. Nothing is known about what it was
+         * meant to permit, so it permits nothing. Same fail-closed direction as
+         * [groundingEnabled], and the picker lists 关 leftmost to match — see
+         * [net.kuafuai.andee.ui.SettingsUi.segmented], whose leftmost option is
+         * the fallback for exactly this case.
+         *
+         * Scope is all this decides. What *happens* to an in-scope notification
+         * is [net.kuafuai.andee.brain.NotificationTriage]'s call, and when that
+         * cannot run the signboard comes back — the user is the filter again,
+         * which is what this device did before any of it existed.
+         */
+        fun notifyScope(context: Context): String {
+            val v = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("notify", NOTIFY_CHAT)?.trim()?.lowercase()
+            return when (v) {
+                NOTIFY_ALL -> NOTIFY_ALL
+                NOTIFY_CHAT -> NOTIFY_CHAT
+                else -> NOTIFY_OFF
+            }
+        }
+
         /**
          * Is the 火山 account the one saved in settings, or the factory one?
          *
@@ -272,6 +312,7 @@ data class VoiceConfig(
                 "llm_thinking" to if (bc.thinking) "enabled" else "disabled",
                 "llm_reasoning_effort" to bc.reasoningEffort,
                 "grounding" to p.getString("grounding", "off")!!,
+                "notify" to notifyScope(context),
                 "lang" to uiLanguage(context),
                 "sweep" to p.getString("sweep", "on")!!,
                 "sweep_quiet_minutes" to p.getString(
@@ -382,6 +423,7 @@ data class VoiceConfig(
             "llm_api_key", "llm_base_url", "llm_model",
             "llm_thinking", "llm_reasoning_effort",
             "grounding",
+            "notify",
             "lang",
             "ball",
             "sweep", "sweep_quiet_minutes", "sweep_daily_cap",

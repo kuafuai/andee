@@ -99,6 +99,10 @@
     <string name="settings_notebook_dump">本子里写了什么</string>
     <string name="settings_notebook_dump_hint">只读。长按可以选中复制。</string>
     <string name="settings_notebook_dump_truncated">…（还有 %1$d 个字符没显示）</string>
+    <string name="settings_section_notify">消息提醒</string>
+    <string name="settings_notify_chat">聊天类</string>
+    <string name="settings_notify_all">全部</string>
+    <string name="settings_notify_note">来消息的时候，它先自己看一眼值不值当：没事的就放过，要紧的说一声，该办的直接去办。「聊天类」是微信、QQ、钉钉、飞书、短信这些有人在那头的；「全部」连其它 App 也一起看（进度条、常驻通知除外）。拿不准的才弹牌子问你。关掉就谁也不打扰你 —— 消息都还在，想知道的时候问它一声就行。</string>
     <string name="settings_section_typing">打字</string>
     <string name="settings_typing_no_ime">这台设备上只有 ADBKeyboard（它没有键盘界面），所以现在打不了字。去系统设置里启用一个输入法，这里就会出现。</string>
     <string name="settings_typing_current">你现在的输入法</string>
@@ -252,6 +256,7 @@
     <string name="svc_meeting_ended_line">（会议记录结束，共 %1$d 字，正在整理纪要…）</string>
     <string name="svc_call_ended_line">（通话结束，共 %1$d 字，正在整理…）</string>
     <string name="svc_notification_look_line">（%1$s 来消息了，我点了「看看」…）</string>
+    <string name="svc_notification_auto_line">（%1$s 来消息了，我自己看一眼…）</string>
     <string name="svc_no_brain_hub">还没有接上大脑，我说不上话。</string>
     <string name="svc_no_brain_local">本地大脑还没配 key，我说不上话。</string>
 
