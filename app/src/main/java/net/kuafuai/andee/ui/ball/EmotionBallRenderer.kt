@@ -256,7 +256,16 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
             if (look.snoutRx > 0f) IcoSphere.build(3) else null
         val ear: Mesh? =
             if (look.earH > 0f)
-                Ear.build(look.earW, look.earH, look.earThick, look.earBend / DEG, 6, 10)
+                Ear.build(
+                    look.earW, look.earH, look.earThick, look.earBend / DEG,
+                    // Rings scale with the taper: a sharp one does all its
+                    // curving in the last fifth of the length, so at the pig's
+                    // 6 rings that fifth is one flat step and the ear ends in a
+                    // chisel. 14 puts four rings inside the rounding.
+                    segs = if (look.earTaper > 3f) 14 else 6,
+                    radialSegs = 10,
+                    taper = look.earTaper,
+                )
             else null
     }
 
@@ -959,6 +968,7 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
 
         drawTongue()
         drawTeeth(aPos)
+        drawBuckTeeth()
         drawNostrils()
         drawBrows(aPos)
         drawBubble()
@@ -1065,6 +1075,60 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
             GLES20.glUniformMatrix4fv(solidShader.uniform("uMVP"), 1, false, mvp, 0)
             tooth.bind(aPos)
             tooth.draw()
+        }
+    }
+
+    /**
+     * Two front teeth in the middle of the mouth. Nothing if the look has no
+     * [BallLook.buckH].
+     *
+     * **Drawn over the lip, not peeking out from under it**, and that is the
+     * decision the rest of the method is arranged around. A rodent's incisors
+     * tucked behind the mouth line would be two pale slivers under a curve,
+     * which at the size this ball is drawn is indistinguishable from a highlight
+     * on the lip; interrupting the line is what makes them teeth. So they go in
+     * front at [BallLook.mouthTube] plus a margin — ahead of the lip's own front
+     * surface, which is a tube radius in front of the face plane — and the pair
+     * is pushed only a third of its height down the mouth's normal, so the top
+     * of each tooth is still inside the lip's own stroke.
+     *
+     * They are placed through [mouthPointAt] rather than from
+     * [BallLook.mouthY], which is what makes them ride the mouth: the smile
+     * deepens, the mood skews it, [BallLook.mouthTilt] puts a permanent roll in
+     * it, and the teeth stay in the middle of whatever shape that leaves. The
+     * tangent is the normal turned a quarter turn, so the pair stays square to
+     * the lip instead of level with the screen.
+     *
+     * Flat-shaded discs, like every other face element and unlike the horns —
+     * see [drawTeeth] for why a tooth is read as a silhouette and lighting it
+     * would only mute the edge that carries it.
+     */
+    private fun drawBuckTeeth() {
+        val h = LOOK.buckH
+        if (h <= 0f) return
+        mouthPointAt(PI.toFloat() / 2f)
+        val nx = mouthPt[2]
+        val ny = mouthPt[3]
+        // The lip's own direction, as the normal turned a quarter turn.
+        val tx = -ny
+        val ty = nx
+        val cx = mouthPt[0] + nx * h * BUCK_DROP
+        val cy = mouthPt[1] + ny * h * BUCK_DROP
+        // The mesh grows +Y, so standing a tooth along the normal means turning
+        // that direction back by a quarter turn — same correction as [drawTeeth].
+        val rot = atan2(ny, nx) - PI.toFloat() / 2f
+        val w = LOOK.buckW
+        for (side in -1..1 step 2) {
+            drawDot(
+                cx + tx * w * side,
+                cy + ty * w * side,
+                rot,
+                lidScale = 1f,
+                radius = h,
+                z = LOOK.mouthTube + 0.016f,
+                color = LOOK.buckColor,
+                aspectX = w / h,
+            )
         }
     }
 
@@ -1649,6 +1713,19 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
          * face — which reads as a chip flying off rather than as a tooth.
          */
         private const val TOOTH_PAD = 0.26f
+
+        /**
+         * How far the buck-tooth pair is pushed down the mouth's normal, as a
+         * multiple of [BallLook.buckH].
+         *
+         * A third, which means two thirds of each tooth hangs below the lip and
+         * the top third is behind it — the proportion a cartoon draws, and the
+         * one that keeps the lip line reading as continuous *through* the teeth
+         * rather than as two separate strokes either side of them. At 1.0 the
+         * teeth clear the lip entirely and become a second mouth under the
+         * first; at 0 they are a white bite taken out of the middle of it.
+         */
+        private const val BUCK_DROP = 0.34f
 
         /**
          * How much darker the nostril dots are than the live [bodyColor]. A

@@ -2,21 +2,27 @@ package net.kuafuai.andee.ui.ball.gl
 
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * A floppy leaf-shaped flap — a pig's ear.
+ * A flap — a pig's ear at the default [build] taper, a rabbit's at a high one.
  *
  * Built like [Horn] as a stack of rings walking a curved axis, but three things
  * make it an ear rather than a horn:
  *
  *  - The cross-section is **elliptical**, not round: wide in the bend plane,
  *    thin in Z. An ear is a flap, and a flap is a flattened shape.
- *  - The profile **rounds off** at the tip (a quarter-ellipse) instead of
- *    coming to a point. A pig's ear is rounded; a pointed tip reads as a horn.
+ *  - The profile **rounds off** at the tip instead of coming to a point. A
+ *    pig's ear is rounded; a pointed tip reads as a horn.
  *  - It is short and droops (the caller rotates it), where a horn is long and
  *    points.
+ *
+ * The third of those is the caller's business and the second turned out to be a
+ * matter of degree — see [build]'s `taper`, which exists because the quarter
+ * ellipse this started as is a *cone with a blunt end* once the flap is long,
+ * and a long cone is a horn no matter how rounded its last millimetre is.
  *
  * Grown in the +Y/+X plane like [Horn], so the same mirror-for-the-other-side
  * trick applies. Normals are real, so the lit shell shader shades the flap
@@ -29,7 +35,20 @@ object Ear {
      * @param thickness half-depth in Z. Small relative to [width] — that flatness
      *   is what makes it a flap.
      * @param bend total rotation of the axis from base to tip, radians, toward +X.
-     * @param segs rings along the length.
+     * @param taper how fast the flap narrows: `√(1 − t^taper)`. **2 is the
+     *   quarter ellipse** this was born as and is the default, so every caller
+     *   that does not pass it gets exactly the mesh it got before.
+     *
+     *   Higher is a *rabbit*. The exponent decides where along the length the
+     *   narrowing happens: at 2 the flap is already down to 87% of its base
+     *   width halfway up and 44% at nine tenths, which is a cone — stand one of
+     *   those up and it reads as a horn, which is what the first 贱贱兔 shipped
+     *   as. At 6 the same two points are 99% and 76%, so the flap runs parallel
+     *   for most of its length and does all its rounding in the last fifth,
+     *   which is the shape a rabbit's ear actually is.
+     * @param segs rings along the length. Worth raising with [taper]: all the
+     *   curvature moves into the last couple of rings, and at 6 rings a sharp
+     *   taper rounds off in one flat step.
      * @param radialSegs vertices around each ring.
      */
     fun build(
@@ -39,6 +58,7 @@ object Ear {
         bend: Float = 0f,
         segs: Int = 6,
         radialSegs: Int = 10,
+        taper: Float = 2f,
     ): Mesh {
         val rings = segs + 1
         val vertCount = rings * (radialSegs + 1)
@@ -53,10 +73,10 @@ object Ear {
         var ui = 0
         for (i in 0 until rings) {
             val t = i.toFloat() / segs
-            // Quarter-ellipse profile, floored so the tip is a small rounded nub
-            // rather than a point — and so the per-ring normal never divides by
-            // zero. A pointed tip is a horn, not a pig's ear.
-            val k = max(sqrt(1f - t * t), 0.08f)
+            // Floored so the tip is a small rounded nub rather than a point —
+            // and so the per-ring normal never divides by zero. A pointed tip
+            // is a horn, not an ear.
+            val k = max(sqrt(1f - t.pow(taper)), 0.08f)
             val w = width * k
             val th = thickness * k
             val ang = bend * t

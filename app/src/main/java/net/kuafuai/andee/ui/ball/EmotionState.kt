@@ -503,7 +503,12 @@ class EmotionState {
         // than only riding on `smile`.
         mouthScaleY = 0.16f + open * 1.5f + abs(smile) * 0.5f + LOOK.mouthThick
         mouthY = LOOK.mouthY + smile * 0.06f
-        mouthRotZ = PI.toFloat() + smile * 0.9f + skew * 2.2f
+        // Three terms on one axis, same arrangement as the eye roll above: the
+        // half turn that makes the half-torus an arch at all, the mood's own
+        // curve and skew, and the look's resting crookedness — see
+        // [BallLook.mouthTilt], where the argument for it lives. The look's is
+        // in degrees, hence the /DEG; the other two are already radians.
+        mouthRotZ = PI.toFloat() + smile * 0.9f + skew * 2.2f + LOOK.mouthTilt / DEG
     }
 
     fun writeHeads(buf: FloatArray) {

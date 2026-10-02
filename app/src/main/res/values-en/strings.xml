@@ -406,5 +406,6 @@
          BallLook.name, which is for logs and diffs. -->
     <string name="ball_look_cream">Cream</string>
     <string name="ball_look_bajie">Pigsy</string>
+    <string name="ball_look_rabbit">Rascal</string>
     <string name="ball_look_imp">Imp</string>
 </resources>

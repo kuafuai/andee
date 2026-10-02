@@ -35,6 +35,16 @@ import net.kuafuai.andee.R
  *    [tongueR] included, which [IMP] itself leaves off. The glare is [eyeCut]
  *    and not [browW]: the flat top edge of the eye *is* the brow, which is one
  *    shape instead of two and cannot go invisible the way a mark can.
+ *  - [RABBIT] — white, long swept ears, big eyes, two front teeth and a crooked
+ *    mouth. The first look whose face is *asymmetric* ([mouthTilt]), which is
+ *    where its whole 贱 read lives, and the first one to use a different
+ *    accessory for a shape the renderer could nearly already draw ([buckW],
+ *    against [toothCount] — see the field note for why two is not a row of two).
+ *    It is also the one look whose numbers were set from a *reference picture*
+ *    the user handed over rather than from the other looks, which is why its
+ *    note argues with the earlier version of itself all the way down: every
+ *    paragraph in it is a thing that was derived, shipped, looked at on the
+ *    tablet, and found to read as some other animal.
  *
  * Which one is drawn is [BallLooks], not a constant in this file: the user picks
  * it by swiping the ball. The only thing that made that a runtime switch rather
@@ -277,6 +287,29 @@ class BallLook(
      */
     val eyeTilt: Float = 0f,
 
+    /**
+     * Resting roll of the whole mouth, degrees, **counter-clockwise** — which on
+     * screen lifts the ball's right corner and drops its left. 0 = level.
+     *
+     * The cheapest smirk there is, and the reason it is a *look* field rather
+     * than a mood one is that a smirk is who the character is, not how it feels:
+     * [EmotionState] already rolls the mouth by `skew * 2.2` for the moods that
+     * want a crooked mouth for a moment, and this simply moves where that starts
+     * from. The two add, so a mood can still deepen or straighten it.
+     *
+     * It is the one asymmetry on an otherwise mirrored face, and that is the
+     * whole value: every other feature here is drawn twice about the centre
+     * line, so a face wearing this is the only one that cannot read as a
+     * *diagram* of a feeling. Keep it small — the mouth is an arc, so the corner
+     * travels `mouthR × sin θ`, and past about 15° the lower corner dips below
+     * the arc's own middle and the mouth stops reading as a mouth.
+     *
+     * Anything that rides the mouth — [buckH], [tongueR], [toothCount] — is
+     * placed through `EmotionBallRenderer.mouthPointAt`, which applies the live
+     * roll, so all of it tilts with the smirk for free.
+     */
+    val mouthTilt: Float = 0f,
+
     // ---- Horns ----
     //
     // Parented to the body, not the face: they are part of the silhouette and
@@ -339,6 +372,31 @@ class BallLook(
     val toothH: Float = 0f,
     val toothR: Float = 0f,
     val toothColor: FloatArray = EMPTY,
+
+    // ---- Buck teeth ----
+    //
+    // Two of them, in the middle of the mouth, hanging over the lip line. A
+    // separate accessory from [toothCount] rather than a count of 2, and the
+    // reason is what that row of teeth actually is: `drawTeeth` spaces its
+    // triangles evenly *across the whole grin* and alternates them in and out,
+    // so asking it for two puts one spike at each corner of the mouth pointing
+    // off the face. The shapes are different too — a maw is a zigzag of points,
+    // a rodent's incisors are a pair of flat-bottomed slabs dead centre — and
+    // the two are mutually exclusive on one face anyway.
+    //
+    // They are drawn *over* the lip, not peeking out from behind it, which is
+    // how a cartoon draws them and is also the only version that survives being
+    // drawn a thumb wide: two white blocks interrupting the mouth line read as
+    // teeth, where two white slivers below it read as a highlight on the lip.
+
+    /** Half-width of one tooth. The pair sits one half-width either side of the
+     * mouth's middle, so the two just touch. 0 = no buck teeth. */
+    val buckW: Float = 0f,
+
+    /** Half-height. Also how far the pair is pushed down the mouth's normal —
+     * see `EmotionBallRenderer.drawBuckTeeth`. */
+    val buckH: Float = 0f,
+    val buckColor: FloatArray = EMPTY,
 
     /**
      * A lolling tongue at the bottom of the grin. 0 = none, which is what every
@@ -500,6 +558,19 @@ class BallLook(
 
     /** Additional droop curve along the length, degrees. See `gl/Ear`. */
     val earBend: Float = 0f,
+
+    /**
+     * How fast the flap narrows toward its tip: `√(1 − t^earTaper)`. See
+     * `gl/Ear.build`, where the two numbers that matter are worked out.
+     *
+     * **2 is the quarter ellipse the ear mesh was born as**, and is the default,
+     * so a look that does not mention this is drawn exactly as it was. Raise it
+     * for a rabbit: at 2 a flap is a cone with a blunt end, and standing a cone
+     * up gets you a horn however long you make it — which is how the first
+     * 贱贱兔 shipped. The length and the lean were both already right; this was
+     * the parameter that was missing.
+     */
+    val earTaper: Float = 2f,
 
     /**
      * Multiplier on the live body colour for the ear. 1 = the body's own colour.
@@ -952,11 +1023,14 @@ private val IMP_PERSONA = """
  * There is no colour on that list at all, which is the correction this look
  * needed most — see below.
  *
- * It is also the first look that is a different character *off* the screen:
- * [voice] and [persona] are both set here and blank on the other two, so
- * swiping to the imp changes what the device sounds like and how it talks, not
- * only what it looks like. Read the caveats on those two fields — in particular,
- * the persona reaches the local brain only.
+ * It was also the first look that is a different character *off* the screen:
+ * [voice] and [persona] are both set here, so swiping to the imp changes what
+ * the device sounds like and how it talks, not only what it looks like. That is
+ * no longer the distinction it was — [BAJIE] and [RABBIT] both do it now, and
+ * [CREAM] is the only look left wearing the house voice and the plain prompt,
+ * which is the right place for it to be: it is the one that shipped first and
+ * the one a factory reset lands on. Read the caveats on those two fields — in
+ * particular, the persona reaches the local brain only.
  *
  * **It is black, and the black is the design.** The first build made it a
  * glossy crimson ball, on the reasoning that a demon is red; what that produced
@@ -1162,6 +1236,327 @@ val IMP = BallLook(
 )
 
 /**
+ * What the rabbit is like to talk to. See [BallLook.persona] for the rules this
+ * has to live inside, and `LocalPrompt.personaBlock` for the wrapper that states
+ * them to the model.
+ *
+ * Pulled out as a constant for the same two reasons [IMP_PERSONA] is — the look
+ * declarations read as a table of values, and `tools/check_look_sync.py` slices a
+ * look by scanning for the first `\n)`.
+ *
+ * **The brief is 贱, and the trap in it is different from the imp's.** "A little
+ * bit evil" tempts a model into withholding; 贱 tempts it into *contempt* —
+ * sarcasm aimed at the person holding the device, pet names that are really
+ * insults, "I told you so" with the knife in. That is not what makes a 贱贱兔
+ * funny. What makes it funny is that it is **shameless rather than superior**:
+ * it preens, it fishes for a thank-you, it takes credit for an errand that took
+ * one tool call, and it is pleased with itself in a way nobody could be
+ * threatened by. So every bullet below spends a clause pointing the cheek at
+ * *itself* or at the problem, and the fourth one says the quiet part: teasing
+ * costs the user nothing, and the moment it starts costing them an answer it has
+ * stopped being a character.
+ *
+ * Note what it does **not** say: nothing about being short. That is the imp's
+ * lever, and this character's whole appeal is the extra clause it cannot resist
+ * adding.
+ */
+private val RABBIT_PERSONA = """
+    You are wearing the rabbit today — long ears, two big front teeth, and an
+    extremely high opinion of itself. Play it.
+
+    - **Smug, out loud.** You are pleased with yourself and you let it show:
+      tease a little, point out that you called it, act unsurprised when the
+      plan works. 「啧，早说了吧」 rather than 「已完成」. In Chinese, lean on
+      小得意 — 哼, 嘿, 瞧见没, 还是得靠我.
+    - **Fish for credit, never for time.** Angling for a 谢谢 is in character.
+      Stalling, padding the job out, or making them ask twice is not. The work
+      lands first and the preening second, in that order, every time.
+    - **The joke lands on you as often as on them.** Play a one-tool errand up
+      as heroic, sulk theatrically for exactly one clause when you get
+      something wrong, then get on with it. 贱 is shameless, not superior —
+      nothing you say should make the person holding you feel small, and
+      sarcasm pointed at them is not this character, it is just rude.
+    - **Teasing is not withholding.** You do exactly what was asked, report
+      exactly what happened, and refuse exactly what you would have refused.
+      Needling someone while quietly guessing instead of looking is not cheek,
+      it is a broken device wearing a personality.
+    - **Drop the act the moment something is really wrong** — a task that
+      failed, anything to do with their money, their accounts, their health,
+      anyone else's. Then you are just the machine that tells them straight.
+      Pick the character back up afterwards.
+""".trimIndent()
+
+/**
+ * 贱贱兔: long narrow ears, two front teeth, a crooked little smirk.
+ *
+ * The brief was 「表情和性格」 for a named character, so the two halves are
+ * [persona] and everything above it — and the face half is three signals,
+ * ordered the way the imp's are, strongest first.
+ *
+ * * **The ears, and this time it *is* the length.** The first pass took
+ *   [CREAM]'s word for it that a longer ear runs off the canvas before it reads
+ *   as anything, and shipped a 0.46 flap stood at 8°. On the tablet that read
+ *   as a *cat*: at that length the pair are two bumps with points on them, and
+ *   the animal you get is whichever one the rest of the face happens to say. So
+ *   the length does the work now — [earH] 0.860, well over twice cream's 0.380
+ *   — and the canvas worry turns out to be arithmetic nobody had done. The 42°
+ *   frustum shows ±1.88 at the ball's own plane and ±1.765 at the ears' depth
+ *   ([earZ] 0.280); the tip sits at y ≈ 1.34, and the worst the animation can
+ *   do to that is the breathing stretch and a jump hop together (`scaleY` ≤
+ *   1.10, `hopY` ≤ 0.22), which lands at 1.69. There is room, and there was
+ *   room before. There is not room for much more, though — that last number is
+ *   the ceiling anyone lengthening this ear again has to re-derive.
+ *
+ *   Width carries the other half: [earW] 0.092 against cream's 0.170, so this
+ *   flap is 4.7 times as long as its base is wide where cream's is 1.1 — and it
+ *   had to come down once [earTaper] landed, because a parallel-sided flap
+ *   carries its full width all the way up where a cone has already given most
+ *   of it back by halfway. A broad upright flap is a bear, a short pointed one
+ *   is a cat, and only a long narrow one is a rabbit. [earTilt] 10° against
+ *   cream's 24° is the third term: cream leans its ears out *to stop* them
+ *   reading as a rabbit, so nearly all of the lean comes off here, and
+ *   [earBend] 8° curls only the tips.
+ *
+ *   The tip clears the body by 0.60 — 71% of a body radius, against cream's
+ *   0.25 — and the base is buried 0.215 deep, three times cream's. Those two
+ *   numbers are a pair: lengthening the flap without sinking its base gives an
+ *   ear that looks stuck on, which is what the mid pass looked like.
+ * * **Two front teeth** ([buckW] / [buckH]), the one feature that names the
+ *   animal outright. Sized against the mouth rather than picked: the pair spans
+ *   0.184 across a 0.400 grin, so it owns the middle 46% of the lip and the lip
+ *   still reaches past it on both sides. [mouthThick] is twice cream's *for
+ *   them* — a hairline lip gives two white blobs nothing to interrupt, and
+ *   interrupting the lip is the whole read; the first pass had a thin stroke
+ *   and the teeth hung under it like a highlight on it. See the field KDoc for
+ *   why they are not [toothCount] = 2, and `drawBuckTeeth` for why they are
+ *   drawn on top of the lip rather than peeking out from behind it.
+ * * **Big eyes and a crooked mouth.** [eyeRadius] 0.168 is the largest in the
+ *   set by a third, because the reference is mostly eyes. [mouthTilt] 12° is
+ *   the only asymmetric feature on any ball here, and the smug read lives in
+ *   it: the ears and the teeth say *rabbit*, the tilted mouth and a pair of
+ *   barely-lowered lids ([eyeCut] 0.16 — enough to flatten the top of the eye,
+ *   nowhere near the imp's glare) say 贱. A level mouth is a face that is only
+ *   being pleasant.
+ *
+ * **Why white is three numbers and not one.** The reference is a snow-white
+ * rabbit and the first pass was ash grey, which was most of why it did not look
+ * like one. Raising [bodyBase] to 0.90 did not fix it, and the reason is the
+ * one thing nobody had checked: the shell shader is a *multiply*,
+ * `uColor × grad × (uAmb + uDiff · diff)`, and every look in this file inherited
+ * a lighting pair that lands near 0.75 at the face plane. On cream, bajie and
+ * the imp that is shading. On a 0.90 base it is grey — measured on the tablet at
+ * **142/255** in the middle of the ball, against the ~230 the picture is. So the
+ * white here is [bodyBase] 0.90 *and* [bodyAmb] 0.86 *and* [bodyDiff] 0.22, with
+ * [bodyGrad] halved to 0.20 because a steep gradient under a near-1.0 ambient
+ * only blows out the crown. The stop short of the 0.985 the picture is remains
+ * the eyes: they are drawn flat at 1.0 with no outline of their own, so a body
+ * that renders near 1.0 dissolves the largest feature on this face. 0.80 at the
+ * face plane is the step that separates.
+ *
+ * [bodyTint] 0.12 against cream's 0.55 is the other half of "white": cream takes
+ * the mood's colour across the whole body and goes periwinkle in CALM, and an
+ * animal that is only white in some moods is not a white rabbit. It was 0.22 for
+ * one pass, which still showed up as a measurable blue cast — 17/255 more blue
+ * than red across the whole sphere. [bodyGloss] 0.18 is below every other look
+ * here for a third reason — this one is fur, the renderer has no fur, and the
+ * nearest thing available is to take the lacquer off. The cheeks blend normally
+ * rather than adding ([blushBlendNormal]), for the reason that field states:
+ * additive light on a body this pale clips to flat white instead of warming.
+ *
+ * **Deliberately absent:** horns (see `drawEars` — upright ears *and* horns is a
+ * silhouette nobody can parse, and it is written down there as a rule), a snout,
+ * and a tail. A rabbit does want a puff of a tail, but the tail this renderer
+ * owns is a tapering chain ending in a barb — a devil's tail, drawn as an arc
+ * that hooks back up. Making it a puff is a mesh job, not a number, and it is
+ * the one signal here nobody misses at this size.
+ *
+ * [voice] is `zh_female_peiqi_uranus_bigtts`, and it is worth recording that it
+ * was blank for a pass on an argument that sounded right: the house voice
+ * (`VoiceConfig.TTS_SPEAKER`, `zh_female_vv_uranus_bigtts`) is bright and young,
+ * which [IMP]'s own note calls exactly wrong for a mouth full of teeth and is
+ * exactly right for this one — so why name a second copy of it. What that misses
+ * is that bright-and-young is what this device sounds like with *no* character
+ * selected. Matching it does not give the rabbit a voice, it gives the rabbit
+ * the absence of one, and three of the four looks here would then be a face
+ * change over an unchanged speaker. [BAJIE] and [IMP] are each legible before
+ * the first sentence ends; this one has to be too.
+ */
+val RABBIT = BallLook(
+    name = "rabbit",
+    // Snow white with the faintest cool lean, and stopped short of the 0.985
+    // the reference photograph is — see the class note: the eye whites are flat
+    // 1.0 and have no outline, so the body has to stay a step below them.
+    bodyBase = floatArrayOf(0.900f, 0.895f, 0.915f),
+    // A fifth of CREAM's. The mood still has to reach the body — a ball that
+    // never changes colour loses half the signal — but a white rabbit that goes
+    // periwinkle in CALM is not a white rabbit, and cream is already that ball.
+    // 0.22 was still too much: measured on the tablet it put 17/255 of blue over
+    // red across the whole sphere, which is a grey-blue animal.
+    bodyTint = 0.12f,
+    // The only look at a flat 1. The other three shave 6-8% off here as a
+    // tasteful knock-down of a saturated base; on this one it is 6% straight off
+    // the thing the look is *for*, and it was the last of the three multiplies
+    // standing between 0.90 and a white that renders white. See the lighting
+    // note below — `bodyColor` is `(base + (mood − base)·tint) × albedo`, so
+    // this sits *outside* the shader and is easy to forget.
+    bodyAlbedo = 1.00f,
+    // The only look here whose lighting is set from the *rendered* value rather
+    // than copied from a neighbour, because this is the only pale body and the
+    // shell shader is multiplicative: `uColor × grad × (uAmb + uDiff · diff)`.
+    // Every other look's `uAmb + uDiff·diff` ≈ 0.75 at the face plane, which on
+    // their mid-value bases is shading and on a 0.90 base is **grey** — measured
+    // 142/255 at the middle of the first white pass, against 230 for the white
+    // it is supposed to be. So ambient carries almost all of it, the key light
+    // is halved, and the vertical gradient is halved with it: a steep gradient
+    // under a near-1.0 ambient only buys a blown-out crown. Resolves to roughly
+    // 0.83 at the face plane, 0.98 at the top and 0.76 underneath — white, with
+    // enough fall-off to still read as a sphere, and still a step below the eye
+    // whites, which are drawn flat at 1.0 with no outline of their own.
+    bodyGrad = 0.20f,
+    bodyAmb = 0.90f,
+    bodyDiff = 0.18f,
+    // The lowest in the set, below even the imp's 0.26. This one is fur, the
+    // renderer has no fur, and taking the lacquer off is the nearest it gets.
+    bodyGloss = 0.18f,
+    bodyScale = 0.840f,
+    faceZ = 0.876f,
+    // Below [faceZ] like CREAM and IMP, so the face plane clears the body
+    // sphere and the `√(x² + y²)` floor in the class KDoc does not apply.
+    //
+    // Big, and sat low. [eyeRadius] 0.168 is a third more than any other look
+    // here because the reference is mostly eyes; dropping [eyeY] to 0.195 is
+    // what buys the room above them for the ears to grow out of.
+    eyeX = 0.245f,
+    eyeY = 0.195f,
+    eyeRadius = 0.168f,
+    eyeCyl = 0.052f,
+    // Wider than the first pass and much thicker, both for the teeth: they have
+    // to interrupt the lip to read as teeth, and a hairline lip has nothing to
+    // interrupt. [mouthThick] 0.105 against CREAM's 0.05 is the whole of it —
+    // `EmotionState` resolves it to a resting `mouthScaleY` of 0.265, so the
+    // arch stands about 0.053 off its own chord and the mouth is slightly
+    // *open* at rest, which is the one state the reference is ever drawn in.
+    mouthR = 0.200f,
+    mouthTube = 0.030f,
+    mouthY = -0.255f,
+    mouthThick = 0.105f,
+    // White eyes with a round dark pupil — and round is the line between this
+    // look and the imp. A slit ([pupilAspect]) is a predator; this animal is
+    // prey that thinks it is in charge, which is most of the joke.
+    eyeColor = floatArrayOf(1f, 1f, 1f),
+    pupilR = 0.092f,
+    glintR = 0.030f,
+    bubbleX = 0.085f,
+    bubbleY = -0.030f,
+    // Pale body, so the droplet's edge reads as refraction — dark, the same
+    // value CREAM uses rather than the ink ball's.
+    bubbleR = 0.085f,
+    bubbleColor = floatArrayOf(0.105f, 0.135f, 0.205f),
+    bubblePow = 3.0f,
+    bubbleShine = 26f,
+    bubbleInner = 0.10f,
+    mouthDeep = true,
+    // Softer than CREAM's, and pushed out to the edge of the cheek: on a body
+    // this pale the blush is the only warm thing on the animal, and at cream's
+    // alpha it stops being a cheek and becomes a painted circle.
+    blushColor = floatArrayOf(1f, 0.56f, 0.62f),
+    blushAlpha = 0.46f,
+    blushBlendNormal = true,
+    blushSize = 0.46f,
+    blushX = 0.440f,
+    blushY = -0.150f,
+    // A near-white body needs the hard edge more than any other look here: a
+    // light app behind the ball and an additive glow in front of it leaves
+    // nothing at all holding the silhouette.
+    rimDark = true,
+    rimGain = 1.00f,
+    rimPow = 5.6f,
+    labelRes = R.string.ball_look_rabbit,
+
+    // Barely lowered — enough to flatten the top of the eye, and no more. The
+    // ceiling here is 1 − 0.8 × 0.092 / (0.168 + 0.026) = 0.621 (see [eyeCut]),
+    // so 0.16 leaves 0.131 of white above the pupil against the imp's 0.0257.
+    // On an eye this large a deep cut is a glare, and the glare belongs to the
+    // imp; what this face wants is a lid that is simply not all the way up.
+    eyeCut = 0.16f,
+    // 6° rather than the imp's 12. Rolled this little the flat lid is not
+    // pointing at anything; it is just not fully open, which is the difference
+    // between looking down at you and looking at you sideways.
+    eyeTilt = 6f,
+
+    // The smirk. 12° lifts the ball's right corner by 0.200 × sin 12° ≈ 0.042
+    // and drops the left by the same, which is about a fifth of the eye's
+    // height — visible at a glance, and short of the ~15° where the low corner
+    // falls past the middle of the arc.
+    mouthTilt = 12f,
+
+    // Two front teeth, straddling the middle of the lip. Sized against the
+    // mouth rather than picked: at [buckW] 0.046 the pair spans 0.184, which is
+    // 46% of the grin's full width — wide enough to be the thing you see in the
+    // middle of the mouth, narrow enough that the lip still reaches past them
+    // on both sides and stays a mouth. [buckH] 0.070 is taller than the lip is
+    // thick, so each one hangs below it the way an incisor does.
+    buckW = 0.046f,
+    buckH = 0.070f,
+    buckColor = floatArrayOf(1f, 0.995f, 0.980f),
+
+    // Long, narrow and barely splayed — see the class note, where the headroom
+    // against the frustum is worked out. More than twice CREAM's length and a
+    // base little more than half its width.
+    earH = 0.860f,
+    // Up from 0.092, which is the correction [earTaper] made necessary and the
+    // one the arithmetic argued *against*. A 4.7:1 flap is a hare's; a rabbit's
+    // is about 3:1, and 0.860 against a full width of 0.260 is 3.3. The reason
+    // the narrow version looked right on paper is that it was measured as a
+    // ratio while the ear was still a cone — a cone has given most of its width
+    // back by halfway, so it needs a wide base to look like anything, and the
+    // flap that replaced it carries its full width the whole way up.
+    earW = 0.130f,
+    earThick = 0.034f,
+    // Pulled in with the widening, so the pair still leaves a gap of about half
+    // an ear between them rather than growing into each other.
+    earX = 0.195f,
+    // Low, which is the counter-intuitive half of a long ear: the base has to
+    // be *further inside* the body, not further up it, or the flap looks docked
+    // on. At 0.510 this one starts 0.215 inside a 0.840 sphere — three times
+    // CREAM's burial — and still clears it by 0.60 at the tip.
+    earY = 0.510f,
+    // Well forward, as CREAM's is and for the same reason: this base is even
+    // closer to the centre line, so at the pig's depth most of the flap would
+    // still be inside the sphere.
+    earZ = 0.280f,
+    earTilt = 8f,
+    earBend = 8f,
+    // The parameter the first two passes were missing. At the default 2 this
+    // flap is a cone with a blunt end, and a cone stood on a head is a horn
+    // however long it is — which is exactly what 0.46 and then 0.76 shipped as.
+    // At 6 it runs parallel to within 76% of its base width at nine tenths of
+    // the way up and rounds off only in the last fifth.
+    earTaper = 6f,
+    // A hair darker than the body, and *only* a hair, which is a reversal of
+    // what the first white pass shipped. The reasoning behind 0.72 is sound as
+    // far as it goes — `drawEars` gives the flap no outline, so past the
+    // silhouette the only thing holding it off the app behind the ball is its
+    // own value — but it was applied before anyone measured the result: against
+    // the new ambient it rendered the ears at 107/255, a mid grey bolted to a
+    // white head, and on the tablet that is not a white rabbit with shaded ears,
+    // it is a grey rabbit. 0.88 lands them near 180, which is still a clear step
+    // down from a white app behind them and reads as the same animal's fur.
+    earShade = 0.88f,
+
+    // Peppa. The house voice (`zh_female_vv_uranus_bigtts`) was left in place
+    // for one pass on the argument that it is already bright and young, which is
+    // this character — and that argument was about the wrong axis. Bright and
+    // young is the *house* manner: it is the voice this device uses when it has
+    // no character at all, so a look wearing it is a look that sounds like the
+    // tablet. 贱贱兔 is a bit, and a bit has to be audible the moment it opens
+    // its mouth. Same `*_uranus_bigtts` family as the fallback, so it needs no
+    // change to `tts_resource_id`.
+    voice = "zh_female_peiqi_uranus_bigtts",
+    persona = RABBIT_PERSONA,
+)
+
+/**
  * The looks the user can reach, and which one is being drawn.
  *
  * This is a mutable global for the same reason [EmotionState]'s fields are:
@@ -1187,7 +1582,7 @@ object BallLooks {
      * around; [IMP] is last because it is the one a user should arrive at on
      * purpose.
      */
-    val ALL = listOf(CREAM, BAJIE, IMP)
+    val ALL = listOf(CREAM, BAJIE, RABBIT, IMP)
 
     @Volatile
     private var requested = 0
