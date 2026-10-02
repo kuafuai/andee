@@ -16,6 +16,7 @@ import net.kuafuai.andee.ui.ball.gl.UvSphere
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -341,6 +342,9 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
 
     /** Scratch for the nostril dots — a dark relative of [bodyColor]. */
     private val nostrilColor = FloatArray(3)
+
+    /** Filled per frame from [bodyColor] — see [BallLook.snoutShade]. */
+    private val snoutColor = FloatArray(3)
 
     // Demo cycling
     private var demoIndex = 0
@@ -851,10 +855,18 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
      * Drawn after the body and before [drawFace], so it writes depth into the
      * opaque pass and the nostrils — drawn flat on top of it inside [drawFace] —
      * land over the bump rather than behind it.
+     *
+     * The colour is [BallLook.snoutShade] times the live body colour, exactly as
+     * [drawEars] does for the ears, and at the default 1 that is the body colour
+     * itself. The shading is still the shell shader's: a muzzle that is a *bump*
+     * and a muzzle that is a lighter *patch* are different animals, and this only
+     * changes the second, so the vertical gradient and the specular keep landing
+     * on it the way they do on a protrusion.
      */
     private fun drawSnout() {
         val snout = meshes.snout ?: return
-        useShellWith(bodyColor)
+        for (i in 0..2) snoutColor[i] = bodyColor[i] * LOOK.snoutShade
+        useShellWith(snoutColor)
         Matrix.setIdentityM(local, 0)
         Matrix.translateM(local, 0, LOOK.snoutX, LOOK.snoutY, 0f)
         Matrix.scaleM(local, 0, LOOK.snoutRx, LOOK.snoutRy, LOOK.snoutRz)
@@ -1137,10 +1149,39 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
      * no [BallLook.nostrilR].
      *
      * Drawn flat in the face pass, after [drawSnout] has already laid down the
-     * lit muzzle, so they sit *on* the bump rather than behind it. Placed at the
-     * muzzle's front surface — pushed forward of the face plane by most of
-     * [BallLook.snoutRz] — so they read as holes in the snout, not marks on the
-     * face behind it.
+     * lit muzzle, so they sit *on* the bump rather than behind it.
+     *
+     * ## Where the Z comes from, and why it is not a fraction of [BallLook.snoutRz]
+     *
+     * It used to be `snoutRz × 0.82`, i.e. "most of the way out", and that was
+     * wrong in a way that only shows up on a muzzle whose nostrils are near its
+     * middle. The muzzle is an **ellipsoid centred on the face plane**, so the
+     * surface the dot has to clear is not a constant — it is
+     * `snoutRz · √(1 − (x/snoutRx)²)`, highest at the muzzle's axis and falling
+     * away toward the rim. Anything flat under that curve is depth-culled,
+     * because the snout is drawn in the opaque pass and writes depth.
+     *
+     * Measured on the tablet before the fix:
+     *
+     *  - [BAJIE] — nostrils at x = ±0.095 on a 0.215-wide muzzle, so the surface
+     *    there is 0.148 against a dot front face at 0.139. Each nostril rendered
+     *    as an outward-facing **crescent**: only the sliver near the rim, where
+     *    the ellipsoid has finally dropped behind the dot's plane, survived.
+     *    That had been shipping unnoticed, read as a stylised pig nostril.
+     *  - [BEAR] — nostrils at x = ±0.028, which puts the whole disc under the
+     *    *apex*. Nothing survived at all: a clean tan muzzle with no nose on it.
+     *
+     * So the clearance is computed at the point of the dot's own footprint
+     * **nearest the muzzle's axis**, `max(0, |nostrilX| − r)`, which is where the
+     * ellipsoid under the disc is highest — a footprint straddling the axis
+     * (the bear) correctly gets the full [BallLook.snoutRz]. Y needs no such term
+     * because the dots sit at `snoutY`, the ellipsoid's own y-apex, and every
+     * other y is lower.
+     *
+     * [NOSTRIL_LIFT] on top of that is the usual flat-element clearance. The dot
+     * is camera-facing and the stand-off is under 0.02 world units even in the
+     * bear's worst case, so it reads as a hole in the bump rather than a disc
+     * hovering in front of one.
      *
      * The colour is the live [bodyColor] darkened, not a fixed black: the body
      * takes the mood's tint, and a fixed near-black would be right in CALM and a
@@ -1150,7 +1191,11 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
         val r = LOOK.nostrilR
         if (r <= 0f) return
         for (i in 0..2) nostrilColor[i] = bodyColor[i] * NOSTRIL_DARK
-        val z = LOOK.snoutRz * 0.82f
+        val rx = LOOK.snoutRx
+        val inner = (abs(LOOK.nostrilX) - r).coerceAtLeast(0f)
+        val k = if (rx > 0f) (inner / rx).coerceAtMost(1f) else 1f
+        val surface = LOOK.snoutRz * sqrt((1f - k * k).coerceAtLeast(0f))
+        val z = surface + r * DISC_THICKNESS + NOSTRIL_LIFT
         for (side in -1..1 step 2) {
             drawDot(
                 LOOK.snoutX + LOOK.nostrilX * side,
@@ -1198,13 +1243,21 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
      * A flattened unit sphere rather than a bar: a scaled sphere is a lens,
      * which tapers at both ends, which is what a brow looks like.
      *
-     * With [BallLook.browShade] set it is not a brow at all but a **wedge of
-     * body colour laid over the top inner corner of the eye** — the white that
-     * survives underneath is a slanted almond, and a slanted eye is a glare
-     * where a bar above a round eye is only an eyebrow. The colour is derived
-     * from the live [bodyColor] rather than stored, because the body takes the
-     * mood's tint and a fixed near-black would show as a smudge the moment the
-     * mood moved. No look ships with it set; see [BallLook.browShade].
+     * With [BallLook.browShade] set the mark is derived from the live
+     * [bodyColor] rather than stored, because the body takes the mood's tint and
+     * a fixed near-black would show as a smudge the moment the mood moved. Which
+     * *kind* of mark it is depends entirely on where the look puts it:
+     *
+     *  - Above the eye and darker than the body ([BEAR], 0.42) it is an ordinary
+     *    eyebrow, which is the only thing a brown body can have — [eyeColor] is
+     *    white there, by the light-on-dark rule, so the default branch below
+     *    would draw two white caterpillars on a bear's forehead. That is what it
+     *    did on the first build of that look.
+     *  - Overlapping the eye and *lighter* than the body it is not a brow at all
+     *    but a **wedge of body colour laid over the top inner corner**, and the
+     *    white that survives underneath is a slanted almond — a slanted eye is a
+     *    glare where a bar above a round eye is only an eyebrow. That is the
+     *    reading [IMP] used to get here; see [BallLook.browShade].
      *
      * **This draw is flat and the face behind it is lit, so the multiplier is
      * not what it looks like.** Measured against the ink body ([IMP]) with the
@@ -1230,8 +1283,14 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
      * have different jobs, is a fragile way to get a glare — and it is fragile
      * in the worst way, silently. [BallLook.eyeCut] gets the same read out of
      * the eye's own geometry, where the flat edge is the highest-contrast line
-     * there is by construction. This draw stays for [CREAM] and [BAJIE], which
-     * want an actual eyebrow rather than a glare.
+     * there is by construction.
+     *
+     * None of that fragility applies to the *downward* use. [BEAR]'s brow sits
+     * clear of the eye — `browY` 0.168 against an eye top at 0.112, so its lower
+     * edge misses by 0.010 — which means it has only one job: beat the body. The
+     * lit body at that latitude is `bodyColor × 0.89`, so 0.42 is a touch over
+     * 2× under it in every channel, and the mood multiplies both sides equally.
+     * One number, one job, no range.
      *
      * The tilt is [BallLook.browTilt] (the look's resting scowl) plus the
      * mood's own [EmotionState.brow], so a look that starts angry can still get
@@ -1734,6 +1793,17 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
          * reasoning.
          */
         private const val NOSTRIL_DARK = 0.28f
+
+        /**
+         * Clearance between a nostril dot's front face and the muzzle surface
+         * it is drawn on — see [drawNostrils], which computes that surface
+         * rather than guessing at it.
+         *
+         * It only has to beat depth-buffer resolution, so it is deliberately
+         * small: a flat disc standing off a curved bump is a disc floating in
+         * front of it, and the whole point of the dot is to read as a hole.
+         */
+        private const val NOSTRIL_LIFT = 0.006f
 
         // ---- Tail ----
         //

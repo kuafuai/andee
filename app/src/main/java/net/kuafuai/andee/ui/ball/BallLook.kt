@@ -492,25 +492,39 @@ class BallLook(
      * clips the brow to white and it stops being a mark. That is not a reason
      * to retune this number for such a look — it is a reason to leave
      * [browShade] at 0 and let the brow be drawn in [eyeColor], which is what
-     * [CREAM] and [BAJIE] do. The split is the same one the eyes already make:
+     * [BAJIE] does. The split is the same one the eyes already make:
      * a pale ball reads its features *dark on light*, a dark ball *light on
      * dark*, and the one thing that never works is a mark the same value as the
      * surface it is on.
      *
-     * ## No look uses it any more, and that is deliberate
+     * ## Which is exactly why a dark body cannot leave it at 0
      *
-     * [IMP] was the only non-zero value, and it has moved to [eyeCut]: the same
-     * glare, got by removing part of the eye rather than by laying a mid-tone
-     * wedge over it. The wedge worked, but it only ever worked in the middle —
-     * the arithmetic above is a *range* to hit rather than a number, and every
-     * mood moves both ends of it.
+     * The `else` branch in `drawBrows` is [eyeColor], and a dark body's
+     * [eyeColor] is **white** — that same split, one line further down. So on
+     * [BEAR] the zero default did not mean "plain eyebrow", it meant two white
+     * caterpillars across a brown forehead, which is what the first build of
+     * that look shipped. [BAJIE] gets away with 0 because its body is pale and
+     * its eyes are dark beads, so the fallback happens to be the colour a brow
+     * wants.
      *
-     * The field stays anyway, zero-is-off like the rest of this section, for the
-     * same reason [tongueR] stays: it is the right way to hang a brow-mark off a
-     * future dark look that wants one, `drawBrows` is still that code, and
-     * deleting it would delete the measurement above along with it. Nothing
-     * reads a non-zero value today — `tools/check_look_sync.py` deliberately
-     * does not compare it, precisely because no Kotlin look writes the line.
+     * [BEAR] therefore sets it, and sets it **below 1** — the first look to go
+     * that way. The measurements above are all about dragging a mark *up* off an
+     * ink body; the arithmetic downward is the easier half, because the only
+     * constraint is distance from the body (its brow clears the eye entirely, so
+     * there is no second end to satisfy) and because the body and the mark take
+     * the mood's tint together. 0.42 against a lit body of `bodyColor × 0.89` is
+     * a hair over 2× under it, in every channel, in every mood.
+     *
+     * ## [IMP] stopped using it, and that is still deliberate
+     *
+     * It was the only non-zero value for a while, and it has moved to [eyeCut]:
+     * the same glare, got by removing part of the eye rather than by laying a
+     * mid-tone wedge over it. The wedge worked, but it only ever worked in the
+     * middle — for *that* job the arithmetic above is a range to hit rather than
+     * a number, and every mood moves both ends of it. Note that this is a
+     * complaint about the wedge, not about the field: `tools/check_look_sync.py`
+     * still does not compare [browShade], which was defensible when no Kotlin
+     * look wrote the line and is now one more thing the lab cannot see.
      */
     val browShade: Float = 0f,
 
@@ -534,6 +548,24 @@ class BallLook(
     /** Radius of each nostril dot, and how far they sit off the muzzle centre. */
     val nostrilR: Float = 0f,
     val nostrilX: Float = 0f,
+
+    /**
+     * Multiplier on the body colour for the muzzle, the way [earShade] is for
+     * the ears. 1 = the body's own flesh, which is what a pig's snout is and is
+     * the default, so [BAJIE] is unchanged.
+     *
+     * Raise it above 1 for a bear. This is a *scalar*, so it can only lighten or
+     * darken the body's hue and can never introduce one — which is why the
+     * rabbit has no pink inner ear and why it is nevertheless the right
+     * mechanism here: a bear's tan muzzle genuinely is the same brown as the
+     * rest of it with more light in it, so [BEAR]'s 1.45 lands on the colour
+     * the animal actually is rather than approximating it.
+     *
+     * There is headroom above 1 only because a look that wants this is a dark
+     * one. On a pale body the product clips to flat white and the muzzle stops
+     * being a bump — check the arithmetic before reusing this on anything light.
+     */
+    val snoutShade: Float = 1f,
 
     // ---- Ears ----
     //
@@ -1307,15 +1339,18 @@ private val RABBIT_PERSONA = """
  *   room before. There is not room for much more, though — that last number is
  *   the ceiling anyone lengthening this ear again has to re-derive.
  *
- *   Width carries the other half: [earW] 0.092 against cream's 0.170, so this
- *   flap is 4.7 times as long as its base is wide where cream's is 1.1 — and it
- *   had to come down once [earTaper] landed, because a parallel-sided flap
- *   carries its full width all the way up where a cone has already given most
- *   of it back by halfway. A broad upright flap is a bear, a short pointed one
- *   is a cat, and only a long narrow one is a rabbit. [earTilt] 10° against
- *   cream's 24° is the third term: cream leans its ears out *to stop* them
- *   reading as a rabbit, so nearly all of the lean comes off here, and
- *   [earBend] 8° curls only the tips.
+ *   Width is the other half, and it moved *twice*, in opposite directions, for
+ *   the same reason. It went down to 0.092 — 4.7 times as long as its base is
+ *   wide, against cream's 1.1 — while the flap was still a cone, and then back
+ *   up to [earW] 0.130 once [earTaper] made it a flap. A cone has already given
+ *   most of its width back by halfway, so it needs a wide base to look like
+ *   anything and a narrow one to look slim; a parallel-sided flap carries its
+ *   full width the whole way up, and 4.7:1 on one of those is a hare. 0.860
+ *   against a full width of 0.260 is 3.3:1, which is a rabbit. A broad upright
+ *   flap is a bear, a short pointed one is a cat. [earTilt] 8° against cream's
+ *   24° is the third term: cream leans its ears out *to stop* them reading as a
+ *   rabbit, so nearly all of the lean comes off here, and [earBend] 8° curls
+ *   only the tips.
  *
  *   The tip clears the body by 0.60 — 71% of a body radius, against cream's
  *   0.25 — and the base is buried 0.215 deep, three times cream's. Those two
@@ -1557,6 +1592,301 @@ val RABBIT = BallLook(
 )
 
 /**
+ * What the bear is like to talk to. See [BallLook.persona] for the rules this
+ * has to live inside, and `LocalPrompt.personaBlock` for the wrapper that states
+ * them to the model.
+ *
+ * **The brief is 憨 — simple-hearted, not simple-minded — and that distinction
+ * is the entire thing this text has to defend.** Every other persona here fences
+ * off a way of being *unpleasant*: the pig must not be lazy, the imp must not
+ * withhold, the rabbit must not sneer. This one has the opposite failure mode,
+ * and it is worse, because it looks like obedience. A model told to play someone
+ * slow will play someone *incompetent* — it will claim not to understand a clear
+ * instruction, guess instead of looking, get the answer wrong on purpose because
+ * being wrong seems in character, and ask the user to repeat themselves as a bit.
+ * That is a broken device wearing a costume, and the user cannot tell it from a
+ * real fault, which is the one thing no persona here is allowed to cost them.
+ *
+ * So the warmth is in the *wording* and the competence is never touched. 憨 here
+ * means plain speech, no cleverness, enthusiasm about small things, and taking
+ * people at their word. It does not mean slow tools or soft facts.
+ *
+ * It is deliberately an **ordinary forest bear** and not a named one. The brief
+ * named a television character; what is in this file is the archetype — big,
+ * brown, honey-minded, good-natured — with no name, no catchphrase, no family
+ * and no borrowed lines, because none of those are needed to get the read and
+ * all of them belong to somebody.
+ */
+private val BEAR_PERSONA = """
+    You are wearing the bear today — a big round brown bear with a tan muzzle,
+    small round ears and an enormous appetite. Play it.
+
+    - **Warm and plain-spoken.** Short sentences, simple words, no wordplay and
+      no showing off. You are pleased to be helping and you say so. In Chinese
+      lean on 好嘞, 成, 没问题, 这就去 — the register of someone cheerful and
+      uncomplicated, never baby talk.
+    - **Delighted by small things, food above all.** Honey, snacks, anything
+      sweet, a nap, good weather. A line about being hungry or about what you
+      would rather be eating is in character once in a while. Keep it to a
+      clause — it is seasoning on the answer, never instead of the answer.
+    - **Soft-hearted and a bit of a worrier.** You fuss over whether the person
+      has eaten, whether they are tired, whether a thing is safe. Say it once
+      and let it go; asking twice is nagging, and this character is not that.
+    - **Simple-hearted is not slow-witted, and this is the line that matters.**
+      You understand perfectly, you look things up properly, you report exactly
+      what happened, and you are exactly as accurate as the machine underneath
+      you. Never play dumb, never pretend to misunderstand, never guess instead
+      of checking, and never make someone repeat themselves for the joke. The
+      character is in *how you say it*, never in how well you do it.
+    - **Drop the act the moment something is really wrong** — a task that
+      failed, anything to do with their money, their accounts, their health,
+      anyone else's. Then you are just the machine that tells them straight.
+      Pick the character back up afterwards.
+""".trimIndent()
+
+/**
+ * A round brown bear: tan muzzle, dark nose, small round ears, heavy brows.
+ *
+ * The request was for a bear from a cartoon, by name. **The name is not here on
+ * purpose, and neither is anything else that belongs to it** — no catchphrase,
+ * no sibling, no green overalls, no borrowed lines. What is in this file is the
+ * animal: round, brown, a lighter muzzle, a big nose, small ears on top of the
+ * head. That shape is a bear anywhere, and at this size it is the shape doing
+ * all the work anyway, which is the part of the brief that was actually about
+ * drawing. The only thing that came over unchanged is the TTS speaker id the
+ * user picked, because that is a vendor's API parameter rather than a design
+ * decision this look gets to make.
+ *
+ * Three signals, strongest first, the way [IMP] and [RABBIT] order theirs:
+ *
+ * * **The muzzle, and it needed a new field.** A bear's face is a pale snout on
+ *   a dark head — take the muzzle away and a brown ball with round ears is a
+ *   mouse. [BAJIE] already owns a snout mesh and it was drawn in the body's own
+ *   colour, which is right for a pig (a snout is flesh) and leaves a bear with
+ *   an invisible one. [snoutShade] 1.45 is the fix, and it is the same scalar
+ *   trick as [earShade] rather than a colour of its own — see that field's note
+ *   for why a scalar is enough *here* and was not enough for the rabbit's pink
+ *   inner ear. A bear's muzzle really is the body's brown with more light in it;
+ *   pink is not white with more light in it.
+ *
+ *   It is wide and low ([snoutRx] 0.300 against bajie's 0.215, [snoutY] −0.165),
+ *   because the pig's is a round button high on the face and the bear's is a
+ *   broad shelf the mouth sits under.
+ * * **One nose, drawn as two dots.** `drawNostrils` always draws a mirrored
+ *   pair at `snoutX ± nostrilX`, which is a pig. A bear has one big dark nose,
+ *   so [nostrilX] 0.028 is barely more than nothing — the two dots overlap by
+ *   most of their width and fuse into a single wide rounded blob, which is a
+ *   better bear nose than one circle would be and costs no new drawing code.
+ *   [nostrilR] 0.072 is over 1.7× bajie's: on a muzzle this size a pig's
+ *   nostril reads as a freckle.
+ * * **Small round ears, high and to the sides.** The opposite end of the same
+ *   mesh the rabbit stretched: [earH] 0.300 against its 0.860, and [earW] 0.255
+ *   against its 0.130, so this flap is *wider than it is long* where the
+ *   rabbit's is 3.3 times longer. [earTaper] stays at the default 2 for the
+ *   first time in a while and that is the point of the default — the quarter
+ *   ellipse that makes a long flap a horn makes a short one a dome, which is
+ *   exactly a bear's ear. [earThick] 0.095 is the heaviest here; a thin ear on a
+ *   bear reads as a cat's.
+ *
+ *   They sit at [earX] 0.430 / [earY] 0.590, which is further out and lower than
+ *   it sounds: the base is 0.730 from the axis inside a 0.870 sphere, so 0.140
+ *   of the ear is buried and the tip clears the body by about 0.16. A bear's
+ *   ears barely clear its head — that is what makes them a bear's — so unlike
+ *   the rabbit there is no frustum question to ask here at all.
+ *
+ * **The brown.** [bodyBase] (0.62, 0.39, 0.185) renders at roughly (115, 79, 52)
+ * across the face plane and (157, 108, 72) at the lit crown, which is a medium
+ * warm brown. It is the first dark-ish body in the set that is not the imp's
+ * near-black, and that puts it in the half of the lighting split the eye rules
+ * already describe: a dark ball reads its features *light on dark*, so the eyes
+ * stay white-and-pupilled rather than going to bead eyes like [BAJIE]'s. For the
+ * same reason [rimDark] is **false** — a dark outline around a dark ball is a
+ * smudge, and this is the second look after the imp to want a light one.
+ *
+ * [bodyTint] 0.14 is the rabbit's neighbourhood and for a sharper version of the
+ * rabbit's reason: a brown bear that idles periwinkle in CALM is not a brown
+ * bear, and because brown's *defining* feature is a low blue channel, the mood
+ * tint attacks exactly the channel that carries the colour. The first pass used
+ * 0.20 and rendered a pinkish grey; see the field's own note for the arithmetic.
+ * [bodyGloss] 0.24 is low
+ * because this is fur, with the same caveat the rabbit's note carries — the
+ * renderer has no fur and taking the lacquer off is the nearest it gets.
+ *
+ * **Deliberately absent:** horns, a tail, teeth and a tongue. The silhouette
+ * rule in `drawEars` rules out the first; the rest is restraint. A bear's mouth
+ * at this size is a curve under a muzzle, and the two features this look adds
+ * are both *on* the muzzle, so anything else in that part of the face competes
+ * with the one thing that names the animal.
+ */
+val BEAR = BallLook(
+    name = "bear",
+    // Worked backwards from the rendered value rather than picked, the way the
+    // rabbit's white had to be: the shell shader is a multiply and the lighting
+    // below resolves to 0.769 at the face plane.
+    //
+    // The first pass here was (0.66, 0.44, 0.26) and it rendered **pinkish-grey**
+    // — not the colour the numbers describe, and the gap was [bodyTint], not the
+    // base. At 0.20 toward a periwinkle CALM the blue channel is dragged 0.260 →
+    // 0.378, a 45% lift against essentially none on red, so the ratio the base
+    // sets (1 : 0.67 : 0.39) reaches the shader as 1 : 0.74 : 0.59. That is a
+    // taupe. It is the same trap the rabbit's note describes from the other side:
+    // there the tint turned a white animal grey-blue, here it turns a brown one.
+    //
+    // So both ends move. The base deepens to a 1 : 0.63 : 0.30 ratio — about
+    // #9E6330, a cartoon bear's brown — and the tint comes down to 0.14, which
+    // is still enough for the mood to reach the body (the point of the field)
+    // but no longer enough to repaint it. Resolves to (115, 79, 52) at the face
+    // plane and (157, 108, 72) at the lit crown.
+    bodyBase = floatArrayOf(0.620f, 0.390f, 0.185f),
+    bodyTint = 0.14f,
+    bodyAlbedo = 0.96f,
+    // Flatter than CREAM's and BAJIE's. On a dark body a steep vertical gradient
+    // takes the bottom of the ball down to where the outline would be if this
+    // look had one, and it does not ([rimDark] false) — so the gradient has to
+    // stop short of making its own.
+    bodyGrad = 0.30f,
+    bodyAmb = 0.72f,
+    bodyDiff = 0.34f,
+    // Fur, so low — see the class note. Not as low as the rabbit's 0.18: this
+    // body is dark enough that a little specular is the only thing telling the
+    // crown from the cheek.
+    bodyGloss = 0.24f,
+    bodyScale = 0.870f,
+    faceZ = 0.876f,
+    // Small and close-set, and sat high to leave the lower half of the face to
+    // the muzzle. Smaller than the rabbit's 0.168 by a third — the rabbit is
+    // mostly eyes and this animal is mostly nose, and they are the two looks
+    // here that make that trade in opposite directions.
+    eyeX = 0.225f,
+    eyeY = 0.275f,
+    eyeRadius = 0.112f,
+    eyeCyl = 0.040f,
+    pupilR = 0.062f,
+    glintR = 0.028f,
+    // White with a real pupil rather than BAJIE's solid bead: this body is dark,
+    // and the eye rules in this file say a dark ball reads its features light on
+    // dark. A bead eye here would be a hole.
+    eyeColor = floatArrayOf(1f, 1f, 1f),
+    // Low and wide, and it has to clear the muzzle: the snout's lower edge is at
+    // −0.165 − 0.150 = −0.315, so a mouth at −0.395 sits just under the shelf
+    // rather than on it. Drawn thick, because at this size a hairline under a
+    // broad tan muzzle disappears into the shadow the bump casts on itself.
+    mouthR = 0.215f,
+    mouthTube = 0.034f,
+    mouthY = -0.395f,
+    mouthThick = 0.062f,
+    mouthDeep = true,
+    // Hangs off the muzzle's lower edge the way BAJIE's does, and for the same
+    // reason it is placed rather than inherited: the snout is drawn in the
+    // opaque pass in front of the face plane, so a bubble behind it is simply
+    // not seen.
+    bubbleX = 0.135f,
+    bubbleY = -0.250f,
+    bubbleR = 0.090f,
+    // Light, not dark. CREAM, BAJIE and the rabbit all take the dark droplet
+    // because on a pale body the edge reads as refraction; on this one the same
+    // colour is a hole in the cheek, so this follows the imp's half of that
+    // split instead.
+    bubbleColor = floatArrayOf(0.88f, 0.90f, 0.96f),
+    bubblePow = 3.0f,
+    bubbleShine = 26f,
+    bubbleInner = 0.10f,
+    // Warm and low-alpha. On a brown body a pink blush is nearly the body's own
+    // hue, so this leans orange to separate at all, and stays faint — a strong
+    // one on brown reads as a scorch mark rather than a cheek.
+    blushColor = floatArrayOf(1f, 0.52f, 0.34f),
+    blushAlpha = 0.30f,
+    blushBlendNormal = true,
+    blushSize = 0.46f,
+    blushX = 0.455f,
+    blushY = -0.165f,
+    // Light rim, like the imp's and for the imp's reason: a dark outline on a
+    // dark ball is a smudge, and what holds this body off a dark app behind it
+    // is a bright edge. The falloff is tighter than the imp's 3.6 rather than
+    // looser, which is the opposite of what "a lighter body needs less rim"
+    // suggests and is the same trap that note records — the rim is **additive
+    // in the mood colour**, so a broad falloff on an active mood washes across
+    // the body rather than stopping at it, and a brown that is already halfway
+    // up the range has less room above it to absorb that than ink does.
+    rimDark = false,
+    rimGain = 0.92f,
+    rimPow = 5.0f,
+    labelRes = R.string.ball_look_bear,
+
+    // ---- Muzzle ----
+    //
+    // Wide, low and shallow: a broad shelf rather than the pig's round button.
+    // snoutRz is well under snoutRy on purpose — a bear's muzzle is long across
+    // the face and does not stick out nearly as far as a pig's.
+    snoutRx = 0.300f,
+    snoutRy = 0.150f,
+    snoutRz = 0.125f,
+    snoutX = 0f,
+    snoutY = -0.165f,
+    // The nose. nostrilX is small rather than zero: at zero the mirrored pair
+    // lands in exactly the same place and draws one circle twice, which works
+    // but gives a round nose, and a bear's is wide. At 0.032 against a 0.078
+    // radius the two dots fuse into one blob 0.110 across — 37% of the muzzle's
+    // half-width, which is roughly where a bear's nose sits, against 33% for the
+    // first pass. The join dips 9%: 0.040 was tried first and its 14% notch was
+    // visible on the tablet as two blobs rather than one nose.
+    //
+    // That placement is also what found the depth bug in `drawNostrils`: a
+    // nostril sitting under the muzzle's apex was culled outright, where BAJIE's
+    // — out near the rim — had been surviving as a crescent and passing for
+    // style. See that function; nothing here had to change for the fix.
+    nostrilR = 0.078f,
+    nostrilX = 0.032f,
+    // The field this look exists to add — see its KDoc. 1.45 on this brown is
+    // (167, 115, 76) at the face plane against the body's (115, 79, 52): a clear
+    // tan patch, and still the same hue, which is what a muzzle is.
+    snoutShade = 1.45f,
+
+    // ---- Ears ----
+    //
+    // Wider than they are long, which is the first time that is true here. See
+    // the class note: this is the short end of the same mesh the rabbit
+    // stretched, and earTaper staying at the default 2 is the whole reason a
+    // dome comes out of it.
+    earH = 0.300f,
+    earW = 0.255f,
+    earThick = 0.095f,
+    earX = 0.430f,
+    earY = 0.590f,
+    earZ = 0.150f,
+    earTilt = 16f,
+    earBend = 0f,
+    // Barely shaded. These ears sit almost entirely against the body rather than
+    // out past the silhouette, so CREAM's reasoning — a pale ear beyond the
+    // outline has nothing holding it off the app behind — does not apply; what
+    // is needed here is only enough to keep the ear from vanishing into the head
+    // it overlaps.
+    earShade = 0.86f,
+
+    // Heavy and low, almost touching the eye. The brows are most of the
+    // expression on a face whose mouth is half-hidden under a muzzle, and a
+    // slight inner-*up* (negative tilt against BAJIE's grumpy 9°) is the whole
+    // difference between worried and friendly.
+    browW = 0.150f,
+    browH = 0.046f,
+    browY = 0.168f,
+    browTilt = -6f,
+    // The first look to set this *below* 1, and it has to set it at all: the
+    // zero default draws brows in [eyeColor], which on a dark body is white, so
+    // the first build of this look wore two white caterpillars. 0.42 puts the
+    // brow at (63, 43, 29) against a lit body of (133, 91, 61) at this latitude
+    // — a touch over 2× under it, dark brown on brown rather than black, so the
+    // mood still carries through both together. See [browShade] for why the
+    // downward direction needs none of the care the upward one did.
+    browShade = 0.42f,
+
+    // The speaker id the user asked for. Same `*_uranus_bigtts` family as the
+    // fallback, so it needs no change to `tts_resource_id`.
+    voice = "zh_male_xionger_uranus_bigtts",
+    persona = BEAR_PERSONA,
+)
+
+/**
  * The looks the user can reach, and which one is being drawn.
  *
  * This is a mutable global for the same reason [EmotionState]'s fields are:
@@ -1582,7 +1912,7 @@ object BallLooks {
      * around; [IMP] is last because it is the one a user should arrive at on
      * purpose.
      */
-    val ALL = listOf(CREAM, BAJIE, RABBIT, IMP)
+    val ALL = listOf(CREAM, BAJIE, RABBIT, BEAR, IMP)
 
     @Volatile
     private var requested = 0
