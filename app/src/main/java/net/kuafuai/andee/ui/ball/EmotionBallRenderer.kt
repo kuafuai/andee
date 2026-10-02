@@ -63,6 +63,24 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
     var listening: Boolean = false
 
     /**
+     * The face the model asked for, for the reply it is saying right now.
+     *
+     * A *separate* channel from [mood] rather than a value written into it, and
+     * the separation is the whole trick. [mood] carries the voice pipeline's
+     * state, and SPEAKING is what used to drive the mouth; swapping HAPPY in
+     * there would have given the user a grinning ball with a shut mouth
+     * halfway through its own sentence. So this layers on top: it supplies the
+     * *face* while [EmotionState.tick]'s `talking` flag keeps supplying the
+     * *mouth*.
+     *
+     * Only read while [mood] is SPEAKING. Null means the model said nothing
+     * about how it felt, which is the overwhelmingly common case and must land
+     * on exactly the behaviour that existed before this channel did.
+     */
+    @Volatile
+    var emotion: Mood? = null
+
+    /**
      * A task is running — set for its whole duration, not per tool call.
      *
      * [toolLeft] cannot express this: it decays [TOOL_SECONDS] after the last
@@ -414,7 +432,14 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
         // actually at the ledge — see [atLedge]. Everything else about working
         // (the face, the rim) is fine to start immediately; the ball looks
         // eager, not broken.
-        state.tick(dt, t, resolveMood(dt), listening, working && atLedge)
+        state.tick(
+            dt,
+            t,
+            resolveMood(dt),
+            listening,
+            working && atLedge,
+            talking = mood == Mood.SPEAKING,
+        )
 
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
         clipToLedge()
@@ -510,10 +535,15 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
             if (overlayLeft <= 0f) overlayMood = null
         }
 
-        val base = if ((working || toolLeft > 0f) && (mood == Mood.CALM || mood == Mood.THINKING)) {
-            Mood.SEARCHING
-        } else {
-            mood
+        val spoken = if (mood == Mood.SPEAKING) emotion else null
+        val base = when {
+            // An emotion the model picked for this reply outranks the work
+            // faces for the same reason the voice pipeline does: the ball is
+            // mid-sentence with the user, and housekeeping can wait.
+            spoken != null -> spoken
+            (working || toolLeft > 0f) && (mood == Mood.CALM || mood == Mood.THINKING) ->
+                Mood.SEARCHING
+            else -> mood
         }
         // Holding a signboard: attending to the user beats the work faces
         // (the task is *paused* on this question) but not the voice pipeline

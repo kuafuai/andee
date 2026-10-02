@@ -710,6 +710,12 @@ class FloatingWindowUi(
             }
             ball?.setMood(mood)
             ball?.setListening(s == State.RECORDING)
+            // The model's face belongs to one utterance. Anything that is not
+            // speaking has ended that utterance — including the IDLE the drain
+            // posts — so the channel is dropped here rather than at each of the
+            // places that stop the voice. Missing one of those would leave the
+            // ball wearing an emotion into the next conversation.
+            if (s != State.SPEAKING) ball?.setEmotion(null)
             // Two transitions are worth a gesture, and only two: the mic
             // opening is the one moment the user is waiting for an acknowledgement
             // before speaking, and an error is the one moment a face alone is
@@ -737,6 +743,18 @@ class FloatingWindowUi(
             ball?.setDemoCycle(false)
             retimeStroll()
         }
+    }
+
+    /**
+     * The face the model picked for the reply it is saying right now.
+     *
+     * Posted to the same handler as [setState], which is what keeps the two
+     * ordered: the emotion is applied by [net.kuafuai.andee.tts.TtsController]
+     * immediately after it asks for SPEAKING, and a null arriving from any
+     * other state transition lands after it rather than racing it.
+     */
+    fun setEmotion(m: Mood?) {
+        ui.post { ball?.setEmotion(m) }
     }
 
     /**

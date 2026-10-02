@@ -203,7 +203,14 @@ class EmotionState {
         actionDur = ACTION_SECONDS[a.ordinal]
     }
 
-    fun tick(dt: Float, t: Float, mood: Mood, listening: Boolean, working: Boolean) {
+    fun tick(
+        dt: Float,
+        t: Float,
+        mood: Mood,
+        listening: Boolean,
+        working: Boolean,
+        talking: Boolean = mood == Mood.SPEAKING,
+    ) {
         val want = FACE[mood]!!
 
         // Lerp toward the target face. 0.14 s to reach = min(1, dt*7).
@@ -241,7 +248,12 @@ class EmotionState {
         // (matches the R3F fallback path when the audio source can't report
         // level). Everything else falls back to the mood's resting [Face.gape],
         // which is how LISTENING gets a mouth that is open rather than curved.
-        val talkTarget = if (mood == Mood.SPEAKING) {
+        //
+        // Gated on [talking], not on `mood == SPEAKING`, because the two stopped
+        // being the same question once the model could pick a face for its own
+        // reply: a HAPPY answer is still an answer being said out loud, and
+        // reading the mood here would have left it grinning in silence.
+        val talkTarget = if (talking) {
             0.34f + sin(t * 17f) * 0.16f + sin(t * 29f) * 0.09f
         } else want.gape
         open += (max(0f, talkTarget) - open) * min(1f, dt * 22f)

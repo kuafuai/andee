@@ -58,6 +58,11 @@ class EmotionBallTextureView @JvmOverloads constructor(
         renderer.listening = l
     }
 
+    /** The face the model picked for what it is saying — see [EmotionBallRenderer.emotion]. */
+    fun setEmotion(m: Mood?) {
+        renderer.emotion = m
+    }
+
     /** A task is running, for its whole duration — see [EmotionBallRenderer.working]. */
     fun setWorking(w: Boolean) {
         renderer.working = w

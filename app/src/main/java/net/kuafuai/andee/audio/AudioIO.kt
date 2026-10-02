@@ -286,6 +286,20 @@ class AudioIO {
     private var streamBytesWritten: Long = 0
 
     /**
+     * Bytes handed to [feedPcm], as against [streamBytesWritten]'s bytes handed
+     * to the track.
+     *
+     * Two counters because there are two clocks and the gap between them is the
+     * whole reason this class has a queue: 火山 delivers an utterance far faster
+     * than it plays, so at any moment "audio we have been given" runs seconds
+     * ahead of "audio the user has heard". Anything lining text up against
+     * sound needs both — the producer's clock to say where a sentence *starts*,
+     * the track's to say when it is *reached*.
+     */
+    @Volatile
+    private var streamBytesQueued: Long = 0
+
+    /**
      * PCM waiting to be written to [streamTrack], and the thread that writes it.
      *
      * The hand-off is the whole point. `AudioTrack.write` on a MODE_STREAM track
@@ -308,6 +322,17 @@ class AudioIO {
     /** Producer's view of "there is somewhere to put audio". */
     @Volatile
     private var playing = false
+
+    /**
+     * Is an utterance still on the speaker?
+     *
+     * True from [startStreamPlayback] until any of the stop paths, all of which
+     * go through [stopStreamPlayback] — including the end of the drain in
+     * [finishStreamPlayback]. That makes it the honest answer to "is the user
+     * still hearing this", which the websocket's own state is not: the socket
+     * finishes long before the sound does.
+     */
+    fun isStreamPlaying(): Boolean = playing
 
     /** Queued by [finishStreamPlayback] to mean "no more audio is coming". */
     private val endOfStream = ByteArray(0)
@@ -340,6 +365,7 @@ class AudioIO {
             .build()
         streamPlaySampleRate = sampleRate
         streamBytesWritten = 0
+        streamBytesQueued = 0
         playQueue.clear()
         t.play()
         streamTrack = t
@@ -375,7 +401,31 @@ class AudioIO {
      */
     fun feedPcm(pcm: ByteArray) {
         if (!playing || pcm.isEmpty()) return
+        streamBytesQueued += pcm.size
         playQueue.offer(pcm)
+    }
+
+    /**
+     * Milliseconds of the current utterance that have been *received*.
+     *
+     * The producer's clock — see [streamBytesQueued]. Sampled at the moment a
+     * sentence is announced, it is that sentence's offset into the utterance.
+     */
+    fun queuedMs(): Long =
+        if (!playing) 0L else streamBytesQueued / BYTES_PER_FRAME * 1000L / streamPlaySampleRate
+
+    /**
+     * Milliseconds of the current utterance the user has actually *heard*.
+     *
+     * Straight off the track's own playback head, so it is real time rather
+     * than an estimate, and it is the only honest answer to "where in the
+     * sentence are we right now".
+     */
+    fun playedMs(): Long {
+        val t = streamTrack ?: return 0L
+        val frames = runCatching { t.playbackHeadPosition.toLong() and 0xFFFFFFFFL }
+            .getOrDefault(0L)
+        return frames * 1000L / streamPlaySampleRate
     }
 
     /**
@@ -436,5 +486,8 @@ class AudioIO {
 
     private companion object {
         const val TAG = "AudioIO"
+
+        /** 16-bit mono, everywhere in this class. */
+        const val BYTES_PER_FRAME = 2
     }
 }

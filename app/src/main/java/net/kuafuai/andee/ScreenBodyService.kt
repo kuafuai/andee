@@ -7,6 +7,7 @@ import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import net.kuafuai.andee.asr.AsrController
 import net.kuafuai.andee.audio.AudioIO
+import net.kuafuai.andee.brain.SpeechMood
 import net.kuafuai.andee.i18n.AppLocale
 import net.kuafuai.andee.net.BodyWsServer
 import net.kuafuai.andee.net.CommandDispatcher
@@ -1811,9 +1812,9 @@ class ScreenBodyService : AccessibilityService() {
             dispatcher.beginTask()
             window.setState(FloatingWindowUi.State.THINKING)
             window.setSubtitle(
-                // Drafts of a settling reply may already carry the end marker;
-                // it must not flash on the live line either.
-                stripMarkdown(END_MARKER.replace(text, "")),
+                // Drafts of a settling reply may already carry the end marker
+                // or an emotion tag; neither must flash on the live line.
+                SpeechMood.strip(stripMarkdown(END_MARKER.replace(text, ""))),
                 FloatingWindowUi.SubtitleKind.PARTIAL,
             )
         }
@@ -1826,7 +1827,13 @@ class ScreenBodyService : AccessibilityService() {
             // open. Written before the speak below because [followUpWindow]
             // reads it seconds later, off the TTS drain — see [expectFollowUp].
             expectFollowUp = !END_MARKER.containsMatchIn(text)
-            val plain = stripMarkdown(END_MARKER.replace(text, ""))
+            // Markers come out here, with the markdown and before anything
+            // else touches the string. This is the one place the answer is
+            // turned from what the model wrote into what the user gets, and a
+            // tag that survives it reaches *both* the scrollback (visible
+            // junk) and 火山 (read out loud as the word "happy").
+            val script = SpeechMood.parse(stripMarkdown(END_MARKER.replace(text, "")))
+            val plain = script.text
             // The finished answer is the end of the task as far as the
             // device is concerned: nothing further will move the app.
             dispatcher.endTask()
@@ -1865,7 +1872,9 @@ class ScreenBodyService : AccessibilityService() {
             // same way it displaces the meeting recorder's. The
             // scrollback row above is already the answer; the user
             // reads it after they hang up.
-            if (!meeting.isActive() && !net.kuafuai.andee.device.CallState.isActive) tts.speak(plain)
+            if (!meeting.isActive() && !net.kuafuai.andee.device.CallState.isActive) {
+                tts.speak(plain, script.cues)
+            }
         }
     }
 
@@ -1904,7 +1913,8 @@ class ScreenBodyService : AccessibilityService() {
         // reason: a rehearsal line is not a question the assistant asked, so
         // the mic must not come up hunting for an answer to it.
         expectFollowUp = false
-        tts.speak(stripMarkdown(text))
+        val script = SpeechMood.parse(stripMarkdown(text))
+        tts.speak(script.text, script.cues)
         return true
     }
 
@@ -2026,13 +2036,16 @@ class ScreenBodyService : AccessibilityService() {
      * Main thread only.
      */
     private fun tellAboutNotification(n: JSONObject, line: String) {
+        val script = SpeechMood.parse(line)
         net.kuafuai.andee.ui.ChatHistory.addUser(
             AppLocale.str(this, R.string.svc_notification_auto_line, n.optString("app"))
         )
-        net.kuafuai.andee.ui.ChatHistory.addAssistant(line)
-        lastAnswer = line
+        net.kuafuai.andee.ui.ChatHistory.addAssistant(script.text)
+        lastAnswer = script.text
         expectFollowUp = false
-        if (!meeting.isActive() && !net.kuafuai.andee.device.CallState.isActive) tts.speak(line)
+        if (!meeting.isActive() && !net.kuafuai.andee.device.CallState.isActive) {
+            tts.speak(script.text, script.cues)
+        }
     }
 
     /**

@@ -7,6 +7,7 @@ import android.os.SystemClock
 import android.util.Log
 import net.kuafuai.andee.audio.AudioFocusGate
 import net.kuafuai.andee.audio.AudioIO
+import net.kuafuai.andee.brain.SpeechMood
 import net.kuafuai.andee.config.VoiceConfig
 import net.kuafuai.andee.ui.FloatingWindowUi
 import java.util.concurrent.Executors
@@ -123,6 +124,88 @@ class TtsController(
         stallWatchdog = null
     }
 
+    // ---- Emotion cues: lining the model's faces up with its own voice ----
+    //
+    // The hard part is that there is no clock in common: the markers are at
+    // character offsets into our string, and the thing the user is actually
+    // hearing is an AudioTrack. The obvious bridge is 火山's own
+    // TTSSentenceStart, which would pin each sentence in both clocks at once —
+    // and it does not work. Measured on device: the server sends that event
+    // **once per [HuoshanTts.push]**, not once per sentence, and with an
+    // **empty** text field, so there is nothing to locate and nothing to
+    // locate it with. Pushing each sentence as its own call would get one
+    // event each, but then the events race the audio (the server may announce
+    // all of them before much sound has arrived) and serialising the pushes
+    // risks an audible gap mid-reply.
+    //
+    // So the mapping is arithmetic instead of protocol: assume the utterance
+    // is read at a constant number of characters per millisecond. That is
+    // false in detail — a comma is a pause, a digit is three syllables — but
+    // the question being answered is "which of two faces", at one-sentence
+    // resolution, where a few hundred milliseconds of error is invisible.
+    // Total length comes from [AudioIO.queuedMs] at [onDone] (the producer's
+    // clock, known within the first fraction of playback because 火山 streams
+    // far faster than real time) and the position from [AudioIO.playedMs]
+    // (the track's own head, so real time). Until the total is known the
+    // opening face holds, which is the same fallback as having no cues.
+    //
+    // Everything below is touched from [ui] only, except [cueText] /
+    // [cueList] / [cueTotalMs], which are written off the ui thread and are
+    // therefore volatile.
+
+    /** The clean utterance; only its length is used, as the character clock's span. */
+    @Volatile
+    private var cueText: String = ""
+
+    @Volatile
+    private var cueList: List<SpeechMood.Cue> = emptyList()
+
+    /**
+     * Length of the whole utterance in ms, or 0 until the server has sent all
+     * of it. Set from [onDone] on the websocket thread, after the last
+     * [onAudio] on that same thread — so it is complete by construction.
+     */
+    @Volatile
+    private var cueTotalMs: Long = 0
+
+    private var cueNext = 0
+    private var cueTicker: Runnable? = null
+
+    private fun startCueTicker() {
+        stopCueTicker()
+        if (cueList.size < 2) return  // one face for the whole reply needs no walking
+        val r = object : Runnable {
+            override fun run() {
+                // Deliberately not `client == null`: the socket is nulled at
+                // [onDone], which is near the *start* of what the user hears,
+                // not the end. Gating on it stopped the walk before any
+                // mid-utterance face was due. The speaker is the clock here,
+                // so the speaker decides when the walk is over.
+                if (cancelled || !audio.isStreamPlaying()) {
+                    cueTicker = null
+                    return
+                }
+                val total = cueTotalMs
+                if (total > 0) {
+                    val heard = cueText.length * audio.playedMs() / total
+                    while (cueNext < cueList.size && cueList[cueNext].at <= heard) {
+                        window.setEmotion(cueList[cueNext].mood)
+                        cueNext++
+                    }
+                }
+                if (cueNext < cueList.size) ui.postDelayed(this, CUE_CHECK_MS)
+                else cueTicker = null
+            }
+        }
+        cueTicker = r
+        ui.postDelayed(r, CUE_CHECK_MS)
+    }
+
+    private fun stopCueTicker() {
+        cueTicker?.let { ui.removeCallbacks(it) }
+        cueTicker = null
+    }
+
     private val executor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "TtsController").apply { isDaemon = true }
     }
@@ -143,13 +226,21 @@ class TtsController(
 
     fun isSpeaking(): Boolean = client != null
 
-    fun speak(text: String) {
+    /**
+     * Say it, optionally wearing the faces the model asked for.
+     *
+     * [cues] are [SpeechMood.Cue]s into [text] — already stripped of their
+     * markers by the caller, which has to be the caller because the same clean
+     * string is what goes into the scrollback. Empty is the normal case and
+     * behaves exactly as this method did before the channel existed.
+     */
+    fun speak(text: String, cues: List<SpeechMood.Cue> = emptyList()) {
         if (text.isBlank()) return
         cancelled = false
         reported = false
         executor.execute {
             try {
-                speakImpl(text)
+                speakImpl(text, cues)
             } catch (t: Throwable) {
                 Log.e(TAG, "speak failed", t)
                 window.setState(FloatingWindowUi.State.IDLE)
@@ -179,6 +270,7 @@ class TtsController(
         // while an utterance is very much on its way.
         cancelled = true
         disarmStallWatchdog()
+        stopCueTicker()
         val c = client
         client = null
         runCatching { c?.cancel() }
@@ -189,6 +281,7 @@ class TtsController(
     fun cancel() {
         executor.execute {
             disarmStallWatchdog()
+            stopCueTicker()
             runCatching { client?.cancel() }
             runCatching { audio.stopStreamPlayback() }
             focus.release()
@@ -199,6 +292,7 @@ class TtsController(
 
     fun shutdown() {
         disarmStallWatchdog()
+        stopCueTicker()
         runCatching { client?.cancel() }
         runCatching { audio.stopStreamPlayback() }
         focus.release()
@@ -206,10 +300,15 @@ class TtsController(
         executor.shutdownNow()
     }
 
-    private fun speakImpl(text: String) {
+    private fun speakImpl(text: String, cues: List<SpeechMood.Cue>) {
         val cfg = VoiceConfig.load(context)
         // Interrupted while this utterance sat in the executor queue.
         if (cancelled) return
+
+        cueText = text
+        cueList = cues
+        cueTotalMs = 0
+        ui.post { cueNext = 0 }
 
         // Before the socket opens, not when the first audio lands: a media app
         // takes a moment to actually stop, and the whole 火山 handshake is that
@@ -235,6 +334,10 @@ class TtsController(
                 // the same words on screen twice, once settled and once in blue
                 // right underneath.
                 window.setState(FloatingWindowUi.State.SPEAKING)
+                // Straight after SPEAKING and on the same handler, so the face
+                // the model opened with is already on when the first word is.
+                cues.firstOrNull()?.takeIf { it.at == 0 }?.let { window.setEmotion(it.mood) }
+                ui.post { startCueTicker() }
                 armStallWatchdog()
                 executor.execute {
                     runCatching {
@@ -257,6 +360,12 @@ class TtsController(
             override fun onDone() {
                 if (cancelled) return
                 disarmStallWatchdog()
+                // The whole utterance has now been received, so this is its
+                // length — the span the cue walk measures character offsets
+                // against. Read here rather than incrementally because it is
+                // the one moment the producer's clock is known to be final,
+                // and it is read on the same thread the audio arrived on.
+                cueTotalMs = audio.queuedMs()
                 // SessionFinished means the *server* has stopped sending, not
                 // that the user has stopped hearing: 火山 delivers audio far
                 // faster than real time, so most of the utterance is usually
@@ -317,5 +426,16 @@ class TtsController(
         // than "until the next turn".
         private const val STALL_CHECK_MS = 5_000L
         private const val STALL_AFTER_MS = 20_000L
+
+        /**
+         * How often the cue walk asks the track where it is.
+         *
+         * A face arriving 120 ms into the sentence it belongs to is
+         * indistinguishable from one arriving on the first syllable — the
+         * crossfade in [net.kuafuai.andee.ui.ball.EmotionState] takes longer
+         * than that by itself. Anything faster is a wake-up per frame for a
+         * change nobody can see.
+         */
+        private const val CUE_CHECK_MS = 120L
     }
 }
