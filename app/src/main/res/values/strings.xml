@@ -70,11 +70,13 @@
     <string name="settings_wake_not_enrolled">未录入 —— 录一次才能语音唤醒</string>
     <string name="settings_wake_record">录入</string>
     <string name="common_clear">清除</string>
+    <string name="common_delete">删除</string>
     <string name="settings_section_vault">保险箱</string>
     <string name="settings_vault_empty_note">还没有存账号 —— 存了之后，Andee 办事时可以直接用它们登录</string>
     <string name="settings_vault_count_note">已存 %1$d 个账号 —— 手机号邮箱大脑读得到，密码只由设备替你敲进输入框</string>
     <string name="settings_vault_manage">管理</string>
-    <string name="settings_section_voice">语音（火山引擎）</string>
+    <string name="settings_section_voice">火山接口地址</string>
+    <string name="settings_section_voice_key">语音</string>
     <string name="settings_voice_factory_note">源码不带密钥。填上自己的 Key 才听得见、说得出;下面几行留空用默认地址即可。</string>
     <string name="settings_voice_api_key">火山 API Key</string>
     <string name="settings_voice_api_key_hint">火山引擎语音服务的 Key,听和说都靠它</string>
@@ -87,6 +89,8 @@
     <string name="settings_voice_tts_resource_id">合成资源 ID</string>
     <string name="settings_voice_tts_sample_rate">合成采样率</string>
     <string name="settings_section_diagnostics">诊断</string>
+    <string name="settings_section_advanced">高级</string>
+    <string name="settings_advanced_note">火山地址、打字、诊断和恢复出厂设置。日常用不到，都藏在这里。</string>
     <string name="settings_grounding">接地采集</string>
     <string name="settings_grounding_note">把坐标点击和截图记到 files/grounding 供离线分析 —— 它会拍下你当时在做的事。改完要重开无障碍服务才生效。</string>
     <string name="settings_device_id">设备 ID</string>
@@ -99,6 +103,7 @@
     <string name="settings_notebook_dump">本子里写了什么</string>
     <string name="settings_notebook_dump_hint">只读。长按可以选中复制。</string>
     <string name="settings_notebook_dump_truncated">…（还有 %1$d 个字符没显示）</string>
+    <string name="settings_notebook_browse">看它记得的事</string>
     <string name="settings_section_notify">消息提醒</string>
     <string name="settings_notify_chat">聊天类</string>
     <string name="settings_notify_all">全部</string>
@@ -114,6 +119,16 @@
          is last because it is the one gesture that only exists unfolded — the
          folded ball reads a horizontal flick as a move instead. -->
     <string name="window_tips">点小球说话 · 双击打字 · 三连击停止 · 滑动切换性格</string>
+
+    <!-- The ⋯ drawer's tool names, under each icon. -->
+    <string name="tool_swipe_up">上滑</string>
+    <string name="tool_swipe_down">下滑</string>
+    <string name="tool_swipe_left">左滑</string>
+    <string name="tool_swipe_right">右滑</string>
+    <string name="tool_back">返回</string>
+    <string name="tool_home">桌面</string>
+    <string name="tool_ui_tree">元素树</string>
+    <string name="tool_screenshot">截图</string>
 
     <!-- The 恢复出厂设置 confirmation list: one line per thing wiped.
          Kept beside config/FactoryReset.kt, which walks them in this order. -->
@@ -277,6 +292,28 @@
     <string name="notebook_dump_recurring">周期 %1$s</string>
     <string name="notebook_dump_next">" · 下次 "</string>
     <string name="notebook_dump_last_error">"   上次出错："</string>
+
+    <!--
+        ui/NotebookUi.kt — the browse-and-delete page, as opposed to the
+        export-shaped dump above. Unlike the dump these are read by the *user*,
+        so they are translated like any other chrome, and the type names are
+        words rather than the raw enum values ("没接住" is not a word a person
+        uses; 踩过的坑 is).
+    -->
+    <string name="notebook_title">它记得的事</string>
+    <string name="notebook_tab_memories">记忆</string>
+    <string name="notebook_tab_todos">待办</string>
+    <string name="notebook_empty_memories">还没记下什么</string>
+    <string name="notebook_empty_todos">没有排着的待办</string>
+    <string name="notebook_type_user">关于你</string>
+    <string name="notebook_type_feedback">你的偏好</string>
+    <string name="notebook_type_way">做事的方式</string>
+    <string name="notebook_type_reference">资料</string>
+    <string name="notebook_type_failure">踩过的坑</string>
+    <string name="notebook_hits">被查过 %1$d 次</string>
+    <string name="notebook_delete_note">删掉就没了，不会只是藏起来。</string>
+    <string name="notebook_todo_cron">周期 %1$s</string>
+    <string name="notebook_todo_paused">已暂停</string>
 
     <!--
         config/Scheduler.kt. `sched_channel_name` and `sched_channel_desc` are
@@ -462,4 +499,38 @@
     <string name="ball_look_rabbit">贱贱兔</string>
     <string name="ball_look_bear">憨憨熊</string>
     <string name="ball_look_imp">小恶魔</string>
+
+
+    <!-- 首次引导向导 -->
+    <string name="wizard_title">首次设置</string>
+    <string name="wizard_progress_welcome">欢迎</string>
+    <string name="wizard_progress_step">第 %1$d 步，共 %2$d 步</string>
+    <string name="wizard_progress_done">完成</string>
+    <string name="wizard_cancel">取消</string>
+    <string name="wizard_back">上一步</string>
+    <string name="wizard_begin">开始</string>
+    <string name="wizard_next">下一步</string>
+    <string name="wizard_finish">完成设置</string>
+    <string name="wizard_done">开始使用</string>
+
+    <string name="wizard_welcome_title">欢迎</string>
+    <string name="wizard_welcome_body">接下来几步，把这台设备配好就能用了。每一步都需要你去开一个权限或填个设置，做完点「下一步」就行。</string>
+
+    <string name="wizard_wake_title">唤醒词</string>
+    <string name="wizard_wake_body">录一个唤醒词，亮屏时喊得醒。不录也能用，只是得点球。</string>
+    <string name="wizard_wake_button">去录</string>
+
+    <string name="wizard_look_title">看一眼周围</string>
+    <string name="wizard_look_body">让它看看你现在在哪儿，记住这个地方。之后问「我在哪」它就能答上来。</string>
+    <string name="wizard_look_button">打开摄像头</string>
+
+    <string name="wizard_sentence_title">说第一句话</string>
+    <string name="wizard_sentence_body">点球，说点什么 — 它会答你，配置就算完成了。</string>
+    <string name="wizard_sentence_button">点球说话</string>
+
+    <string name="wizard_complete_title">都配好了</string>
+    <string name="wizard_complete_body">去点球说话吧。长按球能回到全屏卡片，⚙ 里能改设置。</string>
+
+    <string name="check_page_rerun_wizard">重新设置</string>
+
 </resources>

@@ -118,13 +118,13 @@ class WakeEnrollUi(
 
         card.addView(TextView(context).apply {
             text = lctx.getString(R.string.wake_title)
-            textSize = 19f
+            textSize = Glass.Type.HEADLINE
             setTextColor(Color.parseColor(Glass.TITLE))
         })
 
         card.addView(TextView(context).apply {
             text = lctx.getString(R.string.wake_instructions, WakeTemplates.ENROLL_COUNT)
-            textSize = 13f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.SECONDARY))
             setLineSpacing(dp(3).toFloat(), 1f)
             setPadding(0, dp(10), 0, dp(14))
@@ -132,7 +132,7 @@ class WakeEnrollUi(
 
         progress = TextView(context).apply {
             text = lctx.getString(R.string.wake_progress, 0, WakeTemplates.ENROLL_COUNT)
-            textSize = 13f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.MUTED))
         }
         card.addView(progress)
@@ -143,7 +143,7 @@ class WakeEnrollUi(
             } else {
                 lctx.getString(R.string.wake_status_not_enrolled)
             }
-            textSize = 14f
+            textSize = Glass.Type.BODY
             setTextColor(Color.parseColor(Glass.LABEL))
             setPadding(0, dp(8), 0, dp(16))
         }
@@ -170,7 +170,7 @@ class WakeEnrollUi(
     private fun button(label: String, filled: Boolean, onClick: () -> Unit): TextView =
         TextView(context).apply {
             text = label
-            textSize = 14f
+            textSize = Glass.Type.BODY
             setTextColor(Color.parseColor(if (filled) Glass.TITLE else Glass.LABEL))
             gravity = Gravity.CENTER
             background =

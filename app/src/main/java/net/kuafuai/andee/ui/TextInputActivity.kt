@@ -90,7 +90,7 @@ class TextInputActivity : Activity() {
 
         field = EditText(this).apply {
             hint = lctx.getString(R.string.input_hint)
-            textSize = 15f
+            textSize = Glass.Type.BODY
             setTextColor(Color.parseColor(Glass.TITLE))
             // SECONDARY, not MUTED. The hint is the only thing in here until
             // somebody types, so it is the one string that has to survive being
@@ -331,7 +331,7 @@ class TextInputActivity : Activity() {
     private fun glyph(label: String, color: String, onClick: () -> Unit): TextView =
         TextView(this).apply {
             text = label
-            textSize = 15f
+            textSize = Glass.Type.BODY
             setTextColor(Color.parseColor(color))
             gravity = Gravity.CENTER
             setPadding(dp(14), dp(10), dp(14), dp(10))

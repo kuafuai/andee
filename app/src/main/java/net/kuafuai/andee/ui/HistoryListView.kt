@@ -104,7 +104,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
 
     private val empty = TextView(context).apply {
         text = lctx.getString(R.string.history_empty)
-        textSize = 13f
+        textSize = Glass.Type.CAPTION
         setTextColor(Color.parseColor(Glass.MUTED))
         gravity = Gravity.CENTER
         setPadding(0, dp(28), 0, 0)
@@ -120,7 +120,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
      * settle *behind* the live line, which is by definition still in progress.
      */
     private val live = TextView(context).apply {
-        textSize = 15f
+        textSize = Glass.Type.BODY
         visibility = View.GONE
         setPadding(dp(4), dp(8), dp(4), dp(2))
         maxLines = 4
@@ -277,7 +277,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
                         lctx.getString(R.string.history_role_page_cleared, clock.format(Date(e.ts)))
                     }
             }
-            textSize = 10f
+            textSize = Glass.Type.MICRO
             letterSpacing = 0.05f
             setTextColor(
                 when (e.role) {
@@ -294,7 +294,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
 
         val body = TextView(context).apply {
             text = e.text
-            textSize = 14f
+            textSize = Glass.Type.BODY
             setLineSpacing(dp(3).toFloat(), 1f)
             setTextColor(Color.parseColor(if (bad) Glass.DANGER else Glass.LABEL))
             setPadding(0, dp(3), 0, 0)

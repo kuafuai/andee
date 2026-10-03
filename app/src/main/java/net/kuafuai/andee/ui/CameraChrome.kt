@@ -128,7 +128,7 @@ class StatusPill(context: Context) : LinearLayout(context) {
             marginEnd = context.dpI(9)
         })
         label.apply {
-            textSize = 15f
+            textSize = Glass.Type.BODY
             setTextColor(PILL_TEXT)
         }
         addView(label)
@@ -165,7 +165,7 @@ class StatusPill(context: Context) : LinearLayout(context) {
 fun closePill(context: Context, onClose: () -> Unit): TextView =
     TextView(context).apply {
         text = AppLocale.str(context, R.string.cam_close)
-        textSize = 15f
+        textSize = Glass.Type.BODY
         setTextColor(PILL_TEXT)
         gravity = Gravity.CENTER
         setPadding(context.dpI(18), context.dpI(8), context.dpI(18), context.dpI(8))

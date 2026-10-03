@@ -3,16 +3,13 @@ package net.kuafuai.andee.ui
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
 import android.graphics.PixelFormat
-import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.os.Handler
 import android.os.Looper
-import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -23,6 +20,9 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
+import androidx.core.content.ContextCompat
 import net.kuafuai.andee.R
 import net.kuafuai.andee.audio.Earcon
 import net.kuafuai.andee.config.VoiceConfig
@@ -121,15 +121,18 @@ class FloatingWindowUi(
     enum class SubtitleKind { PARTIAL, FINAL }
 
     /** Screen tools shown as a row of small buttons in the top-right corner. */
-    enum class Tool(val glyph: String) {
-        SWIPE_UP("↑"),
-        SWIPE_DOWN("↓"),
-        SWIPE_LEFT("←"),
-        SWIPE_RIGHT("→"),
-        BACK("⌫"),
-        HOME("⌂"),
-        UI_TREE("☰"),
-        SCREENSHOT("◉"),
+    enum class Tool(
+        @param:DrawableRes val icon: Int,
+        @param:StringRes val label: Int,
+    ) {
+        SWIPE_UP(R.drawable.ic_swipe_up, R.string.tool_swipe_up),
+        SWIPE_DOWN(R.drawable.ic_swipe_down, R.string.tool_swipe_down),
+        SWIPE_LEFT(R.drawable.ic_swipe_left, R.string.tool_swipe_left),
+        SWIPE_RIGHT(R.drawable.ic_swipe_right, R.string.tool_swipe_right),
+        BACK(R.drawable.ic_back, R.string.tool_back),
+        HOME(R.drawable.ic_home, R.string.tool_home),
+        UI_TREE(R.drawable.ic_tree, R.string.tool_ui_tree),
+        SCREENSHOT(R.drawable.ic_screenshot, R.string.tool_screenshot),
     }
 
     interface Listeners {
@@ -728,6 +731,17 @@ class FloatingWindowUi(
             // gets none — it announces itself — and errors get none either, now
             // that they arrive as a card. See [Earcon].
             if (s != lastState) {
+                // A haptic for the hand that just touched the ball. Through the
+                // view, not a Vibrator: no permission, it honours the system's
+                // touch-feedback switch, and — unlike a tone — it cannot take
+                // audio focus from a meeting or a call.
+                val haptic = when {
+                    s == State.RECORDING -> HapticFeedbackConstants.CONFIRM
+                    lastState == State.RECORDING -> HapticFeedbackConstants.GESTURE_END
+                    s == State.ERROR -> HapticFeedbackConstants.REJECT
+                    else -> null
+                }
+                if (haptic != null) root?.performHapticFeedback(haptic)
                 when (s) {
                     State.RECORDING -> {
                         ball?.trigger(Action.NOD)
@@ -2000,7 +2014,7 @@ class FloatingWindowUi(
         // tips have nowhere to be; the gestures they describe work there anyway.
         val tips = TextView(context).apply {
             text = AppLocale.str(context, R.string.window_tips)
-            textSize = 12f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.SECONDARY))
             gravity = Gravity.CENTER
             // The bottom padding clears the gesture bar, the same 30 dp the
@@ -2103,27 +2117,22 @@ class FloatingWindowUi(
         toolsView = tools
 
         keys.addView(
-            barButton("⋯", Glass.LABEL, 20f) {
+            barButton(R.drawable.ic_more, Glass.LABEL, "更多工具") {
                 tools.visibility = if (tools.visibility == View.VISIBLE) View.GONE else View.VISIBLE
             }
         )
         // ✓ and not ■: the stop button used to sit here, and stop is the one
         // action in this bar the ball can already perform — see onStopClick.
-        // A check mark for 自检, and it is a glyph rather than an icon set for
-        // the same reason as the rest of the bar: one Paint, one font, and it
-        // inherits the ink-centred drawing in GlyphButton.
-        keys.addView(barButton("✓", Glass.LABEL, 17f, label = "自检") { listeners.onSelfCheckClick() })
+        keys.addView(barButton(R.drawable.ic_check, Glass.LABEL, "自检") { listeners.onSelfCheckClick() })
         // No ⌨ here. Typing moved onto the ball's double-tap, and the bar is
         // the wrong place for it twice over: it only exists while the card is
         // unfolded (so the way to type vanished with the fold — the same fault
         // that made "点右上角的 ⌨" a lie in a failure message), and it put a
         // second meaning on the one control the user already had to learn.
-        keys.addView(barButton("⚙", Glass.LABEL, 18f) { listeners.onSettingsClick() })
+        keys.addView(barButton(R.drawable.ic_settings, Glass.LABEL, "设置") { listeners.onSettingsClick() })
         // Reads as close, not as resize: the card is a thing you dismiss, and the
-        // corner ball it folds into stays on screen either way. It used to sit
-        // alone in the bottom-right of the subtitle band, diagonally opposite
-        // every other control in the card.
-        keys.addView(barButton("✕", Glass.LABEL, 17f) { listeners.onMinimizeClick() })
+        // corner ball it folds into stays on screen either way.
+        keys.addView(barButton(R.drawable.ic_close, Glass.LABEL, "收起") { listeners.onMinimizeClick() })
 
         bar.addView(keys)
         bar.addView(tools)
@@ -2131,57 +2140,41 @@ class FloatingWindowUi(
     }
 
     /**
-     * A glyph centred on the ink it actually draws, rather than on the line box
-     * its font reserves.
+     * One of the four permanent keys: a vector icon, tinted, centred in a 36 dp
+     * square with 6 dp of air on each side.
      *
-     * `TextView` with `gravity = CENTER` centres the *line* — ascent to descent,
-     * the same box for every character in the font. These glyphs come from all
-     * over Unicode (`⋯` hangs at the baseline, `■` is a full-height block, `⚙`
-     * and the arrows sit somewhere else again), so a row of them centred that way
-     * is a row of characters at four different heights, which is what the bar
-     * looked like. Measuring each glyph's own bounds and centring on that is the
-     * only way they line up, and it costs one [Paint.getTextBounds] at build time.
+     * These were Unicode glyphs (`⋯ ✓ ⚙ ✕`) drawn by a custom View that measured
+     * each character's ink to centre it. That worked around one problem — every
+     * glyph sits at a different height in its font's line box — and could not
+     * work around the other: the weight, size and shape of `⚙` is whatever the
+     * ROM's font says it is, so the bar looked different on every tablet and
+     * never quite matched itself. Vectors are drawn the same everywhere.
+     *
+     * `mutate()` before `setTint`, because drawables from one resource share
+     * constant state and this bar is rebuilt with the card.
+     *
+     * A bare View draws an image without telling anyone it is there, so the
+     * description is not optional: without it the whole control bar drops out
+     * of `get_screen_element` and out of TalkBack alike. Deliberately not
+     * localised — rebuilding the bar on a language change for four content
+     * descriptions nobody reads is the wrong trade.
      */
-    private class GlyphButton(
-        ctx: Context,
-        private val glyph: String,
+    private fun barButton(
+        @DrawableRes icon: Int,
         color: String,
-        sizeSp: Float,
-    ) : View(ctx) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = Color.parseColor(color)
-            textSize = TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_SP, sizeSp, ctx.resources.displayMetrics,
+        description: String,
+        onClick: () -> Unit,
+    ): View {
+        val pad = dp(6)
+        return ImageView(context).apply {
+            setImageDrawable(
+                ContextCompat.getDrawable(context, icon)?.mutate()?.apply {
+                    setTint(Color.parseColor(color))
+                }
             )
-        }
-        private val ink = Rect()
-
-        init {
-            paint.getTextBounds(glyph, 0, glyph.length, ink)
-            // A bare View draws text without ever telling anyone it is there, so
-            // the whole control bar dropped out of `get_screen_element` the moment these
-            // stopped being TextViews — invisible to the brain and to TalkBack
-            // alike. The glyph is the label it had as a TextView; keep it one.
-            //
-            // Set by the caller when the glyph is not a word in any language:
-            // `⋯` and `■` are punctuation, and TalkBack reading "✓" out as
-            // "check mark" beside a button that opens the self-check page is a
-            // worse label than the two characters the page is called by.
-            contentDescription = glyph
-        }
-
-        override fun onDraw(canvas: Canvas) {
-            canvas.drawText(
-                glyph,
-                width / 2f - ink.exactCenterX(),
-                height / 2f - ink.exactCenterY(),
-                paint,
-            )
-        }
-    }
-
-    private fun barButton(glyph: String, color: String, size: Float, onClick: () -> Unit): View =
-        GlyphButton(context, glyph, color, size).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(pad, pad, pad, pad)
+            contentDescription = description
             isClickable = true
             isFocusable = true
             Glass.pressable(this)
@@ -2190,23 +2183,6 @@ class FloatingWindowUi(
                 leftMargin = dp(2)
             }
         }
-
-    /**
-     * The same button, with a spoken name for a glyph that is not one.
-     *
-     * Deliberately not localised. "自检" is the name of this page in the one
-     * language it has a name in, and the alternative — a `@StringRes` picked by
-     * [AppLocale] — would mean rebuilding the whole control bar on a language
-     * change for one content description nobody reads.
-     */
-    private fun barButton(
-        glyph: String,
-        color: String,
-        size: Float,
-        label: String,
-        onClick: () -> Unit,
-    ): View = (barButton(glyph, color, size, onClick) as GlyphButton).apply {
-        contentDescription = label
     }
 
     // ---- Tap / drag / long-press on the ball ----
@@ -2269,9 +2245,13 @@ class FloatingWindowUi(
             ui.removeCallbacks(tapRunnable)
             if (tapCount >= TAPS_FOR_STOP) {
                 tapCount = 0
+                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                 listeners.onStopClick()
                 return
             }
+            // Felt on the touch, not ~300 ms later when the run resolves: the
+            // multi-tap wait is otherwise a tap that seemed not to land.
+            performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
             ui.postDelayed(tapRunnable, multiTapMs)
         }
 
@@ -2312,6 +2292,7 @@ class FloatingWindowUi(
         private val longPressRunnable = Runnable {
             if (tracking && !moved) {
                 longPressed = true
+                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                 listeners.onLongPress()
             }
         }
@@ -2466,18 +2447,54 @@ class FloatingWindowUi(
 
     // ---- Colors / units ----
 
+    /**
+     * One tool in the `⋯` drawer: its icon, then its name.
+     *
+     * The name is new and it is the point. These were eight unlabelled
+     * monochrome glyphs — `↑ ↓ ← → ⌫ ⌂ ☰ ◉` — behind a `⋯`, which meant the
+     * drawer was a row of symbols a user had to decode by tapping, and the two
+     * that are also Android idioms (`⌂` home, `⌫` back) are not the two whose
+     * meaning is obvious from the others. A word beside each costs the row its
+     * compactness and buys the whole drawer its legibility; the labels are
+     * localised, unlike the glyphs they replace.
+     */
     private fun buildToolButton(tool: Tool): View {
         // Dimmer than the four permanent keys on purpose: these are developer
-        // instruments hidden behind `⋯`, and they sat at the same weight as ■
-        // and ⚙ when they were all one colour.
-        return GlyphButton(context, tool.glyph, Glass.SECONDARY, 15f).apply {
+        // instruments hidden behind `⋯`, and they sat at the same weight as the
+        // permanent keys when they were all one colour.
+        val tint = Color.parseColor(Glass.SECONDARY)
+        val icon = ContextCompat.getDrawable(context, tool.icon)?.mutate()?.apply { setTint(tint) }
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(6), 0, dp(6), 0)
             isClickable = true
             isFocusable = true
+            background = Glass.well(context, dp(14))
+            contentDescription = AppLocale.str(context, tool.label)
             Glass.pressable(this)
             setOnClickListener { listeners.onToolClick(tool) }
-            layoutParams = LinearLayout.LayoutParams(dp(32), dp(36)).apply {
-                leftMargin = dp(1)
-            }
+
+            addView(
+                View(context).apply {
+                    background = icon
+                    layoutParams = LinearLayout.LayoutParams(dp(16), dp(16))
+                }
+            )
+            addView(
+                TextView(context).apply {
+                    text = AppLocale.str(context, tool.label)
+                    textSize = Glass.Type.MICRO
+                    setTextColor(tint)
+                    setPadding(dp(4), 0, 0, 0)
+                    includeFontPadding = false
+                }
+            )
+
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(32),
+            ).apply { leftMargin = dp(4) }
         }
     }
 

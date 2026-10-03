@@ -133,7 +133,7 @@ class VaultUi(
                 } else {
                     lctx.getString(R.string.vault_edit_title)
                 }
-                textSize = 20f
+                textSize = Glass.Type.HEADLINE
                 setTextColor(Color.parseColor(Glass.TITLE))
             },
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
@@ -141,7 +141,7 @@ class VaultUi(
         header.addView(
             TextView(context).apply {
                 text = "✕"
-                textSize = 13f
+                textSize = Glass.Type.CAPTION
                 setTextColor(Color.parseColor(Glass.SECONDARY))
                 gravity = Gravity.CENTER
                 background = Glass.panel(context, dp(16))
@@ -201,7 +201,7 @@ class VaultUi(
     private fun buildList(body: LinearLayout): LinearLayout {
         body.addView(TextView(context).apply {
             text = lctx.getString(R.string.vault_intro)
-            textSize = 12f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.SECONDARY))
             setPadding(0, 0, 0, dp(10))
         })
@@ -210,7 +210,7 @@ class VaultUi(
         if (all.isEmpty()) {
             body.addView(TextView(context).apply {
                 text = lctx.getString(R.string.vault_empty)
-                textSize = 13f
+                textSize = Glass.Type.CAPTION
                 setTextColor(Color.parseColor(Glass.MUTED))
                 setPadding(0, dp(12), 0, dp(12))
             })
@@ -247,7 +247,7 @@ class VaultUi(
         val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         column.addView(TextView(context).apply {
             text = entry.label.ifBlank { entry.id }
-            textSize = 15f
+            textSize = Glass.Type.BODY
             setTextColor(Color.WHITE)
         })
         // [Vault.Entry.masked] rather than masking here: `card_last4` is four
@@ -260,14 +260,14 @@ class VaultUi(
         }.joinToString(" · ")
         column.addView(TextView(context).apply {
             text = summary.ifBlank { lctx.getString(R.string.vault_summary_empty) }
-            textSize = 12f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.SECONDARY))
             setPadding(0, dp(2), 0, 0)
         })
         row.addView(column, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         row.addView(TextView(context).apply {
             text = lctx.getString(R.string.vault_delete)
-            textSize = 13f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.DANGER))
             setPadding(dp(12), dp(6), dp(4), dp(6))
             isClickable = true
@@ -288,7 +288,7 @@ class VaultUi(
         val password = field(body, lctx.getString(R.string.vault_field_password), entry.password, password = true)
         body.addView(TextView(context).apply {
             text = lctx.getString(R.string.vault_password_note)
-            textSize = 11f
+            textSize = Glass.Type.MICRO
             setTextColor(Color.parseColor(Glass.MUTED))
             setPadding(0, dp(4), 0, 0)
         })
@@ -302,13 +302,13 @@ class VaultUi(
         // blank card rows reads as four things the user forgot to fill in.
         body.addView(TextView(context).apply {
             text = lctx.getString(R.string.vault_section_card)
-            textSize = 13f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.LABEL))
             setPadding(0, dp(18), 0, dp(2))
         })
         body.addView(TextView(context).apply {
             text = lctx.getString(R.string.vault_card_note)
-            textSize = 11f
+            textSize = Glass.Type.MICRO
             setTextColor(Color.parseColor(Glass.MUTED))
         })
         val cardHolder = field(
@@ -394,7 +394,7 @@ class VaultUi(
     ): EditText {
         parent.addView(TextView(context).apply {
             text = label
-            textSize = 12f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.LABEL))
             setPadding(0, dp(8), 0, dp(4))
         })
@@ -403,7 +403,7 @@ class VaultUi(
             setPadding(dp(12), dp(11), dp(12), dp(11))
             setTextColor(Color.parseColor(Glass.TITLE))
             setHintTextColor(Color.parseColor(Glass.MUTED))
-            textSize = 14f
+            textSize = Glass.Type.BODY
             if (hint != null) setHint(hint)
             // Order matters: setSingleLine installs its own transformation and
             // would strip the password dots right back off again.
@@ -427,7 +427,7 @@ class VaultUi(
             var shown = false
             row.addView(TextView(context).apply {
                 text = lctx.getString(R.string.common_show)
-                textSize = 13f
+                textSize = Glass.Type.CAPTION
                 setTextColor(Color.parseColor(Glass.ACCENT))
                 gravity = Gravity.CENTER
                 setPadding(dp(12), dp(10), dp(4), dp(10))
@@ -465,7 +465,7 @@ class VaultUi(
     private fun button(label: String, filled: Boolean, onClick: () -> Unit): TextView =
         TextView(context).apply {
             text = label
-            textSize = 14f
+            textSize = Glass.Type.BODY
             setTextColor(Color.parseColor(if (filled) Glass.TITLE else Glass.LABEL))
             gravity = Gravity.CENTER
             background =

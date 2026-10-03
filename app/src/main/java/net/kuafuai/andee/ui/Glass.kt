@@ -150,6 +150,45 @@ object Glass {
 
     const val DANGER = "#FF6B6B"
 
+    /** Done, granted, reachable — the self-check's green and nothing else's. */
+    const val OK = "#4ADE80"
+
+    /** Works, but degrades silently. */
+    const val WARN = "#FBBF24"
+
+    // ---- Type ----
+
+    /**
+     * The only text sizes a card may use, in sp.
+     *
+     * The cards grew sixteen different sizes between them — 9.5, 10, 11, 11.5,
+     * 12, 12.5, 13, 14, 14.5, 15, 16, 17, 19, 20, 26 — each a reasonable local
+     * choice and together the reason the surfaces read as assembled rather
+     * than designed: a 14 beside a 14.5 is not a hierarchy, it is a rounding
+     * error the eye notices without being able to name. Six steps, each far
+     * enough from its neighbours to mean something. A new size is a new rung
+     * here, not a literal at the call site.
+     */
+    object Type {
+        /** A card's own title. */
+        const val DISPLAY = 26f
+
+        /** The title of a card stacked on another card, or of a step. */
+        const val HEADLINE = 20f
+
+        /** A dialog's title, a row that is the point of its panel. */
+        const val TITLE = 17f
+
+        /** What the user reads: rows, fields, buttons, answers. */
+        const val BODY = 15f
+
+        /** What explains the body: subtitles, notes, section heads, hints. */
+        const val CAPTION = 13f
+
+        /** Timestamps, badges, the pinned gesture tips. */
+        const val MICRO = 11f
+    }
+
     // ---- Motion ----
 
     /** Fast out of the gate, long tail. The house easing. */
@@ -462,9 +501,15 @@ object Glass {
 
                 android.view.MotionEvent.ACTION_UP,
                 android.view.MotionEvent.ACTION_CANCEL,
-                ->
+                -> {
+                    // On UP only: a scroll that began on a button arrives as
+                    // CANCEL, and ticking for it would buzz through every list.
+                    if (ev.actionMasked == android.view.MotionEvent.ACTION_UP) {
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    }
                     view.animate().scaleX(1f).scaleY(1f).alpha(1f)
                         .setDuration(200).setInterpolator(OvershootInterpolator(2f)).start()
+                }
             }
             false
         }

@@ -110,6 +110,12 @@ class SelfCheckUi(
      * has anything to do, and it is the only host that passes this.
      */
     private val onYieldScreen: () -> Unit = {},
+    /**
+     * Fired when the user taps 重新设置 — the manual entry point into the wizard.
+     * Null ⇒ the button is not drawn. Default null, because `SelfCheckActivity`
+     * has no service to ask and therefore cannot open it.
+     */
+    private val onRerunWizard: (() -> Unit)? = null,
     /** Non-null ⇒ that host places the card and this class owns no window. */
     private val host: FrameLayout? = null,
 ) {
@@ -121,8 +127,8 @@ class SelfCheckUi(
         const val GUTTER_DP = 20
         const val CARD_RADIUS_DP = 28
 
-        val OK_GREEN = 0xFF4ADE80.toInt()
-        val WARN_AMBER = 0xFFFBBF24.toInt()
+        val OK_GREEN = android.graphics.Color.parseColor(Glass.OK)
+        val WARN_AMBER = android.graphics.Color.parseColor(Glass.WARN)
 
         const val MATCH = LinearLayout.LayoutParams.MATCH_PARENT
         const val WRAP = LinearLayout.LayoutParams.WRAP_CONTENT
@@ -505,13 +511,13 @@ class SelfCheckUi(
         titles.addView(TextView(context).apply {
             text = lctx.getString(R.string.check_page_title)
             // Settings' 26sp, so the two cards' titles are the same size.
-            textSize = 26f
+            textSize = Glass.Type.DISPLAY
             setTextColor(Color.parseColor(Glass.TITLE))
             letterSpacing = 0.01f
         })
         titles.addView(TextView(context).apply {
             text = lctx.getString(R.string.check_page_lead)
-            textSize = 13f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.MUTED))
             setPadding(0, dp(4), 0, 0)
         })
@@ -526,7 +532,7 @@ class SelfCheckUi(
 
     private fun closeButton(): View = TextView(context).apply {
         text = "✕"
-        textSize = 15f
+        textSize = Glass.Type.BODY
         setTextColor(Color.parseColor(Glass.SECONDARY))
         gravity = Gravity.CENTER
         background = Glass.panel(context, dp(18))
@@ -557,6 +563,20 @@ class SelfCheckUi(
             },
             LinearLayout.LayoutParams(0, WRAP, 1f),
         )
+        // 重新设置 sits beside 重新检查 and not in a row of its own, because the
+        // two are the same shape of thing — the one door here that is *not* a fix
+        // for a listed failure has to look like the door that is. It is
+        // deliberately not a filled button either: 完成 is the way out of this
+        // card and must stay the only one that looks like a way out.
+        if (onRerunWizard != null) {
+            row.addView(
+                textButton(lctx.getString(R.string.check_page_rerun_wizard), Glass.LABEL) {
+                    hide()
+                    onRerunWizard.invoke()
+                },
+                LinearLayout.LayoutParams(WRAP, WRAP).apply { marginEnd = dp(16) },
+            )
+        }
         row.addView(button(lctx.getString(R.string.check_page_done), filled = true) { hide() })
         return row
     }
@@ -573,7 +593,7 @@ class SelfCheckUi(
     private fun textButton(label: String, tint: String, onClick: () -> Unit): TextView =
         TextView(context).apply {
             text = label
-            textSize = 14f
+            textSize = Glass.Type.BODY
             setTextColor(Color.parseColor(tint))
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setPadding(dp(4), dp(13), dp(4), dp(13))
@@ -587,7 +607,7 @@ class SelfCheckUi(
         val radius = dp(24)
         return TextView(context).apply {
             text = label
-            textSize = 15f
+            textSize = Glass.Type.BODY
             setTextColor(Color.parseColor(if (filled) Glass.TITLE else Glass.LABEL))
             gravity = Gravity.CENTER
             background =
@@ -634,7 +654,7 @@ class SelfCheckUi(
         head.addView(TextView(context).apply {
             text = lctx.getString(f.title)
             setTextColor(Color.parseColor(Glass.TITLE))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.TITLE)
             setTypeface(typeface, Typeface.BOLD)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
@@ -646,7 +666,7 @@ class SelfCheckUi(
         card.addView(TextView(context).apply {
             text = AppLocale.str(context, f.detail, *f.detailArgs.toTypedArray())
             setTextColor(Color.parseColor(Glass.SECONDARY))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.BODY)
             setPadding(0, dp(6), 0, 0)
         })
 
@@ -658,13 +678,13 @@ class SelfCheckUi(
             card.addView(TextView(context).apply {
                 text = lctx.getString(R.string.check_fix_adb_lead)
                 setTextColor(Color.parseColor(Glass.MUTED))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.CAPTION)
                 setPadding(0, dp(10), 0, dp(4))
             })
             card.addView(TextView(context).apply {
                 text = adb.command
                 setTextColor(Color.parseColor(Glass.LABEL))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.CAPTION)
                 typeface = Typeface.MONOSPACE
                 // Direct call, not `isTextSelectable = true`: TextView's setter
                 // is `setTextIsSelectable` and its getter `isTextSelectable`,
@@ -712,7 +732,7 @@ class SelfCheckUi(
         return TextView(context).apply {
             text = lctx.getString(label)
             setTextColor(Color.parseColor(Glass.ACCENT))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.BODY)
             setTypeface(typeface, Typeface.BOLD)
             setPadding(dp(10), dp(6), 0, dp(6))
             isClickable = true
@@ -880,9 +900,9 @@ class SelfCheckUi(
             } else {
                 lctx.getString(R.string.check_page_issues, problems)
             }
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.TITLE)
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor(if (problems == 0) "#4ADE80" else Glass.DANGER))
+            setTextColor(Color.parseColor(if (problems == 0) Glass.OK else Glass.DANGER))
         })
         // Only in the clean case: a green headline with no sentence under it
         // leaves the user wondering whether the list below is part of the
@@ -891,7 +911,7 @@ class SelfCheckUi(
             addView(TextView(context).apply {
                 text = lctx.getString(R.string.check_page_ok_note)
                 setTextColor(Color.parseColor(Glass.SECONDARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.BODY)
                 setPadding(0, dp(4), 0, dp(12))
             })
         }
@@ -900,14 +920,14 @@ class SelfCheckUi(
     private fun sectionHeading(id: Int): TextView = TextView(context).apply {
         text = lctx.getString(id)
         setTextColor(Color.parseColor(Glass.MUTED))
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.CAPTION)
         setPadding(0, dp(4), 0, dp(8))
     }
 
     private fun note(text: String): TextView = TextView(context).apply {
         this.text = text
         setTextColor(Color.parseColor(Glass.SECONDARY))
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.BODY)
         background = Glass.panel(context, dp(12))
         setPadding(dp(14), dp(12), dp(14), dp(12))
         layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) }

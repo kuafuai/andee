@@ -168,8 +168,17 @@ class SettingsUi(
      */
     private var lctx: Context = context
 
-    /** Survives a [rebuild], so switching language doesn't re-hide the group. */
+    /**
+     * Survives a [rebuild], so switching language doesn't re-hide the group.
+     *
+     * This is now 高级's flag: it was the 火山 panel's, and the panel moved
+     * inside 高级 when the card split. One flag would have unfolded both, which
+     * is why [voiceOpen] exists.
+     */
     private var advancedOpen = false
+
+    /** Same, for the 火山 panel. Kept apart from [advancedOpen] — see there. */
+    private var voiceOpen = false
 
     /** Same, for the notebook dump. Kept apart so opening one does not unfold the other. */
     private var notebookOpen = false
@@ -360,20 +369,67 @@ class SettingsUi(
             setPadding(dp(24), dp(4), dp(24), dp(24))
         }
 
+        // Split in two, and the split is the whole of item 5 of the review: the
+        // card used to be eleven sections in one flat column, in which the
+        // question "what can I actually set here" took a full scroll to answer
+        // because the answer was interleaved with endpoints and a factory-reset
+        // button. 常用 is what a person opens settings for; 高级 is everything
+        // that answers a question they have not asked yet.
+        //
+        // Order inside 常用 is by how early the errand comes up, not
+        // alphabetically: who does the thinking, then how it hears you, then
+        // what it is allowed to keep, then what it may interrupt you for, then
+        // the credentials it can spend. 大脑 stays first because it is the one
+        // setting that changes what the rest of the card means.
         brainSection(form)
-        voiceSection(form)
+        voiceKeySection(form)
+        wakeSection(form)
         notebookSection(form)
         notifySection(form)
-        wakeSection(form)
-        typingSection(form)
         vaultSection(form)
-        diagnosticsSection(form)
+
+        advancedSection(form)
 
         sv.addView(form, matchWrap())
         card.addView(sv, LinearLayout.LayoutParams(MATCH, 0, 1f))
 
         card.addView(footerBar(), matchWrap())
         return card
+    }
+
+    /**
+     * 高级: the three sections a configured device never opens.
+     *
+     * A foldable *group of sections* rather than one more collapsible section —
+     * the only one in the card — because its members draw their own headings and
+     * panels and putting a panel around them would nest one inside another. That
+     * is what `bare = true` is for; see [collapsible].
+     *
+     * It is closed by default, which is the point: 火山's endpoints, the
+     * keyboard report and the factory-reset button are all things the user goes
+     * looking for deliberately. Nothing it hides is needed to make the device
+     * work out of the box, and the one item that *would* have been an exception
+     * — the 火山 key, which a fresh install genuinely needs — is deliberately
+     * **not** in here. It sits in 常用 under 语音 as [voiceKeySection], because
+     * the setup wizard sends the user to it and a wizard that then asks them to
+     * unfold 高级 is a wizard with a fold in the middle of it.
+     *
+     * The note under the heading is not decoration and is not optional: a
+     * collapsed disclosure gives no account of itself, so a user who has lost
+     * 恢复出厂设置 has no way to know it is behind this chevron and not gone.
+     */
+    private fun advancedSection(form: LinearLayout) {
+        val body = collapsible(
+            form,
+            lctx.getString(R.string.settings_section_advanced),
+            lctx.getString(R.string.settings_advanced_note),
+            bare = true,
+        )
+        // The three go in the bare container directly, so their own section
+        // titles and panels land at the form's own width and rhythm.
+        voiceSection(body)
+        typingSection(body)
+        diagnosticsSection(body)
     }
 
     @SuppressLint("SetTextI18n")
@@ -389,13 +445,13 @@ class SettingsUi(
             // 21 was sized against the old, smaller card. On a card this wide
             // a 21sp title is the first thing that reads as undersized, and it
             // is the one line that has to carry the sheet's identity.
-            textSize = 26f
+            textSize = Glass.Type.DISPLAY
             setTextColor(Color.parseColor(Glass.TITLE))
             letterSpacing = 0.01f
         })
         titles.addView(TextView(context).apply {
             text = saved["device_name"].orEmpty().ifEmpty { lctx.getString(R.string.settings_default_device_name) }
-            textSize = 13f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.MUTED))
             setPadding(0, dp(4), 0, 0)
         })
@@ -413,7 +469,7 @@ class SettingsUi(
         // 13dp of glyph in a 36dp circle, on a card the user can now see
         // properly. It was 13 in a 32dp circle, which is a target you have to
         // aim at; 15 in 36 is one you can hit without looking.
-        textSize = 15f
+        textSize = Glass.Type.BODY
         setTextColor(Color.parseColor(Glass.SECONDARY))
         gravity = Gravity.CENTER
         // A circle, so it reads as a button at a size where a bare glyph would
@@ -584,7 +640,7 @@ class SettingsUi(
 
         val state = TextView(context).apply {
             text = summary()
-            textSize = 13f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.LABEL))
             setLineSpacing(dp(3).toFloat(), 1f)
         }
@@ -601,6 +657,40 @@ class SettingsUi(
             state.text = summary()
         })
         panel.addView(row, rowParams(dp(12)))
+    }
+
+    /**
+     * 语音 *without* an engine in the name: the one row here is the key.
+     *
+     * 火山's endpoints are three more rows about a service the user did not know
+     * they were using, so they live in [advancedSection] under their own heading
+     * — which is why this exists as a separate method from [voiceSection] and
+     * why the two carry different titles. What matters here is the key: a fresh
+     * install has none, `VoiceConfig.API_KEY` ships empty on purpose, and
+     * without it the device is mute. A key behind a 高级 disclosure is a key the
+     * setup flow hides mid-setup, so it stays out in 常用.
+     */
+    private fun voiceKeySection(form: LinearLayout) {
+        val panel = group(form, lctx.getString(R.string.settings_section_voice_key))
+        // Blank means *factory*, which is what an untouched box shows — see
+        // VoiceConfig.save / OVERRIDE_KEYS. Masked like any other credential.
+        field(
+            panel, "api_key",
+            lctx.getString(R.string.settings_voice_api_key),
+            hint = lctx.getString(R.string.settings_voice_api_key_hint),
+            secret = true,
+        )
+        // Feedback for the row above. Without it, "did my key actually take
+        // effect?" is only answerable by reading shared_prefs over adb.
+        readOnly(
+            panel,
+            lctx.getString(R.string.settings_voice_in_use),
+            if (VoiceConfig.usingOwnCredentials(context)) {
+                lctx.getString(R.string.settings_voice_in_use_own)
+            } else {
+                lctx.getString(R.string.settings_voice_in_use_factory)
+            },
+        )
     }
 
     /**
@@ -621,7 +711,7 @@ class SettingsUi(
 
         val state = TextView(context).apply {
             text = summary()
-            textSize = 13f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.LABEL))
             setLineSpacing(dp(3).toFloat(), 1f)
         }
@@ -634,32 +724,20 @@ class SettingsUi(
         panel.addView(row, rowParams(dp(12)))
     }
 
-    /** 火山 endpoints. Collapsed, because they ship working and rarely move. */
+    /**
+     * 火山 endpoints. Collapsed, because they ship working and rarely move.
+     *
+     * The key is **not** in here — it is the one row in this group that a fresh
+     * device actually needs, so it lives in [voiceKeySection] out in 常用 and
+     * only the endpoints fold away. See there.
+     */
     private fun voiceSection(form: LinearLayout) {
         val panel = collapsible(
             form,
             lctx.getString(R.string.settings_section_voice),
             lctx.getString(R.string.settings_voice_factory_note),
-        )
-        // The one overridable credential. Blank means *factory*, which is what
-        // an untouched box shows — see VoiceConfig.save / OVERRIDE_KEYS. The key
-        // is masked like any other credential.
-        field(
-            panel, "api_key",
-            lctx.getString(R.string.settings_voice_api_key),
-            hint = lctx.getString(R.string.settings_voice_api_key_hint),
-            secret = true,
-        )
-        // Feedback for the row above. Without it, "did my key actually take
-        // effect?" is only answerable by reading shared_prefs over adb.
-        readOnly(
-            panel,
-            lctx.getString(R.string.settings_voice_in_use),
-            if (VoiceConfig.usingOwnCredentials(context)) {
-                lctx.getString(R.string.settings_voice_in_use_own)
-            } else {
-                lctx.getString(R.string.settings_voice_in_use_factory)
-            },
+            isOpen = { voiceOpen },
+            setOpen = { voiceOpen = it },
         )
         field(panel, "asr_endpoint", lctx.getString(R.string.settings_voice_asr_endpoint))
         field(panel, "asr_resource_id", lctx.getString(R.string.settings_voice_asr_resource_id))
@@ -781,7 +859,7 @@ class SettingsUi(
     /** The bold red line at the head of a destructive confirm. */
     private fun confirmTitle(text: String): TextView = TextView(context).apply {
         this.text = text
-        textSize = 14f
+        textSize = Glass.Type.BODY
         setTextColor(Color.parseColor(Glass.DANGER))
         letterSpacing = 0.02f
     }
@@ -789,7 +867,7 @@ class SettingsUi(
     /** The grey explanation under it. [text] is pre-joined by the caller. */
     private fun confirmBody(text: String): TextView = TextView(context).apply {
         this.text = text
-        textSize = 12f
+        textSize = Glass.Type.CAPTION
         setTextColor(Color.parseColor(Glass.MUTED))
         setLineSpacing(dp(4).toFloat(), 1f)
         setPadding(0, dp(8), 0, 0)
@@ -859,17 +937,22 @@ class SettingsUi(
 
         // The bill, such as it is. These calls are paid for with the user's own
         // key, so the count and the spend are shown rather than hidden.
-        val used = Notebook.sweepCountToday(context)
-        val spent = Notebook.sweepTokensToday(context)
-        val remembered = Notebook.memories(context).size
-        val open = Notebook.todos(context, "pending").size
-        readOnly(
+        val stats = readOnly(
             panel,
             lctx.getString(R.string.settings_notebook_today),
-            lctx.getString(
-                R.string.settings_notebook_stats,
-                used, spent, remembered, open,
-            ),
+            notebookStats(),
+        )
+        val dumpView = notebookDumpView()
+        // Refresh only what a delete can change, not the whole card: a rebuild
+        // cross-fades the sheet the user is about to look at again.
+        panel.addView(
+            button(lctx.getString(R.string.settings_notebook_browse), filled = false) {
+                NotebookUi(context) {
+                    stats.text = notebookStats()
+                    dumpView.text = notebookDumpText()
+                }.show()
+            },
+            LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(10) },
         )
 
         val dump = collapsible(
@@ -879,8 +962,16 @@ class SettingsUi(
             isOpen = { notebookOpen },
             setOpen = { notebookOpen = it },
         )
-        dump.addView(notebookDumpView(), matchWrap())
+        dump.addView(dumpView, matchWrap())
     }
+
+    private fun notebookStats(): String = lctx.getString(
+        R.string.settings_notebook_stats,
+        Notebook.sweepCountToday(context),
+        Notebook.sweepTokensToday(context),
+        Notebook.memories(context).size,
+        Notebook.todos(context, "pending").size,
+    )
 
     /**
      * Which notifications the device may think about by itself.
@@ -927,9 +1018,18 @@ class SettingsUi(
      * truncation says so in the last line — a silent cut-off would read as "this
      * is everything".
      */
-    private fun notebookDumpView(): TextView {
+    private fun notebookDumpView(): TextView = TextView(context).apply {
+        text = notebookDumpText()
+        textSize = Glass.Type.CAPTION
+        typeface = android.graphics.Typeface.MONOSPACE
+        setTextColor(Color.parseColor(Glass.SECONDARY))
+        setLineSpacing(dp(3).toFloat(), 1f)
+        setTextIsSelectable(true)
+    }
+
+    private fun notebookDumpText(): String {
         val full = Notebook.dumpText(context)
-        val body = if (full.length <= NOTEBOOK_DUMP_CHARS) {
+        return if (full.length <= NOTEBOOK_DUMP_CHARS) {
             full
         } else {
             full.take(NOTEBOOK_DUMP_CHARS) +
@@ -938,14 +1038,6 @@ class SettingsUi(
                     R.string.settings_notebook_dump_truncated,
                     full.length - NOTEBOOK_DUMP_CHARS,
                 )
-        }
-        return TextView(context).apply {
-            text = body
-            textSize = 12f
-            typeface = android.graphics.Typeface.MONOSPACE
-            setTextColor(Color.parseColor(Glass.SECONDARY))
-            setLineSpacing(dp(3).toFloat(), 1f)
-            setTextIsSelectable(true)
         }
     }
 
@@ -1001,6 +1093,11 @@ class SettingsUi(
      *
      * @param isOpen / @param setOpen which flag remembers the state. Parameterised
      *   so two foldable panels can exist without one unfolding the other.
+     * @param bare the returned container carries no fill of its own, so the
+     *   sections that go inside it stay flush with the ones above rather than
+     *   sitting in a panel inside a panel. Used by 高级, which is a *group of
+     *   sections* rather than a section — the only disclosure here whose
+     *   children draw their own headings and panels. See [advancedSection].
      */
     private fun collapsible(
         form: LinearLayout,
@@ -1008,6 +1105,7 @@ class SettingsUi(
         note: String,
         isOpen: () -> Boolean = { advancedOpen },
         setOpen: (Boolean) -> Unit = { advancedOpen = it },
+        bare: Boolean = false,
     ): LinearLayout {
         val head = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -1017,7 +1115,7 @@ class SettingsUi(
         head.addView(sectionTitle(title), LinearLayout.LayoutParams(0, WRAP, 1f))
         val chevron = TextView(context).apply {
             text = "›"
-            textSize = 17f
+            textSize = Glass.Type.TITLE
             setTextColor(Color.parseColor(Glass.ACCENT))
             gravity = Gravity.CENTER
             setPadding(dp(10), 0, dp(4), 0)
@@ -1029,6 +1127,10 @@ class SettingsUi(
 
         val panel = panel().apply {
             visibility = if (isOpen()) View.VISIBLE else View.GONE
+            if (bare) {
+                setPadding(0, 0, 0, 0)
+                background = null
+            }
         }
         form.addView(panel, rowParams(dp(10)))
         head.setOnClickListener {
@@ -1046,7 +1148,7 @@ class SettingsUi(
 
     private fun sectionTitle(title: String): TextView = TextView(context).apply {
         text = title
-        textSize = 13f
+        textSize = Glass.Type.CAPTION
         setTextColor(Color.parseColor(Glass.ACCENT))
         letterSpacing = 0.08f
         setPadding(0, dp(22), 0, dp(8))
@@ -1070,7 +1172,7 @@ class SettingsUi(
             this.text = text
             // 12 was legible only because the card was small enough to read at
             // a glance. It is now the smallest thing on a much larger surface.
-            textSize = 13f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.LABEL))
         }, rowParams(dp(16)))
     }
@@ -1086,18 +1188,20 @@ class SettingsUi(
         // least of all — but at 11sp on a 690dp-wide card they end up as one
         // line each, which is both harder to read and denser-looking than the
         // rows they sit between.
-        textSize = 12.5f
+        textSize = Glass.Type.CAPTION
         setTextColor(Color.parseColor(Glass.MUTED))
         setLineSpacing(dp(4).toFloat(), 1f)
     }
 
-    private fun readOnly(parent: LinearLayout, title: String, value: String) {
+    private fun readOnly(parent: LinearLayout, title: String, value: String): TextView {
         rowLabel(parent, title)
-        parent.addView(TextView(context).apply {
+        val v = TextView(context).apply {
             text = value
-            textSize = 14.5f
+            textSize = Glass.Type.BODY
             setTextColor(Color.parseColor(Glass.SECONDARY))
-        }, rowParams(dp(4)))
+        }
+        parent.addView(v, rowParams(dp(4)))
+        return v
     }
 
     /**
@@ -1125,7 +1229,7 @@ class SettingsUi(
             // full-width well on a 690dp card is a lot of empty space holding
             // one line of text. Sizing the field up is what fills that space
             // with something rather than just making it emptier.
-            textSize = 15f
+            textSize = Glass.Type.BODY
             if (hint != null) setHint(hint)
             // isSingleLine before the mask, as in VaultUi: the other order lets
             // it undo the password transformation and the dots come out as text.
@@ -1152,7 +1256,7 @@ class SettingsUi(
         var shown = false
         row.addView(TextView(context).apply {
             text = lctx.getString(R.string.common_show)
-            textSize = 13f
+            textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.ACCENT))
             setPadding(dp(14), dp(8), dp(2), dp(8))
             isClickable = true
@@ -1296,7 +1400,7 @@ class SettingsUi(
             val (value, label) = option
             val cell = TextView(context).apply {
                 text = label
-                textSize = if (compact) 12f else 13f
+                textSize = if (compact) Glass.Type.MICRO else Glass.Type.CAPTION
                 gravity = Gravity.CENTER
                 setTextColor(if (i == index) onColor else offColor)
                 if (compact) setPadding(dp(12), dp(6), dp(12), dp(6))
@@ -1331,7 +1435,7 @@ class SettingsUi(
             // sized for a card narrower than this one. Larger type and more
             // padding is what makes 保存 / 取消 hit-or-miss avoidable on a
             // tablet held in two hands, which is how it is actually used.
-            textSize = 15f
+            textSize = Glass.Type.BODY
             setTextColor(
                 Color.parseColor(
                     if (danger) Glass.DANGER else if (filled) Glass.TITLE else Glass.LABEL,

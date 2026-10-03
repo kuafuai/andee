@@ -1,16 +1,22 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    <!--
+      The night half of Theme.Body. It exists only to keep the platform from
+      swapping in Material's light defaults after dark; the colours are the
+      same as values/themes.xml on purpose, because this app has exactly one
+      palette — Glass' black-and-white stack — and it does not have a light
+      mode. Anything that differs between these two files is a bug.
+    -->
     <style name="Theme.Body" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
         <!-- Primary brand color. -->
-        <item name="colorPrimary">@color/purple_200</item>
-        <item name="colorPrimaryVariant">@color/purple_700</item>
+        <item name="colorPrimary">@color/glass_tint</item>
+        <item name="colorPrimaryVariant">@color/glass_base</item>
         <item name="colorOnPrimary">@color/black</item>
         <!-- Secondary brand color. -->
-        <item name="colorSecondary">@color/teal_200</item>
-        <item name="colorSecondaryVariant">@color/teal_200</item>
+        <item name="colorSecondary">@color/glass_accent</item>
+        <item name="colorSecondaryVariant">@color/glass_accent</item>
         <item name="colorOnSecondary">@color/black</item>
         <!-- Status bar color. -->
-        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        <item name="android:statusBarColor">@color/glass_base</item>
         <!-- Customize your theme here. -->
     </style>
 </resources>

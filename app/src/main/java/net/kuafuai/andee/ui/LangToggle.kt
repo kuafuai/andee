@@ -90,7 +90,7 @@ class LangToggle(
         OPTIONS.forEach { (tag, label) ->
             val cell = TextView(context).apply {
                 text = label
-                textSize = 14f
+                textSize = Glass.Type.BODY
                 setTypeface(typeface, Typeface.BOLD)
                 gravity = Gravity.CENTER
                 minWidth = context.dpI(CELL_MIN_W_DP)

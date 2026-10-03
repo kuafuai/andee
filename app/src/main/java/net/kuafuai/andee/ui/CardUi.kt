@@ -227,7 +227,7 @@ object CardUi {
             val title = TextView(context).apply {
                 this.text = text
                 setTextColor(Color.parseColor(Glass.TITLE))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.TITLE)
                 typeface = Typeface.DEFAULT_BOLD
                 setLineSpacing(dp(3).toFloat(), 1f)
                 maxLines = 4
@@ -250,7 +250,7 @@ object CardUi {
                 val isPrimary = label == buttons.first()
                 val btn = TextView(context).apply {
                     this.text = label
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.BODY)
                     typeface = Typeface.DEFAULT_BOLD
                     setPadding(dp(18), dp(9), dp(18), dp(9))
                     gravity = Gravity.CENTER
