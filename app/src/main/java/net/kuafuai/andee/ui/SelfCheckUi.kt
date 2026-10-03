@@ -959,9 +959,7 @@ class SelfCheckUi(
         return minOf(screen - dp(2 * GUTTER_DP), (screen * 0.96f).toInt())
     }
 
-    private fun screenW(): Int = wm?.currentWindowMetrics?.bounds?.width()
-        ?: context.resources.displayMetrics.widthPixels
+    private fun screenW(): Int = Glass.usableSize(context).first
 
-    private fun screenH(): Int = wm?.currentWindowMetrics?.bounds?.height()
-        ?: context.resources.displayMetrics.heightPixels
+    private fun screenH(): Int = Glass.usableSize(context).second
 }

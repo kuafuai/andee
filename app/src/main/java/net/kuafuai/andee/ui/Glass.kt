@@ -15,6 +15,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.animation.OvershootInterpolator
 import android.view.animation.PathInterpolator
@@ -206,6 +207,23 @@ object Glass {
     private val ui = Handler(Looper.getMainLooper())
 
     // ---- Window ----
+
+    /**
+     * Width and height a centred card can actually occupy: the display minus
+     * the status bar, navigation bar and cutout.
+     *
+     * Not `currentWindowMetrics.bounds` alone. An overlay without
+     * `FLAG_LAYOUT_IN_SCREEN` is laid out between the bars, so a card sized
+     * as "display minus a gutter" spends its gutter on the bars — invisible on
+     * a landscape tablet, flush against both bars on a portrait phone.
+     */
+    fun usableSize(context: Context): Pair<Int, Int> {
+        val m = (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).currentWindowMetrics
+        val i = m.windowInsets.getInsetsIgnoringVisibility(
+            WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+        )
+        return (m.bounds.width() - i.left - i.right) to (m.bounds.height() - i.top - i.bottom)
+    }
 
     /**
      * Ask the compositor to blur behind this window. Returns whether it agreed.

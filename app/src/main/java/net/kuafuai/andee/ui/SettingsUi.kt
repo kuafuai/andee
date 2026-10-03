@@ -313,12 +313,12 @@ class SettingsUi(
      * sides anyway; the point is only that it does not touch the edge.
      */
     private fun cardWidth(): Int {
-        val screen = wm.currentWindowMetrics.bounds.width()
+        val screen = Glass.usableSize(context).first
         return minOf(screen - dp(2 * GUTTER_DP), (screen * 0.98f).toInt())
     }
 
     private fun cardHeight(): Int {
-        val screen = wm.currentWindowMetrics.bounds.height()
+        val screen = Glass.usableSize(context).second
         return minOf(screen - dp(2 * GUTTER_DP), (screen * 0.96f).toInt())
     }
 
