@@ -362,6 +362,13 @@ class FloatingWindowUi(
             gravity = Gravity.TOP or Gravity.START
             x = dm.widthPixels - side - dp(COMPACT_MARGIN_DP)
             y = dm.heightPixels - side - dp(COMPACT_MARGIN_DP)
+            // FLAG_LAYOUT_IN_SCREEN alone is not enough: since API 30 the window
+            // also fits the system-bar insets by default, so on the Honor phone a
+            // MATCH_PARENT card still started below the status bar and stopped
+            // above the navigation bar. Zero lets the card cover the display.
+            fitInsetsTypes = 0
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         }
         // Where the ball climbs back to when a task ends. [enterCompact] is the
         // other place this is set, and it is the one that usually runs — but
