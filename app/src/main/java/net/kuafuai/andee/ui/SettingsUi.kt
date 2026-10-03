@@ -27,16 +27,6 @@ import net.kuafuai.andee.wake.WakeTemplates
 import net.kuafuai.andee.wake.WakeWord
 
 /**
- * How much of the notebook the settings card prints.
- *
- * Bounded because it is a `TextView` inside a scroll view inside a floating
- * card, laid out on every rebuild: a few thousand lines would be paid for on
- * each open, and again on every language switch. The cut is announced in the
- * last line — a silent truncation would read as "this is all of it".
- */
-private const val NOTEBOOK_DUMP_CHARS = 6_000
-
-/**
  * Settings overlay for editing [VoiceConfig].
  *
  * A focusable glass card centred on screen — see [Glass] for the palette, the
@@ -179,9 +169,6 @@ class SettingsUi(
 
     /** Same, for the 火山 panel. Kept apart from [advancedOpen] — see there. */
     private var voiceOpen = false
-
-    /** Same, for the notebook dump. Kept apart so opening one does not unfold the other. */
-    private var notebookOpen = false
 
     /**
      * The 诊断 section is showing the factory-reset warning instead of its
@@ -942,27 +929,14 @@ class SettingsUi(
             lctx.getString(R.string.settings_notebook_today),
             notebookStats(),
         )
-        val dumpView = notebookDumpView()
         // Refresh only what a delete can change, not the whole card: a rebuild
         // cross-fades the sheet the user is about to look at again.
         panel.addView(
             button(lctx.getString(R.string.settings_notebook_browse), filled = false) {
-                NotebookUi(context) {
-                    stats.text = notebookStats()
-                    dumpView.text = notebookDumpText()
-                }.show()
+                NotebookUi(context) { stats.text = notebookStats() }.show()
             },
             LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(10) },
         )
-
-        val dump = collapsible(
-            form,
-            lctx.getString(R.string.settings_notebook_dump),
-            lctx.getString(R.string.settings_notebook_dump_hint),
-            isOpen = { notebookOpen },
-            setOpen = { notebookOpen = it },
-        )
-        dump.addView(dumpView, matchWrap())
     }
 
     private fun notebookStats(): String = lctx.getString(
@@ -1007,38 +981,6 @@ class SettingsUi(
             panel,
             lctx.getString(R.string.settings_notify_note),
         )
-    }
-
-    /**
-     * The book itself, as text.
-     *
-     * Truncated at [NOTEBOOK_DUMP_CHARS] rather than paginated: this is a
-     * TextView inside a scroll view inside a floating card, and a few thousand
-     * lines of text would make every layout pass of that card expensive. The
-     * truncation says so in the last line — a silent cut-off would read as "this
-     * is everything".
-     */
-    private fun notebookDumpView(): TextView = TextView(context).apply {
-        text = notebookDumpText()
-        textSize = Glass.Type.CAPTION
-        typeface = android.graphics.Typeface.MONOSPACE
-        setTextColor(Color.parseColor(Glass.SECONDARY))
-        setLineSpacing(dp(3).toFloat(), 1f)
-        setTextIsSelectable(true)
-    }
-
-    private fun notebookDumpText(): String {
-        val full = Notebook.dumpText(context)
-        return if (full.length <= NOTEBOOK_DUMP_CHARS) {
-            full
-        } else {
-            full.take(NOTEBOOK_DUMP_CHARS) +
-                "\n\n" +
-                lctx.getString(
-                    R.string.settings_notebook_dump_truncated,
-                    full.length - NOTEBOOK_DUMP_CHARS,
-                )
-        }
     }
 
     // ---- Widgets ----

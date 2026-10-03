@@ -1,6 +1,8 @@
 package net.kuafuai.andee.ui
 
 import android.annotation.SuppressLint
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -21,9 +23,9 @@ import java.util.Locale
 /**
  * 它记得的事: what the device remembers, browsable and deletable per item.
  *
- * [Notebook.dumpText] is the other view into the book, and it is
- * export-shaped — every field, as text, for copying out. This page answers a
- * different question: "what is it allowed to remember about me".
+ * The header's 复制全部 copies [Notebook.dumpText] — every field, untruncated,
+ * export-shaped. That is the only route to the raw text; the rows here answer
+ * a different question: "what is it allowed to remember about me".
  *
  * **记忆** groups [Notebook.Memory] by type, most important first within each.
  * **待办** lists active and paused [Notebook.Todo]s, soonest first.
@@ -156,8 +158,38 @@ class NotebookUi(
             },
             LinearLayout.LayoutParams(0, WRAP, 1f),
         )
+        h.addView(copyButton())
+        h.addView(View(context), LinearLayout.LayoutParams(dp(8), 1))
         h.addView(closeButton())
         return h
+    }
+
+    private fun copyButton(): TextView = TextView(context).apply {
+        val label = lctx.getString(R.string.notebook_copy_all)
+        text = label
+        textSize = Glass.Type.CAPTION
+        setTextColor(Color.parseColor(Glass.SECONDARY))
+        gravity = Gravity.CENTER
+        setPadding(dp(12), 0, dp(12), 0)
+        background = Glass.panel(context, dp(16))
+        isClickable = true
+        Glass.pressable(this)
+        setOnClickListener {
+            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val ok = runCatching {
+                cm.setPrimaryClip(
+                    ClipData.newPlainText(lctx.getString(R.string.notebook_title), Notebook.dumpText(context)),
+                )
+            }.isSuccess
+            if (!ok) return@setOnClickListener
+            text = lctx.getString(R.string.notebook_copied)
+            setTextColor(Color.parseColor(Glass.OK))
+            postDelayed({
+                text = label
+                setTextColor(Color.parseColor(Glass.SECONDARY))
+            }, 1500)
+        }
+        layoutParams = LinearLayout.LayoutParams(WRAP, dp(32))
     }
 
     private fun closeButton(): TextView = TextView(context).apply {

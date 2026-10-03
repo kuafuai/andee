@@ -100,9 +100,6 @@
     <string name="settings_notebook_daily_cap">每天最多复盘几次</string>
     <string name="settings_notebook_today">今天 / 攒到现在</string>
     <string name="settings_notebook_stats">复盘 %1$d 次（约 %2$d tokens）· 记住 %3$d 条 · 还欠着 %4$d 件事</string>
-    <string name="settings_notebook_dump">本子里写了什么</string>
-    <string name="settings_notebook_dump_hint">只读。长按可以选中复制。</string>
-    <string name="settings_notebook_dump_truncated">…（还有 %1$d 个字符没显示）</string>
     <string name="settings_notebook_browse">看它记得的事</string>
     <string name="settings_section_notify">消息提醒</string>
     <string name="settings_notify_chat">聊天类</string>
@@ -301,6 +298,8 @@
         uses; 踩过的坑 is).
     -->
     <string name="notebook_title">它记得的事</string>
+    <string name="notebook_copy_all">复制全部</string>
+    <string name="notebook_copied">已复制</string>
     <string name="notebook_tab_memories">记忆</string>
     <string name="notebook_tab_todos">待办</string>
     <string name="notebook_empty_memories">还没记下什么</string>
