@@ -2006,7 +2006,7 @@ class FloatingWindowUi(
         val tips = TextView(context).apply {
             text = AppLocale.str(context, R.string.window_tips)
             textSize = Glass.Type.CAPTION
-            setTextColor(Color.parseColor(Glass.SECONDARY))
+            setTextColor(Color.parseColor(Glass.MUTED))
             gravity = Gravity.CENTER
             // The bottom padding clears the gesture bar, the same 30 dp the
             // scrollback's last row used to reserve for itself — this bar
@@ -2098,20 +2098,20 @@ class FloatingWindowUi(
         }
 
         keys.addView(
-            barButton(R.drawable.ic_artifacts, Glass.LABEL, "产物") { listeners.onArtifactsClick() }
+            barButton(R.drawable.ic_artifacts, Glass.MUTED, "产物") { listeners.onArtifactsClick() }
         )
         // ✓ and not ■: the stop button used to sit here, and stop is the one
         // action in this bar the ball can already perform — see onStopClick.
-        keys.addView(barButton(R.drawable.ic_check, Glass.LABEL, "自检") { listeners.onSelfCheckClick() })
+        keys.addView(barButton(R.drawable.ic_check, Glass.MUTED, "自检") { listeners.onSelfCheckClick() })
         // No ⌨ here. Typing moved onto the ball's double-tap, and the bar is
         // the wrong place for it twice over: it only exists while the card is
         // unfolded (so the way to type vanished with the fold — the same fault
         // that made "点右上角的 ⌨" a lie in a failure message), and it put a
         // second meaning on the one control the user already had to learn.
-        keys.addView(barButton(R.drawable.ic_settings, Glass.LABEL, "设置") { listeners.onSettingsClick() })
+        keys.addView(barButton(R.drawable.ic_settings, Glass.MUTED, "设置") { listeners.onSettingsClick() })
         // Reads as close, not as resize: the card is a thing you dismiss, and the
         // corner ball it folds into stays on screen either way.
-        keys.addView(barButton(R.drawable.ic_close, Glass.LABEL, "收起") { listeners.onMinimizeClick() })
+        keys.addView(barButton(R.drawable.ic_close, Glass.MUTED, "收起") { listeners.onMinimizeClick() })
 
         bar.addView(keys)
         return bar
@@ -2143,7 +2143,8 @@ class FloatingWindowUi(
         description: String,
         onClick: () -> Unit,
     ): View {
-        val pad = dp(6)
+        // The 36 dp target stays; only the glyph shrinks, to 20 dp.
+        val pad = dp(8)
         return ImageView(context).apply {
             setImageDrawable(
                 ContextCompat.getDrawable(context, icon)?.mutate()?.apply {
@@ -2524,7 +2525,7 @@ class FloatingWindowUi(
          * On the phone this stacks with a ~12 dp cluster clearance, on a wide
          * tablet it is the whole offset.
          */
-        private const val BALL_NUDGE_DP = 14
+        private const val BALL_NUDGE_DP = 26
 
         /**
          * Floor for the card's height while a typing field is up — see
