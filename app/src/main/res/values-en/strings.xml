@@ -143,14 +143,15 @@
          longer than one they can read at a glance. -->
     <string name="window_tips">1tap: talk · 2tap: type · 3tap: stop · swipe: character</string>
 
-    <string name="tool_swipe_up">Up</string>
-    <string name="tool_swipe_down">Down</string>
-    <string name="tool_swipe_left">Left</string>
-    <string name="tool_swipe_right">Right</string>
-    <string name="tool_back">Back</string>
-    <string name="tool_home">Home</string>
-    <string name="tool_ui_tree">Tree</string>
-    <string name="tool_screenshot">Shot</string>
+    <string name="artifacts_title">Made for you</string>
+    <string name="artifacts_subtitle">Pages it has built for you</string>
+    <string name="artifacts_open">Open</string>
+    <string name="artifacts_edit">Revise</string>
+    <string name="artifacts_delete_confirm">Really delete</string>
+    <string name="artifacts_empty">Nothing here yet.\nAsk it to build you a page — say, “make me a pomodoro timer”.</string>
+    <string name="artifacts_cap_note">Only the latest 100 are kept</string>
+    <string name="artifacts_edit_prompt">How should “%1$s” change? Say it or type it</string>
+    <string name="artifacts_edit_said">Revise “%1$s”: %2$s</string>
 
     <!-- The factory-reset confirmation list; see config/FactoryReset.kt. -->
     <string name="factory_reset_target_keys">the Volcano and DeepSeek keys, and every speech and brain setting</string>

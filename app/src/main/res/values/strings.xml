@@ -117,15 +117,18 @@
          folded ball reads a horizontal flick as a move instead. -->
     <string name="window_tips">点小球说话 · 双击打字 · 三连击停止 · 滑动切换性格</string>
 
-    <!-- The ⋯ drawer's tool names, under each icon. -->
-    <string name="tool_swipe_up">上滑</string>
-    <string name="tool_swipe_down">下滑</string>
-    <string name="tool_swipe_left">左滑</string>
-    <string name="tool_swipe_right">右滑</string>
-    <string name="tool_back">返回</string>
-    <string name="tool_home">桌面</string>
-    <string name="tool_ui_tree">元素树</string>
-    <string name="tool_screenshot">截图</string>
+    <!-- 产物: the pages the assistant has made. See ui/ArtifactsUi.kt. -->
+    <string name="artifacts_title">产物</string>
+    <string name="artifacts_subtitle">它为你做的网页</string>
+    <string name="artifacts_open">打开</string>
+    <string name="artifacts_edit">继续修改</string>
+    <string name="artifacts_delete_confirm">确认删除</string>
+    <string name="artifacts_empty">还没有产物。\n让它给你做个网页试试，比如「做个番茄钟」。</string>
+    <string name="artifacts_cap_note">只保留最近 100 个</string>
+    <!-- Shown on the card after 继续修改, while it waits for the change. -->
+    <string name="artifacts_edit_prompt">要怎么改「%1$s」？说出来或打字告诉我</string>
+    <!-- The scrollback row for the user's change request. -->
+    <string name="artifacts_edit_said">修改「%1$s」：%2$s</string>
 
     <!-- The 恢复出厂设置 confirmation list: one line per thing wiped.
          Kept beside config/FactoryReset.kt, which walks them in this order. -->

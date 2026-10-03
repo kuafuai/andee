@@ -102,6 +102,9 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
      */
     private val laid = LinkedHashSet<Long>()
 
+    /** Laid rows drawn as re-openable pages; one losing its file forces a relayout. */
+    private val laidOpen = HashSet<Long>()
+
     private val empty = TextView(context).apply {
         text = lctx.getString(R.string.history_empty)
         textSize = Glass.Type.CAPTION
@@ -202,7 +205,8 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
         empty.visibility = if (all.isEmpty()) View.VISIBLE else View.GONE
 
         val ids = all.map { it.id }.toSet()
-        if (laid.any { it !in ids }) {
+        val open = all.filter { it.page != null }.map { it.id }.toSet()
+        if (laid.any { it !in ids } || laidOpen.any { it !in open }) {
             // A row we laid out is gone from the history — evicted from the
             // middle, or the whole list wiped. Cheaper and less error-prone to
             // start over than to reconcile. This deliberately does not also
@@ -213,11 +217,13 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
             column.addView(empty)
             column.addView(live)
             laid.clear()
+            laidOpen.clear()
         }
         // Inserted above the live row rather than appended, so a settled entry
         // lands behind the thing that is still in progress.
         for (e in all) {
             if (laid.add(e.id)) {
+                if (e.page != null) laidOpen.add(e.id)
                 column.addView(buildRow(e), column.indexOfChild(live))
             }
         }
@@ -243,6 +249,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
         lctx = AppLocale.wrap(context)
         empty.text = lctx.getString(R.string.history_empty)
         laid.clear()
+        laidOpen.clear()
         column.removeAllViews()
         column.addView(empty)
         column.addView(live)

@@ -17,7 +17,6 @@ import net.kuafuai.andee.tts.TtsController
 import net.kuafuai.andee.ui.EdgeRippleUi
 import net.kuafuai.andee.ui.FloatingWindowUi
 import net.kuafuai.andee.ui.SettingsUi
-import android.util.DisplayMetrics
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicReference
 
@@ -44,6 +43,15 @@ class ScreenBodyService : AccessibilityService() {
      * can be on screen at once — see [openSelfCheck].
      */
     private var selfCheck: net.kuafuai.andee.ui.SelfCheckUi? = null
+
+    /** The artifacts panel, when it is up. See [openArtifacts]. */
+    private var artifactsUi: net.kuafuai.andee.ui.ArtifactsUi? = null
+
+    /**
+     * The page entry the user just tapped 继续修改 on, waiting for them to say
+     * what change they want. Cleared once they speak or type, or on stop.
+     */
+    private var pendingArtifact: net.kuafuai.andee.ui.ChatHistory.Entry? = null
 
     /**
      * The first-run wizard, when it is up.
@@ -89,10 +97,6 @@ class ScreenBodyService : AccessibilityService() {
      * payload). See [net.kuafuai.andee.net.CallExtensionRegistry].
      */
     private val callExtensions = net.kuafuai.andee.net.CallExtensionRegistry()
-    private val toolExec = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
-        Thread(r, "ScreenTools").apply { isDaemon = true }
-    }
-    private val stamper = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US)
 
     // Closed by [stopEverything], reopened when the user starts the next turn.
     // Cancelling the brain's task is asynchronous, so progress / message frames
@@ -173,13 +177,14 @@ class ScreenBodyService : AccessibilityService() {
 
             override fun onLongPress() {
                 // Long-press the ball — folded or not — asks for the full card
-                // back: the subtitle band and the tool row only exist at full
+                // back: the scrollback and the control bar only exist at full
                 // size, and tapping is taken by the mic.
                 dispatcher.expand()
             }
 
-            override fun onToolClick(tool: FloatingWindowUi.Tool) {
-                runTool(tool)
+            /** Same reasoning as [onSelfCheckClick]: our own surface, no task. */
+            override fun onArtifactsClick() {
+                openArtifacts()
             }
 
             override fun onStopClick() {
@@ -258,7 +263,7 @@ class ScreenBodyService : AccessibilityService() {
         // below — so a service that comes up folded cannot cover whatever the
         // user was doing when they flipped the switch in 设置. That reasoning
         // was about *enabling*, and it cost more than it bought. The card is
-        // the only thing that shows the scrollback, the tool row and the
+        // the only thing that shows the scrollback, the control bar and the
         // minimise control, and a device that came back from a reboot showed
         // none of them: just a 168 dp ball in the corner whose one way in (a
         // long-press) nothing on screen mentions. The user turned this on to
@@ -707,16 +712,23 @@ class ScreenBodyService : AccessibilityService() {
         closeTyping()
         // The user is asking for something, so the answer is theirs to see.
         acceptBrainOutput = true
-        net.kuafuai.andee.ui.ChatHistory.addUser(said)
+        // A 继续修改 waiting for its words: the scrollback gets what they said,
+        // the brain gets that plus the page it is about.
+        val editing = pendingArtifact
+        pendingArtifact = null
+        val forBrain = editing?.let { artifactEditQuery(it, said) } ?: said
+        net.kuafuai.andee.ui.ChatHistory.addUser(
+            if (editing != null) AppLocale.str(this, R.string.artifacts_edit_said, editing.text, said) else said,
+        )
         val payload = org.json.JSONObject()
-            .put("text", said)
+            .put("text", forBrain)
             .put("ts", System.currentTimeMillis())
         hubClient?.sendEvent("asr.final", payload)
         wsServer?.broadcastEvent("asr.final", payload)
         // Same turn, different brain. The local one takes the text directly —
         // there is no socket in between, and no event kind it would have to be
         // taught (see the meeting callback).
-        localBrain?.submit(said)
+        localBrain?.submit(forBrain)
         // Task start, and deliberately at the request rather than at the
         // reply: from here the device is being worked on, whether that reaches
         // us as a tool call or as thirty seconds of thinking. Nobody listening
@@ -1046,7 +1058,6 @@ class ScreenBodyService : AccessibilityService() {
         // stream to still exist, and flushes the last segment to disk.
         if (::meeting.isInitialized) meeting.shutdown()
         if (::audio.isInitialized) audio.release()
-        toolExec.shutdownNow()
         // shutdown, not shutdownNow: its queue is a few small appends and one
         // PNG, and losing them would silently truncate the record.
         net.kuafuai.andee.screen.GroundingLog.shutdown()
@@ -1058,6 +1069,8 @@ class ScreenBodyService : AccessibilityService() {
         selfCheck?.hide()
         selfCheck?.destroy()
         selfCheck = null
+        artifactsUi?.hide()
+        artifactsUi = null
         // Before the windows go: this one has to put the keyboard back, and a
         // service that dies mid-typing would otherwise leave the tablet with
         // its keyboard on the user's IME — where every future `type_text`
@@ -1200,6 +1213,73 @@ class ScreenBodyService : AccessibilityService() {
         // Paint the local half immediately, then fill in the two probes behind
         // it. See SelfCheckUi.start.
         s.start()
+    }
+
+    /**
+     * 产物 — the pages the assistant has made. Our own surface, like ✓ and ⚙:
+     * starts no task and lights no glow.
+     */
+    private fun openArtifacts() {
+        if (artifactsUi?.isShown() == true) return
+        val a = net.kuafuai.andee.ui.ArtifactsUi(
+            context = this,
+            onOpen = { e -> e.page?.let { openPageFrom(e, it) } },
+            onEdit = { e -> beginArtifactEdit(e) },
+        )
+        artifactsUi = a
+        a.show()
+    }
+
+    /**
+     * 继续修改: remember which page, then ask the user what to change.
+     *
+     * The change itself arrives as an ordinary turn — said or typed — and
+     * [submitUserTurn] wraps it with the page. Not a turn of its own here,
+     * because until the user says what they want there is nothing to ask the
+     * brain, and a model call that answers "what would you like to change?"
+     * is a sentence the device can write for free.
+     *
+     * Opens the typing field rather than the mic: a page revision is usually a
+     * precise instruction ("把标题改成蓝色"), and the ball is one tap away for
+     * anyone who would rather say it.
+     */
+    private fun beginArtifactEdit(e: net.kuafuai.andee.ui.ChatHistory.Entry) {
+        if (e.page == null) return
+        pendingArtifact = e
+        window.setSubtitle(
+            AppLocale.str(this, R.string.artifacts_edit_prompt, e.text),
+            FloatingWindowUi.SubtitleKind.FINAL,
+        )
+        if (!net.kuafuai.andee.ui.TextInputActivity.isShowing) toggleTyping()
+    }
+
+    /**
+     * What the brain is given for a 继续修改: the user's words, the page they
+     * are about, and that page's current source.
+     *
+     * The source is inlined because neither brain can read a file off this
+     * device — there is no file tool — and a revision written from the title
+     * alone is a new page wearing the old name. Capped, since a page with
+     * base64 images can run to hundreds of KB; past the cap the brain is told
+     * so and rebuilds the rest from what it can see.
+     *
+     * English, like every other device-composed prompt, so the model's own
+     * language rule (§9) decides the reply's language from the user's words.
+     */
+    private fun artifactEditQuery(e: net.kuafuai.andee.ui.ChatHistory.Entry, said: String): String {
+        val html = e.page?.let { runCatching { it.readText() }.getOrNull() }.orEmpty()
+        val cut = html.length > ARTIFACT_SOURCE_MAX
+        return buildString {
+            append(said)
+            append("\n\n(I picked this from the 产物 panel: it is about the page you made earlier titled \"")
+            append(e.text)
+            append("\". Apply my change above to that page and show the full revised page with show_html,")
+            append(" keeping everything I did not ask to change. Its current source follows")
+            if (cut) append(" — truncated at $ARTIFACT_SOURCE_MAX characters; rebuild the missing tail in the same style")
+            append(".)\n\n<<<CURRENT PAGE SOURCE>>>\n")
+            append(if (cut) html.take(ARTIFACT_SOURCE_MAX) else html)
+            append("\n<<<END PAGE SOURCE>>>")
+        }
     }
 
     /**
@@ -1396,9 +1476,8 @@ class ScreenBodyService : AccessibilityService() {
      * Stop the current task. Runs entirely on the caller (UI) thread because
      * every local step is non-blocking: [TtsController.stopSpeaking] cuts the
      * AudioTrack inline, [AsrController.stop] only queues onto its executor.
-     * Deliberately not routed through [toolExec] — that queue may be holding a
-     * swipe mid-dispatchGesture, which is seconds of exactly the wait we're
-     * trying to abort.
+     * Deliberately synchronous for that reason — an action already inside
+     * `dispatchGesture` is seconds of exactly the wait we're trying to abort.
      *
      * Three layers, and only the local ones are guaranteed: the brain is asked
      * to cancel over the hub socket, and a tool request already dispatched to
@@ -1414,6 +1493,9 @@ class ScreenBodyService : AccessibilityService() {
             return
         }
         acceptBrainOutput = false
+        // A 继续修改 the user walked away from must not attach itself to
+        // whatever they ask next.
+        pendingArtifact = null
         tts.stopSpeaking()
         if (asr.isActive()) asr.stop()
         // Task over from the device's point of view: whatever the brain had
@@ -1442,123 +1524,6 @@ class ScreenBodyService : AccessibilityService() {
                 }
             }.start()
         }
-    }
-
-    /**
-     * Run a top-bar tool on a background thread (ScreenController.tap/swipe
-     * block on dispatchGesture for up to ~2 s and would ANR the UI thread).
-     * Result is echoed to the floating window subtitle.
-     */
-    private fun runTool(tool: FloatingWindowUi.Tool) {
-        window.setSubtitle("${AppLocale.str(this, tool.label)}…", FloatingWindowUi.SubtitleKind.PARTIAL)
-        toolExec.execute {
-            try {
-                val result = when (tool) {
-                    FloatingWindowUi.Tool.SWIPE_UP -> swipe(dx = 0, dy = -1)
-                    FloatingWindowUi.Tool.SWIPE_DOWN -> swipe(dx = 0, dy = 1)
-                    FloatingWindowUi.Tool.SWIPE_LEFT -> swipe(dx = -1, dy = 0)
-                    FloatingWindowUi.Tool.SWIPE_RIGHT -> swipe(dx = 1, dy = 0)
-                    // actor="user": these bypass the dispatcher, so without it
-                    // the grounding log would file the user's own navigation
-                    // under the brain's and the offline pairing would read a
-                    // human's back-press as the agent correcting itself.
-                    FloatingWindowUi.Tool.BACK -> screen.globalAction("back", actor = "user")
-                    FloatingWindowUi.Tool.HOME -> screen.globalAction("home", actor = "user")
-                    FloatingWindowUi.Tool.UI_TREE -> saveUiTree(screen.dumpUiTree(verbose = true))
-                    // Through the dispatcher, not ScreenController directly: the
-                    // overlay has to be blanked or the capture is just our own card.
-                    FloatingWindowUi.Tool.SCREENSHOT ->
-                        saveScreenshot(dispatcher.dispatch("screen.screenshot", null) as JSONObject)
-                }
-                window.setSubtitle(
-                    "${AppLocale.str(this, tool.label)} · $result",
-                    FloatingWindowUi.SubtitleKind.FINAL,
-                )
-            } catch (t: Throwable) {
-                net.kuafuai.andee.ui.CardUi.error(
-                    "${AppLocale.str(this, tool.label)} · ${t.message ?: t.javaClass.simpleName}"
-                )
-            }
-        }
-    }
-
-    /**
-     * Full-screen center swipe, 60% of the axis. dispatchGesture simulates
-     * real touch events, which the overlay window would grab first — so we
-     * flip the overlay to non-touchable for the duration of the swipe, then
-     * restore it. Overlay stays visible either way.
-     */
-    private fun swipe(dx: Int, dy: Int): JSONObject {
-        val dm: DisplayMetrics = resources.displayMetrics
-        val cx = dm.widthPixels / 2
-        val cy = dm.heightPixels / 2
-        val ax = (dm.widthPixels * 0.3f).toInt()
-        val ay = (dm.heightPixels * 0.3f).toInt()
-        val durationMs = 300L
-        window.setTouchable(false)
-        // The glow window counts toward the opacity Android checks before it
-        // trusts an injected gesture, so it has to step aside too — see
-        // EdgeRippleUi's KDoc. Same for a tap marker still on screen.
-        ripple.setVisibleForGesture(false)
-        marker.setVisibleForGesture(false)
-        // updateViewLayout is posted to the UI thread; give it a couple of
-        // frames to actually apply before the gesture starts.
-        Thread.sleep(50)
-        try {
-            // Goes straight to the pixel swipe, so swipeNorm's own hook never
-            // fires — but the screen still moves under everything the brain
-            // was aiming at, and this one was the user's doing.
-            net.kuafuai.andee.screen.GroundingLog.noteSwipe(
-                nx1 = (cx - dx * ax) * 1000 / dm.widthPixels,
-                ny1 = (cy - dy * ay) * 1000 / dm.heightPixels,
-                nx2 = (cx + dx * ax) * 1000 / dm.widthPixels,
-                ny2 = (cy + dy * ay) * 1000 / dm.heightPixels,
-                durationMs = durationMs,
-                actor = "user",
-            )
-            return screen.swipe(cx - dx * ax, cy - dy * ay, cx + dx * ax, cy + dy * ay, durationMs)
-        } finally {
-            ripple.setVisibleForGesture(true)
-            marker.setVisibleForGesture(true)
-            window.setTouchable(true)
-        }
-    }
-
-    /**
-     * The full UI tree is huge — write to a JSON file under app-external
-     * files so you can `adb pull` it, and return a small summary + path.
-     * External files (Context.getExternalFilesDir) don't need storage
-     * permission and are visible to `adb pull`.
-     */
-    private fun saveUiTree(tree: JSONObject): JSONObject {
-        val dir = java.io.File(getExternalFilesDir(null), "captures").apply { mkdirs() }
-        val file = java.io.File(dir, "ui_${stamper.format(java.util.Date())}.json")
-        file.writeText(tree.toString(2), Charsets.UTF_8)
-        android.util.Log.i("Body", "ui_tree saved: ${file.absolutePath}")
-        return JSONObject()
-            .put("pkg", tree.optString("pkg"))
-            .put("class", tree.optString("class"))
-            .put("children", tree.optJSONArray("children")?.length() ?: 0)
-            .put("file", file.name)
-            .put("bytes", file.length())
-    }
-
-    /**
-     * Save the PNG bytes to disk (skipping the base64 round-trip in the
-     * subtitle), and return a small summary + path.
-     */
-    private fun saveScreenshot(shot: JSONObject): JSONObject {
-        val b64 = shot.optString("png_base64", "")
-        val bytes = android.util.Base64.decode(b64, android.util.Base64.NO_WRAP)
-        val dir = java.io.File(getExternalFilesDir(null), "captures").apply { mkdirs() }
-        val file = java.io.File(dir, "screen_${stamper.format(java.util.Date())}.png")
-        file.writeBytes(bytes)
-        android.util.Log.i("Body", "screenshot saved: ${file.absolutePath}")
-        return JSONObject()
-            .put("width", shot.optInt("width"))
-            .put("height", shot.optInt("height"))
-            .put("bytes", bytes.size)
-            .put("file", file.name)
     }
 
     private fun startWsServer() {
@@ -2087,6 +2052,17 @@ class ScreenBodyService : AccessibilityService() {
          * read aloud.
          */
         private val END_MARKER = Regex("""(?i)\[END]""")
+
+        /**
+         * How much of a page's source a 继续修改 hands the brain.
+         *
+         * A generated page is routinely 10–60 KB of inline CSS and JS, which is
+         * nothing to the request; one with a base64 image can be several hundred
+         * KB, which is most of a context window for a picture the brain already
+         * drew and cannot usefully redraw from text. Past this the prompt says
+         * so and the tail is rebuilt rather than quoted.
+         */
+        private const val ARTIFACT_SOURCE_MAX = 60_000
         private val instanceRef = AtomicReference<ScreenBodyService?>()
         fun get(): ScreenBodyService? = instanceRef.get()
 

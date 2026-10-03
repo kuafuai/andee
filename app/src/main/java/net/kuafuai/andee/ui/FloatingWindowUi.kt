@@ -21,7 +21,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.annotation.DrawableRes
-import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 import net.kuafuai.andee.R
 import net.kuafuai.andee.audio.Earcon
@@ -44,7 +43,7 @@ import kotlin.random.Random
  *
  * Layout (FrameLayout, two stacked areas plus a floating control pill):
  *   ┌──── ball area (top 40%) ─────────────────┐
- *   │                          ⋯ ✓ ⚙ ✕  │  ← tools / self-check / gear / close
+ *   │                          ◈ ✓ ⚙ ✕  │  ← 产物 / self-check / gear / close
  *   │                                          │
  *   │           [round ball]                   │  ← tap = talk
  *   │                                          │  ← double-tap = type
@@ -120,21 +119,6 @@ class FloatingWindowUi(
      */
     enum class SubtitleKind { PARTIAL, FINAL }
 
-    /** Screen tools shown as a row of small buttons in the top-right corner. */
-    enum class Tool(
-        @param:DrawableRes val icon: Int,
-        @param:StringRes val label: Int,
-    ) {
-        SWIPE_UP(R.drawable.ic_swipe_up, R.string.tool_swipe_up),
-        SWIPE_DOWN(R.drawable.ic_swipe_down, R.string.tool_swipe_down),
-        SWIPE_LEFT(R.drawable.ic_swipe_left, R.string.tool_swipe_left),
-        SWIPE_RIGHT(R.drawable.ic_swipe_right, R.string.tool_swipe_right),
-        BACK(R.drawable.ic_back, R.string.tool_back),
-        HOME(R.drawable.ic_home, R.string.tool_home),
-        UI_TREE(R.drawable.ic_tree, R.string.tool_ui_tree),
-        SCREENSHOT(R.drawable.ic_screenshot, R.string.tool_screenshot),
-    }
-
     interface Listeners {
         fun onTalkClick()
         fun onSettingsClick()
@@ -155,7 +139,9 @@ class FloatingWindowUi(
          */
         fun onSelfCheckClick()
         fun onLongPress()
-        fun onToolClick(tool: Tool)
+
+        /** The 产物 key — the pages the assistant has made. See [ArtifactsUi]. */
+        fun onArtifactsClick()
 
         /**
          * `■` is gone from the bar; stop is still here.
@@ -218,7 +204,6 @@ class FloatingWindowUi(
     private var params: WindowManager.LayoutParams? = null
     private var ball: EmotionBallTextureView? = null
     private var topBarView: View? = null
-    private var toolsView: View? = null
     private var historyView: HistoryListView? = null
 
     /** The ball's gesture vocabulary, pinned along the bottom of the full card. */
@@ -1505,10 +1490,10 @@ class FloatingWindowUi(
      * one, from the card's current height.
      *
      * Called from the ball host's size change and from the cluster's own layout,
-     * because the cluster's height is one of the inputs and two things move it:
-     * the status-bar inset lands after the first layout, and the tool drawer
-     * changes it at runtime. Listening to the cluster rather than hooking each
-     * of those call sites keeps it to one place that can be forgotten.
+     * because the cluster's height is one of the inputs and it moves: the
+     * status-bar inset lands after the first layout. Listening to the cluster
+     * rather than hooking that call site keeps it to one place that can be
+     * forgotten.
      *
      * Main thread only.
      */
@@ -1734,7 +1719,6 @@ class FloatingWindowUi(
         // whether the compositor agreed to blur — and [setCompact] calls it
         // immediately after this, before the next frame.
         topBarView?.visibility = View.VISIBLE
-        toolsView?.visibility = View.GONE   // tools always start folded away
         historyView?.visibility = View.VISIBLE
         tipsView?.visibility = View.VISIBLE
         backdrop?.visibility = View.VISIBLE
@@ -1804,7 +1788,7 @@ class FloatingWindowUi(
         paintCard()
         // The card now runs under the status bar ([FLAG_LAYOUT_IN_SCREEN]), so
         // the control cluster has to step around it — otherwise the clock and
-        // the battery icon sit on top of `⋯` and `✕`, and those are the two
+        // the battery icon sit on top of `◈` and `✕`, and those are the two
         // controls the user cannot do without.
         insetTopBar()
         runCatching { wm.updateViewLayout(v, p) }
@@ -2056,9 +2040,8 @@ class FloatingWindowUi(
         )
         topBarView = topBar
         // The cluster's own bounds are an input to the card's split — see
-        // [ballAreaHeight]. Watching it here means the status-bar inset and the
-        // tool drawer both re-derive the split without either having to know
-        // that it is responsible for it.
+        // [ballAreaHeight]. Watching it here means the status-bar inset lands
+        // without this having to know it is responsible for the split.
         topBar.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
             // Also the only place the inset is guaranteed to be *available*:
             // `rootWindowInsets` is null until the view is attached, so the
@@ -2073,8 +2056,8 @@ class FloatingWindowUi(
     }
 
     /**
-     * The control cluster: one pill holding the three things the user actually
-     * reaches for, with the eight screen tools folded behind `⋯`.
+     * The control cluster: one pill holding the four things the user actually
+     * reaches for.
      *
      * Three and not four since typing moved onto the ball's double-tap — see
      * [Listeners.onTextInputToggle] for why it belongs there rather than here.
@@ -2084,14 +2067,18 @@ class FloatingWindowUi(
      * not changed twice over; only one of the three is different, and it is the
      * one that was not earning its slot.
      *
-     * The bar now reads `⋯ ✓ ⚙ ✕` — one working row (the self-check, next to
-     * the gear it is a sibling of) between the two that bracket it: the tools
-     * drawer on the left and the dismiss on the right.
+     * The bar now reads `◈ ✓ ⚙ ✕`. `◈` used to be `⋯`, and behind it were ten
+     * developer instruments — swipe four ways, back, home, dump the tree, grab a
+     * screenshot — as a second row of monochrome glyphs. That row is gone
+     * outright, not folded somewhere else: every one of those actions is one the
+     * brain performs on its own (`screen.*`, all of it reachable by talking),
+     * and a hand-driven toolbar sitting over the app being driven was a second,
+     * competing way to operate the same device. What took the slot is 产物 — the
+     * pages the assistant has made, which is the one thing in this bar the user
+     * cannot get at by talking.
      *
-     * The tools are developer instruments — swipe four ways, back, home, dump
-     * the tree, grab a screenshot. Ten identical monochrome glyphs crammed at
-     * dp(2) apart was most of why the card read as unfinished, and none of them
-     * is something the user needs within one tap.
+     * All four keys are `Glass.LABEL` now rather than roughly half of them being
+     * dimmed: the dimmer ones were the drawer's contents and a folded `⋯`.
      */
     @SuppressLint("SetTextI18n")
     private fun buildTopBar(): View {
@@ -2110,23 +2097,8 @@ class FloatingWindowUi(
             gravity = Gravity.CENTER_VERTICAL
         }
 
-        // A second row rather than more of the first: twelve dp(36) keys in a
-        // line measure ~1500px against a 1200px screen, and the overflow fell
-        // off the *right* — expanding the tools pushed `⚙` and `⤡` off-window,
-        // making the tool drawer a one-way door out of the card. Stacked, the
-        // eight tools are ~990px and the permanent keys never move at all.
-        val tools = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            visibility = View.GONE
-        }
-        for (tool in Tool.values()) tools.addView(buildToolButton(tool))
-        toolsView = tools
-
         keys.addView(
-            barButton(R.drawable.ic_more, Glass.LABEL, "更多工具") {
-                tools.visibility = if (tools.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-            }
+            barButton(R.drawable.ic_artifacts, Glass.LABEL, "产物") { listeners.onArtifactsClick() }
         )
         // ✓ and not ■: the stop button used to sit here, and stop is the one
         // action in this bar the ball can already perform — see onStopClick.
@@ -2142,7 +2114,6 @@ class FloatingWindowUi(
         keys.addView(barButton(R.drawable.ic_close, Glass.LABEL, "收起") { listeners.onMinimizeClick() })
 
         bar.addView(keys)
-        bar.addView(tools)
         return bar
     }
 
@@ -2453,57 +2424,6 @@ class FloatingWindowUi(
     }
 
     // ---- Colors / units ----
-
-    /**
-     * One tool in the `⋯` drawer: its icon, then its name.
-     *
-     * The name is new and it is the point. These were eight unlabelled
-     * monochrome glyphs — `↑ ↓ ← → ⌫ ⌂ ☰ ◉` — behind a `⋯`, which meant the
-     * drawer was a row of symbols a user had to decode by tapping, and the two
-     * that are also Android idioms (`⌂` home, `⌫` back) are not the two whose
-     * meaning is obvious from the others. A word beside each costs the row its
-     * compactness and buys the whole drawer its legibility; the labels are
-     * localised, unlike the glyphs they replace.
-     */
-    private fun buildToolButton(tool: Tool): View {
-        // Dimmer than the four permanent keys on purpose: these are developer
-        // instruments hidden behind `⋯`, and they sat at the same weight as the
-        // permanent keys when they were all one colour.
-        val tint = Color.parseColor(Glass.SECONDARY)
-        val icon = ContextCompat.getDrawable(context, tool.icon)?.mutate()?.apply { setTint(tint) }
-        return LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(6), 0, dp(6), 0)
-            isClickable = true
-            isFocusable = true
-            background = Glass.well(context, dp(14))
-            contentDescription = AppLocale.str(context, tool.label)
-            Glass.pressable(this)
-            setOnClickListener { listeners.onToolClick(tool) }
-
-            addView(
-                View(context).apply {
-                    background = icon
-                    layoutParams = LinearLayout.LayoutParams(dp(16), dp(16))
-                }
-            )
-            addView(
-                TextView(context).apply {
-                    text = AppLocale.str(context, tool.label)
-                    textSize = Glass.Type.MICRO
-                    setTextColor(tint)
-                    setPadding(dp(4), 0, 0, 0)
-                    includeFontPadding = false
-                }
-            )
-
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(32),
-            ).apply { leftMargin = dp(4) }
-        }
-    }
 
     private fun dp(v: Int): Int =
         (v * context.resources.displayMetrics.density).toInt()

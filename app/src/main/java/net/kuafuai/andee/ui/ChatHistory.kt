@@ -54,15 +54,19 @@ object ChatHistory {
      * Two separate caps, because the two costs are unrelated: a line of text is
      * a few hundred bytes and the list is only worth scrolling if it goes back
      * a while, whereas a generated page is routinely 50–100 KB of inlined CSS,
-     * JS and base64 images. Keeping [MAX_ENTRIES] pages would be tens of
-     * megabytes of an app-private directory nobody ever looks at.
+     * JS and base64 images — 100 of them is up to ~10 MB, the price of the 产物
+     * panel being a shelf rather than a recent-items strip.
+     *
+     * A live page does not count against [MAX_ENTRIES]. It used to, and then the
+     * page cap was fiction: 80 rows of chatter pushed pages out (file and all)
+     * long before [MAX_PAGES] was reached.
      *
      * A page evicted from disk leaves its row behind with `page = null`. The
      * row stays because "you showed me a 贪吃蛇 at 3pm" is still true and still
      * worth scrolling past; it just stops claiming to be re-openable.
      */
     private const val MAX_ENTRIES = 80
-    private const val MAX_PAGES = 12
+    private const val MAX_PAGES = 100
 
     /**
      * How much of a message is kept.
@@ -107,6 +111,27 @@ object ChatHistory {
 
     /** Oldest first — the order the card lays rows out in. */
     fun snapshot(): List<Entry> = synchronized(lock) { ArrayList(entries) }
+
+    /** Pages still on disk, newest first — what the 产物 panel lists. */
+    fun artifacts(): List<Entry> = synchronized(lock) {
+        entries.filter { it.role == Role.PAGE && it.page != null }.reversed()
+    }
+
+    /**
+     * Delete one page's file and keep its row, the same end state eviction
+     * leaves: "you showed me a page at 3pm" stays true after the page is gone.
+     */
+    fun deletePage(id: Long) {
+        synchronized(lock) {
+            val i = entries.indexOfFirst { it.id == id }
+            if (i < 0) return
+            val e = entries[i]
+            e.page?.let { runCatching { it.delete() } }
+            entries[i] = e.copy(page = null)
+            save()
+        }
+        listener?.invoke()
+    }
 
     /**
      * Delete everything and forget it. For 恢复出厂设置.
@@ -180,11 +205,7 @@ object ChatHistory {
 
     /** Caller holds [lock]. */
     private fun trim() {
-        while (entries.size > MAX_ENTRIES) {
-            entries.removeAt(0).page?.let { runCatching { it.delete() } }
-        }
-        // Newest page kept, oldest dropped. Counted from the end so the walk
-        // stops as soon as the budget is spent instead of scanning every row.
+        // Pages first, so one that just lost its file is an ordinary row below.
         var pages = 0
         for (i in entries.indices.reversed()) {
             val e = entries[i]
@@ -195,6 +216,14 @@ object ChatHistory {
                 entries[i] = e.copy(page = null)
             }
         }
+        var over = entries.count { it.page == null } - MAX_ENTRIES
+        val it = entries.iterator()
+        while (over > 0 && it.hasNext()) {
+            if (it.next().page == null) {
+                it.remove()
+                over--
+            }
+        }
     }
 
     // ---- Persistence ----
@@ -202,7 +231,7 @@ object ChatHistory {
     // A plain JSON file rather than SharedPreferences: this is an append-only
     // log with a per-row shape, and VoiceConfig's prefs file is the *settings*,
     // which are hand-edited and whitelisted (see its ALLOWED_KEYS). Rewriting
-    // the whole log on every append is fine at 80 rows and saves having to
+    // the whole log on every append is fine at 180 rows and saves having to
     // reason about partial writes.
 
     private fun file(): File? = appContext?.let { File(it.filesDir, "chat_history.json") }
