@@ -114,7 +114,10 @@ object ToolSchemas {
            center, the same relative space as the screenshot, so the icon at
            image position (x,y) is the line with the nearest bracket
            coordinates. Then still tap by e-number, never by the coordinates
-           you read off.
+           you read off. A missing `*` does not mean "not a button": ad
+           popups draw their ✕ as a bare `ImageView` line with no label and
+           no `*`. If such a line sits where the screenshot shows the ✕, tap
+           it by e-number — that beats aiming at it by grid cell.
         3) Chinese input: tap the input field FIRST (by e-number), then the
            VERY NEXT action must be type_text. Never re-tap the same input box
            before typing; the keyboard opens by itself.
@@ -154,7 +157,7 @@ object ToolSchemas {
         - nodes_total > 0: the elements are there, they are merely nameless.
           The outline still groups them and still gives every centre, so use
           it — match what you see in the attached screenshot against the
-          indentation and tap the `*` line sitting at that spot by e-number.
+          indentation and tap the line sitting at that spot by e-number.
           A coordinate tap here is a downgrade, not a shortcut.
 
         `elements_dropped: N` means the screen carried more elements than fit

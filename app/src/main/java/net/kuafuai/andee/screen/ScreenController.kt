@@ -2289,7 +2289,7 @@ class ScreenController(
      *   4. hoist if it has exactly 1 surviving child and no reason — return
      *      that child in place of self. Collapses deep layout wrapper chains.
      *   5. drop if it has 0 children and no reason — decorative leaves like
-     *      Spacers, dividers, dots.
+     *      Spacers, dividers, dots — unless it [looksLikeIcon].
      *
      * `verbose=true` disables all of this and emits every node with every
      * field, matching pre-pruning behavior.
@@ -2331,7 +2331,10 @@ class ScreenController(
                 || surface != null
 
         if (!verbose) {
-            if (!hasReason && kids.isEmpty()) return null           // drop decorative leaf
+            // Lynx parks hidden panels at x≈4000 and still calls them visible;
+            // an e-number there would send a tap past the screen edge.
+            if (kids.isEmpty() && !Rect.intersects(bounds, Rect(0, 0, screenW, screenH))) return null
+            if (!hasReason && kids.isEmpty() && !looksLikeIcon(bounds)) return null   // drop decorative leaf
             if (!hasReason && kids.size == 1) return kids[0]        // hoist single child
         }
 
@@ -2365,6 +2368,23 @@ class ScreenController(
         return obj
     }
 
+    /**
+     * A nameless, non-clickable leaf that is still worth an e-number: ad SDKs
+     * draw their ✕ as a bare ImageView with no desc and the click handled by
+     * a parent or a touch listener, so step 5 used to delete the one control
+     * the brain was looking for and leave it aiming from a screenshot.
+     * Icon-sized and roughly square keeps dots, dividers and banners out;
+     * fully on-screen keeps out nodes caught mid-animation with bounds that
+     * would hand the brain an e-number it cannot hit.
+     */
+    private fun looksLikeIcon(b: Rect): Boolean {
+        if (b.left < 0 || b.top < 0 || b.right > screenW || b.bottom > screenH) return false
+        val d = service.resources.displayMetrics.density
+        val w = b.width() / d
+        val h = b.height() / d
+        if (minOf(w, h) < ICON_MIN_DP || maxOf(w, h) > ICON_MAX_DP) return false
+        return maxOf(w, h) <= ICON_MAX_ASPECT * minOf(w, h)
+    }
 
     /**
      * Views that draw their own content and therefore have no accessibility
@@ -2487,6 +2507,9 @@ class ScreenController(
          * control" from "we did not print it".
          */
         private const val MAX_ELEMENT_LINES = 300
+        private const val ICON_MIN_DP = 16f
+        private const val ICON_MAX_DP = 120f
+        private const val ICON_MAX_ASPECT = 2f
 
         /**
          * Deepest indent level rendered; beyond it lines stay at this column.
