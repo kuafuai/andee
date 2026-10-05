@@ -653,10 +653,15 @@ class CommandDispatcher(
             }
 
             "screen.tap" -> {
-                val x = params?.optInt("x", Int.MIN_VALUE) ?: Int.MIN_VALUE
-                val y = params?.optInt("y", Int.MIN_VALUE) ?: Int.MIN_VALUE
-                require(x != Int.MIN_VALUE && y != Int.MIN_VALUE) { "screen.tap requires int x,y (0-1000 relative)" }
-                passthroughForGesture { screen.tapNorm(x, y) }
+                passthroughForGesture {
+                    screen.tapAim(
+                        on = params?.optString("on")?.ifBlank { null },
+                        x = params?.optInt("x", Int.MIN_VALUE)?.takeIf { it != Int.MIN_VALUE },
+                        y = params?.optInt("y", Int.MIN_VALUE)?.takeIf { it != Int.MIN_VALUE },
+                        cell = params?.optString("cell")?.ifBlank { null },
+                        part = params?.optString("part")?.ifBlank { null },
+                    )
+                }
             }
 
             "screen.tap_id" -> {
@@ -679,11 +684,17 @@ class CommandDispatcher(
             }
 
             "screen.long_press" -> {
-                val x = params?.optInt("x", Int.MIN_VALUE) ?: Int.MIN_VALUE
-                val y = params?.optInt("y", Int.MIN_VALUE) ?: Int.MIN_VALUE
                 val dur = params?.optLong("duration_ms", 600L) ?: 600L
-                require(x != Int.MIN_VALUE && y != Int.MIN_VALUE) { "screen.long_press requires int x,y (0-1000 relative)" }
-                passthroughForGesture { screen.longPressNorm(x, y, dur) }
+                passthroughForGesture {
+                    screen.longPressAim(
+                        on = params?.optString("on")?.ifBlank { null },
+                        x = params?.optInt("x", Int.MIN_VALUE)?.takeIf { it != Int.MIN_VALUE },
+                        y = params?.optInt("y", Int.MIN_VALUE)?.takeIf { it != Int.MIN_VALUE },
+                        cell = params?.optString("cell")?.ifBlank { null },
+                        part = params?.optString("part")?.ifBlank { null },
+                        durationMs = dur,
+                    )
+                }
             }
 
             "screen.long_press_id" -> {
@@ -707,12 +718,20 @@ class CommandDispatcher(
 
             "screen.look_region" -> blankedForCapture {
                 requireNotNull(params) { "screen.look_region requires params" }
-                screen.lookRegion(
-                    params.optInt("x", Int.MIN_VALUE),
-                    params.optInt("y", Int.MIN_VALUE),
-                    params.optInt("w", 0),
-                    params.optInt("h", 0),
-                )
+                // A cell replaces x/y/w/h entirely: it names the aim point the
+                // zoom is centred on, and letting both be given would mean
+                // guessing which one the caller meant.
+                val cell = params.optString("cell")?.ifBlank { null }
+                if (cell != null) {
+                    screen.zoomAim(cell, params.optString("part")?.ifBlank { null })
+                } else {
+                    screen.lookRegion(
+                        params.optInt("x", Int.MIN_VALUE),
+                        params.optInt("y", Int.MIN_VALUE),
+                        params.optInt("w", 0),
+                        params.optInt("h", 0),
+                    )
+                }
             }
 
             "screen.ui_tree" -> screen.dumpUiTree(

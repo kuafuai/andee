@@ -1,5 +1,6 @@
 package net.kuafuai.andee.net
 
+import net.kuafuai.andee.screen.ScreenController
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -191,11 +192,48 @@ object ToolSchemas {
         tool(
             name = "tap_by_coordinates",
             method = "screen.tap",
-            description = "[LAST RESORT] Tap a point by RELATIVE 0-1000 coordinates ((0,0) top-left, (1000,1000) bottom-right — the device converts to real pixels for any screen size). Use ONLY when the target has no e-number: self-drawn panes (mini-program, WebView, game), images, or pure-visual content you located on a screenshot. When you did locate it on a screenshot, scale proportionally (image center = 500,500). Values outside 0-1000 are rejected. If a get_screen_element list exists for this screen, use tap_screen_element instead.",
-            required = listOf("x", "y"),
+            description = """
+        [LAST RESORT] Tap a point on the screen. Aim in ONE of two ways:
+
+        1. **By grid cell + part** (preferred whenever you are looking at an
+           image): {"cell": "D7", "part": "bottom-right"}. The cell is one of
+           the aim grid drawn on the screenshot you were shown, columns A-H
+           left to right, rows 1-12 top to bottom, and each label is printed at
+           the CENTRE of its cell. Pick the cell the target sits IN — not the
+           label nearest to it. Then `part` says which third of that cell the
+           target is in, across and down: top-left, top, top-right, left,
+           center, right, bottom-left, bottom, bottom-right (omit it for the
+           centre). The device converts both to pixels itself; there is no
+           arithmetic for you to do. A cell is too coarse to tap with on its
+           own — always give the part unless the target fills the cell.
+           If the target straddles two cells, pick the one holding most of it.
+           For anything not clearly bigger than a cell (an icon, a ✕ close
+           button, a small chip), CHECK FIRST: zoom_screen_region with the
+           same cell and part shows a red crosshair exactly where this tap
+           would land. On target → send this tap with the same arguments.
+           Off target → aim off that magnified image: its labels are
+           LOWERCASE and you must say so — {"cell": "d7", "part": "left",
+           "on": "zoom"}. A lowercase label sent as if it were a full-screen
+           cell will be about 120 units off.
+
+        2. **By coordinate** {"x": …, "y": …} — RELATIVE 0-1000 integers
+           ((0,0) top-left, (1000,1000) bottom-right; the device converts to real
+           pixels for any screen size). With {"on": "zoom"} these numbers are
+           0-1000 *within the last magnified image* instead of the whole screen,
+           and the device maps them back — so you never add region.left or divide
+           by scale_x yourself. Values outside 0-1000 are rejected, not clamped.
+
+        Use this only when the target has no e-number: self-drawn panes
+        (mini-program, WebView, game), images, pure-visual content. If a
+        get_screen_element list exists for this screen, use tap_screen_element.
+    """.trimIndent(),
+            required = emptyList(),
             props = mapOf(
-                "x" to prop("integer", "X position, 0 (left edge) to 1000 (right edge)."),
-                "y" to prop("integer", "Y position, 0 (top edge) to 1000 (bottom edge)."),
+                "cell" to prop("string", "Grid cell of the image you aimed from, e.g. \"D7\" on a full screenshot or \"d7\" on a magnified one."),
+                "part" to propEnum("Which third of that cell the target is in. Omit for the centre.", ScreenController.PARTS),
+                "x" to prop("integer", "X, 0 (left edge) to 1000 (right edge) — of the screen, or of the zoom image when on=\"zoom\"."),
+                "y" to prop("integer", "Y, 0 (top edge) to 1000 (bottom edge) — of the screen, or of the zoom image when on=\"zoom\"."),
+                "on" to propEnum("Which image x/y (or a lowercase cell) were read off. \"screen\" is the default.", listOf("screen", "zoom")),
             ),
         ),
         tool(
@@ -210,11 +248,14 @@ object ToolSchemas {
         tool(
             name = "long_press_by_coordinates",
             method = "screen.long_press",
-            description = "Hold a finger on a point for a set duration (context menus, drag handles). Coordinates are RELATIVE 0-1000 like tap_by_coordinates, not pixels. Prefer long_press_screen_element when the target has an e-number.",
-            required = listOf("x", "y"),
+            description = "Hold a finger on a point for a set duration (context menus, drag handles). Aim exactly like tap_by_coordinates — by grid cell plus the third of it the target is in, {\"cell\": \"D7\", \"part\": \"bottom-right\"} (add on=\"zoom\" and use a lowercase label for a magnified image), or by RELATIVE 0-1000 coordinates, not pixels. Prefer long_press_screen_element when the target has an e-number.",
+            required = emptyList(),
             props = mapOf(
-                "x" to prop("integer", "X position, 0 (left edge) to 1000 (right edge)."),
-                "y" to prop("integer", "Y position, 0 (top edge) to 1000 (bottom edge)."),
+                "cell" to prop("string", "Grid cell of the image you aimed from, e.g. \"D7\" on a full screenshot or \"d7\" on a magnified one."),
+                "part" to propEnum("Which third of that cell the target is in. Omit for the centre.", ScreenController.PARTS),
+                "x" to prop("integer", "X, 0 (left edge) to 1000 (right edge) — of the screen, or of the zoom image when on=\"zoom\"."),
+                "y" to prop("integer", "Y, 0 (top edge) to 1000 (bottom edge) — of the screen, or of the zoom image when on=\"zoom\"."),
+                "on" to propEnum("Which image x/y (or a lowercase cell) were read off. \"screen\" is the default.", listOf("screen", "zoom")),
                 "duration_ms" to prop("integer", "How long to hold, in milliseconds. Default 600.", default = 600),
             ),
         ),
@@ -265,27 +306,39 @@ object ToolSchemas {
         do with the physical camera (camera_turn). A magnified look at ONE region of the screen —
         4x the pixel density of a full screenshot around wherever you point.
 
-        Use it BEFORE tapping a small target you located on a full
-        screenshot: icon buttons (`...` comment bubbles, toolbars, close ✕),
-        small chips, dense rows. On a full shot a 25px icon makes your aim
-        ±30 real pixels — half the button's hit area, coin-flip taps. On
-        this zoomed image the same read is ±3 pixels: see it clearly, aim
-        once.
+        Use it to CHECK an aim before tapping anything not clearly bigger
+        than a grid cell (an icon, a ✕ close button, a small chip): pass the
+        cell and part you were about to tap — {"cell": "D9", "part":
+        "bottom-right"} — and you get a magnified view two cells each way,
+        centred on that point, with a RED CROSSHAIR exactly where the tap
+        would land. Crosshair on the target → tap with the same cell and
+        part. Off it → aim off this image instead (below). Targets often sit
+        right on a grid line; this view is centred on the aim, so they are
+        never cut in half.
 
-        Coordinates: x/y mark the region's CENTER in the usual 0-1000 space;
-        w/h are the region's size (try 200x300 for one control, 400x600 for
-        a card). The response includes the region's screen bounds
-        (region.left/top/right/bottom) and scale_x/scale_y — a point (px,py)
-        read off the image maps to screen-relative
-        (region.left + px/scale_x, region.top + py/scale_y).
+        The other form is x/y marking the region's CENTER in the usual
+        0-1000 space plus w/h for its size (try 200x300 for one control,
+        400x600 for a card) — a plain magnified look, no crosshair.
+
+        This image is a magnified region, and it carries the SAME 8x12 grid in
+        LOWERCASE (a1..h12), labels at each cell's centre, so a label read off
+        it can never be confused with a cell of the full screen. Aim your tap
+        straight from one of those labels: {"cell": "d7", "part": "top",
+        "on": "zoom"} on tap_by_coordinates, and the device
+        converts it — no arithmetic. (The old route still works and is
+        equivalent: the response carries the region's screen bounds and
+        scale_x/scale_y, and a point (px,py) read off the image maps to
+        screen-relative (region.left + px/scale_x, region.top + py/scale_y).)
 
         After a tap that reported screen_changed=false, its miss_shot field
         is exactly this — aim your retry from that image.
     """.trimIndent(),
-            required = listOf("x", "y", "w", "h"),
+            required = emptyList(),
             props = mapOf(
-                "x" to prop("integer", "Region center X, 0 (left) to 1000 (right)."),
-                "y" to prop("integer", "Region center Y, 0 (top) to 1000 (bottom)."),
+                "cell" to prop("string", "Grid cell of the full screenshot you are about to tap, e.g. \"D7\". Replaces x/y/w/h."),
+                "part" to propEnum("Which third of that cell — the same part you would tap. Omit for the centre.", ScreenController.PARTS),
+                "x" to prop("integer", "Region center X, 0 (left) to 1000 (right). Use instead of cell."),
+                "y" to prop("integer", "Region center Y, 0 (top) to 1000 (bottom). Use instead of cell."),
                 "w" to prop("integer", "Region width in 0-1000 units, e.g. 200."),
                 "h" to prop("integer", "Region height in 0-1000 units, e.g. 300."),
             ),
@@ -297,11 +350,23 @@ object ToolSchemas {
         [FALLBACK · REQUIRES A REASON] Capture the current screen as a PNG
         (downscaled to 1280 on the long side — proportions preserved).
 
+        Every screenshot arrives with an 8x12 AIM GRID drawn on it, labelled
+        A1 (top-left) to H12 (bottom-right), each label printed at the CENTRE
+        of its cell. This is the device's way of taking the arithmetic out of
+        aiming: read the cell the target sits in and which third of it, and
+        pass them straight to tap_by_coordinates as {"cell": "D7", "part":
+        "bottom-right"} — no pixel measuring, no rescaling, nothing to get
+        wrong. For anything not clearly bigger than a cell, first pass the
+        same cell and part to zoom_screen_region: it shows a red crosshair
+        where the tap would land, so you can confirm or re-aim off the
+        magnified image (its grid is lowercase, and a lowercase label means
+        "this was read off the zoom").
+
         Every screenshot now arrives WITH the current element list attached
         (`elements`, same e-numbers as get_screen_element) whenever the tree
         is readable. When it is attached: aim with tap_id(e) / type(id) from
-        THAT list — system-computed and exact. Pixel-measuring the image is
-        only for elements the list does not carry.
+        THAT list — system-computed and exact. The grid is for elements the
+        list does not carry.
 
         Do NOT use this for finding controls, tapping buttons, or reading
         text — get_screen_element is cheaper and more precise. Only call it
@@ -311,8 +376,7 @@ object ToolSchemas {
            mini-program, WebView article, game canvas, Moments feed) AND you
            need a FRESH look — the empty response already carried a shot of
            that screen (shot_auto), so use this only after something changed.
-           Read the shot and tap by 0-1000 RELATIVE coordinates (tap_by_coordinates),
-           scaling proportionally (image center = 500,500). Prefer back /
+           Read the shot and tap by grid cell. Prefer back /
            home over blind taps when unsure.
         3) A human-eye-level visual judgement is required
            (color, overlap, render bug).
@@ -330,9 +394,9 @@ object ToolSchemas {
         A cyan ring with a small caption like "tap 500,500" or "hold 240,880"
         is NOT part of the app — it is where YOUR last tap / long-press
         actually landed, drawn by the device and kept on screen for a few
-        seconds. Read it as ground truth for the 0-1000 coordinate space: it
-        tells you what the number you sent turned out to mean on this
-        display. Most useful after tap_screen_element (where you never knew the
+        seconds. Likewise the grid lines and their A1..H12 labels. Read the
+        ring as ground truth for where a number you sent turned out to be on
+        this display. Most useful after tap_screen_element (where you never knew the
         pixel location) and after a tap that seemed to do nothing — a ring
         sitting beside the button is a different problem from a ring on a
         button that did not respond.

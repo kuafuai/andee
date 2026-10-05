@@ -4,8 +4,12 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
+import android.graphics.Typeface
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Base64
@@ -102,6 +106,315 @@ class ScreenController(
         }
         GroundingLog.noteTapCoord(nx, ny, px, py, w, h, hold = true, refused = false, pkg = lastPkg())
         return longPress(px, py, durationMs).put("norm", "$nx,$ny")
+    }
+
+    // ---- the aim grid, and the two ways to name a point --------------------
+    //
+    // This exists because a general-purpose vision model *reads* a position off
+    // an image far better than it *computes* one, and the arithmetic is where
+    // it has been losing: on a self-drawn pane — the exact case where the
+    // element tree is empty and pixels are all there is — the old protocol
+    // asked the model to measure a point on a 1280-px image and rescale it to
+    // 0-1000 by hand. Measured in the field, three attempts at one button
+    // spread across 410 px.
+    //
+    // So every image the brain sees now carries a faint labelled grid, and it
+    // may answer with a cell label instead of a number. Two vocabularies, and
+    // they are deliberately the same one twice: a cell is always A1..H12 of
+    // whatever image the label was read off, and `on` says which image that
+    // was.
+    //
+    // A cell alone is too coarse to tap with, and that is measured, not
+    // guessed: a cell is 150x222 px on a 1200x2664 phone, so aiming at its
+    // centre hits a 460x140 button 64% of the time and a 110 px icon 38% —
+    // *for a model that reads the cell perfectly*. Hence `part`, a third of the
+    // cell each way (top-left … bottom-right): the same perfect reader then
+    // hits the icon every time and a 66 px one 90% of the time, in one step.
+    // Zooming a cell is still there for anything smaller.
+    //
+    // Nothing here redefines a coordinate. Every path still ends in
+    // [tapNorm]'s 0-1000 screen space, so the stuck-loop guard and
+    // [GroundingLog] see exactly the same numbers they saw before, and a cell
+    // tap is still a coordinate tap as far as the offline pairing is concerned.
+
+    /**
+     * Left, top, right, bottom of the last [lookRegion], in screen 0-1000
+     * space. This is the whole of what a zoom has to remember: the region's
+     * geometry is a fact about the screen, so a point inside it converts the
+     * same way whether the content has since changed or not.
+     */
+    @Volatile
+    private var zoomRegion: IntArray? = null
+
+    @Volatile
+    private var zoomAtMs = 0L
+
+    private class Aim(val nx: Int, val ny: Int, val label: String)
+
+    private fun cellLabel(col: Int, row: Int): String = "${('A' + col)}${row + 1}"
+
+    /**
+     * The centre of one third-by-third of a cell, in the 0-1000 space of the
+     * image it was read off. `fx`/`fy` are 0..2; (1, 1) is the cell's centre.
+     */
+    private fun cellPoint(col: Int, row: Int, fx: Int, fy: Int): IntArray = intArrayOf(
+        ((col * 3 + fx) * 2 + 1) * NORM_MAX / (2 * GRID_COLS * 3),
+        ((row * 3 + fy) * 2 + 1) * NORM_MAX / (2 * GRID_ROWS * 3),
+    )
+
+    /** `part` → which third of the cell, as (fx, fy); null means the centre. */
+    private fun parsePart(part: String?): IntArray {
+        if (part.isNullOrBlank()) return intArrayOf(1, 1)
+        val p = part.trim().lowercase().replace('_', '-').replace(' ', '-')
+        return PART_THIRDS[p] ?: throw IllegalArgumentException(
+            "unknown part=\"$part\" — expected one of ${PARTS.joinToString()} " +
+                "(which third of the cell the target is in; omit it for the centre)"
+        )
+    }
+
+    private fun badCell(cell: String) =
+        "bad grid cell '$cell' — expected a column letter A..${'A' + GRID_COLS - 1} " +
+            "and a row number 1..$GRID_ROWS, exactly as labelled on the image you were " +
+            "shown (e.g. \"D7\")"
+
+    private fun parseCell(cell: String): IntArray {
+        val s = cell.trim().uppercase()
+        val row = if (s.length >= 2) s.substring(1).toIntOrNull()?.minus(1) else null
+        val col = if (s.isNotEmpty()) s[0] - 'A' else -1
+        if (row == null || col !in 0 until GRID_COLS || row !in 0 until GRID_ROWS) {
+            throw IllegalArgumentException(badCell(cell))
+        }
+        return intArrayOf(col, row)
+    }
+
+    /** A point in the last zoom image's own 0-1000 space → screen 0-1000. */
+    private fun zoomToScreen(lx: Int, ly: Int): IntArray {
+        val r = zoomRegion
+            ?: throw IllegalStateException(
+                "on=\"zoom\" needs a zoom to have been taken first — call " +
+                    "zoom_screen_region and read the aim off the image it returns"
+            )
+        val age = SystemClock.uptimeMillis() - zoomAtMs
+        if (age > ZOOM_STALE_MS) {
+            throw IllegalStateException(
+                "the last zoom image is ${age / 1000}s old — the screen has almost " +
+                    "certainly moved since. Take a fresh zoom_screen_region (or a " +
+                    "screenshot) and aim from that image instead of this one"
+            )
+        }
+        requireNorm(lx, "x"); requireNorm(ly, "y")
+        return intArrayOf(
+            r[0] + lx * (r[2] - r[0]) / NORM_MAX,
+            r[1] + ly * (r[3] - r[1]) / NORM_MAX,
+        )
+    }
+
+    /**
+     * Turn whatever the brain said into screen coordinates.
+     *
+     * @param on which image the aim was read off — "screen" (the default) or
+     *   "zoom" (the last [lookRegion] image, whose own 0-1000 space maps onto
+     *   the region it showed).
+     * @param cell a grid label from that image, e.g. "D7".
+     * @param part which third of that cell, e.g. "bottom-right"; null = centre.
+     */
+    private fun resolveAim(on: String?, x: Int?, y: Int?, cell: String?, part: String?): Aim {
+        var zoom = when (on?.trim()?.lowercase()) {
+            null, "", "screen" -> false
+            "zoom" -> true
+            else -> throw IllegalArgumentException(
+                "unknown on=\"$on\" — expected \"screen\" (a full screenshot) or \"zoom\" " +
+                    "(the image zoom_screen_region returned)"
+            )
+        }
+        if (cell != null && cell.isNotBlank()) {
+            // The grid labels a zoom in lowercase and a full screen in
+            // uppercase, so the label alone says where it was read — and it has
+            // to be honoured, because "d7 from the magnified picture" and "D7
+            // from the screen" are 120 units apart and both plausible. Only
+            // consulted when `on` was not given: an explicit on= wins, so a
+            // model that says on="screen" with a lowercase label is corrected
+            // by the parser rather than silently followed off the zoom.
+            if (on.isNullOrBlank() && cell.trim().all { it.isLowerCase() || !it.isLetter() } &&
+                cell.trim().any { it.isLetter() }
+            ) {
+                zoom = true
+            }
+            val c = parseCell(cell)
+            val f = parsePart(part)
+            val local = cellPoint(c[0], c[1], f[0], f[1])
+            val where = if (part.isNullOrBlank()) "cell $cell" else "cell $cell ${part.trim()}"
+            if (!zoom) return Aim(local[0], local[1], where)
+            val s = zoomToScreen(local[0], local[1])
+            return Aim(s[0], s[1], "$where of the zoom image")
+        }
+        if (x == null || y == null) {
+            throw IllegalArgumentException(
+                "aim needs either {\"cell\": \"D7\"} or {\"x\": …, \"y\": …} — see " +
+                    "the grid drawn on the last image you were shown"
+            )
+        }
+        if (!zoom) return Aim(requireNorm(x, "x"), requireNorm(y, "y"), "screen $x,$y")
+        val s = zoomToScreen(x, y)
+        return Aim(s[0], s[1], "zoom $x,$y")
+    }
+
+    fun tapAim(on: String?, x: Int?, y: Int?, cell: String?, part: String?): JSONObject {
+        val a = resolveAim(on, x, y, cell, part)
+        return tapNorm(a.nx, a.ny).put("aimed_at", a.label)
+    }
+
+    fun longPressAim(
+        on: String?, x: Int?, y: Int?, cell: String?, part: String?, durationMs: Long,
+    ): JSONObject {
+        val a = resolveAim(on, x, y, cell, part)
+        return longPressNorm(a.nx, a.ny, durationMs).put("aimed_at", a.label)
+    }
+
+    /**
+     * Zoom on the point a cell (+ part) would tap, with a crosshair on it —
+     * look before you fire.
+     *
+     * Centred on the aim point and two cells each way, not on the cell
+     * itself: targets sit on grid lines as often as not (a dialog's ✕ is
+     * centred on the screen, and the screen's centre *is* a grid line), and
+     * a zoom of exactly one cell cut such a target into quarters. The
+     * crosshair turns "where is the target" — the question vision models get
+     * wrong — into "is the mark on it", which they get right.
+     */
+    fun zoomAim(cell: String, part: String?): JSONObject {
+        val a = resolveAim("screen", null, null, cell, part)
+        val out = lookRegion(
+            a.nx, a.ny, 2 * NORM_MAX / GRID_COLS, 2 * NORM_MAX / GRID_ROWS,
+            mark = intArrayOf(a.nx, a.ny),
+        )
+        val args = if (part.isNullOrBlank()) "{\"cell\": \"$cell\"}"
+        else "{\"cell\": \"$cell\", \"part\": \"${part.trim()}\"}"
+        return out.put("aimed_at", a.label).put(
+            "aim_check",
+            "The RED CROSSHAIR is exactly where tap_by_coordinates $args would land. " +
+                "If it sits on the target, tap with those same arguments. If it does " +
+                "not, do NOT nudge the screen cell: name the lowercase cell (+ part) " +
+                "of THIS image where the target is, with on=\"zoom\".",
+        )
+    }
+
+    /**
+     * Draw the aim grid onto an image the brain is about to be shown, in
+     * place-of-copy (the source is left alone; the caller recycles the copy).
+     *
+     * The lines are deliberately **faint and two-tone** — a dark hairline with
+     * a white halo — because this lands on top of content nobody chose for it
+     * to sit on: a white document, a night-mode chat, a photo. One colour
+     * alone disappears on half the things this device looks at, and a grid you
+     * cannot see is worse than no grid, because the model will still aim by it.
+     * The **labels are not faint**: they are the thing being read, so they get
+     * a dark halo of their own and enough alpha to survive a white page. They
+     * sit at the cell's centre, which is also the `part` = center point.
+     *
+     * Same grid, same size, on every image — and on a zoom it is *lowercase*,
+     * which is the whole disambiguation: a label read off a magnified region
+     * must never be mistakable for a cell of the full screen, and the case
+     * carries that from the image itself rather than from a rule the model has
+     * to remember. [resolveAim] honours it in the other direction too — a
+     * lowercase cell with no `on` means the zoom.
+     *
+     * The returned PNG is what the brain sees AND what [GroundingLog] keeps.
+     * One encode, deliberately: the pairing's job is to show what the model was
+     * actually looking at, and a training set of ungridded images beside
+     * gridded inferences would be a set about a screen nobody saw.
+     */
+    /**
+     * A hollow ring with a gap at its centre, so the mark says where without
+     * hiding what is under it. Red with a white halo: it has to win against
+     * the grid and against whatever the app painted.
+     */
+    private fun drawCrosshair(bmp: Bitmap, x: Float, y: Float) {
+        runCatching {
+            val canvas = Canvas(bmp)
+            val r = minOf(bmp.width, bmp.height) * 0.045f
+            val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                color = Color.WHITE
+                strokeWidth = r * 0.30f
+            }
+            val red = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                color = Color.rgb(255, 30, 60)
+                strokeWidth = r * 0.14f
+            }
+            for (p in listOf(halo, red)) {
+                canvas.drawCircle(x, y, r, p)
+                canvas.drawLine(x - r * 1.8f, y, x - r * 0.4f, y, p)
+                canvas.drawLine(x + r * 0.4f, y, x + r * 1.8f, y, p)
+                canvas.drawLine(x, y - r * 1.8f, x, y - r * 0.4f, p)
+                canvas.drawLine(x, y + r * 0.4f, x, y + r * 1.8f, p)
+            }
+            canvas.drawCircle(x, y, r * 0.08f, red.apply { style = Paint.Style.FILL })
+        }
+    }
+
+    private fun withAimGrid(src: Bitmap, zoom: Boolean): Bitmap {
+        val out = runCatching { src.copy(Bitmap.Config.ARGB_8888, true) }.getOrNull() ?: return src
+        runCatching {
+            val w = out.width
+            val h = out.height
+            val cw = w.toFloat() / GRID_COLS
+            val ch = h.toFloat() / GRID_ROWS
+            val canvas = Canvas(out)
+            val unit = minOf(cw, ch)
+            val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                color = Color.WHITE
+                alpha = 38
+                strokeWidth = (unit * 0.06f).coerceIn(2f, 3f)
+            }
+            val hair = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                color = Color.BLACK
+                alpha = 96
+                strokeWidth = 1f
+            }
+            // Edges too: the last row and column are aimable, and a cell whose
+            // far side is the screen edge reads as open-ended without them.
+            for (i in 0..GRID_COLS) {
+                val x = (i * cw).coerceIn(0.5f, w - 0.5f)
+                canvas.drawLine(x, 0f, x, h.toFloat(), halo)
+                canvas.drawLine(x, 0f, x, h.toFloat(), hair)
+            }
+            for (i in 0..GRID_ROWS) {
+                val y = (i * ch).coerceIn(0.5f, h - 0.5f)
+                canvas.drawLine(0f, y, w.toFloat(), y, halo)
+                canvas.drawLine(0f, y, w.toFloat(), y, hair)
+            }
+            val textSize = (unit * 0.20f).coerceIn(9f, 24f)
+            val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.textSize = textSize
+                typeface = Typeface.DEFAULT_BOLD
+                textAlign = Paint.Align.CENTER
+            }
+            for (row in 0 until GRID_ROWS) {
+                for (col in 0 until GRID_COLS) {
+                    val raw = cellLabel(col, row)
+                    val label = if (zoom) raw.lowercase() else raw
+                    // Dead centre of the cell. In a corner the label sat nearer
+                    // to three neighbours than to most of its own cell, and a
+                    // model reads "the label closest to the target".
+                    val tx = (col + 0.5f) * cw
+                    val ty = (row + 0.5f) * ch + textSize * 0.35f
+                    text.style = Paint.Style.STROKE
+                    text.strokeWidth = textSize * 0.18f
+                    text.color = Color.BLACK
+                    text.alpha = 165
+                    canvas.drawText(label, tx, ty, text)
+                    text.style = Paint.Style.FILL
+                    text.color = Color.WHITE
+                    text.alpha = 175
+                    canvas.drawText(label, tx, ty, text)
+                }
+            }
+        }.onFailure { Log.w("Body", "aim grid: could not draw: ${it.message}") }
+        return out
     }
 
     fun swipeNorm(nx1: Int, ny1: Int, nx2: Int, ny2: Int, durationMs: Long): JSONObject {
@@ -514,8 +827,11 @@ class ScreenController(
             result.put(
                 "same_spot_hint",
                 "the screen did NOT react to this tap. miss_shot shows where the ring " +
-                    "landed — the tapped point, magnified with its surroundings. Aim the " +
-                    "retry from that image, not from the previous full screenshot.",
+                    "landed — the tapped point, magnified with its surroundings. Its grid " +
+                    "is lowercase (a1..h12) because it is a zoom, so a cell read off it is " +
+                    "aimed with {\"cell\": \"d7\", \"part\": \"…\", \"on\": \"zoom\"}, which " +
+                    "the device converts for you. Aim the retry from that image, not from " +
+                    "the previous full screenshot.",
             )
             runCatching {
                 if (tapX > 0 || tapY > 0) {
@@ -902,8 +1218,12 @@ class ScreenController(
      *   "with_shot", or "auto_empty" (the dump had no list to give). It is the
      *   field the offline pairing filters on: only the self-drawn panes behind
      *   "auto_empty" carry coordinate taps worth learning from.
+     * @param grid draw the [withAimGrid] overlay. Off only for a capture that
+     *   is not itself shown to the brain — [lookRegion] takes a full shot and
+     *   then crops it, and a crop carrying the full screen's grid lines and
+     *   cell labels would put two contradictory grids on one image.
      */
-    fun screenshot(reason: String = "tool"): JSONObject {
+    fun screenshot(reason: String = "tool", grid: Boolean = true): JSONObject {
         // Settle before capture: images loading and lists settling MOVE the
         // things a screenshot is about to be used to aim at — a shot taken
         // mid-settle gives the brain targets that have already shifted by
@@ -956,9 +1276,17 @@ class ScreenController(
                                     true,
                                 )
                             } else bmp
+                            // The grid goes on the downscaled copy and only
+                            // there: this PNG is what the brain reads a cell
+                            // off, so the lines must be drawn at the
+                            // resolution it will be looking at. `bmp` is left
+                            // untouched for the same reason it was never ours
+                            // to keep — it belongs to the hardware buffer.
+                            val gridded = if (grid) withAimGrid(outBmp, zoom = false) else outBmp
                             val bos = ByteArrayOutputStream()
-                            outBmp.compress(Bitmap.CompressFormat.PNG, 100, bos)
+                            gridded.compress(Bitmap.CompressFormat.PNG, 100, bos)
                             pngBytes = bos.toByteArray()
+                            if (gridded !== outBmp) gridded.recycle()
                             if (outBmp !== bmp) outBmp.recycle()
                             hb.close()
                         } catch (t: Throwable) {
@@ -1002,6 +1330,29 @@ class ScreenController(
                 // Lets the response the brain saw be matched to the file on
                 // disk. Absent when the log is off.
                 .also { if (shotId != null) it.put("shot_id", shotId) }
+                // The grid, named. A model that has to infer the labels' meaning
+                // from the picture alone may never use them at all, and the
+                // whole point is to take the rescaling arithmetic out of its
+                // hands.
+                .also {
+                    if (grid) it.put(
+                        "aim_grid",
+                        "This image carries an 8x12 aim grid, labelled A1 (top-left) to " +
+                            "${'A' + GRID_COLS - 1}$GRID_ROWS (bottom-right), a letter per " +
+                            "column and a number per row; each label is printed at the " +
+                            "CENTRE of its cell. To tap something, name the cell it sits in " +
+                            "plus which third of that cell it is in — {\"cell\": \"D7\", " +
+                            "\"part\": \"bottom-right\"} on tap_by_coordinates / " +
+                            "long_press_by_coordinates (part is one of " +
+                            "${PARTS.joinToString("/")}; omit it for the centre) — and the " +
+                            "device converts it to the right pixels itself. For anything " +
+                            "not clearly bigger than a cell (an icon, a ✕ close button), " +
+                            "first send the same cell and part to zoom_screen_region: it " +
+                            "shows a red crosshair where the tap would land, so you can " +
+                            "confirm it or re-aim off the magnified image. The grid lines " +
+                            "and labels are drawn by the device and are not part of the app.",
+                    )
+                }
                 // Piggyback the element list. The brain's known failure mode
                 // (measured, 2026-09-20): it takes a screenshot, measures a
                 // target in pixels off the image, and taps blind — even on
@@ -1055,7 +1406,7 @@ class ScreenController(
      * region's origin, and has a screen-true coordinate without the device
      * doing math for it.
      */
-    fun lookRegion(nx: Int, ny: Int, w: Int, h: Int): JSONObject {
+    fun lookRegion(nx: Int, ny: Int, w: Int, h: Int, mark: IntArray? = null): JSONObject {
         requireNorm(nx, "x"); requireNorm(ny, "y")
         if (w <= 0 || h <= 0 || w > 1000 || h > 1000) {
             throw IllegalArgumentException("w and h must be 1..1000 (relative), got w=$w h=$h")
@@ -1067,7 +1418,7 @@ class ScreenController(
         if (right - left < 8 || bottom - top < 8) {
             throw IllegalArgumentException("region too small after clamping to screen")
         }
-        val full = screenshot("look_region")
+        val full = screenshot("look_region", grid = false)
         val bytes = Base64.decode(full.getString("png_base64"), Base64.NO_WRAP)
         var bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
             ?: throw IllegalStateException("could not decode screenshot")
@@ -1093,16 +1444,34 @@ class ScreenController(
         try {
             val region = Bitmap.createBitmap(bmp, rLeft, rTop, cw, ch)
             val scaled = Bitmap.createScaledBitmap(region, outW, outH, true)
-            val bos = ByteArrayOutputStream()
-            scaled.compress(Bitmap.CompressFormat.PNG, 100, bos)
-            val outBytes = bos.toByteArray()
-            region.recycle()
-            if (scaled !== region) scaled.recycle()
-            // Region bounds in the 0-1000 space the brain speaks.
+            // Region bounds in the 0-1000 space the brain speaks — computed
+            // before the grid so the recorded zoom describes the screen
+            // rectangle that was actually magnified.
             val relLeft = (left * 1000f / screenW).toInt()
             val relTop = (top * 1000f / screenH).toInt()
             val relRight = (right * 1000f / screenW).toInt()
             val relBottom = (bottom * 1000f / screenH).toInt()
+            // Same grid, same 8×12, drawn on a picture of a region ~120 units
+            // wide: each cell here is ~15 screen units against the ~125 of a
+            // full shot, which is what makes two steps enough. Remembered so
+            // `on="zoom"` and a lowercase cell can be turned back into screen
+            // coordinates without the brain doing the arithmetic itself.
+            zoomRegion = intArrayOf(relLeft, relTop, relRight, relBottom)
+            zoomAtMs = SystemClock.uptimeMillis()
+            val gridded = withAimGrid(scaled, zoom = true)
+            if (mark != null) {
+                drawCrosshair(
+                    gridded,
+                    (mark[0] - relLeft) * outW.toFloat() / (relRight - relLeft).coerceAtLeast(1),
+                    (mark[1] - relTop) * outH.toFloat() / (relBottom - relTop).coerceAtLeast(1),
+                )
+            }
+            val bos = ByteArrayOutputStream()
+            gridded.compress(Bitmap.CompressFormat.PNG, 100, bos)
+            val outBytes = bos.toByteArray()
+            region.recycle()
+            if (gridded !== scaled) gridded.recycle()
+            if (scaled !== region) scaled.recycle()
             return JSONObject()
                 .put("png_base64", Base64.encodeToString(outBytes, Base64.NO_WRAP))
                 .put("width", outW)
@@ -1119,6 +1488,21 @@ class ScreenController(
                 // (relLeft + px / scale_x, relTop + py / scale_y).
                 .put("scale_x", outW.toFloat() / (relRight - relLeft).coerceAtLeast(1))
                 .put("scale_y", outH.toFloat() / (relBottom - relTop).coerceAtLeast(1))
+                // The arithmetic above still works and is still documented,
+                // but it is no longer what the brain is asked to do: this is
+                // the magnified picture, so its labels are lowercase and a tap
+                // may name one of them with no conversion at all.
+                .put(
+                    "zoom_hint",
+                    "This image is a MAGNIFIED REGION, and its grid is lowercase " +
+                        "(a1..h12) so a label can never be confused with a cell of the " +
+                        "full screen. Each label is printed at the CENTRE of its cell. " +
+                        "Name one of these labels, plus which third of it the target is " +
+                        "in — {\"cell\": \"d7\", \"part\": \"top-left\", \"on\": \"zoom\"} " +
+                        "on tap_by_coordinates / long_press_by_coordinates — and the " +
+                        "device converts it for you; no arithmetic, and none of the " +
+                        "scale_x/scale_y math is needed. Pick the cell the target sits " +
+                        "IN, not the label nearest it.")
         } finally {
             bmp.recycle()
         }
@@ -2065,6 +2449,36 @@ class ScreenController(
 
         /** Screenshot long side after downscale (generic_bridge value). */
         private const val SHOT_MAX_SIDE = 1280
+
+        /** Aim-grid columns. Letters run A.. — keep it ≤ 26. */
+        private const val GRID_COLS = 8
+
+        /** Aim-grid rows; rows are numbered from 1, so the last is [GRID_ROWS]. */
+        private const val GRID_ROWS = 12
+
+        /** How long a zoom image stays usable as an aiming reference. */
+        private const val ZOOM_STALE_MS = 180_000L
+
+        /** The nine thirds of a cell a tap may name, in reading order. */
+        val PARTS = listOf(
+            "top-left", "top", "top-right",
+            "left", "center", "right",
+            "bottom-left", "bottom", "bottom-right",
+        )
+
+        // Aliases are the names a model reaches for when it is not looking at
+        // the schema — a Chinese answer says 右下, not bottom-right.
+        private val PART_THIRDS: Map<String, IntArray> = buildMap {
+            PARTS.forEachIndexed { i, p -> put(p, intArrayOf(i % 3, i / 3)) }
+            listOf("左上", "上", "右上", "左", "中", "右", "左下", "下", "右下")
+                .forEachIndexed { i, p -> put(p, intArrayOf(i % 3, i / 3)) }
+            put("centre", intArrayOf(1, 1)); put("middle", intArrayOf(1, 1))
+            put("中间", intArrayOf(1, 1)); put("中心", intArrayOf(1, 1))
+            put("top-center", intArrayOf(1, 0)); put("bottom-center", intArrayOf(1, 2))
+            put("center-left", intArrayOf(0, 1)); put("center-right", intArrayOf(2, 1))
+            put("left-top", intArrayOf(0, 0)); put("right-top", intArrayOf(2, 0))
+            put("left-bottom", intArrayOf(0, 2)); put("right-bottom", intArrayOf(2, 2))
+        }
 
         /**
          * Hard ceiling on outline lines. Generous — it is a safety valve for a
