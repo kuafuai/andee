@@ -384,6 +384,36 @@ data class VoiceConfig(
                 .getString("ball", "").orEmpty().trim()
 
         /**
+         * The scene the assistant is in, by [Notebook.Scene.name], or null.
+         *
+         * Persisted for the same reason as [ballLook]: a service restart is not
+         * the user leaving the scene. Written directly rather than through
+         * [save], because [save] skips blank values and leaving a scene *is*
+         * writing a blank.
+         */
+        fun activeScene(context: Context): String? =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("scene", "").orEmpty().trim().ifEmpty { null }
+
+        fun setActiveScene(context: Context, name: String?) {
+            val next = name?.trim().orEmpty()
+            val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val prev = p.getString("scene", "").orEmpty()
+            if (prev == next) return
+            p.edit().putString("scene", next).apply()
+            onSceneChanged?.invoke(prev.ifEmpty { null }, next.ifEmpty { null })
+        }
+
+        /**
+         * `(left, entered)`, either null. Set by the service so the card's chip
+         * and the scrollback follow whoever changed it — the brain's tool, the
+         * scenes card, the chip's ✕ or an app trigger. Called on the writer's
+         * thread.
+         */
+        @Volatile
+        var onSceneChanged: ((String?, String?) -> Unit)? = null
+
+        /**
          * The 火山 speaker for the ball's current look, falling back to
          * [TTS_SPEAKER].
          *

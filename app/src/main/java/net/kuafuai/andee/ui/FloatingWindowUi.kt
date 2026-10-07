@@ -143,6 +143,12 @@ class FloatingWindowUi(
         /** The 产物 key — the pages the assistant has made. See [ArtifactsUi]. */
         fun onArtifactsClick()
 
+        /** The 情景 key — the scenes it has learned. See [ScenesUi]. */
+        fun onScenesClick()
+
+        /** ✕ on the scene chip — leave the scene the assistant is in. */
+        fun onSceneExitClick()
+
         /**
          * `■` is gone from the bar; stop is still here.
          *
@@ -205,6 +211,16 @@ class FloatingWindowUi(
     private var ball: EmotionBallTextureView? = null
     private var topBarView: View? = null
     private var historyView: HistoryListView? = null
+
+    /**
+     * 「情景 · X ✕」, centred under the ball while a scene is active. Its own
+     * view rather than a row in the control pill, because the pill's bounds are
+     * an input to the card's split ([ballAreaHeight]) and a scene starting
+     * should not move the ball.
+     */
+    private var sceneChip: LinearLayout? = null
+    private var sceneChipText: TextView? = null
+    @Volatile private var sceneTitle: String? = null
 
     /** The ball's gesture vocabulary, pinned along the bottom of the full card. */
     private var tipsView: View? = null
@@ -801,7 +817,26 @@ class FloatingWindowUi(
         ui.post {
             (tipsView as? TextView)?.text = AppLocale.str(context, R.string.window_tips)
             historyView?.onLocaleChanged()
+            renderSceneChip()
         }
+    }
+
+    /**
+     * The scene the assistant is in, by title, or null for none. Drawn only in
+     * the full card — folded there is no room, and the corner ball is not where
+     * anyone reads a label.
+     */
+    fun setScene(title: String?) {
+        sceneTitle = title
+        ui.post { renderSceneChip() }
+    }
+
+    /** Main thread only. */
+    private fun renderSceneChip() {
+        val chip = sceneChip ?: return
+        val title = sceneTitle
+        sceneChipText?.text = title?.let { AppLocale.str(context, R.string.scenes_chip, it) }.orEmpty()
+        chip.visibility = if (title != null && !compact) View.VISIBLE else View.GONE
     }
 
     /**
@@ -1479,6 +1514,7 @@ class FloatingWindowUi(
         root?.background = null
         backdrop?.visibility = View.GONE
         topBarView?.visibility = View.GONE
+        sceneChip?.visibility = View.GONE
         // Not just invisible — GONE, so the ball area has the whole window to
         // itself. A scrollback left in the layout would cover most of a 168dp
         // square and there would be nothing left to see the ball in.
@@ -1540,7 +1576,27 @@ class FloatingWindowUi(
         val tipsH = tipsHeight()
         setHistoryHeight(maxOf(0, h - ballH - tipsH))
         setHistoryBottomMargin(tipsH)
-        ball?.translationY = (ballDrop(bandH) + dp(BALL_NUDGE_DP)).toFloat()
+        val ty = ballDrop(bandH) + dp(BALL_NUDGE_DP)
+        ball?.translationY = ty.toFloat()
+        placeSceneChip(ballH, ty)
+    }
+
+    /**
+     * Centre the scene chip just under the sphere's lower edge — the same
+     * radius [ballDrop] uses, so it follows the ball when the card is resized
+     * or the ball is nudged down. Under the ball rather than in a top corner,
+     * because both top corners belong to the control pill's line.
+     *
+     * Main thread only.
+     */
+    private fun placeSceneChip(ballH: Int, ty: Int) {
+        val chip = sceneChip ?: return
+        val lp = chip.layoutParams as? FrameLayout.LayoutParams ?: return
+        val r = SPHERE_RADIUS_FRACTION * ballH * BALL_SCALE
+        val want = (ballH / 2f + ty + r).toInt() + dp(6)
+        if (lp.topMargin == want) return
+        lp.topMargin = want
+        chip.layoutParams = lp
     }
 
     /**
@@ -1738,6 +1794,7 @@ class FloatingWindowUi(
         // whether the compositor agreed to blur — and [setCompact] calls it
         // immediately after this, before the next frame.
         topBarView?.visibility = View.VISIBLE
+        sceneChip?.visibility = if (sceneTitle != null) View.VISIBLE else View.GONE
         historyView?.visibility = View.VISIBLE
         tipsView?.visibility = View.VISIBLE
         backdrop?.visibility = View.VISIBLE
@@ -2058,6 +2115,46 @@ class FloatingWindowUi(
             },
         )
         topBarView = topBar
+
+        // ---- Under the ball: the scene chip ----
+        // Placed by [placeSceneChip] once the card's split is known.
+        val chipText = TextView(context).apply {
+            textSize = Glass.Type.CAPTION
+            setTextColor(Color.parseColor(Glass.LABEL))
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            maxWidth = dp(220)
+        }
+        val chip = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(4), dp(4), dp(4))
+            background = Glass.well(context, dp(22))
+            visibility = View.GONE
+            addView(chipText)
+            addView(TextView(context).apply {
+                text = "✕"
+                textSize = Glass.Type.CAPTION
+                setTextColor(Color.parseColor(Glass.SECONDARY))
+                gravity = Gravity.CENTER
+                contentDescription = "退出情景"
+                isClickable = true
+                Glass.pressable(this)
+                setOnClickListener { listeners.onSceneExitClick() }
+                layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { leftMargin = dp(2) }
+            })
+        }
+        sceneChip = chip
+        sceneChipText = chipText
+        root.addView(
+            chip,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL,
+            ),
+        )
+        renderSceneChip()
         // The cluster's own bounds are an input to the card's split — see
         // [ballAreaHeight]. Watching it here means the status-bar inset lands
         // without this having to know it is responsible for the split.
@@ -2096,6 +2193,10 @@ class FloatingWindowUi(
      * pages the assistant has made, which is the one thing in this bar the user
      * cannot get at by talking.
      *
+     * 情景 sits beside it for a weaker version of the same reason: scenes *can*
+     * be managed by talking, but "what has it learned to do with me" is a
+     * question a list answers better than a conversation. Five keys now.
+     *
      * All four keys are `Glass.LABEL` now rather than roughly half of them being
      * dimmed: the dimmer ones were the drawer's contents and a folded `⋯`.
      */
@@ -2119,6 +2220,7 @@ class FloatingWindowUi(
         keys.addView(
             barButton(R.drawable.ic_artifacts, Glass.MUTED, "产物") { listeners.onArtifactsClick() }
         )
+        keys.addView(barButton(R.drawable.ic_scene, Glass.MUTED, "情景") { listeners.onScenesClick() })
         // ✓ and not ■: the stop button used to sit here, and stop is the one
         // action in this bar the ball can already perform — see onStopClick.
         keys.addView(barButton(R.drawable.ic_check, Glass.MUTED, "自检") { listeners.onSelfCheckClick() })

@@ -2,6 +2,7 @@ package net.kuafuai.andee.brain
 
 import android.util.Log
 import net.kuafuai.andee.R
+import net.kuafuai.andee.config.Notebook
 import net.kuafuai.andee.config.VoiceConfig
 import net.kuafuai.andee.i18n.AppLocale
 import net.kuafuai.andee.net.CallExtensionRegistry
@@ -441,6 +442,7 @@ class LocalBrain(
             // Empty notebook, empty string, zero cost: the feature only starts
             // paying for itself once there is something to remember.
             val index = net.kuafuai.andee.config.Notebook.indexForPrompt(appContext)
+            val scenes = Notebook.scenesForPrompt(appContext)
             // Photos with no words: there is no sentence of the user's to take
             // the language from, so the bracketed fallback comes back for it.
             val wordless = userText.isEmpty()
@@ -476,6 +478,14 @@ class LocalBrain(
                             ""
                         } else {
                             "\n\n(what your notebook holds, for reference; use recall for detail)\n$index"
+                        } +
+                        // Same position and same reason as the notebook index:
+                        // a newly saved scene must not cost the prefix cache.
+                        // Only the scene you are *in* sits in the system prompt.
+                        if (scenes.isEmpty()) {
+                            ""
+                        } else {
+                            "\n\n(scenes you can enter — see §11; you are in: ${VoiceConfig.activeScene(appContext) ?: "none"})\n$scenes"
                         },
                 )
         }
@@ -488,6 +498,10 @@ class LocalBrain(
 
         for (step in 1..MAX_ITERATIONS) {
             if (gen != generation.get()) return
+            // `enter_scene` mid-turn should change how the rest of this turn
+            // reads, not only the next one. A string compare, free when nothing
+            // moved.
+            if (step > 1) reseatPersona()
             val reply = llm.complete(history, tools)
             if (gen != generation.get()) return
             turnTokens += reply.promptTokens + reply.completionTokens
@@ -782,10 +796,15 @@ class LocalBrain(
      * latched value and only exists once the ball has been built — this runs on
      * the loop thread and can run before there is a ball at all. The preference
      * is written the instant the user swipes, so it is never behind the screen.
+     *
+     * The active scene rides in the same message for the same reason, and
+     * [reseatPersona] picks up entering or leaving one without knowing scenes
+     * exist. A pref naming a scene that was deleted reads as no scene.
      */
     private fun systemPrompt(): String = LocalPrompt.withPersona(
         net.kuafuai.andee.ui.ball.BallLooks
             .byName(VoiceConfig.ballLook(appContext)).persona,
+        VoiceConfig.activeScene(appContext)?.let { Notebook.scene(appContext, it) },
     )
 
     /**
@@ -811,7 +830,7 @@ class LocalBrain(
         val head = history[0]
         if (head.optString("role") != "system" || head.optString("content") == want) return
         head.put("content", want)
-        Log.i(TAG, "persona changed — system prompt rewritten, prefix cache dropped once")
+        Log.i(TAG, "persona or scene changed — system prompt rewritten, prefix cache dropped once")
     }
 
     /**
@@ -1106,6 +1125,7 @@ class LocalBrain(
    No coordinates, not this time's verification code, not this time's order number.
 5. Step back and look at this person: what state he is in, what you want to do next, whether your read on him has changed.
    When it has, remember under the same name to overwrite that entry. This one is a judgement left for future you, not a log.
+6. A kind of session that has now come up more than once and will come again (practising a language, minding his messages, comparing prices) and is not a scene yet → remember(type=feedback) "propose saving <kind> as a scene next time we do it". Do NOT call save_scene here: scenes are saved only after he says yes (§11), and he is not here.
 
 If this conversation genuinely produced nothing new, record nothing — ending empty-handed is allowed. Forcing one in just dirties the notebook."""
 
@@ -1125,11 +1145,11 @@ If this conversation genuinely produced nothing new, record nothing — ending e
                 "You are not facing the user now, and nobody is watching you. Go back over the conversation above, and put only what should be kept into the notebook.\n" +
                 "Do not reply to the user, make no sound, do not touch the device — touching the device will be refused.\n\n" +
                 REVIEW_RULES +
-                "\n\n6. The last step (in this turn's final message) is a summary of no more than 300 words: what has happened so far, " +
+                "\n\n7. The last step (in this turn's final message) is a summary of no more than 300 words: what has happened so far, " +
                 "how far it got, what the next step is, and whether anything is hanging without an answer.\n" +
                 "The conversation above is about to be deleted from the context, leaving only your summary, so do not write a log — " +
                 "write \"what future-you must know in order to take over\".\n" +
-                "Finish items 1-5 first, and write that summary last."
+                "Finish items 1-6 first, and write that summary last."
 
         private const val DEFAULT_TOOL_TIMEOUT_MS = 60_000L
         private const val TIMEOUT_SLACK_MS = 10_000L

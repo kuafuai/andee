@@ -508,6 +508,24 @@ The trap this introduced, caught before it compiled: `notified()` defers behind 
 
 `notified` is also not `submit`: it does not stamp `Notebook.touchActivity`, because the quiet-hour timer measures silence from the *user* and a chatty group would otherwise push the nightly review out all evening on their behalf.
 
+### Scenes: ways of working it learned with this person (local brain only)
+
+A scene (「陪我练英语」「帮我接管微信」「比价购物」) is a goal + voice + rules + routine that the model steps into for a while. It is **only a prompt** — no tool scoping, no scheduler of its own — and it is **learned, not shipped**: the model proposes one after the same kind of session has recurred, the user says yes, *then* `save_scene` writes it. `LocalPrompt` §11 is the whole teaching; the nightly review (`REVIEW_RULES` item 6) only leaves itself a `remember(type=feedback)` to propose one next time, because there is nobody to ask while it reviews.
+
+Where the pieces live, and why there:
+
+- **Storage is the notebook** (`Notebook.scenes` in the same encrypted blob), so wipe, factory reset and export cover it for free and it reads as "something it learned". The **active** scene is the `scene` key in `voice_prefs`, written by `VoiceConfig.setActiveScene` directly — not through `save()`, which drops blanks, and leaving a scene *is* a blank. It survives a service restart, like `ball`.
+- **The active scene is §13 of the system prompt** (`LocalPrompt.withPersona(persona, scene)`), fenced like the persona: it never outranks the vault, truthfulness or ask-before-irreversible unless its rules grant it in words. `reseatPersona()` string-compares the rendered prompt, so entering/leaving costs one prefix-cache miss and nothing else knows scenes exist. It is also called on every loop step after the first, so `enter_scene` takes effect inside the same turn. **The list of enterable scenes rides on the user message** next to the notebook index — saving a new scene must not invalidate the cache.
+- **Triage reads the active scene** (`NotificationTriage.decide(…, scene)`), appended to the *system* message and never to the payload: it is the owner's instruction, the notification is a stranger's. That is how a scene saying "reply to my WeChat for me" turns a chat message into `act` — the autonomy is whatever the scene's rules say, by design.
+- **One listener for every route in or out** — the tool, the 情景 card, the chip's ✕, an app trigger all end in `VoiceConfig.onSceneChanged`, which `ScreenBodyService.onSceneChanged` turns into a scrollback row and the chip. Nothing about entering speaks.
+
+Two guards, both mechanical rather than prompt:
+
+- **An `untrusted` (NOTIFY) turn cannot `scene.save`, `scene.enter` or `scene.delete`** (`CommandDispatcher.dispatch`, beside the vault guard). A scene can carry "act for me without asking", so a stranger's message that talked the model into creating or entering one would have bought itself standing permission. `scene.exit` stays allowed — leaving only ever narrows. Silent turns already allow only `note.*`.
+- **App-triggered entry (`maybeAutoEnterScene`) is skipped while `dispatcher.isTaskActive()`**, because the brain opens apps itself: a price comparison walking through three shops must not be dragged into another scene by its own navigation. It also never overrides a scene already active, only fires on a change of package (window-state events fire on every dialog inside one app), ignores our own package, and is suppressed in the package where the user just left a scene until they go somewhere else — otherwise the next event in that app drags them straight back.
+
+Timed entry is not a mechanism: the model sets a `todo` whose text says `enter_scene <name>` and calls it when woken. Hub mode has no scenes — the chip is hidden and auto-entry is off when `localBrain` is null.
+
 ### The vault: the brain can spend the user's credentials but never holds them
 
 `config/Vault.kt` stores the user's own accounts — one `Entry` per account (label + phone/email/username/note + password) — so the body can log in *as them* when a task needs it. Three tools reach it: `list_vault` (masked overview), `get_vault` (one readable field in the clear), `fill_secret` (types the password into the focused field).

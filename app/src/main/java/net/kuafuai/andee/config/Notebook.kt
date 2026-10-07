@@ -122,6 +122,24 @@ object Notebook {
         }
     }
 
+    /**
+     * A situation the assistant can step into: a goal, a voice, rules and steps
+     * that ride in the system prompt while it is active. Learned, not shipped —
+     * the model proposes one and the user says yes before it is written.
+     */
+    data class Scene(
+        val name: String,
+        val title: String,
+        val summary: String,
+        val prompt: String,
+        /** Package names whose arrival in the foreground enters this scene. */
+        val triggerApps: List<String>,
+        val createdAt: Long,
+        val updatedAt: Long,
+        val lastUsedAt: Long,
+        val uses: Int,
+    )
+
     data class Todo(
         val id: String,
         val what: String,
@@ -176,6 +194,7 @@ object Notebook {
     private fun emptyBook(): JSONObject = JSONObject()
         .put("memories", JSONArray())
         .put("todos", JSONArray())
+        .put("scenes", JSONArray())
         .put("meta", JSONObject())
 
     private fun write(context: Context, next: JSONObject) {
@@ -645,6 +664,129 @@ object Notebook {
         }
         return null
     }
+
+    // ------------------------------------------------------------------
+    // scenes
+    // ------------------------------------------------------------------
+
+    const val MAX_SCENES = 30
+    const val MAX_SCENE_PROMPT = 3000
+    private val SCENE_NAME = Regex("[a-z0-9_]{1,40}")
+
+    fun scenes(context: Context): List<Scene> {
+        val arr = book(context).optJSONArray("scenes") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let(::toScene) }
+    }
+
+    fun scene(context: Context, name: String): Scene? =
+        scenes(context).firstOrNull { it.name == name }
+
+    private fun toScene(o: JSONObject): Scene {
+        val apps = o.optJSONArray("trigger_apps")
+        return Scene(
+            name = o.optString("name"),
+            title = o.optString("title"),
+            summary = o.optString("summary"),
+            prompt = o.optString("prompt"),
+            triggerApps = if (apps == null) emptyList()
+            else (0 until apps.length()).map { apps.optString(it) }.filter { it.isNotBlank() },
+            createdAt = o.optLong("created_at"),
+            updatedAt = o.optLong("updated_at"),
+            lastUsedAt = o.optLong("last_used_at"),
+            uses = o.optInt("uses"),
+        )
+    }
+
+    private fun toJson(s: Scene): JSONObject = JSONObject()
+        .put("name", s.name)
+        .put("title", s.title)
+        .put("summary", s.summary)
+        .put("prompt", s.prompt)
+        .put("trigger_apps", JSONArray(s.triggerApps))
+        .put("created_at", s.createdAt)
+        .put("updated_at", s.updatedAt)
+        .put("last_used_at", s.lastUsedAt)
+        .put("uses", s.uses)
+
+    /** Create or overwrite. The second value is true when it was new. */
+    fun saveScene(
+        context: Context,
+        name: String,
+        title: String,
+        summary: String,
+        prompt: String,
+        triggerApps: List<String>,
+    ): Pair<Scene, Boolean> {
+        require(SCENE_NAME.matches(name)) { "name must be 1-40 chars of a-z 0-9 _ (got \"$name\")" }
+        require(title.isNotBlank()) { "title is required" }
+        require(prompt.isNotBlank()) { "prompt is required" }
+        require(prompt.length <= MAX_SCENE_PROMPT) {
+            "prompt is ${prompt.length} chars; keep it under $MAX_SCENE_PROMPT"
+        }
+        val b = book(context).let { JSONObject(it.toString()) }
+        val arr = b.optJSONArray("scenes") ?: JSONArray()
+        val now = System.currentTimeMillis()
+        var old: Scene? = null
+        val kept = JSONArray()
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (o.optString("name") == name) old = toScene(o) else kept.put(o)
+        }
+        check(old != null || kept.length() < MAX_SCENES) {
+            "already $MAX_SCENES scenes; delete one first"
+        }
+        val s = Scene(
+            name = name,
+            title = title.trim().take(40),
+            summary = summary.trim().take(160),
+            prompt = prompt.trim(),
+            triggerApps = triggerApps.map { it.trim() }.filter { it.isNotBlank() }.distinct(),
+            createdAt = old?.createdAt ?: now,
+            updatedAt = now,
+            lastUsedAt = old?.lastUsedAt ?: 0L,
+            uses = old?.uses ?: 0,
+        )
+        kept.put(toJson(s))
+        b.put("scenes", kept)
+        write(context, b)
+        return s to (old == null)
+    }
+
+    fun deleteScene(context: Context, name: String): Boolean {
+        val b = book(context).let { JSONObject(it.toString()) }
+        val arr = b.optJSONArray("scenes") ?: return false
+        val kept = JSONArray()
+        var found = false
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (o.optString("name") == name) found = true else kept.put(o)
+        }
+        if (!found) return false
+        b.put("scenes", kept)
+        write(context, b)
+        return true
+    }
+
+    fun markSceneUsed(context: Context, name: String) {
+        val b = book(context).let { JSONObject(it.toString()) }
+        val arr = b.optJSONArray("scenes") ?: return
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (o.optString("name") != name) continue
+            o.put("uses", o.optInt("uses") + 1)
+            o.put("last_used_at", System.currentTimeMillis())
+            b.put("scenes", arr)
+            write(context, b)
+            return
+        }
+    }
+
+    /** One line per scene for the per-turn user message; empty when there are none. */
+    fun scenesForPrompt(context: Context): String =
+        scenes(context).sortedByDescending { it.lastUsedAt }.joinToString("\n") { s ->
+            val auto = if (s.triggerApps.isEmpty()) "" else "  [auto-enters on ${s.triggerApps.joinToString(",")}]"
+            "- ${s.name}（${s.title}）：${s.summary}$auto"
+        }
 
     // ------------------------------------------------------------------
     // meta: activity stamp + sweep budget

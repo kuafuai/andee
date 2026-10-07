@@ -153,6 +153,22 @@
     <string name="artifacts_edit_prompt">How should “%1$s” change? Say it or type it</string>
     <string name="artifacts_edit_said">Revise “%1$s”: %2$s</string>
 
+    <string name="scenes_title">Scenes</string>
+    <string name="scenes_subtitle">Ways of working it worked out with you</string>
+    <string name="scenes_enter">Enter</string>
+    <string name="scenes_exit">Leave</string>
+    <string name="scenes_active">Current scene</string>
+    <string name="scenes_show_prompt">Rules</string>
+    <string name="scenes_hide_prompt">Hide</string>
+    <string name="scenes_empty">No scenes yet.\nDo the same kind of thing with it a few times — English practice, say — and it will offer to save it as a scene. Or just say “save this as a scene”.</string>
+    <string name="scenes_edit_note">To change a scene, just tell it — e.g. “in English practice, only correct one mistake at a time”</string>
+    <string name="scenes_meta_uses">Used %1$d times</string>
+    <string name="scenes_meta_auto">Enters by itself in %1$s</string>
+    <string name="scenes_chip">Scene · %1$s</string>
+    <string name="scenes_entered_row">(Entered scene: %1$s)</string>
+    <string name="scenes_exited_row">(Left scene: %1$s)</string>
+    <string name="settings_scenes_browse">Manage scenes</string>
+
     <!-- The factory-reset confirmation list; see config/FactoryReset.kt. -->
     <string name="factory_reset_target_keys">the Volcano and DeepSeek keys, and every speech and brain setting</string>
     <string name="factory_reset_target_notebook">the notebook: what it remembers and what it promised</string>

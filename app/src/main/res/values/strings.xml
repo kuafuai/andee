@@ -130,6 +130,25 @@
     <!-- The scrollback row for the user's change request. -->
     <string name="artifacts_edit_said">修改「%1$s」：%2$s</string>
 
+    <!-- 情景: ways of working it learned with the user. See ui/ScenesUi.kt. -->
+    <string name="scenes_title">情景</string>
+    <string name="scenes_subtitle">它和你一起总结出来的做事方式</string>
+    <string name="scenes_enter">进入</string>
+    <string name="scenes_exit">退出</string>
+    <string name="scenes_active">当前情景</string>
+    <string name="scenes_show_prompt">看规则</string>
+    <string name="scenes_hide_prompt">收起</string>
+    <string name="scenes_empty">还没有情景。\n和它多做几次同一类事——比如陪练英语——它会提议存成情景。也可以直接说「把这个存成情景」。</string>
+    <string name="scenes_edit_note">要修改情景，直接对它说，比如「把练英语改成每次只纠一个错」</string>
+    <string name="scenes_meta_uses">用过 %1$d 次</string>
+    <string name="scenes_meta_auto">打开 %1$s 时自动进入</string>
+    <!-- The chip on the unfolded card while a scene is active. -->
+    <string name="scenes_chip">情景 · %1$s</string>
+    <!-- Scrollback rows written by the device itself when a scene starts or ends. -->
+    <string name="scenes_entered_row">（进入情景：%1$s）</string>
+    <string name="scenes_exited_row">（退出情景：%1$s）</string>
+    <string name="settings_scenes_browse">管理情景</string>
+
     <!-- The 恢复出厂设置 confirmation list: one line per thing wiped.
          Kept beside config/FactoryReset.kt, which walks them in this order. -->
     <string name="factory_reset_target_keys">火山 key、DeepSeek key，以及所有语音与大脑的设置</string>

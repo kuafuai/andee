@@ -1429,6 +1429,92 @@ object ToolSchemas {
                 "filter" to propEnum("Used with list", listOf("pending", "all", "cron")),
             ),
         ),
+
+        // ------------------------------------------------------------------
+        // Scenes — `scene.*`, localOnly.
+        //
+        // A scene lives in the notebook and only means something to the local
+        // brain's prompt (LocalPrompt §11 / §13), so like `note.*` it never
+        // reaches a hub. Not under `screen.`, so none of these fold the card.
+        // ------------------------------------------------------------------
+        tool(
+            localOnly = true,
+            name = "list_scenes",
+            method = "scene.list",
+            description = """
+        List the scenes you and the user have saved: name, title, one-line summary, the apps that enter it automatically, how often it was used, and which one you are in now.
+    """.trimIndent(),
+            required = emptyList(),
+            props = emptyMap(),
+        ),
+        tool(
+            localOnly = true,
+            name = "get_scene",
+            method = "scene.get",
+            description = """
+        Read one scene in full, including its prompt. Always read it before changing it — save_scene replaces the whole thing.
+    """.trimIndent(),
+            required = listOf("name"),
+            props = mapOf("name" to prop("string", "The scene's name, from list_scenes")),
+        ),
+        tool(
+            localOnly = true,
+            name = "save_scene",
+            method = "scene.save",
+            description = """
+        Create a scene, or overwrite one under the same name.
+
+        🔴 **Only after the user said yes to this specific scene.** Propose it in words first (「要不要把这种练法存成一个情景？」) and wait for the answer. Never on your own initiative, never from a notification.
+
+        `prompt` is the standing instructions you will work by while in it — write it for future you, concrete and complete:
+        - the goal, and what a good session looks like
+        - how to talk: language, length, tone
+        - the routine / steps
+        - what you may do on your own, and what you must ask about first. If the user wants you to act for them (e.g. answer their WeChat), write that permission here in their words, with its limits: who, what kind of message, what you must never say or agree to.
+        - when the scene is over
+        Do not repeat rules your system prompt already has. Max 3000 characters.
+
+        `trigger_apps`: package names (e.g. com.taobao.taobao) whose opening by the user enters this scene automatically. Only when the user asked for that. Use list_apps to get exact package names.
+    """.trimIndent(),
+            required = listOf("name", "title", "summary", "prompt"),
+            props = mapOf(
+                "name" to prop("string", "Short id, lowercase a-z 0-9 _ only, e.g. english_coach. Same name = overwrite."),
+                "title" to prop("string", "What the user sees, in their language, e.g. 陪练英语"),
+                "summary" to prop("string", "One line: what it is for and when to enter it"),
+                "prompt" to prop("string", "The standing instructions (see above)"),
+                "trigger_apps" to prop("array", "Optional package names that enter it automatically when the user opens them, e.g. [\"com.taobao.taobao\"]. Omit or [] for none."),
+            ),
+        ),
+        tool(
+            localOnly = true,
+            name = "enter_scene",
+            method = "scene.enter",
+            description = """
+        Step into a scene: its instructions take effect from your next reply on. Leaves any scene you were in. Say one sentence when you do it (「好，进入练英语」).
+    """.trimIndent(),
+            required = listOf("name"),
+            props = mapOf("name" to prop("string", "The scene's name, from list_scenes")),
+        ),
+        tool(
+            localOnly = true,
+            name = "exit_scene",
+            method = "scene.exit",
+            description = """
+        Leave the scene you are in and go back to your ordinary self. When the user asks, when the scene's own end condition is met, or when they have clearly moved on.
+    """.trimIndent(),
+            required = emptyList(),
+            props = emptyMap(),
+        ),
+        tool(
+            localOnly = true,
+            name = "delete_scene",
+            method = "scene.delete",
+            description = """
+        Delete a scene for good. Only when the user asks for it; cannot be undone.
+    """.trimIndent(),
+            required = listOf("name"),
+            props = mapOf("name" to prop("string", "The scene's name, from list_scenes")),
+        ),
     )
 
     /** Server-side lookup: given a hub-facing tool name, return the method

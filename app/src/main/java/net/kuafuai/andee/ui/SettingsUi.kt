@@ -937,6 +937,14 @@ class SettingsUi(
             },
             LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(10) },
         )
+        // Scenes are learned the same way memories are, so they are reached
+        // from the same section — the control bar's 情景 key is the other door.
+        panel.addView(
+            button(lctx.getString(R.string.settings_scenes_browse), filled = false) {
+                ScenesUi(context).show()
+            },
+            LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(10) },
+        )
     }
 
     private fun notebookStats(): String = lctx.getString(

@@ -47,6 +47,16 @@ class ScreenBodyService : AccessibilityService() {
     /** The artifacts panel, when it is up. See [openArtifacts]. */
     private var artifactsUi: net.kuafuai.andee.ui.ArtifactsUi? = null
 
+    /** The scenes panel, when it is up. See [openScenes]. */
+    private var scenesUi: net.kuafuai.andee.ui.ScenesUi? = null
+
+    /**
+     * The package the user left a scene in, and therefore must not be pulled
+     * back into one by — see [maybeAutoEnterScene]. Cleared the moment the
+     * foreground moves to a different package. Main thread only.
+     */
+    private var sceneSuppressedPkg: String? = null
+
     /**
      * The page entry the user just tapped 继续修改 on, waiting for them to say
      * what change they want. Cleared once they speak or type, or on stop.
@@ -187,6 +197,14 @@ class ScreenBodyService : AccessibilityService() {
                 openArtifacts()
             }
 
+            override fun onScenesClick() {
+                openScenes()
+            }
+
+            override fun onSceneExitClick() {
+                net.kuafuai.andee.config.VoiceConfig.setActiveScene(this@ScreenBodyService, null)
+            }
+
             override fun onStopClick() {
                 stopEverything()
             }
@@ -280,6 +298,7 @@ class ScreenBodyService : AccessibilityService() {
         // arrives as the same geometry change a long-press makes — one code
         // path, not a second way for the window to be born.
         window.setCompact(false)
+        net.kuafuai.andee.config.VoiceConfig.onSceneChanged = ::onSceneChanged
 
         // After the card: same window type, so insertion order is z-order and
         // the glow needs to sit on top of the ball, not under it.
@@ -1045,7 +1064,10 @@ class ScreenBodyService : AccessibilityService() {
     override fun onAccessibilityEvent(event: android.view.accessibility.AccessibilityEvent?) {
         if (event == null) return
         if (event.eventType == android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            event.packageName?.toString()?.let { net.kuafuai.andee.device.DeviceState.foregroundPkg = it }
+            event.packageName?.toString()?.let {
+                net.kuafuai.andee.device.DeviceState.foregroundPkg = it
+                maybeAutoEnterScene(it)
+            }
         }
         if (::screen.isInitialized) screen.noteEvent(event)
     }
@@ -1080,6 +1102,9 @@ class ScreenBodyService : AccessibilityService() {
         selfCheck = null
         artifactsUi?.hide()
         artifactsUi = null
+        scenesUi?.hide()
+        scenesUi = null
+        net.kuafuai.andee.config.VoiceConfig.onSceneChanged = null
         // Before the windows go: this one has to put the keyboard back, and a
         // service that dies mid-typing would otherwise leave the tablet with
         // its keyboard on the user's IME — where every future `type_text`
@@ -1237,6 +1262,99 @@ class ScreenBodyService : AccessibilityService() {
         )
         artifactsUi = a
         a.show()
+    }
+
+    /** 情景 — the scenes it has learned. Our own surface, like 产物. */
+    private fun openScenes() {
+        if (scenesUi?.isShown() == true) return
+        val s = net.kuafuai.andee.ui.ScenesUi(this)
+        scenesUi = s
+        s.show()
+    }
+
+    /**
+     * The chip on the card follows the active scene — but only while the local
+     * brain is the one answering. A hub brain has its own prompt and never sees
+     * a scene, so a chip there would claim a mode nothing is in.
+     */
+    private fun refreshSceneChip() {
+        if (!::window.isInitialized) return
+        val name = if (localBrain != null) net.kuafuai.andee.config.VoiceConfig.activeScene(this) else null
+        window.setScene(name?.let { net.kuafuai.andee.config.Notebook.scene(this, it)?.title ?: it })
+    }
+
+    /**
+     * A scene started or ended, by whichever route: the brain's tool, the
+     * scenes card, the chip's ✕, an app trigger. One listener, so every route
+     * leaves the same record — a scrollback row and the chip — and none of them
+     * speaks. Called on the writer's thread.
+     */
+    private fun onSceneChanged(left: String?, entered: String?) {
+        ui.post {
+            val nb = net.kuafuai.andee.config.Notebook
+            if (left != null) {
+                net.kuafuai.andee.ui.ChatHistory.addAssistant(
+                    AppLocale.str(this, R.string.scenes_exited_row, nb.scene(this, left)?.title ?: left),
+                )
+                // Leaving inside a trigger app must stick until the user goes
+                // somewhere else, or the next window event in that app drags
+                // them straight back into what they just left.
+                if (entered == null) sceneSuppressedPkg = sceneLastPkg
+            }
+            if (entered != null) {
+                net.kuafuai.andee.ui.ChatHistory.addAssistant(
+                    AppLocale.str(this, R.string.scenes_entered_row, nb.scene(this, entered)?.title ?: entered),
+                )
+            }
+            refreshSceneChip()
+            scenesUi?.rebuild()
+        }
+    }
+
+    /** The package [maybeAutoEnterScene] last looked at. Main thread only. */
+    private var sceneLastPkg: String? = null
+
+    /**
+     * Enter a scene because the user just opened one of its trigger apps.
+     *
+     * A mechanism, not a model call: the scene is in the system prompt from
+     * the next thing the user says, and the only signs are the chip and a
+     * scrollback row. It does not speak — the user has just opened another app
+     * to use it, and a voice out of the tablet at that moment is an
+     * interruption, not a greeting.
+     *
+     * Four conditions, each for its own reason:
+     *  - **No scene already.** One at a time, and an app trigger never
+     *    overrides a scene the user or the brain chose.
+     *  - **Not while a task is running.** The brain opens apps itself — a
+     *    price comparison walks through three shops — and its own navigation
+     *    must not drag it into a different scene halfway through.
+     *  - **Not where the user just left one.** See [sceneSuppressedPkg].
+     *  - **Only on a change of package**, which is also what keeps this cheap:
+     *    window-state events fire on every dialog inside the same app.
+     *
+     * Local brain only, like everything else about scenes.
+     */
+    private fun maybeAutoEnterScene(pkg: String) {
+        // Our own windows (the cards, the typing field) are not the user going
+        // anywhere — and must not clear [sceneSuppressedPkg] on the way past,
+        // or leaving a scene from the scenes card would only last until the
+        // card closed.
+        if (pkg == packageName) return
+        if (pkg == sceneLastPkg) return
+        sceneLastPkg = pkg
+        if (pkg != sceneSuppressedPkg) sceneSuppressedPkg = null
+        if (localBrain == null || !::dispatcher.isInitialized) return
+        if (dispatcher.isTaskActive()) return
+        if (sceneSuppressedPkg != null) return
+        val vc = net.kuafuai.andee.config.VoiceConfig
+        if (vc.activeScene(this) != null) return
+        val hit = net.kuafuai.andee.config.Notebook.scenes(this)
+            .filter { pkg in it.triggerApps }
+            .maxByOrNull { it.lastUsedAt } ?: return
+        android.util.Log.i("Body", "scene ${hit.name} auto-entered on $pkg")
+        vc.setActiveScene(this, hit.name)
+        net.kuafuai.andee.config.Notebook.markSceneUsed(this, hit.name)
     }
 
     /**
@@ -1759,6 +1877,7 @@ class ScreenBodyService : AccessibilityService() {
             onTurnEnd = ::onTurnEnd,
             onSweepSpent = { tokens -> net.kuafuai.andee.config.Notebook.noteSweep(this, tokens) },
         )
+        refreshSceneChip()
         // Promises outlive the process: anything that came due while the
         // accessibility service was off (or the tablet was off) is dealt with
         // here, on the first start that can hear about it. This runs in hub
@@ -1773,6 +1892,7 @@ class ScreenBodyService : AccessibilityService() {
         val lb = localBrain ?: return
         localBrain = null
         lb.stop()
+        refreshSceneChip()
     }
 
     /**
@@ -2136,8 +2256,12 @@ class ScreenBodyService : AccessibilityService() {
         // An `act` has nowhere to go without one of these, and finding that out
         // after spending a call on the triage would be a bill for nothing.
         if (localBrain == null && hubClient == null) return false
+        // Scenes are a local-brain thing; a hub has its own idea of who it is.
+        val scene = if (localBrain == null) null
+        else net.kuafuai.andee.config.VoiceConfig.activeScene(this)
+            ?.let { net.kuafuai.andee.config.Notebook.scene(this, it) }
         val verdict = net.kuafuai.andee.brain.NotificationTriage(bc)
-            .decide(n, net.kuafuai.andee.config.VoiceConfig.uiLanguage(this)) ?: return false
+            .decide(n, net.kuafuai.andee.config.VoiceConfig.uiLanguage(this), scene) ?: return false
         when (verdict.action) {
             net.kuafuai.andee.brain.NotificationTriage.Action.IGNORE -> {
                 // Not silence-with-no-record: the ring buffer still has it, so
