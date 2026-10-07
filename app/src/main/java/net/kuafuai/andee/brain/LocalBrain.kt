@@ -206,9 +206,17 @@ class LocalBrain(
     /** Image messages currently in [history], oldest first. See [trimImages]. */
     private val imageMessages = mutableListOf<JSONObject>()
 
-    fun submit(userText: String) {
+    /**
+     * Photo messages the *user* attached, oldest first. Kept apart from
+     * [imageMessages] so a task's screenshots cannot evict the very photo the
+     * task is about; see [attachUserPhotos].
+     */
+    private val photoMessages = mutableListOf<JSONObject>()
+
+    /** [images] are base64 JPEGs; with any of them, [userText] may be empty. */
+    fun submit(userText: String, images: List<String> = emptyList()) {
         val text = userText.trim()
-        if (text.isEmpty()) return
+        if (text.isEmpty() && images.isEmpty()) return
         if (cfg.apiKey.isEmpty()) {
             // Said out loud rather than logged: from the ball's point of view a
             // missing key is indistinguishable from a brain that never answers.
@@ -220,7 +228,7 @@ class LocalBrain(
         // must not look like the user spoke, or it would keep pushing its own
         // trigger out.
         net.kuafuai.andee.config.Notebook.touchActivity(appContext)
-        launch(text, TurnKind.USER)
+        launch(text, TurnKind.USER, images)
     }
 
     /**
@@ -300,14 +308,14 @@ class LocalBrain(
      * it, draining queued wakes, harvesting, telling the service the turn is
      * over — is here once, so no entry point can forget a step.
      */
-    private fun launch(text: String, kind: TurnKind) {
+    private fun launch(text: String, kind: TurnKind, images: List<String> = emptyList()) {
         val gen = generation.incrementAndGet()
         loop.execute {
             busy.set(true)
             currentKind = kind
             turnTokens = 0
             try {
-                runTurn(text, gen, kind)
+                runTurn(text, gen, kind, images)
             } catch (t: Throwable) {
                 if (gen == generation.get()) {
                     Log.e(TAG, "turn $gen ($kind) failed", t)
@@ -399,7 +407,7 @@ class LocalBrain(
     // the loop
     // ------------------------------------------------------------------
 
-    private fun runTurn(userText: String, gen: Int, kind: TurnKind) {
+    private fun runTurn(userText: String, gen: Int, kind: TurnKind, images: List<String> = emptyList()) {
         val internal = kind.silent
         val harvest = kind == TurnKind.HARVEST
         if (history.isEmpty()) {
@@ -433,6 +441,14 @@ class LocalBrain(
             // Empty notebook, empty string, zero cost: the feature only starts
             // paying for itself once there is something to remember.
             val index = net.kuafuai.andee.config.Notebook.indexForPrompt(appContext)
+            // Photos with no words: there is no sentence of the user's to take
+            // the language from, so the bracketed fallback comes back for it.
+            val wordless = userText.isEmpty()
+            val said = if (wordless) {
+                "(the user sent ${images.size} photo(s) with no words — they are attached right below; answer what they most likely want)"
+            } else {
+                userText
+            }
             JSONObject()
                 .put("role", "user")
                 .put(
@@ -455,7 +471,7 @@ class LocalBrain(
                     // is the answer and absent when there is a better one, and
                     // the model is never asked to arbitrate between two.
                     "content",
-                    "[now ${stamp()}${if (kind == TurnKind.USER) "" else " · ui-language ${uiLangTag()}"}] $userText" +
+                    "[now ${stamp()}${if (kind == TurnKind.USER && !wordless) "" else " · ui-language ${uiLangTag()}"}] $said" +
                         if (index.isEmpty()) {
                             ""
                         } else {
@@ -463,6 +479,8 @@ class LocalBrain(
                         },
                 )
         }
+
+        if (!internal && images.isNotEmpty()) attachUserPhotos(images)
 
         val tools = LlmClient.toolSpecs(ToolSchemas.all(), registry.tools())
         var lastSignature = ""
@@ -709,6 +727,32 @@ class LocalBrain(
     }
 
     /**
+     * The user's own photos, as a vision message right behind their words.
+     *
+     * Behind rather than inside: the words stay a plain-string `user` message,
+     * which is what [isBoundary] cuts at, and this one is then dropped together
+     * with them by [trimHistory]. Only the newest batch survives — a photo the
+     * user sent ten minutes ago is not worth re-uploading on every request.
+     */
+    private fun attachUserPhotos(images: List<String>) {
+        val content = JSONArray()
+        // "这是什么" next to a photo is exactly the trigger `camera_turn`'s
+        // description names, so say outright that the seeing is already done.
+        content.put(
+            LlmClient.textBlock(
+                "The ${images.size} photo(s) the user attached to the message above. " +
+                    "You can already see them here — \"这个 / this\" means these photos. " +
+                    "Do NOT open the camera or take a screenshot to look at them.",
+            ),
+        )
+        for (b64 in images) content.put(LlmClient.imageBlock(b64, "image/jpeg"))
+        val msg = JSONObject().put("role", "user").put("content", content)
+        history += msg
+        photoMessages += msg
+        while (photoMessages.size > MAX_PHOTO_MESSAGES) history.remove(photoMessages.removeAt(0))
+    }
+
+    /**
      * Keep only the newest [MAX_IMAGE_MESSAGES] image messages, dropping the
      * older ones from the history entirely.
      *
@@ -791,6 +835,7 @@ class LocalBrain(
     private fun drop(index: Int) {
         val gone = history.removeAt(index)
         imageMessages.remove(gone)
+        photoMessages.remove(gone)
     }
 
     // ------------------------------------------------------------------
@@ -900,6 +945,7 @@ class LocalBrain(
         // longer exist, or [trimImages] would later try to remove an object
         // twice and drop a live message with it.
         imageMessages.retainAll { msg -> history.any { it === msg } }
+        photoMessages.retainAll { msg -> history.any { it === msg } }
         lastHarvestAtSize = history.size
         Log.i(
             TAG,
@@ -1040,6 +1086,7 @@ class LocalBrain(
 
         private const val MAX_IMAGE_MESSAGES = 2
         private const val MAX_IMAGES_PER_STEP = 2
+        private const val MAX_PHOTO_MESSAGES = 1
         private const val MAX_TOOL_CHARS = 24_000
 
         /**

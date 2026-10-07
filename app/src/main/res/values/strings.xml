@@ -228,6 +228,10 @@
     <string name="bubble_tap_to_talk">点击说话</string>
     <string name="input_hint">打字跟它说…</string>
     <string name="input_send">发送</string>
+    <string name="input_hint_photos">可以直接发送，或者补一句…</string>
+    <string name="input_take_photo">拍照</string>
+    <string name="input_pick_photos">选图片</string>
+    <string name="input_photos_row">［%1$d 张图片］</string>
     <string name="cam_close">✕ 完成</string>
 
     <!--

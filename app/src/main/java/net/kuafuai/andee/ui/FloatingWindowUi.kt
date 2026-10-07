@@ -213,6 +213,9 @@ class FloatingWindowUi(
     private var captureHidden = false
     private var compact = false
 
+    /** The typing field has sent the user to a camera or a photo picker. See [setAway]. */
+    private var away = false
+
     /** The typing field's top edge, in screen px. 0 = no field is up. */
     private var typingTop = 0
 
@@ -875,6 +878,22 @@ class FloatingWindowUi(
     fun setVisibleForCapture(visible: Boolean) {
         ui.post {
             captureHidden = !visible
+            applyWindow()
+        }
+    }
+
+    /**
+     * Vanish while the typing field has the user in another app's camera or
+     * photo picker. The card still holds its typing height, which puts it over
+     * the top of that app, and overlays sort above activities; it is already
+     * untouchable while a field is up, so alpha 0 is all that is missing.
+     * Separate from [captureHidden] so a screenshot finishing mid-pick cannot
+     * bring the card back over the picker.
+     */
+    fun setAway(away: Boolean) {
+        ui.post {
+            if (this.away == away) return@post
+            this.away = away
             applyWindow()
         }
     }
@@ -1748,7 +1767,7 @@ class FloatingWindowUi(
     private fun applyWindow() {
         val v = root ?: return
         val p = params ?: return
-        p.alpha = if (captureHidden) 0f else 1f
+        p.alpha = if (captureHidden || away) 0f else 1f
         // FLAG_LAYOUT_IN_SCREEN is what makes the unfolded card actually
         // fullscreen. Without it the window's frame is the *content* area —
         // the display minus the status and navigation bars — so a MATCH_PARENT
@@ -1783,7 +1802,7 @@ class FloatingWindowUi(
         // full screen of pixels nobody can see. Turning it off here is also what
         // makes the card look the same on a device where cross-window blur is
         // unavailable, which is most of them.
-        val wantFrost = !compact && !captureHidden && !backdropUp()
+        val wantFrost = !compact && !captureHidden && !away && !backdropUp()
         frosted = Glass.frost(context, wm, p, want = wantFrost)
         paintCard()
         // The card now runs under the status bar ([FLAG_LAYOUT_IN_SCREEN]), so

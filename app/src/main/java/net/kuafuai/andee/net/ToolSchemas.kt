@@ -733,6 +733,9 @@ object ToolSchemas {
         as a screenshot). The session STAYS OPEN between calls.
 
         WHEN TO USE — you decide the cadence, fit it to the ask:
+        - NOT when the user's message came with attached photos: then
+          "这是什么/看看这个" is about those photos, which you can already
+          see. Answer from them; never open the camera for them.
         - "这是什么/看看这个" → look once, answer. If the frame is blurry or
           the target isn't in view, TELL the user to aim ("对准一点") and
           look again.

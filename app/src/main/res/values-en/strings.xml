@@ -251,6 +251,10 @@
     <string name="bubble_tap_to_talk">Tap to talk</string>
     <string name="input_hint">Type to talk to it…</string>
     <string name="input_send">Send</string>
+    <string name="input_hint_photos">Send as is, or add a few words…</string>
+    <string name="input_take_photo">Take photo</string>
+    <string name="input_pick_photos">Choose images</string>
+    <string name="input_photos_row">[%1$d image(s)]</string>
     <string name="cam_close">✕ Done</string>
 
     <!-- ScreenBodyService.kt — display-only; see the comment on the Chinese side. -->

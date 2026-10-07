@@ -308,7 +308,10 @@ class ScreenBodyService : AccessibilityService() {
         // The field the user types into. A window of its own, and an Activity
         // rather than an overlay — an overlay window cannot raise the soft
         // keyboard on this ROM. See ui/TextInputActivity.
-        net.kuafuai.andee.ui.TextInputActivity.onSubmit = { submitUserTurn(it, "typed") }
+        net.kuafuai.andee.ui.TextInputActivity.onSubmit = { text, images -> submitUserTurn(text, "typed", images) }
+        // The camera and the photo picker are other apps' windows, and the card
+        // is an overlay that sorts above them — so it steps aside while they are up.
+        net.kuafuai.andee.ui.TextInputActivity.onAway = { window.setAway(it) }
         // Fires on every way out of the field; see [typingFinished].
         net.kuafuai.andee.ui.TextInputActivity.onClosed = { typingFinished() }
         // And this is how the card knows where to stop: the field's own top
@@ -703,10 +706,10 @@ class ScreenBodyService : AccessibilityService() {
      *
      * [how] is only for the log line.
      */
-    private fun submitUserTurn(text: String, how: String) {
+    private fun submitUserTurn(text: String, how: String, images: List<String> = emptyList()) {
         val said = text.trim()
-        if (said.isEmpty()) return
-        android.util.Log.i("Body", "$how: $said")
+        if (said.isEmpty() && images.isEmpty()) return
+        android.util.Log.i("Body", "$how: $said" + if (images.isEmpty()) "" else " (+${images.size} images)")
         // Hand the keyboard back before the turn exists: the brain may call
         // `type_text` inside it, and it can only do that on ADBKeyboard.
         closeTyping()
@@ -717,18 +720,23 @@ class ScreenBodyService : AccessibilityService() {
         val editing = pendingArtifact
         pendingArtifact = null
         val forBrain = editing?.let { artifactEditQuery(it, said) } ?: said
+        val row = if (editing != null) AppLocale.str(this, R.string.artifacts_edit_said, editing.text, said) else said
         net.kuafuai.andee.ui.ChatHistory.addUser(
-            if (editing != null) AppLocale.str(this, R.string.artifacts_edit_said, editing.text, said) else said,
+            if (images.isEmpty()) row
+            else "${AppLocale.str(this, R.string.input_photos_row, images.size)} $row".trim(),
         )
+        // The hub gets the count, not the pixels: an event is fire-and-forget,
+        // and megabytes of base64 on it would be dropped along with the text.
         val payload = org.json.JSONObject()
             .put("text", forBrain)
             .put("ts", System.currentTimeMillis())
+        if (images.isNotEmpty()) payload.put("images", images.size)
         hubClient?.sendEvent("asr.final", payload)
         wsServer?.broadcastEvent("asr.final", payload)
         // Same turn, different brain. The local one takes the text directly —
         // there is no socket in between, and no event kind it would have to be
         // taught (see the meeting callback).
-        localBrain?.submit(forBrain)
+        localBrain?.submit(forBrain, images)
         // Task start, and deliberately at the request rather than at the
         // reply: from here the device is being worked on, whether that reaches
         // us as a tool call or as thirty seconds of thinking. Nobody listening
@@ -792,6 +800,7 @@ class ScreenBodyService : AccessibilityService() {
      */
     private fun typingFinished() {
         window.setTypingTop(0)
+        window.setAway(false)
         if (typingFromFullscreen && !window.isCompact()) dispatcher.expand()
         typingFromFullscreen = false
     }

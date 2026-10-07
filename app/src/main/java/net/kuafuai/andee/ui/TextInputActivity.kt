@@ -1,12 +1,23 @@
 package net.kuafuai.andee.ui
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.ImageDecoder
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
+import android.media.ThumbnailUtils
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.text.InputType
+import android.util.Base64
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -14,15 +25,21 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import net.kuafuai.andee.R
 import net.kuafuai.andee.i18n.AppLocale
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.lang.ref.WeakReference
+import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 
 /**
  * The field a person types into — an **Activity**, not an overlay window.
@@ -84,6 +101,32 @@ class TextInputActivity : Activity() {
     /** Pending "the keyboard is really gone, close up" check. See [scheduleCloseWhenGone]. */
     private var closeWhenGone: Runnable? = null
 
+    /** A photo ready to go: what the brain gets, and what the strip shows. */
+    private class Photo(val jpegBase64: String, val thumb: Bitmap)
+
+    private val photos = mutableListOf<Photo>()
+    private lateinit var strip: LinearLayout
+    private lateinit var thumbs: LinearLayout
+    private lateinit var thumbScroll: HorizontalScrollView
+
+    /** Whether the card should follow the strip's top edge right now. */
+    private var trackTop = false
+
+    /**
+     * The user is in the camera, the photo picker or the permission dialog.
+     * While it is set, the keyboard going away and this activity stopping are
+     * both expected, and neither may close the field.
+     */
+    private var picking = false
+
+    /** Where the system camera was told to write. */
+    private var shotFile: File? = null
+
+    /** Images still being decoded; [send] waits for them rather than dropping them. */
+    private var decoding = 0
+    private var sendWhenDecoded = false
+    private val worker = Executors.newSingleThreadExecutor()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lctx = AppLocale.wrap(this)
@@ -120,6 +163,25 @@ class TextInputActivity : Activity() {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+        }
+        row.addView(iconButton(R.drawable.ic_camera, lctx.getString(R.string.input_take_photo)) { takePhoto() })
+        row.addView(iconButton(R.drawable.ic_image, lctx.getString(R.string.input_pick_photos)) { pickPhotos() })
+        row.addView(field, LinearLayout.LayoutParams(0, WRAP, 1f))
+        row.addView(glyph(lctx.getString(R.string.input_send), Glass.ACCENT) { send() })
+        row.addView(glyph("✕", Glass.LABEL) { finish() })
+
+        thumbs = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(4), dp(4), dp(4), dp(8))
+        }
+        thumbScroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            visibility = View.GONE
+            addView(thumbs)
+        }
+
+        strip = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             // The *card* fill, not `Glass.panel`.
             //
             // `Glass` is a two-layer stack: an almost-opaque black base, then
@@ -139,10 +201,9 @@ class TextInputActivity : Activity() {
             // at. A dark bar over the bottom edge is the honest answer.
             background = Glass.card(this@TextInputActivity, dp(20), frosted = false)
             setPadding(dp(8), dp(8), dp(8), dp(8))
+            addView(thumbScroll, LinearLayout.LayoutParams(MATCH_PARENT, WRAP))
+            addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP))
         }
-        row.addView(field, LinearLayout.LayoutParams(0, WRAP, 1f))
-        row.addView(glyph(lctx.getString(R.string.input_send), Glass.ACCENT) { send() })
-        row.addView(glyph("✕", Glass.LABEL) { finish() })
 
         // The strip sits on **the card's own backdrop**, not on the user's app.
         //
@@ -174,7 +235,7 @@ class TextInputActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.BOTTOM
             setPadding(dp(12), dp(4), dp(12), dp(12))
-            addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP))
+            addView(strip, LinearLayout.LayoutParams(MATCH_PARENT, WRAP))
         }
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.parseColor(Glass.CARD_SOLID))
@@ -207,7 +268,12 @@ class TextInputActivity : Activity() {
             if (ime > 0) {
                 imeShown = true
                 cancelCloseWhenGone()
-            } else if (imeShown) {
+            } else if (picking) {
+                // Off in the camera or the picker; the keyboard left with us
+                // and comes back in onResume. Leave the card's height alone.
+                trackTop = false
+                return@setOnApplyWindowInsetsListener insets
+            } else if (imeShown && photos.isEmpty()) {
                 // The keyboard is on its way out, and so is this field:收起键盘
                 // means the user is done typing, and a strip left behind on an
                 // otherwise empty screen is a thing to dismiss twice.
@@ -217,6 +283,11 @@ class TextInputActivity : Activity() {
                 // of the screen, the card would grow to meet it, and the whole
                 // thing would close a moment later — three moves for one
                 // gesture. Left alone, the card simply grows back once.
+                //
+                // Not with photos on the strip, though: those took a trip to
+                // another app to collect, and losing them to a dropped keyboard
+                // is worse than a strip that waits at the bottom for 发送.
+                trackTop = false
                 scheduleCloseWhenGone()
                 return@setOnApplyWindowInsetsListener insets
             }
@@ -225,13 +296,13 @@ class TextInputActivity : Activity() {
             // position until this pass has laid it out — and sent again on every
             // inset change, which is what keeps the two in step as the keyboard
             // slides up and as 搜狗's toolbar row comes and goes.
-            root.post {
-                if (isFinishing) return@post
-                val at = IntArray(2)
-                row.getLocationOnScreen(at)
-                onTop?.invoke(at[1])
-            }
+            trackTop = true
+            root.post { reportTop() }
             insets
+        }
+        // The strip also grows by itself, when the first photo arrives.
+        strip.addOnLayoutChangeListener { _, _, top, _, _, _, oldTop, _, _ ->
+            if (top != oldTop && trackTop) reportTop()
         }
         window.decorView.hideFromAccessibility()
         OwnCard.shown()
@@ -259,8 +330,16 @@ class TextInputActivity : Activity() {
         super.onPause()
     }
 
+    /** What `noHistory` used to do, minus the trips this field sends the user on. */
+    override fun onStop() {
+        super.onStop()
+        if (!picking && !isFinishing) finish()
+    }
+
     override fun onDestroy() {
         cancelCloseWhenGone()
+        worker.shutdownNow()
+        shotFile?.delete()
         if (live?.get() === this) live = null
         resumed = false
         OwnCard.hidden()
@@ -275,19 +354,212 @@ class TextInputActivity : Activity() {
     }
 
     /**
-     * Hand the text to the service and get out of the way.
+     * Hand the text and the photos to the service and get out of the way.
      *
+     * Photos alone are a complete message — "what is this", without the words.
      * Clears the field before handing it over, so a send that turns out to be a
      * no-op (nothing listening) is visible as an empty box rather than as text
      * that silently went nowhere.
      */
     private fun send() {
+        if (decoding > 0) {
+            sendWhenDecoded = true
+            return
+        }
         val text = field.text?.toString()?.trim().orEmpty()
-        if (text.isEmpty()) return
+        if (text.isEmpty() && photos.isEmpty()) return
+        val images = photos.map { it.jpegBase64 }
         field.setText("")
         sent = true
-        onSubmit?.invoke(text)
+        onSubmit?.invoke(text, images)
         finish()
+    }
+
+    private fun takePhoto() {
+        if (photos.size + decoding >= MAX_PHOTOS) return
+        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            goAway()
+            requestPermissions(arrayOf(Manifest.permission.CAMERA), REQ_CAMERA_PERMISSION)
+            return
+        }
+        val dir = File(cacheDir, "shots").apply { mkdirs() }
+        val file = File(dir, "shot-${System.currentTimeMillis()}.jpg")
+        val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            .putExtra(MediaStore.EXTRA_OUTPUT, uri)
+            .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        goAway()
+        if (runCatching { startActivityForResult(intent, REQ_CAMERA) }.isFailure) {
+            Log.w(TAG, "no camera app to take a photo with")
+            comeBack()
+            return
+        }
+        shotFile = file
+    }
+
+    /**
+     * The system photo picker where there is one (no storage permission, and
+     * it is the picker people already know); `GET_CONTENT` below API 33.
+     */
+    private fun pickPhotos() {
+        val room = MAX_PHOTOS - photos.size - decoding
+        if (room <= 0) return
+        val intent = if (Build.VERSION.SDK_INT >= 33) {
+            Intent(MediaStore.ACTION_PICK_IMAGES).apply {
+                // The picker rejects a limit of 1; leaving it out means "one".
+                if (room > 1) putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, room)
+            }
+        } else {
+            Intent(Intent.ACTION_GET_CONTENT)
+                .setType("image/*")
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, room > 1)
+        }
+        goAway()
+        if (runCatching { startActivityForResult(intent, REQ_PICK) }.isFailure) {
+            Log.w(TAG, "no photo picker")
+            comeBack()
+        }
+    }
+
+    private fun goAway() {
+        picking = true
+        cancelCloseWhenGone()
+        onAway?.invoke(true)
+    }
+
+    private fun comeBack() {
+        picking = false
+        onAway?.invoke(false)
+    }
+
+    override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
+        super.onRequestPermissionsResult(code, permissions, results)
+        if (code != REQ_CAMERA_PERMISSION) return
+        comeBack()
+        if (results.firstOrNull() == PackageManager.PERMISSION_GRANTED) takePhoto()
+    }
+
+    @Deprecated("Activity has no other way to get a result without androidx.activity")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        comeBack()
+        when (requestCode) {
+            REQ_CAMERA -> {
+                val file = shotFile
+                shotFile = null
+                if (file == null) return
+                if (resultCode == RESULT_OK && file.length() > 0) {
+                    load(Uri.fromFile(file), file)
+                } else {
+                    file.delete()
+                }
+            }
+            REQ_PICK -> {
+                if (resultCode != RESULT_OK || data == null) return
+                val uris = mutableListOf<Uri>()
+                data.clipData?.let { clip ->
+                    for (i in 0 until clip.itemCount) clip.getItemAt(i).uri?.let { uris += it }
+                }
+                if (uris.isEmpty()) data.data?.let { uris += it }
+                uris.take(MAX_PHOTOS - photos.size - decoding).forEach { load(it, null) }
+            }
+        }
+    }
+
+    /**
+     * Decode off the main thread, at screenshot size: 1280 on the long side
+     * is what the brain already reads every screen at, and a 12-megapixel
+     * original would be a few megabytes of base64 for no more understanding.
+     * `ImageDecoder` applies the EXIF rotation, so a portrait photo arrives
+     * upright.
+     */
+    private fun load(uri: Uri, deleteAfter: File?) {
+        decoding++
+        val thumbPx = dp(THUMB_DP)
+        worker.execute {
+            val result = runCatching {
+                val bmp = ImageDecoder.decodeBitmap(ImageDecoder.createSource(contentResolver, uri)) { d, info, _ ->
+                    d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    val w = info.size.width
+                    val h = info.size.height
+                    val long = maxOf(w, h)
+                    if (long > PHOTO_LONG_SIDE) {
+                        val s = PHOTO_LONG_SIDE.toFloat() / long
+                        d.setTargetSize((w * s).roundToInt().coerceAtLeast(1), (h * s).roundToInt().coerceAtLeast(1))
+                    }
+                }
+                val out = ByteArrayOutputStream()
+                bmp.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
+                val thumb = ThumbnailUtils.extractThumbnail(bmp, thumbPx, thumbPx)
+                if (thumb !== bmp) bmp.recycle()
+                Photo(Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP), thumb)
+            }
+            deleteAfter?.delete()
+            runOnUiThread {
+                decoding--
+                result.onSuccess { addPhoto(it) }
+                    .onFailure { Log.w(TAG, "could not read $uri: ${it.message}") }
+                if (decoding == 0 && sendWhenDecoded) {
+                    sendWhenDecoded = false
+                    send()
+                }
+            }
+        }
+    }
+
+    private fun addPhoto(p: Photo) {
+        if (isFinishing || photos.size >= MAX_PHOTOS) return
+        photos += p
+        val size = dp(THUMB_DP)
+        val cell = FrameLayout(this)
+        val image = ImageView(this).apply {
+            setImageBitmap(p.thumb)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = GradientDrawable().apply { cornerRadius = dp(10).toFloat() }
+            clipToOutline = true
+        }
+        cell.addView(image, FrameLayout.LayoutParams(size, size))
+        val remove = TextView(this).apply {
+            text = "✕"
+            textSize = 11f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#CC000000"))
+            }
+            setOnClickListener {
+                photos.remove(p)
+                thumbs.removeView(cell)
+                syncPhotos()
+            }
+        }
+        cell.addView(
+            remove,
+            FrameLayout.LayoutParams(dp(22), dp(22), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(3)
+                marginEnd = dp(3)
+            },
+        )
+        thumbs.addView(
+            cell,
+            LinearLayout.LayoutParams(size, size).apply { marginEnd = dp(8) },
+        )
+        syncPhotos()
+        thumbScroll.post { thumbScroll.fullScroll(View.FOCUS_RIGHT) }
+    }
+
+    private fun syncPhotos() {
+        thumbScroll.visibility = if (photos.isEmpty()) View.GONE else View.VISIBLE
+        field.hint = lctx.getString(if (photos.isEmpty()) R.string.input_hint else R.string.input_hint_photos)
+    }
+
+    private fun reportTop() {
+        if (isFinishing) return
+        val at = IntArray(2)
+        strip.getLocationOnScreen(at)
+        onTop?.invoke(at[1])
     }
 
     /**
@@ -305,7 +577,7 @@ class TextInputActivity : Activity() {
      * cancels it.
      */
     private fun scheduleCloseWhenGone() {
-        if (closeWhenGone != null || isFinishing) return
+        if (closeWhenGone != null || isFinishing || picking) return
         val r = Runnable {
             closeWhenGone = null
             if (!isFinishing) finish()
@@ -341,10 +613,31 @@ class TextInputActivity : Activity() {
             setOnClickListener { onClick() }
         }
 
+    private fun iconButton(icon: Int, label: String, onClick: () -> Unit): ImageView =
+        ImageView(this).apply {
+            setImageResource(icon)
+            setColorFilter(Color.parseColor(Glass.LABEL))
+            contentDescription = label
+            setPadding(dp(8), dp(10), dp(8), dp(10))
+            isClickable = true
+            isFocusable = true
+            Glass.pressable(this)
+            setOnClickListener { onClick() }
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(44))
+        }
+
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     companion object {
+        private const val TAG = "Body"
         private const val IME_RETRY_MS = 250L
+        private const val MAX_PHOTOS = 6
+        private const val PHOTO_LONG_SIDE = 1280
+        private const val JPEG_QUALITY = 85
+        private const val THUMB_DP = 64
+        private const val REQ_CAMERA = 1
+        private const val REQ_PICK = 2
+        private const val REQ_CAMERA_PERMISSION = 3
 
         /**
          * How long the keyboard has to stay gone before the field follows it.
@@ -355,9 +648,17 @@ class TextInputActivity : Activity() {
         private const val WRAP = LinearLayout.LayoutParams.WRAP_CONTENT
         private const val MATCH_PARENT = LinearLayout.LayoutParams.MATCH_PARENT
 
-        /** Set once by the service, like [ChatHistory.init]. */
+        /** Set once by the service, like [ChatHistory.init]. Text may be empty when photos are not. */
         @Volatile
-        var onSubmit: ((String) -> Unit)? = null
+        var onSubmit: ((String, List<String>) -> Unit)? = null
+
+        /**
+         * The field is sending the user to the camera / photo picker (true) or
+         * has them back (false). The card above has to vanish meanwhile: it is
+         * an overlay and would sit over the top of whatever app opens.
+         */
+        @Volatile
+        var onAway: ((Boolean) -> Unit)? = null
 
         /**
          * Fires from [onDestroy] — the field is gone, whatever took it away.
