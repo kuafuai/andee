@@ -79,6 +79,9 @@ abstract class StageActivity : AppCompatActivity() {
      */
     private var leaving = false
 
+    /** Main thread only, like [leaving] itself. Read by [HtmlActivity.replaceFile]. */
+    internal val isLeaving: Boolean get() = leaving
+
     /**
      * Called once, the instant [leave] starts, while this window is still on
      * screen. Put the overlay back from here.

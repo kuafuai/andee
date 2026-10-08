@@ -59,6 +59,25 @@ class HtmlActivity : StageActivity() {
         @Volatile var pageUp = false
 
         /**
+         * The page that is on screen, for [replaceFile].
+         *
+         * A weak reference rather than a second `pageUp` flag, because the
+         * question being asked is not "is one up" but "which object do I hand
+         * new bytes to" — and the answer has to survive being asked from a
+         * dispatcher worker while the field is written from the main thread.
+         *
+         * Set at the top of [onCreate], before that method reads the statics
+         * below, and cleared in [onDestroy]. Those two facts are what close the
+         * handoff window: a `startActivity` that has been *asked* for but has not
+         * run yet is covered by the statics being the live values, and one that
+         * has run is covered by this.
+         */
+        @Volatile private var live: java.lang.ref.WeakReference<HtmlActivity>? = null
+
+        /** Main thread. [replaceFile] posts here; a dispatcher worker only waits on it. */
+        internal val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+        /**
          * Origin the brain's page runs as.
          *
          * Not a `file://` URL and not null, and both halves of that are bugs
@@ -129,10 +148,83 @@ class HtmlActivity : StageActivity() {
                 throw it
             }
         }
+
+        /**
+         * Put new bytes on the page that is already up. Returns false when there
+         * is nothing to hand them to.
+         *
+         * **The reason this exists is that "one page at a time" used to mean
+         * "refused".** A user who asked for a change to the page in front of
+         * them — "把标题改短点" — got a model call, a refused `ui.show_html`, and
+         * a sentence telling them to close the page by hand first: an
+         * instruction to do the one thing the assistant was there to do. The
+         * limit is real (one [htmlFile], one WebView), but what it forbids is two
+         * *instances*, not a second render.
+         *
+         * Safe against the handoff gap by two paths, and both are needed:
+         * before [onCreate] has run there is no instance and the statics are the
+         * live values, so writing them is the replacement; once it has run,
+         * [swapTo] swaps them under the running WebView. A page that is already
+         * on its way out is refused rather than swapped into — writing into a
+         * window that is being destroyed loses the new page entirely, and the
+         * caller is told to open it as a fresh page instead.
+         */
+        fun replaceFile(
+            context: android.content.Context,
+            file: java.io.File,
+            title: String,
+            onClosed: () -> Unit,
+        ): Boolean {
+            if (!pageUp) return false
+            val running = live?.get()
+            if (running == null) {
+                titleText = title
+                onClose = onClosed
+                htmlFile = file
+                return true
+            }
+            val done = java.util.concurrent.CountDownLatch(1)
+            var ok = false
+            mainHandler.post {
+                ok = if (running.isLeaving) {
+                    false
+                } else {
+                    running.swapTo(file, title, onClosed)
+                    true
+                }
+                done.countDown()
+            }
+            done.await(500, java.util.concurrent.TimeUnit.MILLISECONDS)
+            return ok
+        }
     }
 
     private var web: WebView? = null
     private var spinner: ProgressBar? = null
+
+    /**
+     * Swap this page's contents. Main thread only — [replaceFile] posts here.
+     *
+     * Not a second Activity and not a `startActivity`: the WebView is already on
+     * screen and already sized, so the new render lands in the same window at
+     * the same scroll position of the *chrome*, which is what "改了" should look
+     * like. The scroll position of the page itself resets, and that is correct —
+     * different bytes are not the same document.
+     *
+     * The statics are updated before the load because [onDestroy] reads them,
+     * and a page closed two seconds after a replacement has to be the page the
+     * caller was told about.
+     */
+    private fun swapTo(file: java.io.File, title: String, closed: () -> Unit) {
+        titleText = title
+        onClose = closed
+        htmlFile = file
+        val html = runCatching { file.readText() }.getOrNull() ?: return
+        // No spinner and no stage animation: the window is already up, and
+        // growing it again would read as a second page opening. A slow render
+        // shows the old page for a beat, which is the honest thing to show.
+        web?.loadDataWithBaseURL(BASE_URL, html, "text/html", "utf-8", null)
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -143,6 +235,10 @@ class HtmlActivity : StageActivity() {
         // Again here, not instead of in [showFile]: this one covers the activity
         // being recreated by the system after process death, where no caller ran.
         pageUp = true
+        // Before the statics below are read, so a replacement that lands while
+        // this method is running either writes the statics (this is not live
+        // yet) or takes the running path — never both and never neither.
+        live = java.lang.ref.WeakReference(this)
         // Only when no caller named the page. [titleText] itself is set by
         // [showFile] before this activity starts, so the common path is already
         // non-blank and this is the fallback for the recreated-instance case.
@@ -289,6 +385,7 @@ class HtmlActivity : StageActivity() {
         // [ChatHistory]'s job, against its own budget. See [showFile].
         htmlFile = null
         pageUp = false
+        live = null
         super.onDestroy()
     }
 

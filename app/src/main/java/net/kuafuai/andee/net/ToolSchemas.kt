@@ -830,8 +830,10 @@ object ToolSchemas {
         columns, cards, steps) or is interactive; length alone is not a
         reason.
 
-        ONE PAGE AT A TIME: while a page is up, calling this again is
-        refused rather than stacked. Compose everything into the one page.
+        ONE PAGE AT A TIME: while a page is up, calling this again REPLACES
+        it in place — that is how you revise a page the user asked you to
+        change. Send the whole new page, not a diff. Never ask the user to
+        close the page first.
 
         Inline CSS and JS ONLY. The device may have no usable internet, so a
         page that fetches a font, a framework or an image over the network

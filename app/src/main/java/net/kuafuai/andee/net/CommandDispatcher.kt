@@ -600,21 +600,41 @@ class CommandDispatcher(
                 val defaultTitle = AppLocale.str(appContext, R.string.html_default_title)
                 val title = params?.optString("title")?.ifEmpty { defaultTitle } ?: defaultTitle
                 if (net.kuafuai.andee.ui.HtmlActivity.pageUp) {
-                    // **Returns at once, and this is the reason it has to.**
-                    // This call used to wait on a latch for the user to close
-                    // the page, up to five minutes, and that wait was the whole
-                    // problem: [net.kuafuai.andee.brain.LocalBrain] runs a turn on
-                    // one thread and runs tools synchronously on it, so a parked
-                    // `show_html` parked the conversation — the user's next
-                    // sentence was accepted and then sat in the queue until the
-                    // page went away. Refusing the second page instead of
-                    // stacking it is the other half of the same constraint:
-                    // `HtmlActivity` keeps ONE page (see its `pageUp`), so two
-                    // in flight would mean the shared static file losing to
-                    // whichever activity read it last.
-                    org.json.JSONObject()
-                        .put("error", "There is still a page open on screen (${net.kuafuai.andee.ui.HtmlActivity.titleText}). " +
-                            "Ask the user to dismiss it first, or fold the new content into what they are already looking at.")
+                    // A page is already up: put the new one *in its place*.
+                    // This used to be refused with "ask the user to dismiss it
+                    // first", and the model said exactly that — so the most
+                    // natural request there is, "改一下这页", ended with the user
+                    // being told to close the page by hand. `HtmlActivity` still
+                    // keeps ONE page (see its `pageUp`); what that forbids is a
+                    // second instance over the shared static file, not a second
+                    // render, so the replacement goes into the running WebView.
+                    // Archived like a fresh page, so both versions are in the
+                    // scrollback.
+                    val archived = net.kuafuai.andee.ui.ChatHistory.addPage(title, html)
+                    val openedAt = android.os.SystemClock.elapsedRealtime()
+                    val replaced = archived != null &&
+                        net.kuafuai.andee.ui.HtmlActivity.replaceFile(appContext, archived, title) {
+                            pageClosed(title, openedAt)
+                        }
+                    if (replaced) {
+                        org.json.JSONObject()
+                            .put("shown", true)
+                            .put("replaced", true)
+                            .put("closed", false)
+                            .put("title", title)
+                            .put(
+                                "note",
+                                "The page that was on screen now shows this new version, in place — the user did " +
+                                    "not have to close anything. This step ends here; I will tell you when they close it.",
+                            )
+                    } else {
+                        // The only ways here are a page already on its way out
+                        // (the user tapped ✕ a moment ago) or an archive write
+                        // that failed. Neither is the user's to fix.
+                        org.json.JSONObject()
+                            .put("error", "The page on screen is closing right now and could not take the new version. " +
+                                "Call show_html again in a moment — do not ask the user to close anything.")
+                    }
                 } else {
                     // The page is the whole point of the call, and our own card
                     // is a fullscreen opaque overlay that sits above every
