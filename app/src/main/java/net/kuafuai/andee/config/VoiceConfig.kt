@@ -143,7 +143,7 @@ data class VoiceConfig(
                     .orEmpty().trim().trimEnd('/').ifEmpty { DEFAULT_LLM_BASE_URL },
                 model = p.getString("llm_model", DEFAULT_LLM_MODEL)
                     .orEmpty().trim().ifEmpty { DEFAULT_LLM_MODEL },
-                thinking = p.getString("llm_thinking", "enabled")
+                thinking = p.getString("llm_thinking", defaultThinking())
                     ?.trim()?.lowercase() != "disabled",
                 reasoningEffort = p.getString("llm_reasoning_effort", DEFAULT_REASONING_EFFORT)
                     .orEmpty().trim().ifEmpty { DEFAULT_REASONING_EFFORT },
@@ -340,6 +340,14 @@ data class VoiceConfig(
                 .getString("grounding", "off")
                 ?.trim()?.lowercase() == "on"
 
+        /**
+         * Thinking for a device that has never saved the setting: the build's
+         * `DEFAULT_THINKING` (local.properties, `on` / `off`), else on. Only the
+         * unset case — a saved choice always wins, same as [uiLanguage].
+         */
+        private fun defaultThinking(): String =
+            if (BuildConfig.DEFAULT_THINKING.trim().lowercase() == "off") "disabled" else "enabled"
+
         const val LANG_ZH = "zh"
         const val LANG_EN = "en"
 
@@ -362,6 +370,13 @@ data class VoiceConfig(
                 .getString("lang", "").orEmpty().trim().lowercase()
             if (saved == LANG_EN) return LANG_EN
             if (saved == LANG_ZH) return LANG_ZH
+            // The build's `DEFAULT_LANG` (local.properties) is the language of a
+            // device nobody has picked for yet. It sits below the saved choice
+            // and above the system locale; anything but zh/en reads as unset.
+            when (BuildConfig.DEFAULT_LANG.trim().lowercase()) {
+                LANG_EN -> return LANG_EN
+                LANG_ZH -> return LANG_ZH
+            }
             return if (java.util.Locale.getDefault().language == "zh") LANG_ZH else LANG_EN
         }
 
