@@ -85,14 +85,13 @@ object Backdrop {
     /**
      * What the backdrop's mean luminance should end up at, once the scrim is on.
      *
-     * 0.13 is not a taste-free number: it is what the card already composites to
-     * today, on average — `CARD_FROSTED` is 60% black over a blurred desktop,
-     * and a desktop averages 0.25–0.4. So this keeps every contrast decision
-     * made above it valid (the `LABEL`/`SECONDARY` text, the `PANEL` and `WELL`
-     * films, the `#2BFFFFFF` hairline) while changing *what* those decisions are
-     * sitting on.
+     * Started at 0.13 — what `CARD_FROSTED` (60% black over a blurred desktop)
+     * composites to on average — and was raised to 0.22 after use: on a card
+     * that stays up for minutes, 0.13 read as a black wall with a photo buried
+     * in it. 0.22 is about the ceiling: past it the pale ball and the
+     * `SECONDARY` text start to lose contrast against the image.
      */
-    private const val TARGET_LUMA = 0.13f
+    private const val TARGET_LUMA = 0.22f
 
     /**
      * Bounds on the derived scrim, so a very dark or very bright photo cannot
@@ -100,8 +99,8 @@ object Backdrop {
      * keeps text legible over a near-black image; the ceiling keeps the image
      * from disappearing under a near-white one.
      */
-    private const val SCRIM_MIN = 0.55f
-    private const val SCRIM_MAX = 0.85f
+    private const val SCRIM_MIN = 0.38f
+    private const val SCRIM_MAX = 0.75f
 
     private val ui = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor { r ->
