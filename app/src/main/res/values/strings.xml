@@ -284,7 +284,6 @@
     -->
     <string name="svc_btn_type_instead">打字说</string>
     <string name="svc_btn_open_settings">打开设置</string>
-    <string name="svc_listening_again">（继续听…）</string>
     <string name="svc_stopped">已停止</string>
     <!--
         The two parenthesised rows dropped into the scrollback when a recording

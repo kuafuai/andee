@@ -1004,7 +1004,6 @@ class ScreenBodyService : AccessibilityService() {
         if (asr.isActive() || tts.isSpeaking() || meeting.isActive() ||
             net.kuafuai.andee.device.CallState.isActive
         ) return
-        net.kuafuai.andee.ui.ChatHistory.addError(AppLocale.str(this, R.string.svc_listening_again))
         asr.toggle()   // not streaming → starts; the 3 s silence watchdog closes it
     }
 
@@ -2071,7 +2070,13 @@ class ScreenBodyService : AccessibilityService() {
             // The brain's own verdict on whether this conversation is still
             // open. Written before the speak below because [followUpWindow]
             // reads it seconds later, off the TTS drain — see [expectFollowUp].
-            expectFollowUp = !END_MARKER.containsMatchIn(text)
+            // A reply that ends on a question is waiting for an answer
+            // whatever the model tagged it; a mic that stays shut there is
+            // the one failure the user hears as being ignored.
+            expectFollowUp = !END_MARKER.containsMatchIn(text) ||
+                END_MARKER.replace(text, "").trimEnd().let {
+                    it.endsWith("?") || it.endsWith("？") || it.endsWith("吗") || it.endsWith("呢")
+                }
             // Markers come out here, with the markdown and before anything
             // else touches the string. This is the one place the answer is
             // turned from what the model wrote into what the user gets, and a
