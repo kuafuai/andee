@@ -113,7 +113,7 @@ class CommandDispatcher(
      * The card is for a user who may be looking anywhere but the screen;
      * a question nobody hears just waits in silence for its timeout.
      */
-    private val sayAloud: (String) -> Boolean = { false },
+    private val sayAloud: (text: String, listen: Boolean) -> Boolean = { _, _ -> false },
 ) {
     private val ui = Handler(Looper.getMainLooper())
 
@@ -527,7 +527,7 @@ class CommandDispatcher(
             // this says so instead of reporting a success nobody can hear.
             "tts.speak" -> {
                 val text = requireNotNull(params?.optString("text")?.ifEmpty { null }) { "tts.speak requires text" }
-                val spoken = sayAloud(text)
+                val spoken = sayAloud(text, false)
                 JSONObject()
                     .put("spoken", spoken)
                     .put("chars", text.length)
@@ -560,20 +560,37 @@ class CommandDispatcher(
                 // worker — bridge through a latch.
                 val latch = java.util.concurrent.CountDownLatch(1)
                 var answer: net.kuafuai.andee.ui.CardUi.Result? = null
-                net.kuafuai.andee.ui.CardUi.ask(question, buttons, timeoutMs) { r ->
+                // captureSpeech: this call is what the brain is blocked on, so
+                // words that name no button still answer it, and come back in
+                // the result below for the model to read against the options.
+                net.kuafuai.andee.ui.CardUi.ask(question, buttons, timeoutMs, captureSpeech = true) { r ->
                     answer = r; latch.countDown()
                 }
                 // The card is up in the user's hands, but they may be looking
                 // anywhere else — the ball is a voice-first device, so the
                 // question is spoken as well as shown. The service applies the
-                // same mute rules it applies to the final answer.
-                sayAloud(question)
+                // same mute rules it applies to the final answer. `listen`:
+                // when the question has been read out the mic opens by itself,
+                // so the user can just answer.
+                sayAloud(question, true)
                 latch.await(timeoutMs + 3000, java.util.concurrent.TimeUnit.MILLISECONDS)
                 val r = answer ?: net.kuafuai.andee.ui.CardUi.Result(null, "no_answer")
                 org.json.JSONObject()
                     .put("button", r.button)
                     .put("how", r.how)
-                    .put("answered", r.button != null)
+                    .put("answered", r.button != null || r.heard != null)
+                    .apply {
+                        if (r.heard != null) {
+                            put("heard", r.heard)
+                            if (r.button == null) {
+                                put(
+                                    "note",
+                                    "The user answered by voice and their words match none of the " +
+                                        "buttons. Read \"heard\" as their answer to your question.",
+                                )
+                            }
+                        }
+                    }
             }
             "ui.alert" -> {
                 val text = requireNotNull(params?.optString("text")?.ifEmpty { null }) { "ui.alert requires text" }
@@ -585,7 +602,7 @@ class CommandDispatcher(
                 }
                 // Same voice-first reasoning as ui.ask: a notice nobody hears
                 // is a notice that was never delivered.
-                sayAloud(text)
+                sayAloud(text, false)
                 latch.await(timeoutMs + 3000, java.util.concurrent.TimeUnit.MILLISECONDS)
                 val r = answer ?: net.kuafuai.andee.ui.CardUi.Result(null, "no_answer")
                 org.json.JSONObject()

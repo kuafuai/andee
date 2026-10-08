@@ -780,9 +780,17 @@ object ToolSchemas {
             method = "ui.ask",
             description = """
         Ask the user a question on a small floating card with tappable
-        buttons — blocks until they answer (or timeout). Returns which
-        button they tapped. The question is also read aloud (TTS), so
-        write it as one speakable sentence, no markdown or lists.
+        buttons — blocks until they answer (or timeout). The question is
+        also read aloud (TTS) and the microphone opens afterwards, so the
+        user may simply answer out loud. Write it as one speakable
+        sentence, no markdown or lists.
+
+        The result says how they answered. `button` is the button they
+        tapped or named. If they said something that matches no button,
+        `button` is null and `heard` holds their words: take those as
+        their answer and act on what they mean, which may be a choice, a
+        different option, or "neither". `answered` false means no reply
+        (timeout or dismissed).
 
         USE WHEN the next step genuinely needs the user's choice: which of
         several options, yes/no on something irreversible, "要继续吗".

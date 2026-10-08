@@ -444,7 +444,7 @@ class ScreenBodyService : AccessibilityService() {
             onPageClosed = { title, seconds -> notifyPageClosed(title, seconds) },
             // The ask/alert cards speak their text; the mute rules live here,
             // not in the dispatcher. See [speakCardText].
-            sayAloud = { text -> speakCardText(text) },
+            sayAloud = { text, listen -> speakCardText(text, listen) },
         )
         // Extension coming or going invalidates the hub's cached tool list; the
         // hub has no incremental protocol, so we bounce the outbound client and
@@ -732,7 +732,9 @@ class ScreenBodyService : AccessibilityService() {
         // rather than start a new turn — the user spoke to the question on
         // screen, not to the brain. Match is fuzzy (case-insensitive, prefix),
         // so "是" / "yes" / "ok" all hit a button labelled "是" or "Yes" or "OK".
-        if (how == "voice" && net.kuafuai.andee.ui.CardUi.tryAnswerByVoice(said)) {
+        if (how == "voice" &&
+            net.kuafuai.andee.ui.CardUi.tryAnswerByVoice(said) != net.kuafuai.andee.ui.CardUi.VoiceOutcome.NOT_HANDLED
+        ) {
             android.util.Log.i("Body", "$how answered card: $said")
             return
         }
@@ -2157,20 +2159,22 @@ class ScreenBodyService : AccessibilityService() {
      * refusal. Its caller is usually a person recording a demo, and "nothing
      * happened and nothing said why" is the worst answer to give them.
      */
-    private fun speakCardText(text: String): Boolean {
+    private fun speakCardText(text: String, listen: Boolean = false): Boolean {
         if (!acceptBrainOutput) return false
         if (meeting.isActive() || net.kuafuai.andee.device.CallState.isActive) return false
-        // A card is its own answer channel — the ask's buttons, the alert's
-        // 知道了. The follow-up mic must not open over it: a spoken answer
-        // would arrive as a *new turn* queued behind the very tool call the
-        // card is blocking, and a mic held open while the user decides
-        // overhears the room. The user who does want to talk has the wake
-        // word and the ball.
+        // [listen] is a `ui.ask`: the brain is blocked on this very card and
+        // the user answers it by voice. [CardUi.tryAnswerByVoice] is what makes
+        // that safe, because a sentence spoken while the card is up is
+        // delivered to the card and never starts a turn of its own, which would
+        // queue behind the tool call the card is blocking. That is why the
+        // follow-up mic may open here. It listens once: [AsrController]'s
+        // silence watchdog closes it, and an unanswered question still has the
+        // buttons, the ball and the wake word.
         //
-        // True for `tts.speak` as well, and for a different version of the same
-        // reason: a rehearsal line is not a question the assistant asked, so
-        // the mic must not come up hunting for an answer to it.
-        expectFollowUp = false
+        // Everything else stays shut: an `ui.alert` asks nothing, and a
+        // `tts.speak` rehearsal line is not a question the assistant asked, so
+        // the mic must not come up hunting for an answer to either.
+        expectFollowUp = listen
         val script = SpeechMood.parse(stripMarkdown(text))
         tts.speak(script.text, script.cues)
         return true
