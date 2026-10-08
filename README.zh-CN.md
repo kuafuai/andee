@@ -4,6 +4,7 @@
 
 <p align="center">
   <a href="https://www.codeflying.net">在线构建</a> ·
+  <a href="https://www.codeflying.net/andi">立即体验</a> ·
   <a href="#核心能力">核心能力</a> ·
   <a href="#快速开始">快速开始</a> ·
   <a href="#权限每一项为什么以及你拒绝了会怎样">权限</a> ·
@@ -204,7 +205,9 @@ WebSocket hub 连到设备。两者之间只是一份普通的工具 schema 契�
 
 **[codeflying.app](https://www.codeflying.app)**（English）· **[codeflying.net](https://www.codeflying.net)**
 （中文）就是一个干这件事的通用平台 —— **你用一句话描述想要的应用，它帮你开发并发布。** 不需要先懂
-Android。跟它要一个 Andee，它会交给你一个**已经配好令牌**的安装包。
+Android。跟它要一个 Andee，它会交给你一个**已经配好令牌**的安装包。也可以直接打开
+**[一键体验页](https://www.codeflying.net/andi)**，点「立即打包」即可复制母应用、生成一个已配好令牌的
+安装包二维码，扫码下载。
 
 **它是一个独立的服务，和本项目没有直接关系** —— 不是 Andee 的构建通道，本项目里的东西也管不到它。
 它自己的条款、定价和数据处理方式，都是它自己的。
