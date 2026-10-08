@@ -54,7 +54,7 @@ data class VoiceConfig(
          * Keys whose blank value means "go back to the compiled default"
          * rather than "the user didn't touch this row". See [save].
          */
-        private val OVERRIDE_KEYS = setOf("api_key", "asr_endpoint", "tts_endpoint")
+        internal val OVERRIDE_KEYS = setOf("api_key", "asr_endpoint", "tts_endpoint")
 
         const val DEFAULT_ASR_ENDPOINT = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
         const val DEFAULT_ASR_RESOURCE = "volc.bigasr.sauc.duration"
