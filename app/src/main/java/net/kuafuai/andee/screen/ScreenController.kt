@@ -604,7 +604,7 @@ class ScreenController(
      * worth far more.
      */
     private fun findLiveNode(entry: EidEntry): IntArray? {
-        val root = runCatching { service.rootInActiveWindow }.getOrNull() ?: return null
+        val root = runCatching { activeRoot() }.getOrNull() ?: return null
         try {
             if (root.packageName?.toString() != entry.pkg) return null
             // Strong path: resource id narrows it down, but WeChat reuses ids
@@ -638,23 +638,25 @@ class ScreenController(
                     matches.forEach { it.recycle() }
                 }
             }
-            // Weak path: walk for a node with the exact same bounds.
-            return findNodeByBounds(root, entry.bounds)
+            // Weak path: walk for a node with the exact same bounds. Budgeted:
+            // a miss falls back to the remembered centre, which is fine.
+            return findNodeByBounds(root, entry.bounds, WalkBudget(SEARCH_BUDGET_MS))
         } finally {
             root.recycle()
         }
     }
 
-    private fun findNodeByBounds(node: AccessibilityNodeInfo, bounds: String): IntArray? {
+    private fun findNodeByBounds(node: AccessibilityNodeInfo, bounds: String, budget: WalkBudget): IntArray? {
         val r = Rect()
         runCatching { node.getBoundsInScreen(r) }
         if (r.width() > 0 && r.height() > 0 && "${r.left},${r.top},${r.right},${r.bottom}" == bounds) {
             return intArrayOf(r.left, r.top, r.right, r.bottom)
         }
         for (i in 0 until node.childCount) {
-            val child = runCatching { node.getChild(i) }.getOrNull() ?: continue
+            if (budget.spent()) return null
+            val child = runCatching { childOf(node, i) }.getOrNull() ?: continue
             try {
-                val hit = findNodeByBounds(child, bounds)
+                val hit = findNodeByBounds(child, bounds, budget)
                 if (hit != null) return hit
             } finally {
                 child.recycle()
@@ -696,11 +698,12 @@ class ScreenController(
      * taken after a fixed beat, answers "did it land" without any of that.
      */
     private fun screenFingerprint(): JSONObject {
-        val root = runCatching { service.rootInActiveWindow }.getOrNull()
+        val root = runCatching { activeRoot() }.getOrNull()
             ?: return JSONObject().put("pkg", "").put("sig", 0)
         return try {
             val f = FingerprintStats()
-            collectFingerprint(root, f, 0)
+            val budget = WalkBudget(FINGERPRINT_BUDGET_MS)
+            collectFingerprint(root, f, 0, budget)
             // Window COUNT is part of the fingerprint on purpose: WeChat's
             // Moments like/comment bar is a full-screen overlay window that
             // changes nothing in the active window's node tree — measured in
@@ -710,6 +713,9 @@ class ScreenController(
             JSONObject()
                 .put("pkg", root.packageName?.toString().orEmpty())
                 .put("sig", f.sig() * 31 + winCount)
+                // Two cut fingerprints stop at different nodes, so their
+                // signatures differ whether or not the screen did.
+                .apply { if (budget.cut) put("cut", true) }
         } finally {
             root.recycle()
         }
@@ -734,13 +740,14 @@ class ScreenController(
         fun sig(): Int = count * 31 + hash
     }
 
-    private fun collectFingerprint(node: AccessibilityNodeInfo, f: FingerprintStats, depth: Int) {
+    private fun collectFingerprint(node: AccessibilityNodeInfo, f: FingerprintStats, depth: Int, budget: WalkBudget) {
         if (depth > 18 || f.count > 900) return  // cap: fingerprint, not a dump
         f.visit(node)
         for (i in 0 until node.childCount) {
-            val c = runCatching { node.getChild(i) }.getOrNull() ?: continue
+            if (budget.spent()) return
+            val c = runCatching { childOf(node, i) }.getOrNull() ?: continue
             try {
-                collectFingerprint(c, f, depth + 1)
+                collectFingerprint(c, f, depth + 1, budget)
             } finally {
                 c.recycle()
             }
@@ -779,6 +786,14 @@ class ScreenController(
         val changed = before.optString("pkg") != after.optString("pkg") ||
             before.optInt("sig") != after.optInt("sig")
         result.put("screen_changed", changed)
+        if (before.optBoolean("cut") || after.optBoolean("cut")) {
+            result.put(
+                "screen_changed_note",
+                "This app answers accessibility too slowly to compare the screen before and " +
+                    "after, so screen_changed is a guess — judge whether the tap landed from the " +
+                    "attached screenshot.",
+            )
+        }
         result.put("now_pkg", after.optString("pkg"))
         val tapX = result.optInt("x")
         val tapY = result.optInt("y")
@@ -810,7 +825,7 @@ class ScreenController(
             // screenshot above already carries the pixels; this carries the
             // e-numbers. One tap response = full next-step context.
             runCatching {
-                val tree = dumpOnce(false)
+                val tree = dumpOnce(false, WalkBudget(ATTACHED_TREE_MS))
                 if (tree.optInt("nodes_useful", 0) > 0) {
                     rebuildIndexAndList(tree)
                     val elements = tree.optString("elements")
@@ -819,7 +834,11 @@ class ScreenController(
                             .put("elements_pkg", tree.optString("pkg"))
                             .put("elements_hint",
                                 "This is the POST-TAP screen. Chain your next tap_screen_element / " +
-                                "type_text directly from these e-numbers — do NOT re-dump first.")
+                                "type_text directly from these e-numbers — do NOT re-dump first." +
+                                if (tree.optBoolean("walk_cut")) {
+                                    " The list is PARTIAL: this app answered too slowly to read it " +
+                                        "all, so what is in the screenshot but not here was not reached."
+                                } else "")
                     }
                 }
             }
@@ -1131,14 +1150,15 @@ class ScreenController(
     private fun readTextFromTree(want: String): String {
         if (want.isEmpty()) return ""
         val r = service.rootInActiveWindow ?: return ""
+        val budget = WalkBudget(SEARCH_BUDGET_MS)
         try {
             val stack = ArrayDeque<AccessibilityNodeInfo>()
             stack.add(r)
-            while (stack.isNotEmpty()) {
+            while (stack.isNotEmpty() && !budget.spent()) {
                 val n = stack.removeFirst()
                 val t = n.text?.toString().orEmpty()
                 if (t == want) return t
-                for (i in 0 until n.childCount) n.getChild(i)?.let { stack.add(it) }
+                for (i in 0 until n.childCount) childOf(n, i)?.let { stack.add(it) }
             }
         } finally {
             r.recycle()
@@ -1233,11 +1253,17 @@ class ScreenController(
         // genuinely animated — the shot is taken anyway and `still_moving`
         // says so, rather than pretending.
         runCatching {
-            var prev = screenFingerprint().optInt("sig", -1)
+            val first = screenFingerprint()
+            // A slow app cannot be fingerprinted to a stable answer, and each
+            // try would cost a full budget — take the picture as it is.
+            if (first.optBoolean("cut")) return@runCatching
+            var prev = first.optInt("sig", -1)
             var tries = 0
             while (tries < STABLE_MAX_TRIES) {
                 Thread.sleep(STABLE_POLL_MS)
-                val sig = screenFingerprint().optInt("sig", -2)
+                val again = screenFingerprint()
+                if (again.optBoolean("cut")) return@runCatching
+                val sig = again.optInt("sig", -2)
                 if (sig == prev) return@runCatching
                 prev = sig
                 tries++
@@ -1366,7 +1392,7 @@ class ScreenController(
                 // it comes back empty and costs nothing.
                 .also {
                     runCatching {
-                        val tree = dumpOnce(false)
+                        val tree = dumpOnce(false, WalkBudget(ATTACHED_TREE_MS))
                         if (tree.optInt("nodes_useful", 0) > 0) {
                             rebuildIndexAndList(tree)
                             val elements = tree.optString("elements")
@@ -1376,7 +1402,11 @@ class ScreenController(
                                     .put("aim_hint",
                                         "Prefer tap_id(e) / type(id) with these elements — " +
                                         "system-computed, always accurate. Pixel-aiming " +
-                                        "from the image is the fallback, not the default.")
+                                        "from the image is the fallback, not the default." +
+                                        if (tree.optBoolean("walk_cut")) {
+                                            " The list is PARTIAL: this app answered too slowly " +
+                                                "to read it all, so aim at what is missing from the image."
+                                        } else "")
                             }
                         }
                     }
@@ -1561,14 +1591,17 @@ class ScreenController(
         capture: (String) -> JSONObject = { screenshot(it) },
     ): JSONObject {
         val ts = System.currentTimeMillis()
-        var out = dumpOnce(verbose)
+        val budget = WalkBudget(TREE_BUDGET_MS)
+        val firstStart = SystemClock.uptimeMillis()
+        var out = dumpOnce(verbose, budget)
+        val firstMs = SystemClock.uptimeMillis() - firstStart
         var waited = 0L
-        while (!verbose && out.optInt("nodes_useful", 0) == 0 && waited < SETTLE_BUDGET_MS) {
+        while (!verbose && out.optInt("nodes_useful", 0) == 0 && waited < SETTLE_BUDGET_MS && !budget.spent()) {
             val age = System.currentTimeMillis() - lastContentEventMs.get()
             if (lastContentEventMs.get() != 0L && age >= QUIET_WINDOW_MS) break
             try { Thread.sleep(SETTLE_POLL_MS) } catch (_: InterruptedException) { break }
             waited += SETTLE_POLL_MS
-            out = dumpOnce(verbose)
+            out = dumpOnce(verbose, budget)
         }
         // Stability pass — the half the old loop never covered: "has content"
         // is not "has stopped moving". A screen mid-animation (list settling,
@@ -1579,13 +1612,20 @@ class ScreenController(
         // still is exactly one extra pass — and that pass is also what
         // guarantees the eid index the brain is about to read was built from
         // the settled geometry, not a mid-flight one.
-        if (!verbose && out.optInt("nodes_useful", 0) > 0) {
+        //
+        // Skipped for a slow app: each re-dump is another full walk, and a
+        // re-dump cut short by the budget is kept out of `out` — a partial
+        // tree must never replace a whole one just because it came second.
+        if (!verbose && out.optInt("nodes_useful", 0) > 0 &&
+            !out.optBoolean("walk_cut") && firstMs < STABLE_SKIP_MS
+        ) {
             var prevSig = treeSignature(out)
             var stableTries = 0
             while (waited < SETTLE_BUDGET_MS && stableTries < STABLE_MAX_TRIES) {
                 try { Thread.sleep(STABLE_POLL_MS) } catch (_: InterruptedException) { break }
                 waited += STABLE_POLL_MS
-                val again = dumpOnce(verbose)
+                val again = dumpOnce(verbose, budget)
+                if (again.optBoolean("walk_cut")) break
                 val sig = treeSignature(again)
                 if (sig == prevSig) {
                     out = again
@@ -1667,8 +1707,15 @@ class ScreenController(
         // so the caller can blank our overlay first — see CommandDispatcher.
         val treeEmpty = out.optInt("nodes_useful", 0) == 0 ||
             out.optString("pkg") == service.packageName
-        if (!verbose && (withShot || treeEmpty)) {
-            val reason = if (withShot) "with_shot" else "auto_empty"
+        // A walk the budget cut short is the same case in part: whatever it
+        // did not reach exists only in the pixels.
+        val walkCut = out.optBoolean("walk_cut")
+        if (!verbose && (withShot || treeEmpty || walkCut)) {
+            val reason = when {
+                withShot -> "with_shot"
+                treeEmpty -> "auto_empty"
+                else -> "auto_partial"
+            }
             runCatching { out.put("shot", capture(reason)) }
                 .onFailure { out.put("shot_error", it.message ?: "capture failed") }
             if (!withShot) out.put("shot_auto", true)
@@ -1697,11 +1744,11 @@ class ScreenController(
         return sb.toString()
     }
 
-    private fun dumpOnce(verbose: Boolean): JSONObject {
-        val active = service.rootInActiveWindow
+    private fun dumpOnce(verbose: Boolean, budget: WalkBudget): JSONObject {
+        val active = activeRoot()
         val out = if (active != null) {
             try {
-                val stats = Stats()
+                val stats = Stats(budget)
                 val body = buildNode(active, verbose, stats) ?: JSONObject().put("empty", true)
                 withStats(body, active.packageName?.toString() ?: "", stats)
             } finally {
@@ -1716,13 +1763,13 @@ class ScreenController(
         // window (WeChat's mini-program / web-view pannes do exactly this).
         // Also entered when the "active" window turned out to be a status-bar
         // or other system shell during an app transition.
-        if (!verbose && out.optInt("nodes_useful", 0) == 0) tryOtherWindows(out)
+        if (!verbose && out.optInt("nodes_useful", 0) == 0 && !budget.spent()) tryOtherWindows(out, budget)
         // A status bar (SystemUI) can be the active window mid-transition and
         // hand us ~27 "useful" status icons — real nodes, wrong screen. The
         // user-facing app is always a better source when it has ANY content.
         // Only run this correction when we did NOT just come from
         // tryOtherWindows with a genuinely better window.
-        if (!verbose && out.optString("pkg") == "com.android.systemui") tryOtherWindows(out)
+        if (!verbose && out.optString("pkg") == "com.android.systemui" && !budget.spent()) tryOtherWindows(out, budget)
 
         return out
     }
@@ -1740,7 +1787,7 @@ class ScreenController(
      * was found, so the next person debugging this (or the model) can see which
      * window existed and which one had content, instead of a bare `{}`.
      */
-    private fun tryOtherWindows(out: JSONObject) {
+    private fun tryOtherWindows(out: JSONObject, budget: WalkBudget) {
         val windows = runCatching { service.windows }.getOrNull()
         if (windows == null) {
             out.put("windows_seen", 0)
@@ -1755,8 +1802,9 @@ class ScreenController(
         var bestUseful = out.optInt("nodes_useful", 0)
         try {
             for (w in windows) {
-                val stats = Stats()
-                val root = runCatching { w.root }.getOrNull()
+                if (budget.spent()) break
+                val stats = Stats(budget)
+                val root = runCatching { rootOf(w) }.getOrNull()
                 // Read everything we need off the node *before* recycling it.
                 val pkg = if (root != null) runCatching { root.packageName?.toString() }.getOrNull().orEmpty() else ""
                 val body = if (root != null) {
@@ -2058,6 +2106,7 @@ class ScreenController(
         body.put("nodes_kept", stats.kept)
         body.put("nodes_useful", stats.useful)
         stats.surface?.let { body.put("surface", shortenClass(it, false)) }
+        if (stats.budget.cut) body.put("walk_cut", true)
         if (source != null) body.put("source", source)
         return body
     }
@@ -2071,12 +2120,52 @@ class ScreenController(
      *   [useful] — nodes carrying something you can act on (text / desc / id)
      *   [surface]— first self-rendering view found, if any
      */
-    private class Stats {
+    private class Stats(val budget: WalkBudget = WalkBudget.UNLIMITED) {
         var total = 0
         var kept = 0
         var useful = 0
         var surface: String? = null
     }
+
+    /**
+     * Wall-clock cap on one tree walk. Every `getChild` is a binder round trip
+     * answered on the *target app's* UI thread, so an app busy animating
+     * answers each one late — 红果's 福利 page measured 551 nodes in 135 s,
+     * ~245 ms a node — and a walk with no cap outlives the brain's tool deadline while
+     * still holding the app's attention. A cut walk reports itself
+     * (`walk_cut`) so the caller can say the list is partial, not absent.
+     */
+    private class WalkBudget(ms: Long) {
+        private val until = if (ms == Long.MAX_VALUE) Long.MAX_VALUE else SystemClock.uptimeMillis() + ms
+        var cut = false
+            private set
+
+        fun spent(): Boolean {
+            if (!cut && SystemClock.uptimeMillis() >= until) cut = true
+            return cut
+        }
+
+        companion object {
+            val UNLIMITED get() = WalkBudget(Long.MAX_VALUE)
+        }
+    }
+
+    /**
+     * API 33+ lets one round trip carry up to 50 descendants back with the
+     * node asked for. `UNINTERRUPTIBLE` is the half that matters for a walk:
+     * by default the app abandons the prefetch the moment our next request
+     * arrives, and a depth-first walk sends the next request immediately —
+     * so most nodes came back one IPC each. Older versions keep the plain call.
+     */
+    private fun childOf(node: AccessibilityNodeInfo, i: Int): AccessibilityNodeInfo? =
+        if (android.os.Build.VERSION.SDK_INT >= 33) node.getChild(i, PREFETCH_WALK) else node.getChild(i)
+
+    private fun activeRoot(): AccessibilityNodeInfo? =
+        if (android.os.Build.VERSION.SDK_INT >= 33) service.getRootInActiveWindow(PREFETCH_WALK)
+        else service.rootInActiveWindow
+
+    private fun rootOf(w: AccessibilityWindowInfo): AccessibilityNodeInfo? =
+        if (android.os.Build.VERSION.SDK_INT >= 33) w.getRoot(PREFETCH_WALK) else w.root
 
     /**
      * Tell the brain what it is looking at when there is nothing to act on, in
@@ -2204,6 +2293,19 @@ class ScreenController(
                         "line covers it.",
                 )
         }
+        // Independent of the verdict above: a cut walk can still have produced
+        // a perfectly good partial list, and the model needs both facts.
+        if (out.optBoolean("walk_cut")) {
+            out.put(
+                "walk_note",
+                "This app answered accessibility too slowly (it is busy animating), so reading " +
+                    "stopped after ${TREE_BUDGET_MS / 1000}s with only part of the screen listed. " +
+                    "The e-numbers above are real and tappable; anything you see in $eyes but not " +
+                    "in the list was simply not reached — aim at it with tap_by_coordinates. " +
+                    "Calling this tool again will be just as slow. Nothing is broken; do not tell " +
+                    "the user you cannot see the screen.",
+            )
+        }
     }
 
     /**
@@ -2306,7 +2408,8 @@ class ScreenController(
 
         val kids = mutableListOf<JSONObject>()
         for (i in 0 until node.childCount) {
-            val child = node.getChild(i) ?: continue
+            if (st != null && st.budget.spent()) break
+            val child = childOf(node, i) ?: continue
             try {
                 buildNode(child, verbose, stats)?.let { kids.add(it) }
             } finally {
@@ -2463,6 +2566,23 @@ class ScreenController(
         private const val STABLE_POLL_MS = 300L
         private const val STABLE_MAX_TRIES = 3
         private const val QUIET_WINDOW_MS = 1200L
+
+        /** See [childOf]. Compile-time ints, only ever passed on API 33+. */
+        @android.annotation.SuppressLint("InlinedApi")
+        private const val PREFETCH_WALK = AccessibilityNodeInfo.FLAG_PREFETCH_DESCENDANTS_HYBRID or
+            AccessibilityNodeInfo.FLAG_PREFETCH_UNINTERRUPTIBLE
+
+        /**
+         * Walk caps — see [WalkBudget]. A whole `get_screen_element`, re-dumps
+         * included, fits in [TREE_BUDGET_MS]; a first pass slower than
+         * [STABLE_SKIP_MS] skips the stability re-dumps, which on a slow app
+         * would cost a full walk each to learn what the screenshot shows anyway.
+         */
+        private const val TREE_BUDGET_MS = 8_000L
+        private const val STABLE_SKIP_MS = 2_000L
+        private const val ATTACHED_TREE_MS = 4_000L
+        private const val FINGERPRINT_BUDGET_MS = 1_500L
+        private const val SEARCH_BUDGET_MS = 1_500L
 
         /** The relative coordinate space the brain speaks: 0..1000 both axes. */
         private const val NORM_MAX = 1000
