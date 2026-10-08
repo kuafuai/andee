@@ -43,6 +43,8 @@ class ScreenController(
      * it is marked *after* the stroke and never before.
      */
     private val marker: net.kuafuai.andee.ui.TapMarkerUi? = null,
+    /** Where our own (still visible) ball window sits, masked out of pixel comparisons. */
+    private val ownArea: () -> Rect? = { null },
 ) {
 
     /** Last meaningful accessibility event from a non-overlay app. */
@@ -680,10 +682,11 @@ class ScreenController(
         // a long-press.
         val stroke = GestureDescription.StrokeDescription(path, 0L, 150L)
         val before = screenFingerprint()
+        val beforePx = if (before.optBoolean("blind")) pixelSignature() else null
         val result = runGesture(GestureDescription.Builder().addStroke(stroke).build(), 2000L)
         marker?.mark(x, y, net.kuafuai.andee.ui.TapMarkerUi.Kind.TAP)
         result.put("x", x).put("y", y)
-        attachEffectSnapshot(result, before)
+        attachEffectSnapshot(result, before, beforePx)
         return result
     }
 
@@ -719,6 +722,10 @@ class ScreenController(
                 // Two cut fingerprints stop at different nodes, so their
                 // signatures differ whether or not the screen did.
                 .apply { if (budget.cut) put("cut", true) }
+                // A withheld root (or a bare canvas) gives the same signature
+                // before and after any tap, so the tree cannot say whether one
+                // landed — see [pixelSignature].
+                .apply { if (f.count <= BLIND_TREE_NODES) put("blind", true) }
         } finally {
             root.recycle()
         }
@@ -758,6 +765,100 @@ class ScreenController(
     }
 
     /**
+     * Mean luma per cell of a [PX_COLS]×[PX_ROWS] grid over the live screen,
+     * with the status bar and our own ball window set to NaN so a ticking
+     * clock or a blinking ball cannot read as the tap landing. Null if the
+     * capture failed — the caller then falls back to the tree's answer.
+     */
+    private fun pixelSignature(): FloatArray? {
+        val mask = ownArea()
+        return captureFrame { hw ->
+            val sw = PX_COLS * PX_SAMPLE
+            val sh = PX_ROWS * PX_SAMPLE
+            val scaled = Bitmap.createScaledBitmap(hw, sw, sh, true)
+            val soft = if (scaled.config == Bitmap.Config.HARDWARE) {
+                scaled.copy(Bitmap.Config.ARGB_8888, false).also { scaled.recycle() }
+            } else scaled
+            val px = IntArray(sw * sh)
+            soft.getPixels(px, 0, sw, 0, 0, sw, sh)
+            soft.recycle()
+            val cellW = hw.width.toFloat() / PX_COLS
+            val cellH = hw.height.toFloat() / PX_ROWS
+            val statusBar = (hw.height * STATUS_BAR_FRACTION).toInt()
+            FloatArray(PX_COLS * PX_ROWS) { i ->
+                val cx = i % PX_COLS
+                val cy = i / PX_COLS
+                val cell = Rect(
+                    (cx * cellW).toInt(), (cy * cellH).toInt(),
+                    ((cx + 1) * cellW).toInt(), ((cy + 1) * cellH).toInt(),
+                )
+                if (cell.top < statusBar || (mask != null && Rect.intersects(mask, cell))) {
+                    return@FloatArray Float.NaN
+                }
+                var sum = 0f
+                for (yy in 0 until PX_SAMPLE) for (xx in 0 until PX_SAMPLE) {
+                    val c = px[(cy * PX_SAMPLE + yy) * sw + cx * PX_SAMPLE + xx]
+                    sum += 0.299f * Color.red(c) + 0.587f * Color.green(c) + 0.114f * Color.blue(c)
+                }
+                sum / (PX_SAMPLE * PX_SAMPLE)
+            }
+        }
+    }
+
+    private fun pixelsMoved(a: FloatArray, b: FloatArray): Boolean {
+        if (a.size != b.size) return true
+        var moved = 0
+        for (i in a.indices) {
+            if (a[i].isNaN() || b[i].isNaN()) continue
+            if (kotlin.math.abs(a[i] - b[i]) > PX_CELL_DELTA) moved++
+        }
+        return moved >= PX_MIN_CELLS
+    }
+
+    /** takeScreenshot refuses calls closer than ~333 ms apart; space them out instead of failing. */
+    private val lastCaptureAt = AtomicLong(0L)
+
+    private fun awaitCaptureGap() {
+        val wait = lastCaptureAt.get() + CAPTURE_GAP_MS - SystemClock.uptimeMillis()
+        if (wait > 0) runCatching { Thread.sleep(wait) }
+    }
+
+    private fun <T> captureFrame(transform: (Bitmap) -> T): T? {
+        awaitCaptureGap()
+        val latch = CountDownLatch(1)
+        var out: T? = null
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            service.takeScreenshot(
+                Display.DEFAULT_DISPLAY,
+                executor,
+                object : AccessibilityService.TakeScreenshotCallback {
+                    override fun onSuccess(screenshot: AccessibilityService.ScreenshotResult) {
+                        val hb = screenshot.hardwareBuffer
+                        try {
+                            Bitmap.wrapHardwareBuffer(hb, screenshot.colorSpace)?.let { out = transform(it) }
+                        } catch (t: Throwable) {
+                            Log.w("Body", "captureFrame: ${t.message}")
+                        } finally {
+                            hb.close()
+                            latch.countDown()
+                        }
+                    }
+
+                    override fun onFailure(errorCode: Int) {
+                        latch.countDown()
+                    }
+                },
+            )
+            latch.await(3, TimeUnit.SECONDS)
+        } finally {
+            lastCaptureAt.set(SystemClock.uptimeMillis())
+            executor.shutdown()
+        }
+        return out
+    }
+
+    /**
      * The "did my tap land" half of the effect snapshot. Waits one beat for
      * the app to react (a transition that has not started yet reads as no
      * change), then fingerprints again and reports the delta:
@@ -775,7 +876,7 @@ class ScreenController(
      * Both carry `tap_mark: [x,y]` in 0-1000 so the ring's position is
      * machine-readable, not just visible.
      */
-    private fun attachEffectSnapshot(result: JSONObject, before: JSONObject) {
+    private fun attachEffectSnapshot(result: JSONObject, before: JSONObject, beforePx: FloatArray? = null) {
         try {
             // 400ms caught the launcher still holding focus mid-launch (tap
             // camera → changed=true but now_pkg=launcher — measured on
@@ -786,8 +887,21 @@ class ScreenController(
             Thread.currentThread().interrupt()
         }
         val after = screenFingerprint()
-        val changed = before.optString("pkg") != after.optString("pkg") ||
+        var changed = before.optString("pkg") != after.optString("pkg") ||
             before.optInt("sig") != after.optInt("sig")
+        if (!changed && beforePx != null) {
+            // Measured 2026-10-08 on a withheld WeChat: every tap that opened a
+            // page came back `false`, and the brain re-aimed at a screen that
+            // had already moved on — most of what looked like bad aim.
+            val afterPx = pixelSignature()
+            if (afterPx != null && pixelsMoved(beforePx, afterPx)) changed = true
+            result.put(
+                "screen_changed_note",
+                "This app hides its contents from accessibility, so screen_changed was judged " +
+                    "from the pixels. A playing video or animation also counts as a change — " +
+                    "confirm from the attached screenshot.",
+            )
+        }
         result.put("screen_changed", changed)
         if (before.optBoolean("cut") || after.optBoolean("cut")) {
             result.put(
@@ -1278,6 +1392,7 @@ class ScreenController(
         var w = 0;
         var h = 0
         val executor = Executors.newSingleThreadExecutor()
+        awaitCaptureGap()
         try {
             service.takeScreenshot(
                 Display.DEFAULT_DISPLAY,
@@ -1415,6 +1530,7 @@ class ScreenController(
                     }
                 }
         } finally {
+            lastCaptureAt.set(SystemClock.uptimeMillis())
             executor.shutdown()
         }
     }
@@ -2670,6 +2786,17 @@ class ScreenController(
         private const val ATTACHED_TREE_MS = 4_000L
         private const val FINGERPRINT_BUDGET_MS = 1_500L
         private const val SEARCH_BUDGET_MS = 1_500L
+
+        /** A withheld root is 1 node; a bare canvas a handful. */
+        private const val BLIND_TREE_NODES = 3
+        private const val PX_COLS = 20
+        private const val PX_ROWS = 32
+        private const val PX_SAMPLE = 6
+        /** Mean-luma delta (0-255) for a cell to count; a blinking text cursor stays under it. */
+        private const val PX_CELL_DELTA = 10f
+        private const val PX_MIN_CELLS = 2
+        private const val STATUS_BAR_FRACTION = 0.035f
+        private const val CAPTURE_GAP_MS = 350L
 
         /** See [awaitHelper]. Measured: the helper binds in about a second. */
         private const val HELPER_WAIT_MS = 3_000L

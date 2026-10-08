@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.os.Handler
 import android.os.Looper
@@ -910,6 +911,22 @@ class FloatingWindowUi(
      * Touch is unaffected; an invisible window still eats taps, which is fine
      * for the ~200 ms a capture holds it.
      */
+    /** Our window's on-screen rectangle right now, or null. Off the main thread only. */
+    fun windowBounds(): Rect? {
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var out: Rect? = null
+        ui.post {
+            root?.let { v ->
+                val loc = IntArray(2)
+                v.getLocationOnScreen(loc)
+                out = Rect(loc[0], loc[1], loc[0] + v.width, loc[1] + v.height)
+            }
+            latch.countDown()
+        }
+        latch.await(200, java.util.concurrent.TimeUnit.MILLISECONDS)
+        return out
+    }
+
     fun setVisibleForCapture(visible: Boolean) {
         ui.post {
             captureHidden = !visible

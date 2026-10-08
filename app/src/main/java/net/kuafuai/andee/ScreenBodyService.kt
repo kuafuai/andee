@@ -406,7 +406,7 @@ class ScreenBodyService : AccessibilityService() {
             }
         }
 
-        screen = ScreenController(this, marker)
+        screen = ScreenController(this, marker, ownArea = { window.windowBounds() })
         // The dog hangs off USB OTG. Nothing here touches the hardware: no port
         // is opened, no permission is asked for, and a tablet with no dongle
         // plugged in pays nothing until something calls a dog_* tool. See
