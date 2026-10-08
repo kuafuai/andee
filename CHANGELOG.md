@@ -27,6 +27,19 @@ build time would close this hole; it is not implemented yet.)
 
 ### Added
 
+- **Both READMEs now ask for your use case (`## Showcase` / `## 好玩的用法`).** The
+  README described what the thing can do and never asked anyone to show what they did with it,
+  which is how a project ends up with no idea whether the odd corners work. The section is an
+  invitation and three things that make a post useful: the device and ROM (this app talks to Android
+  at a level where ROMs disagree, so "worked on my phone" is not reproducible), the sentence you
+  actually said, and a link if there is one. It goes to a Discussions **Show and tell** rather than
+  the issue tracker, which follows the rule `config.yml` already sets — the tracker is for
+  reproducible defects, and a story is not one. Two details are deliberate rather than decorative.
+  **GitHub cannot play a video inside a README** (iframes are stripped, so a YouTube link stays a
+  link), and the section hands over the thumbnail form that makes it look like a player anyway,
+  rather than letting twenty people discover that separately. And it says plainly that **a
+  screenshot of this app is a picture of your messages** — the one thing in a showcase that can do
+  real harm is posting someone's private screen content, including your own.
 - `LICENSE` — Apache-2.0 with additional conditions (Part A: no multi-tenant SaaS, no
   white-labelling that removes the branding, no embedding it in another product without written
   authorisation). Note that GitHub reports this as `NOASSERTION`.
