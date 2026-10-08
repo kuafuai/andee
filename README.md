@@ -35,7 +35,11 @@
   No root. No custom ROM. No computer on a cable. <b>One APK.</b>
 </p>
 
-<!-- images/demo.gif goes here once it is recorded — see the asset list near the end. -->
+<!-- Demo video: drag the mp4 into the GitHub web editor here and it inserts the asset URL.
+     Keep that URL on its own line — no []() wrapper, no <p> — that is what renders the player.
+     URL: -->
+
+<!-- ↓ demo video goes here ↓ -->
 
 The phone you already own can do everything an "AI phone" is sold on. What it was missing was
 someone living in it. Andee is that someone: **a floating ball on your screen with a face, a voice
@@ -809,7 +813,7 @@ CLAUDE.md               architecture notes written for AI coding assistants (Eng
      Capture all of them on a real device; an emulator makes this app look like nothing.
        1. images/cover.png                      1200×630, goes at the very top
        2. images/demo.gif                       10–15s loop: the ball reacting while a task runs
-       3. a full demo video                     30–60s, hosted on Bilibili / YouTube
+       3. a full demo video                     30–60s, GitHub attachment link (drag-drop upload), goes at the top
        4. images/shot-{ball,phone,dog}.png      three stills, including the dog mid-motion
      Shot list for the video, in order: wake it by voice → it opens an app and taps through it →
      the ball's face changes as it works → a page it wrote appears → the dog moving. The dog is the
