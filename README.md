@@ -49,17 +49,17 @@ it can do it.
 
 ### Things you can just say
 
-You are driving when your mother messages you. One hand on the wheel, eyes on the road:
+You are driving when your mother texts you. One hand on the wheel, eyes on the road:
 
-> *"Hey Andee — reply to Mom on WeChat: I'll be home by seven."*
+> *"Hey Andee — reply to Mom on WhatsApp: I'll be home by seven."*
 
-It opens WeChat, finds the chat, types, sends, and reads the answer back. Your hands never left the
-wheel. **The hard part was never the sentence** — it is getting into a real app, as you, while you
-are somewhere else. The rest of the list is the same job in other shapes:
+It opens WhatsApp, finds your chat with Mom, types, sends, and reads the reply back. Your hands never
+left the wheel. **The hard part was never the sentence** — it is getting into a real app, as you,
+while you are somewhere else. The rest of the list is the same job in other shapes:
 
 | You say | What happens |
 |---|---|
-| *"Find this cheaper on Taobao and JD."* | It walks both shops itself and comes back with a comparison page. |
+| *"Find this cheaper on Amazon and eBay."* | It shops both sites itself and comes back with a comparison page. |
 | *"Remind me to call the landlord at nine tomorrow."* | The alarm is set before it says "OK". At nine, it wakes up and tells you. |
 | *"Record this meeting."* | It holds the mic for the hour, then hands you the minutes as a page. |
 | *(a photo)* *"What's wrong with this plant?"* | Photos ride along with what you type; it looks and answers. |
@@ -134,12 +134,12 @@ every fill on the ball as it happens.
 ### Mind — it gets to know you
 
 **5. Scenes: ways of working it learns with you.** *(new)*
-"Practice English with me", "look after my WeChat", "compare prices for me" — a scene is a goal, a
-voice, rules and a routine it steps into for a while. They are **not shipped, they are learned**:
+"Practice English with me", "keep an eye on my messages", "compare prices for me" — a scene is a goal,
+a voice, rules and a routine it steps into for a while. They are **not shipped, they are learned**:
 after the same kind of session comes up a few times, it proposes one; nothing is saved until you say
-yes. Enter one by saying so, from the 情景 panel, on a schedule, or automatically when you open an
-app. A scene's own rules decide how much it does on its own — "reply to my WeChat for me" really
-means it replies. While you are in one, a chip under the ball names it; its ✕ leaves it.
+yes. Enter one by saying so, from the **Scenes** panel, on a schedule, or automatically when you
+open an app. A scene's own rules decide how much it does on its own — "answer my messages for me"
+really means it answers. While you are in one, a chip under the ball names it; its ✕ leaves it.
 
 **6. It reads your notifications before they interrupt you.** *(new)*
 A cheap, tool-less model call (~500 tokens, against ~22,000 for a full turn) classifies each one:
@@ -154,7 +154,7 @@ test decides what gets written: *"next time I deal with them, would not knowing 
 it wrong?"* The notebook is **private** — the tools are `localOnly` and filtered out of the hub
 payload, so habits and promises never leave the device. On top of it sits a real scheduler, under
 a hard rule: the moment it says "I'll remind you", the task must already be set and confirmed. And it
-is yours to read: **它记得的事** lists every memory and every scheduled task, each one deletable.
+is yours to read: **What it remembers** lists every memory and every scheduled task — all deletable.
 
 **8. It behaves the same when nobody is watching.**
 After a conversation goes quiet the device sends a `(to yourself …)` turn — Andee reviewing the
@@ -186,9 +186,9 @@ up to six photos — from the camera or the gallery — with or without words.
 
 **12. Answers you can keep.**
 Anything structured — a comparison, a plan, meeting minutes — comes back as a page it writes and
-puts on screen. The **产物** panel keeps up to a hundred of them to reopen, delete, or revise by
-just saying what should change. Ask it to record a meeting and it holds the microphone for the
-hour, writing a verbatim transcript to disk as it goes, then turns it into minutes.
+puts on screen. The **Made for you** panel keeps up to a hundred of them to reopen, delete, or
+revise by just saying what should change. Ask it to record a meeting and it holds the microphone
+for the hour, writing a verbatim transcript to disk as it goes, then turns it into minutes.
 
 ### Body
 
@@ -279,7 +279,7 @@ behind it falls back to something else. The ball does at least say so out loud, 
 doing nothing.
 
 **2. The voice key — optional.** A [Volcengine Speech](https://www.volcengine.com/product/voice-tech)
-API key, in 「语音密钥」 / *Voice API key*. Without it ASR and TTS fail during the WebSocket
+API key, in the **Voice API key** field. Without it ASR and TTS fail during the WebSocket
 handshake, which surfaces as a **connect timeout** — the device looks like it has a network problem
 when what it has is a blank field. Everything else still works; it is just mute and deaf.
 
@@ -304,8 +304,8 @@ There is no home screen. What exists:
 
 - **A floating ball.** The entire UI is `TYPE_APPLICATION_OVERLAY` layers added through
   `WindowManager` (`ui/FloatingWindowUi`). Unfolded, it is a full-screen card: the ball's face on
-  top, the conversation underneath, and a small control bar — **产物** (the pages it has made),
-  **情景** (its scenes), **✓** (self-check), **⚙** (settings). When it starts working another app it
+  top, the conversation underneath, and a small control bar — **Made for you** (the pages it has
+  made), **Scenes**, **✓** (self-check), **⚙** (settings). When it starts working another app it
   folds itself into a ball in the corner and gets out of the way; tap to talk, long-press to unfold.
 - **The launcher icon opens two doors.** With the assistant running, it unfolds the card — exactly
   what a long-press on the ball does. With accessibility off, it shows the self-check card instead,
@@ -386,10 +386,10 @@ report success and a filename.
 *Note:* most vendor ROMs **switch this grant off again** after every system update and every
 force-stop. That is ROM behaviour, and not something the app can prevent.
 
-*WeChat (and other apps) sometimes show a blank screen to it.* Some apps hand **every**
-accessibility client an empty placeholder instead of their real UI. This is not Andee's fault:
-the system's own `uiautomator dump` gets the same blank page. Measured on a Xiaomi Pad 5 with
-MIUI and WeChat 8.0.78, WeChat only shows its real UI tree when MIUI's hidden
+*Some apps hand it a blank screen instead of their real UI.* They serve **every**
+accessibility client an empty placeholder, not just Andee — and it is not Andee's fault:
+the system's own `uiautomator dump` gets the same blank page. The one we measured is WeChat, on a
+Xiaomi Pad 5 with MIUI and WeChat 8.0.78: it only shows its real UI tree when MIUI's hidden
 **`MiuiEnhanceTBService`** is enabled. That is a TalkBack companion service, and it has no switch
 in Settings. With it on, the same chat screen dumps 219 nodes. With it off, it dumps none. MIUI
 also turns that service on and off by itself whenever Andee is re-bound (after a reinstall, a

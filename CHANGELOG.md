@@ -121,10 +121,27 @@ build time would close this hole; it is not implemented yet.)
   *this* project to). It is now described in its own terms first — **a general platform where you
   describe the app you want and it develops and publishes it** — followed by one plain sentence:
   **a separate service with no direct relationship to this project**, its own terms, pricing and data
-  handling. Same treatment in `## Using Andee` / `## 三种使用方式` and the Chinese
-  `## 从哪里开始看` table, so the three places it appears do not disagree. The practical guidance is
+  handling. Same treatment in `## Using Andee` / `## 三种使用方式`; the Chinese `## 从哪里开始看`
+  table carried it too, and has since been removed (see *Removed*). The practical guidance is
   unchanged (still the shortest path; still an APK you have to install; the free token allowance is
   still finite and then paid), because none of that was wrong — only the implied ownership was.
+
+- **The English README now addresses an English reader — in its examples and in the panel names it
+  points at.** Two different faults with one symptom: a reader concluding the page is not for them.
+  The examples were the Chinese ones with the words swapped (`WeChat`, `Taobao`, `JD`), and an
+  example is precisely what a reader uses to judge whether something is addressed to them. They are
+  now `WhatsApp`, `Amazon` and `eBay` — WhatsApp rather than a platform-native messenger because this
+  runs on Android only, and naming an iOS-only one would be a false claim rather than a foreign one.
+  Two of the scene examples needed rewriting rather than substituting: "look after my WeChat" is
+  帮我看着微信 carried across word for word, which is not a sentence English builds. Separately, the
+  panel names were the Chinese labels, so a reader on an English device was being told to look for
+  **产物** — a word their screen does not have. They now use the labels `values-en/` actually ships:
+  **Scenes**, **Made for you**, **What it remembers**, **Voice API key**.
+  The **measured** passage keeps every fact. Xiaomi Pad 5, MIUI, WeChat 8.0.78 and the 219-node count
+  are what was observed, and changing the app name there to make the prose consistent would be
+  inventing a measurement. Only its framing moved: it opened on WeChat, which a non-Chinese reader
+  reads as someone else's app having someone else's problem, so it now opens on the general
+  behaviour and names WeChat as the one we happened to measure.
 
 ### Removed
 
@@ -134,6 +151,14 @@ build time would close this hole; it is not implemented yet.)
   `git show <rev>:brain/andee-system-prompt.md`.
 - `dog/NRF24_Dongle/README.md` reference in the README — the dongle firmware is not in this
   repository and never was. The README now says so.
+- The `## 从哪里开始看` section in `README.zh-CN.md`, heading included. Its visible content was three
+  rows announcing that the demo video and the screenshots do not exist yet, which tells a reader
+  nothing they cannot see for themselves. The heading went too: once the table was gone the section
+  held nothing but an HTML comment, and a heading over nothing renders as exactly that. Every
+  pointer to it went as well — the nav anchor, the header comment, and the sentence above. In its
+  place, a slot for the demo video sits directly under the hero in both language files, and the
+  asset checklist moved down beside the contributors block, which is where the English file already
+  kept it.
 
 ### Known issues
 
