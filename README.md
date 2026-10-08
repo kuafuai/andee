@@ -69,7 +69,7 @@ while you are somewhere else. The rest of the list is the same job in other shap
 
 ### Why it is not another assistant app
 
-- **Works in every app, not a list of integrations.** It reads the accessibility tree and the
+- **Works in every app — not just a shortlist of integrated apps.** It reads the accessibility tree and the
   screenshot, and aims on a labelled grid instead of doing coordinate maths — the thing general models
   are worst at.
 - **Lives on the phone.** The brain runs on the device against any OpenAI-compatible model (DeepSeek
