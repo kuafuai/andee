@@ -70,6 +70,33 @@ build time would close this hole; it is not implemented yet.)
 
 ### Changed
 
+- **`SECURITY.md` no longer claims a safeguard the software does not have.** Its
+  prompt-injection section stated that destructive or irreversible actions are
+  *"gated behind `ask_user` / `confirm` flows"*. That is not true, and it was the
+  one sentence in the repository that could be turned against the project:
+  `ask_user` is an ordinary tool the model chooses to call, `confirm` exists on a
+  single tool (`request_permissions`, where it prevents an unwanted permission
+  dialog, not a payment), and nothing forces a confirmation before
+  `tap_by_coordinates` — which is the path a payment is completed along and the
+  very thing the disclaimer is about. `DISCLAIMER.md` and
+  `docs/acceptable-use.md` had both already said the opposite in as many words
+  ("no guardrail whatsoever", "no technical guardrail on that path"), so the three
+  files contradicted each other and the security page was the one that was wrong.
+  It now states the posture plainly: the checks on risky actions are instructions
+  to the model rather than enforcement, and the device should be assumed drivable
+  into anything its permissions and the user's own logged-in state allow —
+  including moving money — with no prompt appearing. The same edit strips detail
+  that made the page read as a recipe rather than a warning: the example request
+  frame, the per-method enumeration of what a LAN peer can reach, and the note
+  that the listening port is a fixed constant. The port number stays — it is what
+  the recommended mitigation (firewall it) refers to. Two smaller changes follow
+  from the same reasoning. The scope list no longer counts "an injection caused an
+  action the user did not ask for" as a vulnerability, because that is the
+  limitation §3 now describes rather than a promise the project can be held to;
+  and the reporting promises are now conditional ("where we can", "no timeframe is
+  promised"), so a small project is not bound to a reply it may not send. A line
+  at the top states the out-loud version: nothing in the file is a promise that
+  any particular action is prevented.
 - **`LICENSE` Part A gained a fourth condition, (d): shipping the software inside another product
   now needs written authorisation.** Conditions (a)–(c) already stopped white-labelling, multi-tenant
   SaaS and dropping the attribution, but nothing stopped someone taking the code and folding it into

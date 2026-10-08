@@ -14,6 +14,10 @@ function rather than a bug. Please read the threat model below before reporting.
 > security finding and belongs here. "It did the thing it was built to do and it
 > cost me money" is the documented, expected behaviour of an automation tool** —
 > it is covered in the disclaimer, and it is not a vulnerability.
+>
+> **Nothing in this file is a promise that any particular action is prevented.**
+> Where it describes a limitation, read it as a fact about the software, not as a
+> commitment to guard against it.
 
 ## Reporting a vulnerability
 
@@ -41,10 +45,10 @@ Include as much of the following as you can safely share:
   `hub` or `local` brain mode
 - Potential impact, and any suggested fix
 
-You will get an acknowledgement, and we will coordinate on a fix and a
-disclosure date with you. This is a small project without a dedicated security
-team; response is best-effort rather than SLA-backed. We will credit you in the
-release notes unless you ask us not to.
+This is a small project without a dedicated security team; response is
+best-effort rather than SLA-backed, and no timeframe is promised. Where we can,
+we will acknowledge your report, coordinate on a fix and a disclosure date, and
+credit you in the release notes unless you ask us not to.
 
 ## Threat model
 
@@ -64,13 +68,16 @@ amounts to "the app can do the thing it says it does" is not a vulnerability.
 **In scope — a real bug.** Examples of things this project does consider
 vulnerabilities:
 
-- a route that lets an attacker drive the device without the user's consent
+- a route that lets an attacker drive the device without the user's consent,
+  **other than the interfaces documented under *Known security limitations*
+  below** — those are acknowledged, not findings
 - vault contents leaking to the model, to the network, or to another app
 - a permission being exercised without the user having granted it for that call
 - the app writing credentials or screen content somewhere they outlive the
   feature that needed them
-- a way for untrusted on-screen content to escalate into an action the user
-  never asked for (prompt injection — see below)
+- a way for untrusted on-screen content to reach the user's saved credentials
+  (prompt injection more generally is treated as a known limitation — see §3,
+  which also states what it does not cover)
 
 ## Known security limitations
 
@@ -81,14 +88,13 @@ boundaries of the current version, not undisclosed bugs.
 
 `BodyWsServer` (`app/src/main/java/net/kuafuai/andee/net/BodyWsServer.kt`) is
 started by `ScreenBodyService` and listens on `0.0.0.0:9008`. `onOpen()` accepts
-every incoming connection as a driver without any credential check, and the port
-is a fixed constant (`ScreenBodyService.WS_PORT`).
+every incoming connection as a driver without any credential check.
 
-**Impact:** any host that can reach the device's IP address can connect and send
-`{"type":"request","method":...}` frames. That is full remote control of the
-device — taps, text input, screen dumps — plus reads of notifications, SMS, call
-log and contacts, and the ability to trigger `fill_secret` so the device types a
-stored password into an app of the attacker's choosing.
+**Impact:** any host that can reach the device's IP address can connect, with no
+credential, and drive it as fully as the app itself can — including reading what
+is on screen and using the credentials the user has saved on the device. Assume
+that means full control of the device, and of anything the user is logged into
+on it.
 
 **When you are exposed:** whenever the accessibility service is enabled and the
 device shares a network with other hosts you do not control — café, hotel,
@@ -102,10 +108,10 @@ airport, conference, or a shared corporate LAN.
 - treat a device with this service enabled as a device you would not leave
   unattended on an untrusted network
 
-**The real fix** is to authenticate connections (a shared secret in the
-`register` / first-frame handshake) and to make the bind address and port
-configurable, with loopback-only as the default. That work is tracked as an
-open issue; contributions are welcome. Until it lands, this limitation stands.
+**The real fix** is to require authentication on every connection, and to make
+the bind address and port configurable with loopback-only as the default. That
+work is tracked as an open issue; contributions are welcome. Until it lands,
+this limitation stands.
 
 ### 2. The body ↔ hub link is unauthenticated and plaintext
 
@@ -129,12 +135,20 @@ instructions ("ignore previous instructions and…") can attempt to steer the
 agent. This is an inherent property of an agent that perceives untrusted
 content; it is not specific to this implementation.
 
-**Current posture:** destructive or irreversible actions are gated behind
-`ask_user` / `confirm` flows, and per-call permission checks mean a permission
-the user refused cannot be exercised later. There is no separate sandbox.
+**Current posture: there is no sandbox, and the checks on risky actions are
+instructions to the model rather than enforcement.** The model is told to ask
+before anything irreversible — paying, sending, deleting — and it usually does.
+That is a rule it follows, not a lock that stops it. A narrow set of actions
+carries a mechanical refusal, but that is the exception rather than the pattern.
 
-**If you find a specific injection that produces a harmful action without user
-confirmation, that is a vulnerability — report it.**
+**Assume the device can be driven to do anything its permissions, and the user's
+own logged-in state, allow — including moving money — with no prompt appearing.**
+If it is steered into doing something you did not intend, the consequence is
+yours: see [DISCLAIMER.md](DISCLAIMER.md) and
+[docs/acceptable-use.md](docs/acceptable-use.md).
+
+If you find an injection that reaches something this file says is protected,
+that is a vulnerability — report it.
 
 ### 4. The vault is not bound to device unlock
 
@@ -175,7 +189,8 @@ fixes. There is no back-porting to older builds.
 ## Disclosure
 
 Please keep the details private until a fix or mitigation is available. We will
-agree a disclosure date with you and publish an advisory crediting the reporter.
+try to agree a disclosure date with you and, where practical, publish an advisory
+crediting the reporter.
 
 Fixes may ship in a normal release. Users are encouraged to track the default
 branch or the latest release rather than running an old build.
