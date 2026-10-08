@@ -382,6 +382,32 @@ report success and a filename.
 *Note:* most vendor ROMs **switch this grant off again** after every system update and every
 force-stop. That is ROM behaviour, and not something the app can prevent.
 
+*WeChat (and other apps) sometimes show a blank screen to it.* Some apps hand **every**
+accessibility client an empty placeholder instead of their real UI. This is not Andee's fault:
+the system's own `uiautomator dump` gets the same blank page. Measured on a Xiaomi Pad 5 with
+MIUI and WeChat 8.0.78, WeChat only shows its real UI tree when MIUI's hidden
+**`MiuiEnhanceTBService`** is enabled. That is a TalkBack companion service, and it has no switch
+in Settings. With it on, the same chat screen dumps 219 nodes. With it off, it dumps none. MIUI
+also turns that service on and off by itself whenever Andee is re-bound (after a reinstall, a
+crash, or a toggle). That is why WeChat could be read **sometimes but not always**, and why
+toggling Andee never actually fixed it. Matching the helper's accessibility config does not help
+either: WeChat checks which service is asking, not what it asked for.
+
+What Andee does about it (`screen/TreeHelper.kt`): when a dump comes back blank like this, Andee
+**adds** that service to the enabled list and dumps again. It never removes anything. It does
+nothing on devices that don't have that component. It writes a line in the chat history so you
+know your system settings changed. It also tries at most once a minute, so if you turn the
+service off on purpose, Andee won't keep turning it back on. Writing that list needs one grant
+that only adb can give. It is the same grant the ADBKeyboard fallback uses:
+
+```bash
+adb shell pm grant net.kuafuai.andee android.permission.WRITE_SECURE_SETTINGS
+```
+
+Without the grant, nothing breaks. On the blank screens, Andee works from screenshots and
+coordinates instead of the element list. That is slower and less precise, but the task still
+gets done.
+
 **Microphone.**
 
 *Why:* ASR is streaming, so it needs the PCM stream upstreamed.

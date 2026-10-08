@@ -17,8 +17,11 @@ import android.util.Log
 import android.view.Display
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import net.kuafuai.andee.R
 import net.kuafuai.andee.device.DeviceState
+import net.kuafuai.andee.i18n.AppLocale
 import net.kuafuai.andee.net.ToolSchemas
+import net.kuafuai.andee.ui.ChatHistory
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -1603,6 +1606,8 @@ class ScreenController(
             waited += SETTLE_POLL_MS
             out = dumpOnce(verbose, budget)
         }
+        val helped = !verbose && out.optBoolean("withheld") && TreeHelper.wake(service)
+        if (helped) out = awaitHelper(out)
         // Stability pass — the half the old loop never covered: "has content"
         // is not "has stopped moving". A screen mid-animation (list settling,
         // pager sliding, splash fading) dumps real elements at positions that
@@ -1639,6 +1644,7 @@ class ScreenController(
                 out.put("still_moving", true)
             }
         }
+        if (helped) out.put("tree_helper_enabled", true)
         if (!verbose && out.optInt("nodes_useful", 0) == 0 && waited >= SETTLE_BUDGET_MS) {
             out.put("settling", true).put("settle_waited_ms", waited)
         }
@@ -1726,6 +1732,27 @@ class ScreenController(
     }
 
     /**
+     * Re-dump after [TreeHelper] switched the system's helper on. The setting
+     * is written at once but the service binds asynchronously, and the app
+     * only hands over its tree once it has — so this polls rather than sleeps.
+     * Its own budget: the wait is not walking, and the first dump may already
+     * have spent most of [TREE_BUDGET_MS].
+     */
+    private fun awaitHelper(first: JSONObject): JSONObject {
+        runCatching {
+            ChatHistory.addAssistant(AppLocale.str(service, R.string.tree_helper_enabled_row))
+        }
+        var out = first
+        val until = SystemClock.uptimeMillis() + HELPER_WAIT_MS
+        while (SystemClock.uptimeMillis() < until) {
+            try { Thread.sleep(HELPER_POLL_MS) } catch (_: InterruptedException) { break }
+            out = dumpOnce(false, WalkBudget(TREE_BUDGET_MS))
+            if (!out.optBoolean("withheld")) break
+        }
+        return out
+    }
+
+    /**
      * Signature of a dump's content for the stability pass: which nodes
      * exist, their ids and their bounds. Bounds are the part that matters —
      * a list mid-settle keeps the same nodes while their coordinates slide,
@@ -1750,7 +1777,9 @@ class ScreenController(
             try {
                 val stats = Stats(budget)
                 val body = buildNode(active, verbose, stats) ?: JSONObject().put("empty", true)
-                withStats(body, active.packageName?.toString() ?: "", stats)
+                withStats(body, active.packageName?.toString() ?: "", stats).also {
+                    if (isWithheld(active)) it.put("withheld", true)
+                }
             } finally {
                 active.recycle()
             }
@@ -1773,6 +1802,29 @@ class ScreenController(
 
         return out
     }
+
+    /**
+     * The app handed accessibility a root with no class, no size and no
+     * children — a placeholder, not a pane.
+     *
+     * Measured on WeChat 8.0.78 (Xiaomi Pad 5, 2026-10-08): the system's own
+     * `uiautomator dump` got the same single blank node with **no**
+     * accessibility service enabled and a freshly started WeChat, while
+     * Settings dumped 89 nodes. With MIUI's `MiuiEnhanceTBService` enabled
+     * alongside us the same screen dumped 219 nodes, and removing it blanked the
+     * root again — reproducible both ways, and the real "有时候可以有时候不行".
+     * So it is the app refusing every client, not our
+     * connection going stale — and the two must not share a hint, because the
+     * stale one sends the user to toggle Andee, which cannot help here.
+     * Occlusion (our card) and self-drawn panes are both distinguishable: they
+     * keep real bounds and their containers.
+     */
+    private fun isWithheld(root: AccessibilityNodeInfo): Boolean = runCatching {
+        if (root.childCount != 0 || root.packageName?.toString() == service.packageName) return@runCatching false
+        val r = android.graphics.Rect()
+        root.getBoundsInScreen(r)
+        r.isEmpty && root.className.isNullOrEmpty()
+    }.getOrDefault(false)
 
     /**
      * Fallback for the case above: walk every window we can see and keep the
@@ -2003,7 +2055,7 @@ class ScreenController(
         val keep = setOf(
             "ts", "pkg", "nodes_total", "nodes_kept", "nodes_useful", "surface",
             "source", "windows_seen", "windows_detail", "settling", "settle_waited_ms",
-            "error", "empty",
+            "error", "empty", "withheld", "tree_helper_enabled",
         )
         val rootKeys = ArrayList(out.keys().asSequence().toList())
         for (k in rootKeys) if (k !in keep) out.remove(k)
@@ -2239,6 +2291,41 @@ class ScreenController(
                         "screen tool, so retry this call once and it should read normally. Do " +
                         "not tell the user to restart anything, and do not tap blindly.",
                 )
+
+            // Ahead of the two [reviveNote] branches: the app worked before,
+            // so they would send the user off to toggle Andee — which is
+            // exactly what they did, to no effect. See [isWithheld].
+            useful == 0 && out.optBoolean("withheld") -> {
+                val app = out.optString("pkg").ifEmpty { "This app" }
+                val helper = if (out.optBoolean("tree_helper_enabled")) {
+                    "Andee has just switched that helper on itself and the app has not picked " +
+                        "it up yet — the next dump may read normally, so retry once before " +
+                        "giving up on the list; if it is still blank, the user may need to " +
+                        "reopen the app. "
+                } else {
+                    "Andee could not switch it on here, and the user cannot either: it is a " +
+                        "hidden companion MIUI only runs alongside TalkBack, and TalkBack " +
+                        "would read the whole screen aloud and change how every tap works. So " +
+                        "do not send the user to look for any setting — if it matters, say " +
+                        "once that in this app you are working from the picture, and carry on. "
+                }
+                out.put(
+                    "hint",
+                    "`$app` is withholding its UI from accessibility: its window hands every " +
+                        "accessibility client — the system's own uiautomator included — a blank " +
+                        "placeholder with no size and no children. That is the app's choice, not a " +
+                        "fault on this device; switching Andee off and on does not change it, so " +
+                        "do not ask the user to. What it does depend on is which *other* " +
+                        "accessibility services are on: WeChat was measured exposing its full " +
+                        "tree only while MIUI's TalkBack helper (MiuiEnhanceTalkback) was also " +
+                        "enabled. " + helper + "It covers " +
+                        "this whole app, not just this screen — so backing out to find a readable " +
+                        "page will not help either. Work from $eyes: find the target in the image " +
+                        "and use tap_by_coordinates / swipe_by_coordinates (0-1000), checking the " +
+                        "result in the screenshot each tap returns. type_text and submit_input " +
+                        "still work on a focused field.",
+                )
+            }
 
             out.has("error") && total == 0 ->
                 out.put(
@@ -2583,6 +2670,10 @@ class ScreenController(
         private const val ATTACHED_TREE_MS = 4_000L
         private const val FINGERPRINT_BUDGET_MS = 1_500L
         private const val SEARCH_BUDGET_MS = 1_500L
+
+        /** See [awaitHelper]. Measured: the helper binds in about a second. */
+        private const val HELPER_WAIT_MS = 3_000L
+        private const val HELPER_POLL_MS = 300L
 
         /** The relative coordinate space the brain speaks: 0..1000 both axes. */
         private const val NORM_MAX = 1000

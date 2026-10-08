@@ -167,6 +167,7 @@
     <string name="scenes_chip">Scene · %1$s</string>
     <string name="scenes_entered_row">(Entered scene: %1$s)</string>
     <string name="scenes_exited_row">(Left scene: %1$s)</string>
+    <string name="tree_helper_enabled_row">(This app was hiding its screen; turned on the system\'s accessibility enhance service so it shows it again)</string>
     <string name="settings_scenes_browse">Manage scenes</string>
 
     <!-- The factory-reset confirmation list; see config/FactoryReset.kt. -->

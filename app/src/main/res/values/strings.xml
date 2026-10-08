@@ -147,6 +147,8 @@
     <!-- Scrollback rows written by the device itself when a scene starts or ends. -->
     <string name="scenes_entered_row">（进入情景：%1$s）</string>
     <string name="scenes_exited_row">（退出情景：%1$s）</string>
+    <!-- Scrollback row: the device switched on a system accessibility helper so an app would expose its UI. -->
+    <string name="tree_helper_enabled_row">（这个应用把界面藏起来了，已打开系统的「无障碍增强」服务让它交出来）</string>
     <string name="settings_scenes_browse">管理情景</string>
 
     <!-- The 恢复出厂设置 confirmation list: one line per thing wiped.
