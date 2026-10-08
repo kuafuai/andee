@@ -728,6 +728,14 @@ class ScreenBodyService : AccessibilityService() {
     private fun submitUserTurn(text: String, how: String, images: List<String> = emptyList()) {
         val said = text.trim()
         if (said.isEmpty() && images.isEmpty()) return
+        // A card is up and waiting for an answer. Voice should answer it
+        // rather than start a new turn — the user spoke to the question on
+        // screen, not to the brain. Match is fuzzy (case-insensitive, prefix),
+        // so "是" / "yes" / "ok" all hit a button labelled "是" or "Yes" or "OK".
+        if (how == "voice" && net.kuafuai.andee.ui.CardUi.tryAnswerByVoice(said)) {
+            android.util.Log.i("Body", "$how answered card: $said")
+            return
+        }
         android.util.Log.i("Body", "$how: $said" + if (images.isEmpty()) "" else " (+${images.size} images)")
         // Hand the keyboard back before the turn exists: the brain may call
         // `type_text` inside it, and it can only do that on ADBKeyboard.

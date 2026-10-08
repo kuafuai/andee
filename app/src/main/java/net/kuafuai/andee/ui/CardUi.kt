@@ -151,12 +151,56 @@ object CardUi {
         main.post { current?.close("superseded") }
     }
 
+    /**
+     * Try to answer the current card by matching [spokenText] against its
+     * button labels. Returns true if a match was found and the card was closed
+     * (the caller should not start a new turn); false if no card is up or no
+     * button matched (the caller may proceed with a normal turn).
+     *
+     * Called from the ASR path when the user speaks while a card is visible.
+     * The match is case-insensitive and normalised: "是" / "yes" / "确定" all
+     * hit a button labelled "是" or "Yes" or "确定". Partial matches (spoken
+     * text is a prefix or the button is a prefix of the spoken text) also
+     * count, so "好" matches "好的".
+     *
+     * Must be called from any thread; callback happens on the main thread.
+     */
+    fun tryAnswerByVoice(spokenText: String): Boolean {
+        val text = spokenText.trim().lowercase()
+        if (text.isEmpty()) return false
+        val latch = java.util.concurrent.CountDownLatch(1)
+        val matched = java.util.concurrent.atomic.AtomicBoolean(false)
+        main.post {
+            try {
+                val handle = current ?: return@post
+                val buttons = handle.buttons
+                val hit = buttons.firstOrNull { btn ->
+                    val label = btn.trim().lowercase()
+                    label == text || label.startsWith(text) || text.startsWith(label)
+                }
+                if (hit != null) {
+                    matched.set(true)
+                    handle.close("voice", hit)
+                }
+            } finally {
+                latch.countDown()
+            }
+        }
+        // Block until the main thread has decided. The caller is on the ASR
+        // callback thread and must know whether to bail or proceed before
+        // returning. Timeout guards against the main thread being dead.
+        latch.await(200, java.util.concurrent.TimeUnit.MILLISECONDS)
+        return matched.get()
+    }
+
     // ------------------------------------------------------------------
 
     private class CardHandle(
         val view: View,
         /** The ball window hosting this card, or null for the standalone fallback. */
         val host: FloatingWindowUi?,
+        /** Button labels, in the order they were passed to show(). */
+        val buttons: List<String>,
         @Volatile var finished: Boolean = false,
         var onDone: ((Result) -> Unit)? = null,
         var timeout: Runnable? = null,
@@ -349,7 +393,7 @@ object CardUi {
                 cardReal.tailX = -1
 
                 // ---- handle + callbacks ------------------------------------
-                val handle = CardHandle(cardReal, host = null)
+                val handle = CardHandle(cardReal, host = null, buttons = buttons)
                 handle.onDone = { r -> main.post { onDone(r) } }
                 wireButtons(handle, btnViews, btnLabels, cancelable, cardReal, title)
                 val timeoutRunnable = Runnable { handle.close("timeout") }
@@ -387,7 +431,7 @@ object CardUi {
             cardReal.tailX = cardReal.measuredWidth / 2
 
             // ---- handle + callbacks ----------------------------------------
-            val handle = CardHandle(cardReal, host)
+            val handle = CardHandle(cardReal, host, buttons = buttons)
             handle.onDone = { r -> main.post { onDone(r) } }
             wireButtons(handle, btnViews, btnLabels, cancelable, cardReal, title)
             val timeoutRunnable = Runnable { handle.close("timeout") }
