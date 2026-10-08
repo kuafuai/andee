@@ -142,6 +142,24 @@ From Codex
 
 **如果你不接受 A.2，请不要提交 PR** —— 我们需要这条才能维持双授权模式，这是事先说清楚的。
 
+### 签署（`Signed-off-by`）
+
+A.2 说的是你**授予**什么；`Signed-off-by:` 一行说的是你**有权授予**。PR 里每个提交都要有，CI 会查 —— 这是整套授权里唯一被机器校验、而不是靠口头约定的部分。
+
+```bash
+git commit -s -m "你的提交信息"
+```
+
+`-s` 会从你的 git 身份自动追加一行：
+
+```
+Signed-off-by: 你的名字 <you@example.com>
+```
+
+把那两个身份值配一次（`git config user.name`、`git config user.email`），以后就自动带上。忘了签？`git rebase --signoff <base>` 补签整条分支；`git commit --amend -s` 只补最后一个提交。
+
+这就是[开发者原创声明（DCO）](https://developercertificate.org/)，没有改动 —— Linux 内核用的是同一个机制。它和 A.2 互不替代：没有提交权的人签了没用，从没签过的人给出的授权很难举证。
+
 ---
 
 ## 语言

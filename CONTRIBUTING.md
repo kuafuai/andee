@@ -133,6 +133,24 @@ You keep the copyright to your own contribution. If you are contributing on beha
 
 **If you do not accept A.2, please do not send a PR** — we need this clause to sustain the dual-licensing model, and we would rather say so up front.
 
+### Sign-off (`Signed-off-by`)
+
+A.2 states what you grant by contributing. A `Signed-off-by:` line is how you state that you were in a position to grant it. Every commit in a pull request needs one, and CI checks it — this is the one part of the licensing that is verified rather than asked for politely.
+
+```bash
+git commit -s -m "your message"
+```
+
+The flag appends a line built from your git identity:
+
+```
+Signed-off-by: Your Name <you@example.com>
+```
+
+Set that identity once (`git config user.name`, `git config user.email`) and it is automatic from then on. Missed one on a branch? `git rebase --signoff <base>` signs the whole branch; `git commit --amend -s` signs just the last commit.
+
+This is the [Developer Certificate of Origin](https://developercertificate.org/), unmodified — the same mechanism the Linux kernel uses. It does not replace A.2 and A.2 does not replace it: a sign-off from someone with no right to submit the work is worthless, and a licence grant from someone who never signed is hard to prove.
+
 ---
 
 ## Language

@@ -863,9 +863,9 @@ The four points worth reading even if you read nothing else:
 
 ## License
 
-[Apache-2.0 **with additional conditions**](LICENSE) — no multi-tenant SaaS, and no white-labelling
-that removes the branding. GitHub reports this as `NOASSERTION`; that is expected, not a
-misconfiguration.
+[Apache-2.0 **with additional conditions**](LICENSE) — no multi-tenant SaaS, no white-labelling
+that removes the branding, and no embedding it in another product without written authorisation.
+GitHub reports this as `NOASSERTION`; that is expected, not a misconfiguration.
 
 Bundled third-party components are inventoried in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 Read it before redistributing: **the ML Kit barcode SDK and the `play-services-*` stubs are not
