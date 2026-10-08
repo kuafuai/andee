@@ -18,9 +18,11 @@ import java.util.concurrent.TimeUnit
 /**
  * Routes WS `request` messages (method + params) to controller methods.
  *
- * All screen actions live under the `screen.*` namespace. TTS/ASR/audio
- * command routing will be added later under their own namespaces
- * (`tts.speak`, `asr.*`, etc.).
+ * All screen actions live under the `screen.*` namespace. `tts.speak` is the one
+ * voice method that exists — and it is deliberately **not** in [ToolSchemas], so
+ * it is reachable from the debug port but not from the model (see the branch's
+ * own comment). ASR/audio routing is still to come under its own namespace
+ * (`asr.*`).
  *
  * Contract: return a JSON-serializable value (usually JSONObject) or throw.
  * Thrown exceptions become error responses in [BodyWsServer].

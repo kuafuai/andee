@@ -35,7 +35,7 @@ An **experimental** piece of software that you install on **your own device**. I
 | What | Goes to | Default |
 |---|---|---|
 | Your speech (ASR) and its speech (TTS) | **Volcengine / ByteDance cloud** | `openspeech.bytedance.com` |
-| The conversation, **and every tool result** | The "brain" you configured | `brain=hub`; in local mode, `api.deepseek.com` |
+| The conversation, **and every tool result** | The "brain" you configured | `brain=local` (the out-of-box default) → `api.deepseek.com`; in hub mode, your own `hub_url` |
 | The private notebook (`Notebook` — what it remembers about you, what it promised) | **On this device only** | Filtered out of the hub payload |
 
 The second row needs spelling out: **tool results are part of the conversation.** The SMS text it read, your contacts, your call log, notification contents, your location, and its reading of the screen all travel to the endpoint you configured.

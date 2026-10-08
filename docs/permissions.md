@@ -103,7 +103,7 @@ Andee has a vault (`config/Vault.kt`) for the account passwords you enter yourse
 | What | Where it goes | Default |
 |---|---|---|
 | Speech recognition (what you say), speech synthesis (what he says) | **Volcengine (ByteDance) cloud** | `openspeech.bytedance.com` |
-| Conversation content, **and every tool result** | The "brain" **you** configured | `brain=hub`; in local mode, `api.deepseek.com` by default |
+| Conversation content, **and every tool result** | The "brain" **you** configured | `brain=local` (the out-of-box default) → `api.deepseek.com`; in hub mode, your own `hub_url` |
 | Private notebook (`config/Notebook.kt`: what he remembers about you, what he promised) | **On-device only** | It is `localOnly` and never enters the hub payload |
 
 The second row deserves spelling out: **a tool result is part of the conversation.** The SMS bodies, contacts, call log, notification content and location he reads, along with his "reading" of the screen, all travel with the conversation to the endpoint you configured.

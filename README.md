@@ -1,9 +1,9 @@
 <p align="center">
   <a href="https://www.codeflying.app">Build online</a> ·
+  <a href="#key-features">Features</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#provisioning">Provisioning</a> ·
   <a href="#what-it-looks-like">What it looks like</a> ·
-  <a href="#key-features">Features</a> ·
   <a href="#permissions-why-each-one-and-what-happens-if-you-refuse">Permissions</a> ·
   <a href="#why-you-can-check-this-instead-of-trusting-it">Verifiability</a> ·
   <a href="SECURITY.md">Security</a> ·
@@ -45,9 +45,16 @@ it can do it.
 
 ### Things you can just say
 
+You are driving when your mother messages you. One hand on the wheel, eyes on the road:
+
+> *"Hey Andee — reply to Mom on WeChat: I'll be home by seven."*
+
+It opens WeChat, finds the chat, types, sends, and reads the answer back. Your hands never left the
+wheel. **The hard part was never the sentence** — it is getting into a real app, as you, while you
+are somewhere else. The rest of the list is the same job in other shapes:
+
 | You say | What happens |
 |---|---|
-| *"Reply to Mom on WeChat: I'll be home by seven."* | It opens WeChat, finds the chat, types, sends — while you watch the ball's face work. |
 | *"Find this cheaper on Taobao and JD."* | It walks both shops itself and comes back with a comparison page. |
 | *"Remind me to call the landlord at nine tomorrow."* | The alarm is set before it says "OK". At nine, it wakes up and tells you. |
 | *"Record this meeting."* | It holds the mic for the hour, then hands you the minutes as a page. |
@@ -65,7 +72,7 @@ it can do it.
 - **Gets to know you.** A private notebook, a real scheduler, a nightly review of its own
   conversations, and **scenes** — ways of working it proposes after doing the same kind of thing with
   you a few times.
-- **Has a character.** Five looks, fifteen moods, and a face the model picks itself, sentence by
+- **Has a character.** Five looks, fourteen moods, and a face the model picks itself, sentence by
   sentence.
 - **Holds lines a prompt cannot talk it out of.** A stranger's notification cannot unlock the vault or
   grant it new permissions — that refusal is in the dispatcher, not in the prompt.
@@ -82,97 +89,15 @@ It is one Android app, and it has no conventional UI. An `AccessibilityService` 
 screen; a `WindowManager` overlay draws the result; **its face is a floating ball** that changes
 expression while it works.
 
+**Today it is Android, and only Android — other bodies are planned, not shipped.** The tool contract
+is what would make a new one a port rather than a rewrite, but nothing outside Android exists yet.
+
 > **Before you install this.** Andee taps, types and acts on your behalf. It can complete a payment,
 > send messages under your name, read your messages, contacts and location, and — with a robot dog
 > attached — physically move. It is experimental, carries no warranty, and **what it does is your
 > responsibility**, including a transfer to the wrong person. Data does leave the device: your speech
 > goes to Volcengine, and the conversation goes to whichever brain you configure. Read
 > **[DISCLAIMER.md](DISCLAIMER.md)** and **[docs/acceptable-use.md](docs/acceptable-use.md)** first.
-
-## Quick start
-
-The fastest route skips the two things that actually stop people: **building it yourself, and wiring
-up tokens.** Andee can be built on [codeflying.app](https://www.codeflying.app) (English) or
-[codeflying.net](https://www.codeflying.net) (中文): describe the Andee you want, and it hands you an
-installable package with the keys already configured. You do not need to know anything about Android
-first.
-
-Two things it does **not** skip. **You still install the package** — the device side is still an APK
-that has to be put on the device. And **the free token allowance is finite**: it covers getting
-started, and once it runs out, tokens are purchased.
-
-```text
-1. Open  https://www.codeflying.app        (中文: https://www.codeflying.net)
-2. Describe the Andee you want
-3. Build → download the package (keys already configured) → install
-4. Grant Overlay, then Accessibility → the ball appears
-```
-
-To build it yourself instead:
-
-> **Requirements**
->
-> - Android 11 (API 30) or newer — `ACTION_IME_ENTER` and `takeScreenshot` are both API 30+
-> - **JDK 17–20.** AGP 8.3.1 needs 17+; the Gradle 8.4 wrapper cannot run on 21+ (Android Studio's
->   bundled JBR 25 is rejected with `Unsupported class file major version 69`)
-> - Android SDK with platform 34 and build-tools 34.0.0
-> - A real device. This app *is* the accessibility service; an emulator can run it, but almost
->   nothing it does is meaningful there
-
-```bash
-./gradlew clean :app:assembleDebug     # → app/build/outputs/apk/debug/app-debug.apk
-./gradlew installDebug                 # build + install to an attached device
-
-# then, on the device, in this order:
-#   1. grant Overlay       → the ball appears
-#   2. enable Accessibility → it can now see and touch the screen
-#   3. tap the ball        → allow the microphone prompt
-#   4. open ⚙ and put in two keys of your own (see below)
-```
-
-**No credentials ship in this repository, and the two that are missing fail in ways that do not look
-like missing credentials.** Both go in ⚙ on the device:
-
-- **Voice** — a [Volcengine Speech](https://www.volcengine.com/product/voice-tech) API key, in
-  「语音密钥」 / *Voice API key*. Without it ASR and TTS fail during the WebSocket handshake, which
-  surfaces as a **connect timeout** — the device looks like it has a network problem when what it has
-  is a blank field. Everything else still works; it is just mute and deaf.
-- **Brain** — with `brain = local` (the default), an API key for any OpenAI-compatible endpoint.
-  Blank means the local brain cannot run at all.
-
-You do not have to remember this: the first run is a stepped setup that walks you through both, and
-afterwards the **✓** button in the ball's control bar opens the self-check list, which says which of
-the two is missing and offers the button that fixes it.
-
-**Use `assembleDebug`, not `assembleRelease`.** The release build type has no `signingConfig` and
-there is no keystore in the repo, so `assembleRelease` emits `app-release-unsigned.apk`, which will
-not install. The debug build is signed with the standard Android debug certificate.
-
-**If the build does not work, the answer is almost always the JDK.** Full from-scratch setup — the
-JDK traps, the Android SDK two different ways (including a command-line-only path for CI), and a table
-of every error you are likely to hit — is in **[Provisioning](#provisioning)** below. Permissions are
-answered in **[Permissions](#permissions-why-each-one-and-what-happens-if-you-refuse)**, and the
-known limitations in **[SECURITY.md](SECURITY.md)** — read that last one before running this on a
-network you do not control.
-
-## What it looks like
-
-There is no home screen. What exists:
-
-- **A floating ball.** The entire UI is `TYPE_APPLICATION_OVERLAY` layers added through
-  `WindowManager` (`ui/FloatingWindowUi`). Unfolded, it is a full-screen card: the ball's face on
-  top, the conversation underneath, and a small control bar — **产物** (the pages it has made),
-  **情景** (its scenes), **✓** (self-check), **⚙** (settings). When it starts working another app it
-  folds itself into a ball in the corner and gets out of the way; tap to talk, long-press to unfold.
-- **The launcher icon opens two doors.** With the assistant running, it unfolds the card — exactly
-  what a long-press on the ball does. With accessibility off, it shows the self-check card instead,
-  because that is the one moment the phone has nothing else to tell you why it is doing nothing.
-- **`ScreenBodyService`** (`AccessibilityService`) — the whole job. It builds the object graph and
-  starts both network paths.
-
-A handful of transient activities (`PermissionRequestActivity`, `ScanActivity`, `LookActivity`,
-`HtmlActivity`, `TextInputActivity`) exist only to borrow a system capability for a moment. They are
-not pages.
 
 ## Key features
 
@@ -193,8 +118,8 @@ On Android 13+ it types through the accessibility service's own input channel �
 Nothing to install, nothing to switch. Older devices fall back to ADBKeyboard.
 
 **3. Sixty-odd tools, held to honest failure.**
-Screen, input, notifications, SMS, calls, contacts, calendar, files, camera, meetings, TTS/ASR, and
-the dog. Every one checks its runtime permission *before* acting and reports `denied("sms")` rather
+Screen, input, notifications, SMS, calls, contacts, calendar, location, camera, meetings, TTS/ASR,
+and the dog. Every one checks its runtime permission *before* acting and reports `denied("sms")` rather
 than working around a refusal. Tools return what they saw, not what was hoped for.
 
 **4. It can log in as you without ever holding your password.**
@@ -235,9 +160,9 @@ worth turning into a scene next time, and ends empty-handed rather than inventin
 
 ### Face — a character, not a theme
 
-**9. Five looks, fifteen moods, and a face it chooses.**
+**9. Five looks, fourteen moods, and a face it chooses.**
 奶油 Cream, 八戒 Pigsy, 贱贱兔 Rascal, 憨憨熊 Bear and 小恶魔 Imp, drawn live in hand-written OpenGL
-ES. Fifteen moods (`ui/ball/Mood.kt`) arbitrate between what it feels, what the voice pipeline is
+ES. Fourteen moods (`ui/ball/Mood.kt`) arbitrate between what it feels, what the voice pipeline is
 doing, and what work is in flight, plus an idle fidget pool that never repeats the same gesture twice
 in a row, *"because a repeat reads as a stuck animation, not a personality."* The model now picks its
 own expression **mid-sentence** — `[happy] Found it, page three. [calm] Want me to open it?` — and the
@@ -291,7 +216,102 @@ makes "any smart hardware as a body" a fact here rather than an aspiration.
 **16. No Compose, no DI framework, no coroutines.**
 Deliberately. Overlays cannot host Compose, so all UI is hand-written `View` code; there is one
 service, so dependencies are constructor-injected by hand; concurrency is `Handler` plus dedicated
-executors. 42k+ lines of Kotlin, all first-party — no code copied in from anywhere.
+executors. 43k+ lines of Kotlin, all first-party — no code copied in from anywhere.
+
+## Quick start
+
+The fastest route skips the two things that actually stop people: **building it yourself, and wiring
+up tokens.**
+
+**[codeflying.app](https://www.codeflying.app)** (English) · **[codeflying.net](https://www.codeflying.net)**
+(中文) is a general platform for exactly that shape of problem — **you describe the app you want in
+words, and it develops and publishes it for you.** No Android knowledge required. Ask it for Andee and
+it hands you an installable package with the keys already configured.
+
+**It is a separate service with no direct relationship to this project** — not Andee's build channel,
+and not covered by anything in this repository. Its own terms, pricing and data handling apply.
+
+Two things it does **not** skip. **You still install the package** — the device side is still an APK
+that has to be put on the device. And **the free token allowance is finite**: it covers getting
+started, and once it runs out, tokens are purchased.
+
+```text
+1. Open  https://www.codeflying.app        (中文: https://www.codeflying.net)
+2. Describe the Andee you want
+3. Build → download the package (keys already configured) → install
+4. Grant Overlay, then Accessibility → the ball appears
+```
+
+To build it yourself instead:
+
+> **Requirements**
+>
+> - Android 11 (API 30) or newer — `ACTION_IME_ENTER` and `takeScreenshot` are both API 30+
+> - **JDK 17–20.** AGP 8.3.1 needs 17+; the Gradle 8.4 wrapper cannot run on 21+ (Android Studio's
+>   bundled JBR 25 is rejected with `Unsupported class file major version 69`)
+> - Android SDK with platform 34 and build-tools 34.0.0
+> - A real device. This app *is* the accessibility service; an emulator can run it, but almost
+>   nothing it does is meaningful there
+
+```bash
+./gradlew clean :app:assembleDebug     # → app/build/outputs/apk/debug/app-debug.apk
+./gradlew installDebug                 # build + install to an attached device
+
+# then, on the device, in this order:
+#   1. grant Overlay       → the ball appears
+#   2. enable Accessibility → it can now see and touch the screen
+#   3. tap the ball        → allow the microphone prompt
+#   4. open ⚙ and put in two keys of your own (see below)
+```
+
+**No credentials ship in this repository, and the two that are missing fail in ways that do not look
+like missing credentials.** Both go in ⚙ on the device — **one is required, the other only costs you
+the voice:**
+
+**1. The brain key — required.** With `brain = local` (the out-of-box default) the agent loop runs on
+the device itself, against any OpenAI-compatible endpoint (`llm_api_key`, default
+`https://api.deepseek.com`). **Leave it empty and the local brain does not run at all** — nothing
+behind it falls back to something else. The ball does at least say so out loud, rather than silently
+doing nothing.
+
+**2. The voice key — optional.** A [Volcengine Speech](https://www.volcengine.com/product/voice-tech)
+API key, in 「语音密钥」 / *Voice API key*. Without it ASR and TTS fail during the WebSocket
+handshake, which surfaces as a **connect timeout** — the device looks like it has a network problem
+when what it has is a blank field. Everything else still works; it is just mute and deaf.
+
+You do not have to remember this: the first run is a stepped setup that walks you through both, and
+afterwards the **✓** button in the ball's control bar opens the self-check list, which says which of
+the two is missing and offers the button that fixes it.
+
+**Use `assembleDebug`, not `assembleRelease`.** The release build type has no `signingConfig` and
+there is no keystore in the repo, so `assembleRelease` emits `app-release-unsigned.apk`, which will
+not install. The debug build is signed with the standard Android debug certificate.
+
+**If the build does not work, the answer is almost always the JDK.** Full from-scratch setup — the
+JDK traps, the Android SDK two different ways (including a command-line-only path for CI), and a table
+of every error you are likely to hit — is in **[Provisioning](#provisioning)** below. Permissions are
+answered in **[Permissions](#permissions-why-each-one-and-what-happens-if-you-refuse)**, and the
+known limitations in **[SECURITY.md](SECURITY.md)** — read that last one before running this on a
+network you do not control.
+
+## What it looks like
+
+There is no home screen. What exists:
+
+- **A floating ball.** The entire UI is `TYPE_APPLICATION_OVERLAY` layers added through
+  `WindowManager` (`ui/FloatingWindowUi`). Unfolded, it is a full-screen card: the ball's face on
+  top, the conversation underneath, and a small control bar — **产物** (the pages it has made),
+  **情景** (its scenes), **✓** (self-check), **⚙** (settings). When it starts working another app it
+  folds itself into a ball in the corner and gets out of the way; tap to talk, long-press to unfold.
+- **The launcher icon opens two doors.** With the assistant running, it unfolds the card — exactly
+  what a long-press on the ball does. With accessibility off, it shows the self-check card instead,
+  because that is the one moment the phone has nothing else to tell you why it is doing nothing.
+- **`ScreenBodyService`** (`AccessibilityService`) — the whole job. It builds the object graph and
+  starts both network paths.
+
+A handful of transient activities (`PermissionRequestActivity`, `ScanActivity`, `LookActivity`,
+`HtmlActivity`, `TextInputActivity`) exist only to borrow a system capability for a moment. They are
+not pages.
 
 ## Permissions: why each one, and what happens if you refuse
 
@@ -409,10 +429,11 @@ If you want to see how the decisions were made rather than only what was decided
 ## Using Andee
 
 - **Online — no local build, no token setup.** **[codeflying.app](https://www.codeflying.app)** ·
-  **[codeflying.net](https://www.codeflying.net)** (中文). Describe the Andee you want, and it hands
-  you an installable package with the keys already configured — nothing to compile locally, and
-  nothing about Android to understand first. A free token allowance gets you started; it is finite,
-  and once it runs out, tokens are purchased.
+  **[codeflying.net](https://www.codeflying.net)** (中文) — a general platform for describing an app
+  in words and having it developed and published. **A separate service, not part of this project.**
+  Describe the Andee you want, and it hands you an installable package with the keys already
+  configured — nothing to compile locally, and nothing about Android to understand first. A free
+  token allowance gets you started; it is finite, and once it runs out, tokens are purchased.
 
 - **Self-hosted.** Clone, build, install. See [Quick start](#quick-start) and the provisioning
   walkthrough in [Provisioning](#provisioning). Point it at any OpenAI-compatible endpoint and it
@@ -725,7 +746,7 @@ app/                    the Android app (Kotlin, no Compose)
     brain/                 the agent loop — LocalBrain, LocalPrompt (the character's rulebook:
                            §§1–10 the job, §11 scenes, §12 the persona, §13 the active scene),
                            and NotificationTriage
-    ui/ball/               the face — Mood (15 moods + idle fidgets), BallLook (five looks, each a character)
+    ui/ball/               the face — Mood (14 moods + idle fidgets), BallLook (five looks, each a character)
     net/                   BodyWsServer, BodyWsClient, ToolSchemas (the tool definitions)
     device/                screen control, permissions, vault, robot dog
     config/                VoiceConfig (settings), Notebook (memories, todos, scenes — encrypted)

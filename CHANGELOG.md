@@ -65,7 +65,7 @@ build time would close this hole; it is not implemented yet.)
   contradicts the project's own first instruction, in `LocalPrompt.TEXT`: *"you are not a tablet's
   assistant, you are an individual, and the tablet is only what carries you."* The docs now lead
   with the individual, and give the body / persona / notebook mechanisms that back it up in code
-  (fifteen moods and idle fidgets, `BallLook.persona` reaching the head of the system prompt, the
+  (fourteen moods and idle fidgets, `BallLook.persona` reaching the head of the system prompt, the
   private `Notebook`, the `(to yourself …)` self-review turn, and §11's rule that the character is
   delivery and never a licence). No code changed — the code was already right; the prose was not.
 - `README.md` is now the **English** front page. The detailed Chinese provisioning guide moved to
@@ -87,6 +87,44 @@ build time would close this hole; it is not implemented yet.)
   point at an English file now points at the Chinese one, so a Chinese reader is never dropped onto
   an English page. `SECURITY.md` and `CODE_OF_CONDUCT.md` have no Chinese edition; the Chinese docs
   now say so explicitly instead of linking silently.
+
+- **Both READMEs restructured and fact-checked against the code.** The 16-item feature list now sits
+  above *Quick start* instead of below *What it looks like*, so the page leads with what the thing
+  does; both nav bars follow. Three claims were corrected against the source: the ball has
+  **fourteen** moods (`ui/ball/Mood.kt`), not fifteen; the tool list no longer names `files` (there
+  is no file tool — `location` does exist); and the Kotlin line count is now 43k+. The
+  two-credential block puts the **brain key first and marks it required**, with the voice key second
+  and optional — voice used to lead, which buried the one whose absence stops the brain from running
+  at all. The "Things you can just say" table no longer repeats the WeChat example: that one is told
+  as a single moment above the table ("you are driving when your mother messages you"), which is what
+  the rest of the list is a variation on. And a short note near the top now says plainly that
+  **Android is the only supported platform today** — the "any device with a body" line is about what
+  the software is written for, and was reading as though other platforms already shipped.
+
+- **Four documents corrected where they contradicted the code — no behaviour changed.**
+  `DISCLAIMER.md` / `DISCLAIMER.zh-CN.md` and `docs/permissions.md` / `docs/permissions.zh-CN.md` all
+  listed `brain=hub` first in their "data goes where" table's *Default* column, which read as though
+  the hub were the out-of-box mode. It is not: `VoiceConfig.brainConfig` reads
+  `getString("brain", BRAIN_LOCAL)`, and the `brain` picker lists 本机 leftmost for the same reason.
+  The row now reads `brain=local` (the default) → `api.deepseek.com`, with hub mode as the other
+  case. Separately, `CLAUDE.md`'s "Existing but not wired up" section claimed there was **no `tts.*`
+  dispatcher namespace** — there is one (`tts.speak`, `CommandDispatcher`); what it lacks is a
+  `ToolSchemas` entry, which is the actual reason the model cannot call it, and the distinction
+  matters because the fix for "let it choose to speak" is adding a schema, not a branch. The
+  matching comment at the head of `CommandDispatcher` ("will be added later") is corrected too. The
+  error was load-bearing in the disclaimer especially: a reader who believed hub was the default
+  would size the data-path risk wrongly.
+
+- **CodeFlying is now introduced as what it is, and disclaimed.** *Quick start* used to name
+  codeflying.app / codeflying.net as simply "the fastest route", which read as though it were this
+  project's own or affiliated build channel — an impression a reader could act on (and later hold
+  *this* project to). It is now described in its own terms first — **a general platform where you
+  describe the app you want and it develops and publishes it** — followed by one plain sentence:
+  **a separate service with no direct relationship to this project**, its own terms, pricing and data
+  handling. Same treatment in `## Using Andee` / `## 三种使用方式` and the Chinese
+  `## 从哪里开始看` table, so the three places it appears do not disagree. The practical guidance is
+  unchanged (still the shortest path; still an APK you have to install; the free token allowance is
+  still finite and then paid), because none of that was wrong — only the implied ownership was.
 
 ### Removed
 
