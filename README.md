@@ -35,11 +35,11 @@
   No root. No custom ROM. No computer on a cable. <b>One APK.</b>
 </p>
 
-<!-- Demo video: drag the mp4 into the GitHub web editor here and it inserts the asset URL.
-     Keep that URL on its own line — no []() wrapper, no <p> — that is what renders the player.
-     URL: -->
 
-<!-- ↓ demo video goes here ↓ -->
+
+https://github.com/user-attachments/assets/b32c59ce-a87f-4442-8b82-6d718c68b655
+
+
 
 The phone you already own can do everything an "AI phone" is sold on. What it was missing was
 someone living in it. Andee is that someone: **a floating ball on your screen with a face, a voice
