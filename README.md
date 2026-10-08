@@ -36,7 +36,7 @@
 </p>
 
 
-https://github.com/user-attachments/assets/c2a6b949-2c03-4a75-979a-fe15525d48b0
+https://github.com/user-attachments/assets/bf560279-d86c-4301-9bcb-01d60fa33d06
 
 
 The phone you already own can do everything an "AI phone" is sold on. What it was missing was
