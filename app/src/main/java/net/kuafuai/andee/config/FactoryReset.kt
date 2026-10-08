@@ -65,7 +65,10 @@ object FactoryReset {
             WakeTemplates.invalidate()
         },
 
-        Target(R.string.factory_reset_target_history) { ChatHistory.wipe(it) },
+        Target(R.string.factory_reset_target_history) {
+            ChatHistory.wipe(it)
+            net.kuafuai.andee.brain.BrainTrace.wipe(it)
+        },
 
         Target(R.string.factory_reset_target_web) { webviewData() },
 

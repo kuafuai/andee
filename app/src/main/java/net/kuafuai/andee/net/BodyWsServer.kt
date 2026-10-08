@@ -59,6 +59,14 @@ class BodyWsServer(
     /** Extension-pushed event; the service turns these into hub broadcasts + UI updates. */
     private val onExtensionEvent: (kind: String, data: JSONObject) -> Unit = { _, _ -> },
     private val onCommand: (method: String, params: JSONObject?) -> Any?,
+    /**
+     * `debug.say {"text"}` — hand a sentence to the brain as if the user typed
+     * it, so a task can be reproduced from a computer. Loopback only (that is
+     * what `adb forward` arrives as): a LAN peer could already drive the
+     * screen through this socket, but it should not get to spend the user's
+     * API key.
+     */
+    private val onSay: (text: String) -> Unit = {},
 ) : WebSocketServer(InetSocketAddress(bindHost, port)) {
 
     /** Driver connections only — the ones broadcasts go to. Extensions never join. */
@@ -119,7 +127,17 @@ class BodyWsServer(
         // otherwise stall ping/pong handling and the client drops us.
         dispatchPool.execute {
             val response = try {
-                val result = onCommand(method, params)
+                val result = if (method == "debug.say") {
+                    if (conn.remoteSocketAddress?.address?.isLoopbackAddress != true) {
+                        throw IllegalStateException("debug.say is loopback only — use adb forward")
+                    }
+                    val text = params?.optString("text").orEmpty().trim()
+                    require(text.isNotEmpty()) { "debug.say needs {\"text\": …}" }
+                    onSay(text)
+                    JSONObject().put("submitted", text)
+                } else {
+                    onCommand(method, params)
+                }
                 JSONObject()
                     .put("type", "response")
                     .put("id", id)

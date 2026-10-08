@@ -1665,6 +1665,7 @@ class ScreenBodyService : AccessibilityService() {
                     // [CommandDispatcher.dispatch].
                     dispatcher.dispatch(method, params, driving = false)
                 },
+                onSay = { text -> ui.post { submitUserTurn(text, "debug.say") } },
             )
             srv.start()
             wsServer = srv

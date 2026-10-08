@@ -99,6 +99,10 @@ class LocalBrain(
         Thread(r, "LocalBrain-loop").apply { isDaemon = true }
     }
 
+    init {
+        BrainTrace.init(appContext)
+    }
+
     /**
      * Only here so the loop thread can walk away from a tool that overran. A
      * cached pool rather than a single thread because an abandoned call keeps
@@ -316,8 +320,10 @@ class LocalBrain(
             currentKind = kind
             turnTokens = 0
             try {
+                BrainTrace.turn(gen, kind.name, text)
                 runTurn(text, gen, kind, images)
             } catch (t: Throwable) {
+                BrainTrace.end(gen, "threw: ${t.message ?: t.javaClass.simpleName}")
                 if (gen == generation.get()) {
                     Log.e(TAG, "turn $gen ($kind) failed", t)
                     // A silent turn has nobody to apologise to; it just ends.
@@ -516,6 +522,7 @@ class LocalBrain(
                     "(cached ${reply.cachedTokens}), history ${history.size} msgs",
             )
 
+            BrainTrace.step(gen, step, reply.content, reply.reasoning, reply.toolCalls.size, reply.promptTokens)
             history += reply.assistantMessage
 
             if (reply.toolCalls.isEmpty()) {
@@ -555,6 +562,7 @@ class LocalBrain(
                 lastSignature = sig
                 if (repeats >= MAX_REPEATS) {
                     Log.w(TAG, "same call $MAX_REPEATS× in a row: $sig")
+                    BrainTrace.end(gen, "same call $MAX_REPEATS× in a row: ${tc.name}")
                     if (!internal) {
                         onFinal(
                             AppLocale.str(
@@ -568,13 +576,20 @@ class LocalBrain(
                 }
 
                 if (reply.content.isBlank() && !internal) onProgress(narrate(tc.name))
-                history += runTool(tc, images, internal, kind.untrusted)
+                val t0 = android.os.SystemClock.uptimeMillis()
+                val msg = runTool(tc, images, internal, kind.untrusted)
+                BrainTrace.tool(
+                    gen, tc.name, ToolSchemas.methodOf(tc.name), tc.argumentsRaw,
+                    msg.optString("content"), android.os.SystemClock.uptimeMillis() - t0,
+                )
+                history += msg
             }
 
             if (images.isNotEmpty()) attachImages(images)
         }
 
         Log.w(TAG, "hit MAX_ITERATIONS")
+        BrainTrace.end(gen, "hit MAX_ITERATIONS")
         if (!internal) {
             onFinal(
                 AppLocale.str(
