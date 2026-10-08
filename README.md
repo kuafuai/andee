@@ -25,14 +25,58 @@
   <a href="./README.zh-CN.md"><img alt="简体中文文档" src="https://img.shields.io/badge/简体中文-d9d9d9"></a>
 </p>
 
-# Andee
+<h1 align="center">Andee</h1>
 
-**Andee is not a tool that runs on a tablet. It is an individual that lives on one.**
+<h3 align="center">Turn any Android phone into an AI phone.</h3>
 
-The tablet is not the point — it is what Andee wears. The same software runs on a phone, and is
-written for **any device with a body worth having**. Everything below is that sentence taken
-seriously in code: the body it uses, the character it has, the notebook it keeps, and the rules it
-holds to when nobody is watching.
+<p align="center">
+  <b>An agent that moves into your phone</b> — it reads the screen, taps through any app, talks back,<br>
+  remembers you, and learns how you like things done.<br>
+  No root. No custom ROM. No computer on a cable. <b>One APK.</b>
+</p>
+
+<!-- images/demo.gif goes here once it is recorded — see the asset list near the end. -->
+
+The phone you already own can do everything an "AI phone" is sold on. What it was missing was
+someone living in it. Andee is that someone: **a floating ball on your screen with a face, a voice
+and a pair of hands**, and an LLM behind it that operates your apps the way you do — by looking at
+the screen and touching it. No app has to integrate with anything. If you can do it with your thumb,
+it can do it.
+
+### Things you can just say
+
+| You say | What happens |
+|---|---|
+| *"Reply to Mom on WeChat: I'll be home by seven."* | It opens WeChat, finds the chat, types, sends — while you watch the ball's face work. |
+| *"Find this cheaper on Taobao and JD."* | It walks both shops itself and comes back with a comparison page. |
+| *"Remind me to call the landlord at nine tomorrow."* | The alarm is set before it says "OK". At nine, it wakes up and tells you. |
+| *"Record this meeting."* | It holds the mic for the hour, then hands you the minutes as a page. |
+| *(a photo)* *"What's wrong with this plant?"* | Photos ride along with what you type; it looks and answers. |
+| *"Practice English with me — every evening at eight."* | It proposes saving that as a **scene**, and from then on steps into it on time. |
+| *(nothing — a message just arrived)* | It reads the notification first and decides: handle it, tell you in one sentence, or stay quiet. |
+
+### Why it is not another assistant app
+
+- **Works in every app, not a list of integrations.** It reads the accessibility tree and the
+  screenshot, and aims on a labelled grid instead of doing coordinate maths — the thing general models
+  are worst at.
+- **Lives on the phone.** The brain runs on the device against any OpenAI-compatible model (DeepSeek
+  by default). No vendor backend, no account, **no telemetry at all**.
+- **Gets to know you.** A private notebook, a real scheduler, a nightly review of its own
+  conversations, and **scenes** — ways of working it proposes after doing the same kind of thing with
+  you a few times.
+- **Has a character.** Five looks, fifteen moods, and a face the model picks itself, sentence by
+  sentence.
+- **Holds lines a prompt cannot talk it out of.** A stranger's notification cannot unlock the vault or
+  grant it new permissions — that refusal is in the dispatcher, not in the prompt.
+
+---
+
+**Andee is not a tool that runs on a phone. It is an individual that lives on one.** The phone is
+what it wears — the same software runs on a tablet, and is written for **any device with a body worth
+having**, up to a robot dog it treats as a leg. Everything below is that sentence taken seriously in
+code: the body it uses, the character it has, the notebook it keeps, and the rules it holds to when
+nobody is watching.
 
 It is one Android app, and it has no conventional UI. An `AccessibilityService` sees and touches the
 screen; a `WindowManager` overlay draws the result; **its face is a floating ball** that changes
@@ -96,9 +140,9 @@ like missing credentials.** Both go in ⚙ on the device:
 - **Brain** — with `brain = local` (the default), an API key for any OpenAI-compatible endpoint.
   Blank means the local brain cannot run at all.
 
-You do not have to remember this: the **✓** button in the ball's control bar opens the self-check
-list, which says which of the two is missing, and offers the button that fixes it. The first run also
-raises that list by itself.
+You do not have to remember this: the first run is a stepped setup that walks you through both, and
+afterwards the **✓** button in the ball's control bar opens the self-check list, which says which of
+the two is missing and offers the button that fixes it.
 
 **Use `assembleDebug`, not `assembleRelease`.** The release build type has no `signingConfig` and
 there is no keystore in the repo, so `assembleRelease` emits `app-release-unsigned.apk`, which will
@@ -113,15 +157,16 @@ network you do not control.
 
 ## What it looks like
 
-There is no home screen and no app drawer icon that does anything useful. What exists:
+There is no home screen. What exists:
 
 - **A floating ball.** The entire UI is `TYPE_APPLICATION_OVERLAY` layers added through
-  `WindowManager` (`ui/FloatingWindowUi`). The ball is the face; subtitles, the settings card and the
-  self-check page hang off it.
-- **A self-check page** (`ui/SelfCheckActivity`) — the only launcher entry, and it exists because of a
-  lesson: the project deliberately shipped without a launcher icon at first, and the cost was that a
-  user whose accessibility service was off held a device that did nothing and had nowhere to be told
-  why.
+  `WindowManager` (`ui/FloatingWindowUi`). Unfolded, it is a full-screen card: the ball's face on
+  top, the conversation underneath, and a small control bar — **产物** (the pages it has made),
+  **情景** (its scenes), **✓** (self-check), **⚙** (settings). When it starts working another app it
+  folds itself into a ball in the corner and gets out of the way; tap to talk, long-press to unfold.
+- **The launcher icon opens two doors.** With the assistant running, it unfolds the card — exactly
+  what a long-press on the ball does. With accessibility off, it shows the self-check card instead,
+  because that is the one moment the phone has nothing else to tell you why it is doing nothing.
 - **`ScreenBodyService`** (`AccessibilityService`) — the whole job. It builds the object graph and
   starts both network paths.
 
@@ -131,63 +176,122 @@ not pages.
 
 ## Key features
 
-**1. A body, not a screen.**
+### Hands — it uses your phone the way you do
+
+**1. Any app, no integrations.**
+It reads the screen as a compact element outline — one indented line per element, with an id it can
+tap — and when the app draws its own pixels (mini-programs, WebViews, games) it falls back to the
+screenshot. General-purpose models are bad at computing coordinates and good at reading them, so it
+**never does the maths**: every screenshot it sees carries a faint labelled 8×12 grid, it taps by
+*cell + which third of it*, and for tight targets it zooms in and sees a red crosshair where the tap
+would land before committing. A per-location guard refuses the fourth tap on the same spot, so a
+confused model stops and asks instead of hammering.
+
+**2. It types like a keyboard, without being one.**
+On Android 13+ it types through the accessibility service's own input channel — the same
+`commitText` path a keyboard uses, into the focused field, **while your own keyboard stays active**.
+Nothing to install, nothing to switch. Older devices fall back to ADBKeyboard.
+
+**3. Sixty-odd tools, held to honest failure.**
+Screen, input, notifications, SMS, calls, contacts, calendar, files, camera, meetings, TTS/ASR, and
+the dog. Every one checks its runtime permission *before* acting and reports `denied("sms")` rather
+than working around a refusal. Tools return what they saw, not what was hoped for.
+
+**4. It can log in as you without ever holding your password.**
+The vault (Keystore AES-GCM, on the device) stores your accounts; the brain can list them and have the
+password **typed** into the focused field, but no tool will ever return it — not even masked. You see
+every fill on the ball as it happens.
+
+### Mind — it gets to know you
+
+**5. Scenes: ways of working it learns with you.** *(new)*
+"Practice English with me", "look after my WeChat", "compare prices for me" — a scene is a goal, a
+voice, rules and a routine it steps into for a while. They are **not shipped, they are learned**:
+after the same kind of session comes up a few times, it proposes one; nothing is saved until you say
+yes. Enter one by saying so, from the 情景 panel, on a schedule, or automatically when you open an
+app. A scene's own rules decide how much it does on its own — "reply to my WeChat for me" really
+means it replies. While you are in one, a chip under the ball names it; its ✕ leaves it.
+
+**6. It reads your notifications before they interrupt you.** *(new)*
+A cheap, tool-less model call (~500 tokens, against ~22,000 for a full turn) classifies each one:
+**act** on it, **tell** you in a single spoken sentence, or **ignore** it and log why. It is biased
+toward silence, and when it cannot decide it falls back to asking you. The text came from a stranger,
+so it is fenced as data — and a notification-driven turn is **mechanically barred** from the vault
+and from creating or entering a scene, whatever the model was talked into.
+
+**7. Its own memory and its own schedule.**
+`config/Notebook.kt` is what it remembers about the person, and what it promised to do later. One
+test decides what gets written: *"next time I deal with them, would not knowing this make me get
+it wrong?"* The notebook is **private** — the tools are `localOnly` and filtered out of the hub
+payload, so habits and promises never leave the device. On top of it sits a real scheduler, under
+a hard rule: the moment it says "I'll remind you", the task must already be set and confirmed. And it
+is yours to read: **它记得的事** lists every memory and every scheduled task, each one deletable.
+
+**8. It behaves the same when nobody is watching.**
+After a conversation goes quiet the device sends a `(to yourself …)` turn — Andee reviewing the
+conversation alone, *"nobody is watching you, nobody is waiting for you to answer."* Two rules:
+make no sound, and do not touch the device. It closes out its own promises, notes which habits are
+worth turning into a scene next time, and ends empty-handed rather than inventing something to record.
+
+### Face — a character, not a theme
+
+**9. Five looks, fifteen moods, and a face it chooses.**
+奶油 Cream, 八戒 Pigsy, 贱贱兔 Rascal, 憨憨熊 Bear and 小恶魔 Imp, drawn live in hand-written OpenGL
+ES. Fifteen moods (`ui/ball/Mood.kt`) arbitrate between what it feels, what the voice pipeline is
+doing, and what work is in flight, plus an idle fidget pool that never repeats the same gesture twice
+in a row, *"because a repeat reads as a stuck animation, not a personality."* The model now picks its
+own expression **mid-sentence** — `[happy] Found it, page three. [calm] Want me to open it?` — and the
+face changes in step with the audio. Swipe the ball to change who you are talking to: a look carries a
+`persona` (how it talks) and a `voice` (how it sounds).
+
+**10. Character is delivery, never a licence.**
+§12 of the prompt subordinates the persona to everything above it: it may change wording, rhythm,
+and how it sounds about the task — never what it does, what it is willing to do, or what it tells
+the user is true. And when something is genuinely wrong, the mask comes off.
+
+### Show and tell
+
+**11. Talk, type, or show it a photo.**
+Tap the ball, or say "Hey Andee" (fully offline wake word). Prefer typing? The typing field takes
+up to six photos — from the camera or the gallery — with or without words.
+
+**12. Answers you can keep.**
+Anything structured — a comparison, a plan, meeting minutes — comes back as a page it writes and
+puts on screen. The **产物** panel keeps up to a hundred of them to reopen, delete, or revise by
+just saying what should change. Ask it to record a meeting and it holds the microphone for the
+hour, writing a verbatim transcript to disk as it goes, then turns it into minutes.
+
+### Body
+
+**13. A body, not a screen.**
 The device is what Andee wears. Camera as eyes, ASR plus an offline wake-word as ears, the
 accessibility service as hands, and — when one is attached — a robot dog as **a leg**. The prompt
 is explicit that it is not a pet on a remote: *"you have not gained a subordinate, you have gained
 a body part."* Bodies differ, so it checks rather than assumes.
 
-**2. The brain is detachable from the body.**
-It runs on the device itself (`brain = local`, calling any OpenAI-compatible endpoint) or lives
-somewhere else and reaches the device over a WebSocket hub. The wire between the two is a plain
-tool-schema contract, so either half can be replaced without rewriting the other. That is what
-makes "any smart hardware as a body" a fact here rather than an aspiration.
-
-**3. A character, not a theme.**
-Fifteen moods (`ui/ball/Mood.kt`) arbitrated between what it feels, what the voice pipeline is
-doing, and what work is in flight — plus an idle fidget pool that never repeats the same gesture
-twice in a row, *"because a repeat reads as a stuck animation, not a personality."* You swipe the
-ball to change who you are talking to: a look carries a `persona` (how it talks) and a `voice`
-(how it sounds), and the persona lands at the *head* of the system prompt, where a manner has to
-sit to change how the model writes.
-
-**4. Character is delivery, never a licence.**
-§11 of the prompt subordinates the persona to the ten sections above it: it may change wording,
-rhythm, and how it sounds about the task — never what it does, what it is willing to do, or what
-it tells the user is true. And when something is genuinely wrong, the mask comes off.
-
-**5. Its own memory and its own schedule.**
-`config/Notebook.kt` is what it remembers about the person, and what it promised to do later. One
-test decides what gets written: *"next time I deal with them, would not knowing this make me get
-it wrong?"* The notebook is **private** — the tools are `localOnly` and filtered out of the hub
-payload, so habits and promises never leave the device. On top of it sits a real scheduler, under
-a hard rule: the moment it says "I'll remind you", the task must already be set and confirmed.
-
-**6. It behaves the same when nobody is watching.**
-After a conversation goes quiet the device sends a `(to yourself …)` turn — Andee reviewing the
-conversation alone, *"nobody is watching you, nobody is waiting for you to answer."* Two rules:
-make no sound, and do not touch the device. It closes out its own promises, and ends empty-handed
-rather than inventing something to record.
-
-**7. Sixty-odd tools, held to honest failure.**
-Screen, input, notifications, SMS, calls, contacts, calendar, files, camera, TTS/ASR, and the dog.
-Every one checks its runtime permission *before* acting and reports `denied("sms")` rather than
-working around a refusal. Tools return what they saw, not what was hoped for.
-
-**8. A robot dog counts as a leg.**
+**14. A robot dog counts as a leg.**
 The dog is not a smart-home accessory bolted onto a phone app. It runs through a USB OTG dongle
 (Arduino Nano + NRF24L01) on the same body, so a single request — *walk to the kitchen and tell me
-what is on the counter* — can move a physical object and look through a camera, in one task. Its
-own safety rules are not negotiable: the original remote must be off, the dog refuses to advance
-inside 20cm of an obstacle, and **if the dongle is unplugged mid-motion the body cannot send a
-stop** — the dog finishes its last action. That last one is a firmware limitation this app does not
-paper over. If you attach a dog, read
+what is on the counter* — can move a physical object and look through a camera, in one task. Turns
+are closed-loop on the phone's own gyroscope, and a tilt past the fall threshold stops it on the
+device without waiting for the brain. Its own safety rules are not negotiable: the original remote
+must be off, the dog refuses to advance inside 20cm of an obstacle, and **if the dongle is unplugged
+mid-motion the body cannot send a stop** — the dog finishes its last action. That last one is a
+firmware limitation this app does not paper over. If you attach a dog, read
 [The robot dog](#the-robot-dog-usb-dongle) before the first move.
 
-**9. No Compose, no DI framework, no coroutines.**
+**15. The brain is detachable from the body.**
+It runs on the device itself (`brain = local`, the default, calling any OpenAI-compatible endpoint)
+or lives somewhere else and reaches the device over a WebSocket hub. The wire between the two is a
+plain tool-schema contract, so either half can be replaced without rewriting the other. That is what
+makes "any smart hardware as a body" a fact here rather than an aspiration.
+
+### Engineering
+
+**16. No Compose, no DI framework, no coroutines.**
 Deliberately. Overlays cannot host Compose, so all UI is hand-written `View` code; there is one
 service, so dependencies are constructor-injected by hand; concurrency is `Handler` plus dedicated
-executors. 34k+ lines, all first-party — no code copied in from anywhere.
+executors. 42k+ lines of Kotlin, all first-party — no code copied in from anywhere.
 
 ## Permissions: why each one, and what happens if you refuse
 
@@ -280,6 +384,10 @@ party has audited. This project's claims are duller and checkable, in code you c
   Habits and promises are physically incapable of being sent.
 - **The wake word is fully offline.** Local MFCC + DTW template matching (`app/.../wake/`). It
   stores feature vectors, never audio, and it never touches the network.
+- **A message from a stranger cannot hand it permissions.** A turn started by a notification runs
+  with `untrusted = true`, and `CommandDispatcher.dispatch` refuses the whole `device.vault.` prefix
+  and `scene.save` / `scene.enter` / `scene.delete` on it — in code, not in the prompt. The prompt is
+  the first layer; this is the one that holds when the prompt is talked around.
 - **The local brain needs no vendor backend.** `brain = local` against any OpenAI-compatible
   endpoint is a supported mode, not a degraded one.
 - **What is *not* fixed is written down.** [SECURITY.md](SECURITY.md) lists five known limitations,
@@ -534,7 +642,10 @@ The tools the brain gets:
 | `dog_sequence` | Several steps in a row (half a turn → pause → forward → back), run in the background, stopping itself at the end |
 | `dog_stop` | Emergency stop. The first thing to call when the user says "stop" |
 | `dog_turn` | Turn a measured number of degrees using the tablet's gyroscope, and stop on the angle — the one dog command that knows whether it worked. Prefers the legs |
-| `dog_status` | Link state and what the dog is doing. It cannot read the battery — this link only sends |
+| `dog_speed` / `dog_pose` | Speed and stance. Settings, not motions: they take effect from the next move |
+| `dog_status` | Link state, what the dog is doing, and the last telemetry it sent back |
+| `dog_sense` | Refresh the dog's own readings — front distance and battery — riding home on the radio's acknowledgement. Needs the v2 firmware on both ends; without it, it says "cannot see" rather than reporting a zero |
+| `dog_calibrate` | Tell the tablet "this is standing upright", for the fall guard. Rarely needed — every move from rest does it automatically |
 
 ### Wiring and first use
 
@@ -611,12 +722,14 @@ that is matched against system text **can never be translated**.
 app/                    the Android app (Kotlin, no Compose)
   src/main/java/net/kuafuai/andee/
     ScreenBodyService.kt   the accessibility service — read this first
-    brain/                 the agent loop — LocalBrain, and LocalPrompt,
-                           which is the character's rulebook (§§1–10 the job, §11 the persona)
-    ui/ball/               the face — Mood (15 moods + idle fidgets), BallLook (looks are characters)
+    brain/                 the agent loop — LocalBrain, LocalPrompt (the character's rulebook:
+                           §§1–10 the job, §11 scenes, §12 the persona, §13 the active scene),
+                           and NotificationTriage
+    ui/ball/               the face — Mood (15 moods + idle fidgets), BallLook (five looks, each a character)
     net/                   BodyWsServer, BodyWsClient, ToolSchemas (the tool definitions)
     device/                screen control, permissions, vault, robot dog
-    ui/                    the overlay: ball, subtitles, settings, self-check
+    config/                VoiceConfig (settings), Notebook (memories, todos, scenes — encrypted)
+    ui/                    the overlay: ball, subtitles, settings, self-check, scenes, pages
     i18n/AppLocale.kt      how the overlay reaches its strings
   src/main/res/values{,-en}/strings.xml   the two user-facing string tables
 docs/permissions.md     why it asks for what it asks for
