@@ -141,8 +141,8 @@ object GroundingLog {
                 note(
                     JSONObject()
                         .put("ev", "session")
-                        .put("screen_w", app.resources.displayMetrics.widthPixels)
-                        .put("screen_h", app.resources.displayMetrics.heightPixels)
+                        .put("screen_w", ScreenController.displaySize(app).x)
+                        .put("screen_h", ScreenController.displaySize(app).y)
                         .put(
                             "orientation",
                             if (app.resources.configuration.orientation ==

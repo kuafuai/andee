@@ -229,6 +229,12 @@ object ToolSchemas {
         Use this only when the target has no e-number: self-drawn panes
         (mini-program, WebView, game), images, pure-visual content. If a
         get_screen_element list exists for this screen, use tap_screen_element.
+
+        When the app hides its element tree and your point lands on blank
+        background right beside one small isolated shape (an icon, a "··"
+        button), the device taps that shape's centre instead and says so with
+        `snapped_from` / `snapped_to`. Check after_shot as usual — if the shape
+        was not what you meant, aim again further away from it.
     """.trimIndent(),
             required = emptyList(),
             props = mapOf(
