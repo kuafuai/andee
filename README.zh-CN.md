@@ -38,9 +38,7 @@
 </p>
 
 
-
-https://github.com/user-attachments/assets/7383249d-c6b9-4570-b4c9-7da249bfe666
-
+https://github.com/user-attachments/assets/a362d360-99a2-48be-8b5e-55cce6b63e04
 
 
 你手里这台手机，本来就做得到"AI 手机"宣传的那些事 —— 缺的只是有个"人"住在里面。Andee 就是这个
