@@ -53,16 +53,18 @@ You are driving when your mother texts you. One hand on the wheel, eyes on the r
 
 It opens WhatsApp, finds your chat with Mom, types, sends, and reads the reply back. Your hands never
 left the wheel. **The hard part was never the sentence** — it is getting into a real app, as you,
-while you are somewhere else. The rest of the list is the same job in other shapes:
+while you are somewhere else.
+
+Some jobs are longer than a sentence, and those it calls **scenes**: a goal, a voice and a routine it
+steps into for a while. Four are ready-made, under **Scenes → Ready-made scenes**. Tap **Adopt** and
+they are yours like any other — edit them, or delete them:
 
 | You say | What happens |
 |---|---|
-| *"Find this cheaper on Amazon and eBay."* | It shops both sites itself and comes back with a comparison page. |
-| *"Remind me to call the landlord at nine tomorrow."* | The alarm is set before it says "OK". At nine, it wakes up and tells you. |
-| *"Record this meeting."* | It holds the mic for the hour, then hands you the minutes as a page. |
-| *(a photo)* *"What's wrong with this plant?"* | Photos ride along with what you type; it looks and answers. |
-| *"Practice English with me — every evening at eight."* | It proposes saving that as a **scene**, and from then on steps into it on time. |
-| *(nothing — a message just arrived)* | It reads the notification first and decides: handle it, tell you in one sentence, or stay quiet. |
+| *"Keep an eye on my messages."* | It reads the notification shade across every chat app at once and tells you the ones needing you now — one line each, name first. Groups, newsletters and ads stay quiet, and a stranger's link or verification code gets named as suspicious and touched not at all. |
+| *"Show me what I'm paying for every month — and cancel the ones I don't want."* | It reads your subscriptions where you point it and lays them out with the monthly total on top. Then one at a time: Cancel, Keep, or Think about it. It stops before the final confirm, and it never enters a payment password. |
+| *"Record this meeting."* | It holds the mic for the hour, then hands you the minutes as a page — decisions, action items, open questions, key quotes — and offers to remind you about your own items. |
+| *"Book it for me the moment it opens."* | At the time you set, it opens the app, reads the page, and fills everything up to just before the last button. Payment and the final confirmation stay with you. |
 
 ### Why it is not another assistant app
 
@@ -131,13 +133,14 @@ every fill on the ball as it happens.
 
 ### Mind — it gets to know you
 
-**5. Scenes: ways of working it learns with you.** *(new)*
-"Practice English with me", "keep an eye on my messages", "compare prices for me" — a scene is a goal,
-a voice, rules and a routine it steps into for a while. They are **not shipped, they are learned**:
-after the same kind of session comes up a few times, it proposes one; nothing is saved until you say
-yes. Enter one by saying so, from the **Scenes** panel, on a schedule, or automatically when you
-open an app. A scene's own rules decide how much it does on its own — "answer my messages for me"
-really means it answers. While you are in one, a chip under the ball names it; its ✕ leaves it.
+**5. Scenes: ways of working, ready-made or learned with you.** *(new)*
+"Keep an eye on my messages", "book it for me when it opens" — a scene is a goal, a voice, rules and a
+routine it steps into for a while. Four are ready-made and sit under **Scenes → Ready-made scenes**,
+saved only when you tap Adopt. Beyond those it **learns** its own: after the same kind of session comes
+up a few times, it proposes one; nothing is saved until you say yes. Enter one by saying so, from the
+**Scenes** panel, on a schedule, or automatically when you open an app. A scene's own rules decide how
+much it does on its own — "answer my messages for me" really means it answers. While you are in one, a
+chip under the ball names it; its ✕ leaves it.
 
 **6. It reads your notifications before they interrupt you.** *(new)*
 A cheap, tool-less model call (~500 tokens, against ~22,000 for a full turn) classifies each one:
