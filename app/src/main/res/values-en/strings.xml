@@ -359,6 +359,8 @@
     <string name="narrate_show_html">Putting it on screen…</string>
     <string name="narrate_camera">Taking a look…</string>
     <string name="narrate_dog">Moving a leg…</string>
+    <string name="narrate_market_search">Finding a tool…</string>
+    <string name="narrate_market_call">Calling an external service…</string>
     <string name="narrate_default">Running %1$s…</string>
 
     <!--

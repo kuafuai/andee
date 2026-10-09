@@ -1084,6 +1084,8 @@ class LocalBrain(
         toolName == "show_html" -> AppLocale.str(appContext, R.string.narrate_show_html)
         toolName == "camera_turn" -> AppLocale.str(appContext, R.string.narrate_camera)
         toolName.startsWith("dog_") -> AppLocale.str(appContext, R.string.narrate_dog)
+        toolName == "market_search" -> AppLocale.str(appContext, R.string.narrate_market_search)
+        toolName == "market_call" -> AppLocale.str(appContext, R.string.narrate_market_call)
         else -> AppLocale.str(appContext, R.string.narrate_default, toolName)
     }
 
