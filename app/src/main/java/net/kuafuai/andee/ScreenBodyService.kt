@@ -108,6 +108,15 @@ class ScreenBodyService : AccessibilityService() {
      */
     private val callExtensions = net.kuafuai.andee.net.CallExtensionRegistry()
 
+    /**
+     * The CodeFlying market as a second external tool source, or null before
+     * [startBrain] has run — and permanently null in the hub branch, which never
+     * builds one. Read inside the `forwardExternal` lambda rather than captured
+     * by value, because the dispatcher is built well before the brain is.
+     */
+    @Volatile
+    private var marketTools: net.kuafuai.andee.market.MarketTools? = null
+
     // Closed by [stopEverything], reopened when the user starts the next turn.
     // Cancelling the brain's task is asynchronous, so progress / message frames
     // already in flight still arrive after the stop; without this gate the
@@ -429,14 +438,24 @@ class ScreenBodyService : AccessibilityService() {
             dogMotion,
             this,
             forwardExternal = { method, params ->
-                // Unknown to the dispatcher → try the call extension. The
-                // server enforces the timeout and turns a missing extension
-                // into a proper error; the throw here becomes brain-visible.
-                val srv = wsServer
-                    ?: throw IllegalStateException(
-                        "no local server running — cannot reach call extension"
-                    )
-                srv.forwardToExtension(method, params)
+                // Unknown to the dispatcher → the market, then the call
+                // extension. Both are "tools that live somewhere else", and the
+                // market goes first because it is the cheap check — an array
+                // walk — while the extension path throws when nothing is
+                // plugged in, which would mask a market hit.
+                val market = marketTools
+                if (market != null && market.hasMethod(method)) {
+                    market.call(method, params)
+                } else {
+                    // The server enforces the timeout and turns a missing
+                    // extension into a proper error; the throw here becomes
+                    // brain-visible.
+                    val srv = wsServer
+                        ?: throw IllegalStateException(
+                            "no local server running — cannot reach call extension"
+                        )
+                    srv.forwardToExtension(method, params)
+                }
             },
             // The page no longer blocks the tool call, so this callback is the
             // only way the brain learns the user is done with it. See
@@ -1911,11 +1930,21 @@ class ScreenBodyService : AccessibilityService() {
         if (bc.apiKey.isEmpty()) {
             reportNoBrain(AppLocale.str(this, R.string.svc_no_brain_local), announce)
         }
+        // CodeFlying is the only backend with a market behind it. Everywhere
+        // else this object is inert — empty tool list, `hasMethod` always false
+        // — so a local or hub brain's tool surface is exactly what it was.
+        val market = net.kuafuai.andee.market.MarketTools(
+            baseUrl = net.kuafuai.andee.config.VoiceConfig.codeFlyingMarketBaseUrl(),
+            apiKey = bc.apiKey,
+            enabled = bc.mode == net.kuafuai.andee.config.VoiceConfig.BRAIN_CODEFLYING,
+        )
+        marketTools = market
         localBrain = net.kuafuai.andee.brain.LocalBrain(
             cfg = bc,
             appContext = this,
             dispatcher = dispatcher,
             registry = callExtensions,
+            market = market,
             onProgress = ::onBrainProgress,
             onFinal = ::onBrainFinal,
             onTurnEnd = ::onTurnEnd,

@@ -443,6 +443,14 @@
     <string name="narrate_show_html">把结果放到屏幕上…</string>
     <string name="narrate_camera">看一眼…</string>
     <string name="narrate_dog">动一下腿…</string>
+    <!--
+        市场的两个元工具。market_call 包着每一个市场 API —— 天气、航班、
+        出图、OCR —— 没有一个动词能同时说清，所以这两条是诚实的泛称。
+        不加这两条时走的是 fallback，会把标识符原样摆到屏幕上：
+        「正在 market_call…」。
+    -->
+    <string name="narrate_market_search">找工具…</string>
+    <string name="narrate_market_call">调用外部服务…</string>
     <string name="narrate_default">正在 %1$s…</string>
 
     <!--
