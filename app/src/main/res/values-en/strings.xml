@@ -388,6 +388,7 @@
     <string name="check_title_network">Network</string>
     <string name="check_title_brain">Assistant</string>
     <string name="check_title_model">Model</string>
+    <string name="check_title_version">Version</string>
     <string name="check_title_microphone">Microphone</string>
     <string name="check_title_notifications">Notification access</string>
     <string name="check_title_typing_channel">Typing channel</string>
@@ -419,6 +420,16 @@
     <string name="check_detail_model_balance">The server answered %1$s: most likely the account is out of balance. Top up on the current provider\'s website and try again.</string>
     <string name="check_detail_model_name">No model called “%1$s” on this server. It offers: %2$s</string>
     <string name="check_detail_model_other">%1$s</string>
+    <!-- The one row that is about the app rather than the device, and the one
+         place this app sends anything outward. %1$s is always the release to
+         move to and %2$s is always the build in hand; the two rows differ by a
+         word, so do not swap the arguments between them. See SelfCheck.version. -->
+    <string name="check_detail_version_current">%1$s is the current release.</string>
+    <string name="check_detail_version_stale">%1$s is available; you are on %2$s. The old one still works — update whenever you like.</string>
+    <string name="check_detail_version_forced">Update to %1$s. The build you are on (%2$s) is no longer supported.</string>
+    <string name="check_detail_version_offline">Offline, so not tested. You are on %1$s.</string>
+    <string name="check_detail_version_quota">Today\'s checks are used up; they reset tomorrow. You are on %1$s.</string>
+    <string name="check_detail_version_unreachable">Could not be checked: %1$s. You are on %2$s.</string>
     <string name="check_detail_notif_on">Granted, and the listener is bound.</string>
     <string name="check_detail_notif_zombie">Settings says “granted”, but the listener is not bound — notifications are being dropped silently.\nThis one only comes back if you turn it off and then on again; leaving it on does nothing.</string>
     <string name="check_detail_notif_off">Off. Call announcements and forwarded notifications never arrive.</string>

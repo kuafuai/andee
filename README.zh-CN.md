@@ -18,7 +18,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20conditions-155eef"></a>
   <a href="app/build.gradle"><img alt="Platform" src="https://img.shields.io/badge/platform-Android%2011%2B%20(API%2030)-3ddc84"></a>
   <a href="app/build.gradle"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.22-7f52ff"></a>
-  <a href="SECURITY.md"><img alt="无遥测" src="https://img.shields.io/badge/遥测-无-0f6e56"></a>
+  <a href="docs/permissions.zh-CN.md"><img alt="遥测不含内容" src="https://img.shields.io/badge/遥测-不含内容-0f6e56"></a>
   <a href="CONTRIBUTING.zh-CN.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-fdb062"></a>
 </p>
 
@@ -69,7 +69,8 @@ https://github.com/user-attachments/assets/866e8333-e97b-4bf5-9525-540f9fdb01cd
 - **任何 App 都能用，而不是一张"已接入应用"清单。** 它读无障碍树和截图，在一张带标号的网格上
   瞄准，而不是自己算坐标 —— 那恰恰是通用大模型最不擅长的事。
 - **住在手机上。** 大脑就跑在设备本机，接任意 OpenAI 兼容模型（默认 DeepSeek）。没有厂商后端、
-  不用注册账号、**没有任何遥测**。
+  不用注册账号。它唯一会发给我们的东西是版本号和机型 —— 只在你查更新的时候发，字段清单见
+  [docs/permissions.zh-CN.md](docs/permissions.zh-CN.md)。
 - **会越来越懂你。** 私人笔记本、真的定时任务、没人时自己复盘对话，还有**情景** —— 同一类事陪你
   做过几次之后，它会主动提议"要不要存成一个情景"。
 - **有性格。** 五个形象、十四种情绪，表情由模型自己挑，一句话说到一半都能换脸。
@@ -302,8 +303,10 @@ OpenAI 兼容端点（`llm_api_key`，默认 `https://api.deepseek.com`）。**�
 这一类产品里的多数说法 —— 包括那些融资充裕的 —— 都是发布时的主张，没有第三方审计过。而
 这个项目的说法更无聊，但**可以核对**，就在你现在能读的代码里：
 
-- **没有任何遥测。** 不是"我们做了匿名化"，也不是"可以在设置里关掉"。这个仓库里根本没有
-  数据分析 SDK。
+- **没有数据分析 SDK，也没有你的内容流向我们。** 不是"我们做了匿名化"，也不是"可以在设置里关掉"。
+  这个仓库里根本没有数据分析 SDK。唯一会到达维护者手上的是版本自检：版本号、手机型号、品牌、
+  系统版本、界面语言，以及一个随机安装 ID，别的什么都没有。逐字段列在
+  [docs/permissions.zh-CN.md](docs/permissions.zh-CN.md)。
 - **笔记本出不了设备。** 这不是一句政策，是一道过滤：`net/ToolSchemas.kt` 在注册之前就把所有
   `localOnly` 工具从发往 hub 的载荷里剔掉了。习惯和承诺在物理上无法被发出去。
 - **唤醒词全离线。** 本机 MFCC + DTW 模板匹配（`app/.../wake/`）。存的是特征向量，从不存录音，
@@ -803,8 +806,9 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
   `FLAG_SECURE`，**本项目对这条路径没有任何技术围栏**。任何涉及钱的操作都要人在场；并且请记住
   **"是 AI 自己做的"不是抗辩理由**，因为它确实不是。
 - **他发出去的东西是你的。** 消息、帖子、通话、订单，署名都是你。
-- **你的数据会离开设备。** 本仓库没有任何遥测，但语音会走火山引擎，对话连同**全部工具返回结果**
-  会走到你配置的那个大脑端点。"本机模式"换的是目的地，不是这个事实。
+- **你的数据会离开设备。** 本仓库里没有数据分析 SDK，但语音会走火山引擎，对话连同**全部工具返回
+  结果**会走到你配置的那个大脑端点，版本自检会走到一台维护者自己跑的服务器。"本机模式"换的是
+  目的地，不是这个事实。
 - **他能被屏幕上的字操纵。** 任何能让你打开一个页面的人，都可能影响到他。
 
 ## Star History

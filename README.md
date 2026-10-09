@@ -16,7 +16,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20conditions-155eef"></a>
   <a href="app/build.gradle"><img alt="Platform" src="https://img.shields.io/badge/platform-Android%2011%2B%20(API%2030)-3ddc84"></a>
   <a href="app/build.gradle"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.22-7f52ff"></a>
-  <a href="SECURITY.md"><img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-0f6e56"></a>
+  <a href="docs/permissions.md"><img alt="No content telemetry" src="https://img.shields.io/badge/telemetry-no%20content-0f6e56"></a>
   <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-fdb062"></a>
 </p>
 
@@ -72,7 +72,9 @@ they are yours like any other — edit them, or delete them:
   screenshot, and aims on a labelled grid instead of doing coordinate maths — the thing general models
   are worst at.
 - **Lives on the phone.** The brain runs on the device against any OpenAI-compatible model (DeepSeek
-  by default). No vendor backend, no account, **no telemetry at all**.
+  by default). No vendor backend, no account. The only thing it ever sends us is a version number and
+  a phone model, when it checks whether there is an update — the full field list is in
+  [docs/permissions.md](docs/permissions.md).
 - **Gets to know you.** A private notebook, a real scheduler, a nightly review of its own
   conversations, and **scenes** — ways of working it proposes after doing the same kind of thing with
   you a few times.
@@ -439,8 +441,11 @@ is through.
 Most claims in this category — including the well-funded ones — are launch claims that no outside
 party has audited. This project's claims are duller and checkable, in code you can read right now:
 
-- **No telemetry at all.** Not "we anonymise it", not "opt out in settings". There is no analytics
-  SDK in this repo.
+- **No analytics SDK, and none of your content reaches us.** Not "we anonymise it", not "opt out in
+  settings": there is no analytics SDK in this repo. The one thing that does reach the maintainers is
+  the version check — your version number, phone model, brand, OS release, UI language and a random
+  per-install ID, and nothing else. Field by field, in
+  [docs/permissions.md](docs/permissions.md).
 - **The notebook cannot leave the device.** It is not a policy, it is a filter:
   `net/ToolSchemas.kt` drops every `localOnly` tool from the hub payload before it is registered.
   Habits and promises are physically incapable of being sent.
@@ -902,9 +907,10 @@ The four points worth reading even if you read nothing else:
   on that path.** Keep a human present for anything financial, and treat *"the AI did it"* as no
   defence, because it is not one.
 - **What it sends is yours.** Messages, posts, calls and orders go out under your name.
-- **Your data leaves the device.** No telemetry exists in this repo — but speech goes to Volcengine,
-  and the conversation plus every tool result goes to whichever brain endpoint you configure. Local
-  mode changes the destination, not the fact.
+- **Your data leaves the device.** There is no analytics SDK in this repo — but speech goes to
+  Volcengine, the conversation plus every tool result goes to whichever brain endpoint you configure,
+  and the version check goes to a server the maintainers run. Local mode changes the destination, not
+  the fact.
 - **It can be steered by what is on screen.** Anyone who can get you to open a page can influence it.
 
 ## License

@@ -26,9 +26,9 @@ An **experimental** piece of software that you install on **your own device**. I
 
 ## 2. Where your data goes (read this before deciding to use it)
 
-**The short version: the maintainers receive nothing about you. "Your data never leaves the device" is nevertheless false.**
+**The short version: no analytics SDK, no crash reporting, no event tracking and no advertising ID — but "the maintainers receive nothing about you" is false too, with exactly one exception: the version check in the table below.**
 
-**There is no telemetry in this repository.** No analytics SDK, no crash reporting, no tracking, no device fingerprinting. A search of `app/build.gradle` and `app/src/main/` for `firebase` / `analytics` / `sentry` / `crashlytics` returns zero. If you install this and use it, we do not know.
+**First, the part that is not there (grep it yourself):** no analytics SDK, no crash reporting, no event tracking, no advertising ID. A search of `app/build.gradle` and `app/src/main/` for `firebase` / `analytics` / `sentry` / `crashlytics` returns zero. And unless you tap **Check again** on the self-check page, the app sends nothing outward during normal use.
 
 **But data does leave the device, to wherever it is configured to go:**
 
@@ -37,13 +37,16 @@ An **experimental** piece of software that you install on **your own device**. I
 | Your speech (ASR) and its speech (TTS) | **Volcengine / ByteDance cloud** | `openspeech.bytedance.com` |
 | The conversation, **and every tool result** | The "brain" you configured | `brain=local` (the out-of-box default) → `api.deepseek.com`; in hub mode, your own `hub_url` |
 | The private notebook (`Notebook` — what it remembers about you, what it promised) | **On this device only** | Filtered out of the hub payload |
+| **Version check**: your version number, phone model / brand / OS version, UI language, one random install ID | **A server the maintainers run** (not a third party) | Once on first launch, and once per tap on the self-check page's **Check again**; capped at 10 per IP per day |
 
 The second row needs spelling out: **tool results are part of the conversation.** The SMS text it read, your contacts, your call log, notification contents, your location, and its reading of the screen all travel to the endpoint you configured.
+
+**The last row needs spelling out too, because it is a different kind of thing from the two above it.** Those two go to an endpoint *you* configured; this one comes to us. It carries the version number, the phone model, the brand, the Android release, the UI language, and a random ID this install generated for itself (`body-xxxxxxxx`, new on every reinstall — **not `ANDROID_ID`**). The server necessarily also sees your IP, from which it derives a country / region / city. **It does not carry**: conversation content, screen content, which apps you have installed, contacts, location, crash logs or an advertising ID. **Nor can it be switched off** — the address is a constant compiled into the code, with no setting and no build flag behind it, so stopping it means editing the source and rebuilding. Field by field, in **[docs/permissions.md](docs/permissions.md)**.
 
 **So "local mode" does not mean "processed locally."** Local mode swaps the hub for whichever provider you typed in. It does not keep a single byte on the device.
 
 Therefore:
-- *"We do not monitor or store your data"* — **true.** We have neither the capability nor the endpoint.
+- *"We do not monitor or store your data"* — **mostly true, but do not overclaim it.** No database, no behavioural analysis, and no reading of anything you send; the one exception is the version check, which tells us that some device of some model on some IP is running 1.0.0.
 - *"Your data never leaves the device"* — **false. Do not claim it.**
 
 ## 3. What it can actually do (not hypotheticals — current state of the code)

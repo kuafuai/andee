@@ -8,9 +8,8 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 Android template shipped with. Rather than pretend otherwise, this file records the policy going
 forward and states plainly where the project is:
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`1` / `1.0`**.
-- The first tagged release should be **`v1.0.0`** with `versionName "1.0.0"` — note that `"1.0"` is
-  not a valid SemVer string, so the two need to be reconciled at that point.
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`1` / `"1.0.0"`**.
+- The first tagged release should be **`v1.0.0`**, matching the `versionName` already in the file.
 - Thereafter: releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the
   leading `v`, and `versionCode` increases by one per release. `versionCode` must increase
   **monotonically** or Android refuses the upgrade; the same number must never be reused for
@@ -66,8 +65,9 @@ build time would close this hole; it is not implemented yet.)
 - `README.zh-CN.md` — the Chinese setup guide, split out from `README.md`.
 - `DISCLAIMER.md` + `DISCLAIMER.zh-CN.md` — the user-facing terms, one file per language (same
   convention as the two READMEs). Covers the four things Apache-2.0 does not: **where your data
-  actually goes** (no telemetry in the repo, but speech goes to Volcengine and the conversation plus
-  every tool result goes to the brain endpoint you configure), **what the software is genuinely
+  actually goes** (at the time this file was written, no telemetry in the repo, but speech goes to
+  Volcengine and the conversation plus every tool result goes to the brain endpoint you configure),
+  **what the software is genuinely
   capable of** (it can complete a payment by tapping; the only guardrail is Android's `FLAG_SECURE`),
   **who bears the consequences**, and third-party platform terms.
 - `docs/acceptable-use.md` + `docs/acceptable-use.zh-CN.md` — the prohibited uses, one file per
@@ -80,6 +80,33 @@ build time would close this hole; it is not implemented yet.)
 - Both READMEs now carry a warning above the fold and a `## Disclaimer and acceptable use` section;
   `SECURITY.md` states the triage boundary (steering it is a vulnerability; doing what it was built
   to do is documented behaviour).
+- **A 版本 row in the self-check list — the first thing this app ever sends anywhere.** It asks a
+  version service whether a newer build exists and reports the answer as one more row in the same list
+  the device diagnostics live in: one row, one renderer, no second settings page. The level mapping is
+  the deliberate part. **Current → OK, newer release available → NOTE, forced update → WARN, and
+  everything undetermined → NOTE.** An outdated app is not a broken one, and only FAIL and WARN may
+  raise the startup card, so a vendor that popped a card every time it shipped a patch would be
+  nagware — which is the exact failure `SelfCheck`'s level doc is written against. The forced case is
+  the one real WARN, because the service is then saying this build is no longer supported. A
+  statistics endpoint being unreachable is never the user's problem, so it never paints the card red.
+  **The address is a hardcoded constant, not a setting.** `VERSION_API_BASE` lives in
+  `device/SelfCheck.kt` (`https://andee.kuafuai.net`), with no settings row, no build flag and no
+  `local.properties` key behind it, so turning the check off means editing that line and rebuilding.
+  That is a deliberate trade rather than an oversight: a check which can be silently misconfigured is
+  a check that silently stops working, and this one should be on for everyone or off for everyone.
+  The price is that there is no build-time way to opt out, and `docs/permissions.md` now says so
+  instead of pretending otherwise — which it had to, because the first cut of this feature did put the
+  address in `local.properties` and then advertised a fresh clone as reporting nothing.
+- **`res/xml/network_security_config.xml` deliberately did *not* gain the version host, on the second
+  pass.** Android refuses cleartext HTTP to any host not named there, and what it produces —
+  `CLEARTEXT communication to X not permitted by network security policy` — arrives as a version row
+  reading 查不到, a message about a policy rather than about anything the user did. So the first cut
+  added the service's IP address to that file, which is the right move *for a `http://` address*. The
+  address then became `https://andee.kuafuai.net`, which needs no exception at all, and the entry was
+  deleted rather than left in place: an exception for a host nobody calls only widens what this app
+  will talk to in the clear. `124.71.176.202` (the CodeFlying backend) is still listed and still needs
+  to be. The rule to carry forward is that this file tracks the addresses actually in use — adding a
+  line is part of pointing the app at plain HTTP, and removing it is part of moving away.
 
 ### Changed
 
@@ -221,6 +248,24 @@ build time would close this hole; it is not implemented yet.)
   inventing a measurement. Only its framing moved: it opened on WeChat, which a non-Chinese reader
   reads as someone else's app having someone else's problem, so it now opens on the general
   behaviour and names WeChat as the one we happened to measure.
+- **The blanket "没有任何遥测 / no telemetry at all" claim is gone, because the version row above
+  made it false.** It appeared in nine places — `DISCLAIMER.md`, `DISCLAIMER.zh-CN.md`,
+  `docs/permissions.md`, `docs/permissions.zh-CN.md`, both READMEs, and both README badges — and all
+  nine were in the same voice: not "we anonymise it", not "opt out in settings", but a flat statement
+  that the reader was invisible. A check that carries an IP, a phone model and a stable per-install ID
+  is telemetry by any ordinary reading of the word, so keeping the sentence would have converted a
+  product guarantee into a lie. The replacements keep the half that is still true and still
+  checkable — no analytics SDK, no crash reporting, no event tracking, no advertising ID, all four
+  confirmed by the same grep the old text quoted — and then state the single exception field by field,
+  in a row of its own in the data table, next to an explicit list of what that request does *not*
+  carry (conversation, screen, app list, contacts, location, crash log, advertising ID). `docs/permissions.md`
+  is the canonical copy; the rest point at it. The badge went from `遥测-无` / `telemetry-none` to
+  `遥测-不含内容` / `telemetry-no content`, because "no content" is the claim that survives.
+  Worth recording for whoever edits these next: the old sentence was true of the *repository* on the
+  day it was written and was always going to be false the moment the project shipped anything that
+  phoned home. This file had already annotated that distinction in the DISCLAIMER's own entry above —
+  *"we do not collect your data", which is true of the maintainers and false of the device* — and the
+  claim that had to be corrected anyway was the neighbouring one about the maintainers.
 
 ### Removed
 

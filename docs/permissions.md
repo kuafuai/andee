@@ -94,9 +94,9 @@ Andee has a vault (`config/Vault.kt`) for the account passwords you enter yourse
 
 ## Where your data goes ("do you collect my data?")
 
-**The conclusion: this project receives nothing about you; but "your data never leaves the device" is false.** Both halves need saying — only stating the first is misleading.
+**The conclusion: no analytics SDK, no crash reporting, no event tracking, no advertising ID; but "this project receives nothing about you" is false too, with exactly one exception — the version check, last row of the table below.** All of it needs saying; stating half of it is misleading.
 
-**There is no telemetry in this repository.** No analytics SDK, no crash reporting, no event tracking, no device fingerprinting — `firebase` / `analytics` / `sentry` / `crashlytics` are all zero across `app/build.gradle` and `app/src/main/`. If you install it and use it, the authors do not know.
+**First, the part that is not there (grep it yourself):** no analytics SDK, no crash reporting, no event tracking, no advertising ID — `firebase` / `analytics` / `sentry` / `crashlytics` are all zero across `app/build.gradle` and `app/src/main/`. And unless you tap **Check again** on the self-check page, the app sends nothing outward during normal use.
 
 **But data does leave the device, by design:**
 
@@ -105,8 +105,13 @@ Andee has a vault (`config/Vault.kt`) for the account passwords you enter yourse
 | Speech recognition (what you say), speech synthesis (what he says) | **Volcengine (ByteDance) cloud** | `openspeech.bytedance.com` |
 | Conversation content, **and every tool result** | The "brain" **you** configured | `brain=local` (the out-of-box default) → `api.deepseek.com`; in hub mode, your own `hub_url` |
 | Private notebook (`config/Notebook.kt`: what he remembers about you, what he promised) | **On-device only** | It is `localOnly` and never enters the hub payload |
+| **Version check**: your version number, phone model / brand / OS version, UI language, one random install ID | **A server the maintainers run** (not a third party) | Once on first launch, and once per tap on **Check again**; capped at 10 per IP per day |
 
 The second row deserves spelling out: **a tool result is part of the conversation.** The SMS bodies, contacts, call log, notification content and location he reads, along with his "reading" of the screen, all travel with the conversation to the endpoint you configured.
+
+**The last row deserves spelling out too, because it is a different kind of thing from the two above it.** Those two go to an endpoint *you* configured; this one comes to us. It carries the version number, the phone model, the brand, the Android release, the UI language, and a random ID this install generated for itself (`body-xxxxxxxx`, new on every reinstall — **not `ANDROID_ID`**). The server necessarily also sees your IP, from which it derives a country / region / city. **It does not carry**: conversation content, screen content, which apps you have installed, contacts, location, crash logs or an advertising ID.
+
+**It cannot be switched off, and that has to be said plainly.** The address is a constant compiled into `device/SelfCheck.kt` (`VERSION_API_BASE` = `https://andee.kuafuai.net`): there is no setting, no build flag, and no `local.properties` key for it. Turning it off means editing that line and rebuilding. The reason it is not configurable is that a check which can be silently misconfigured is a check that silently stops working — this one is meant to be on for everyone or off for everyone. So do not look for a switch in Settings; there is not one.
 
 **So "local mode" does not mean "local processing"** — it changes where the brain is, not the fact that data leaves the device. If you genuinely want data to stay in, you have to point `asr_endpoint` / `tts_endpoint` / `llm_base_url` / `hub_url` at a machine you control yourself.
 

@@ -464,6 +464,7 @@
     <string name="check_title_network">网络</string>
     <string name="check_title_brain">大脑</string>
     <string name="check_title_model">模型连通</string>
+    <string name="check_title_version">版本</string>
     <string name="check_title_microphone">麦克风</string>
     <string name="check_title_notifications">通知使用权</string>
     <string name="check_title_typing_channel">打字通道</string>
@@ -495,6 +496,15 @@
     <string name="check_detail_model_balance">服务端返回 %1$s：多半是账户余额不足。去当前服务商的官网充值后再试。</string>
     <string name="check_detail_model_name">模型名「%1$s」不在服务端列表里。这台服务上有的：%2$s</string>
     <string name="check_detail_model_other">%1$s</string>
+    <!-- 版本这条是全表唯一「关于 App 自己」而不是「关于这台设备」的检查，也是
+         唯一一次主动往外发东西。%1$s 恒为「该升到的版本」，%2$s 恒为「你手上这个」，
+         两条文案的参数顺序不许对调。见 SelfCheck.version。 -->
+    <string name="check_detail_version_current">%1$s 已经是最新。</string>
+    <string name="check_detail_version_stale">有新版本 %1$s，你现在是 %2$s。旧的还能用，想换再换。</string>
+    <string name="check_detail_version_forced">请更新到 %1$s —— 你现在这个（%2$s）已经不再支持了。</string>
+    <string name="check_detail_version_offline">没网，先不测。当前 %1$s。</string>
+    <string name="check_detail_version_quota">今天的检查次数用完了，明天恢复。当前 %1$s。</string>
+    <string name="check_detail_version_unreachable">查不到：%1$s。当前是 %2$s。</string>
     <string name="check_detail_notif_on">已授权，监听器也连着。</string>
     <string name="check_detail_notif_zombie">系统显示「已授权」，但监听器没连上，通知会被静默丢掉。\n这条得关掉再打开一次才行 —— 只打开不生效。</string>
     <string name="check_detail_notif_off">没开。来电播报和通知转发都收不到。</string>

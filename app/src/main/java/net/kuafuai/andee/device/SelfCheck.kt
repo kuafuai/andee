@@ -16,6 +16,8 @@ import android.provider.Settings
 import androidx.annotation.StringRes
 import net.kuafuai.andee.R
 import net.kuafuai.andee.config.VoiceConfig
+import net.kuafuai.andee.BuildConfig
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,6 +27,7 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
@@ -162,11 +165,14 @@ object SelfCheck {
     /**
      * The whole list, in report order.
      *
-     * @param probe whether to spend the two network round-trips (the backend,
-     *   then the voice host). **This blocks the calling thread** — up to ~20 s
-     *   on a black-holed network — so call it off the main thread. With
-     *   `probe = false` those two rows come back as [Level.NOTE] "检查中…",
-     *   which is what lets the page paint instantly and fill in behind.
+     * @param probe whether to spend the three network round-trips (the backend,
+     *   then the version service, then the voice host). **This blocks the
+     *   calling thread** — up to ~30 s on a black-holed network — so call it off
+     *   the main thread. The version probe is the one that cannot stretch that
+     *   budget: it carries its own 8 s `callTimeout`, so it adds at most 8 s
+     *   whatever the socket does. With `probe = false` those three rows come
+     *   back as [Level.NOTE] "检查中…", which is what lets the page paint
+     *   instantly and fill in behind.
      */
     fun run(context: Context, probe: Boolean = true): List<Finding> {
         val online = isOnline(context)
@@ -177,6 +183,7 @@ object SelfCheck {
             network(online),
             brain(context),
             backend(context, probe, online),
+            version(context, probe, online),
             microphone(context),
             notificationAccess(context),
             typingChannel(context),
@@ -368,6 +375,115 @@ object SelfCheck {
                 detailArgs = if (r.kind == Kind.MODEL) listOf(bc.model, r.detail)
                 else listOf(r.detail),
                 fix = Fix.OurSettings,
+            )
+        }
+    }
+
+    /**
+     * Whether this copy of the app is the one we think you should be running.
+     *
+     * **The only row here that is about the app rather than the device**, and
+     * the only one that talks to a host the *author* owns rather than one the
+     * user configured. It is also the only thing this app ever reports about
+     * itself: the request carries the version number, the phone model, the
+     * brand, the Android release, the UI language and this install's own random
+     * `device_id` — and nothing else. No conversation, no screen content, no
+     * app list, no crash log, no advertising ID, and no `ANDROID_ID`. The
+     * numbers behind those claims are in `docs/permissions.md`, which is the
+     * file to keep in step with this function.
+     *
+     * ### Why the levels are not all WARN
+     *
+     * A vendor checking for its own updates is one bad decision away from
+     * nagware, so the mapping is deliberate:
+     *
+     *  * Answered, and this build is current → [Level.OK].
+     *  * **A newer version exists → [Level.NOTE], not WARN.** An outdated app
+     *    is not a broken one, and this list's contract is that only FAIL and
+     *    WARN may interrupt. Putting up a card every time we ship a patch would
+     *    be exactly the failure the [Level] doc is written against.
+     *  * The one exception is a *forced* update — `force_update` set in
+     *    `version.json`, or this build sitting below `min_supported_version` —
+     *    which is [Level.WARN], because the service is saying this build is no
+     *    longer supported.
+     *  * **Anything undetermined is [Level.NOTE]**: no network, today's quota
+     *    spent, connection refused, a 500, a domain that does not resolve. A
+     *    statistics endpoint being down is never the user's problem, and
+     *    letting it paint this card red would make it one. This row is also
+     *    the reason [Level.NOTE] rows must stay out of the startup card.
+     *
+     * Every one of those states still names the build the user is holding, even
+     * the ones where nothing could be checked, because this row is the only
+     * place the app can answer "what version am I on?" — there is no
+     * version number anywhere in Settings.
+     *
+     * **The address is a constant, deliberately.** [VERSION_API_BASE] is written
+     * into this file and cannot be changed without editing the source and
+     * rebuilding: there is no setting, no build property and no `local.properties`
+     * key behind it. That is the point — a check that a user can silently
+     * misconfigure is a check that silently stops working, and this one is meant
+     * to be either on for everyone or off for everyone. The cost is that the
+     * repository has no build-time switch to turn reporting off; the honest
+     * description of that is in `docs/permissions.md`, which is the file to keep
+     * in step with this function.
+     */
+    private fun version(context: Context, probe: Boolean, online: Boolean): Finding {
+        if (!probe || !online) {
+            return Finding(
+                id = "version",
+                title = R.string.check_title_version,
+                level = Level.NOTE,
+                // The offline case gets its own string rather than sharing
+                // `check_detail_skipped_offline` with the model and voice rows:
+                // those two are only ever *skipped*, while this row is the one
+                // place a user can read back which build they are holding, and
+                // a blank network is exactly when they might want to.
+                detail = if (online) R.string.check_detail_checking
+                else R.string.check_detail_version_offline,
+                detailArgs = if (online) emptyList() else listOf(BuildConfig.VERSION_NAME),
+            )
+        }
+        val deviceId = VoiceConfig.hubConfig(context).deviceId
+        return when (val v = probeVersion(VERSION_API_BASE, BuildConfig.VERSION_NAME, deviceId)) {
+            is Verdict.Current -> Finding(
+                id = "version",
+                title = R.string.check_title_version,
+                level = Level.OK,
+                detail = R.string.check_detail_version_current,
+                detailArgs = listOf(BuildConfig.VERSION_NAME),
+            )
+
+            is Verdict.Update -> Finding(
+                id = "version",
+                title = R.string.check_title_version,
+                level = if (v.forced) Level.WARN else Level.NOTE,
+                detail = if (v.forced) R.string.check_detail_version_forced
+                else R.string.check_detail_version_stale,
+                // %1$s is always the release we want you on and %2$s is always
+                // the build you are holding, in both strings -- the two rows are
+                // one word apart and swapping the order in one of them would be
+                // a silent lie about which version is which.
+                detailArgs = listOf(v.latest, BuildConfig.VERSION_NAME),
+                // No published download URL means nowhere to send the user, and
+                // a button that goes nowhere is the small lie this list exists
+                // to avoid -- see Fix.Link.
+                fix = v.url?.let { Fix.Link(it) } ?: Fix.Nothing,
+            )
+
+            is Verdict.QuotaSpent -> Finding(
+                id = "version",
+                title = R.string.check_title_version,
+                level = Level.NOTE,
+                detail = R.string.check_detail_version_quota,
+                detailArgs = listOf(BuildConfig.VERSION_NAME),
+            )
+
+            is Verdict.Unreachable -> Finding(
+                id = "version",
+                title = R.string.check_title_version,
+                level = Level.NOTE,
+                detail = R.string.check_detail_version_unreachable,
+                detailArgs = listOf(v.detail, BuildConfig.VERSION_NAME),
             )
         }
     }
@@ -910,6 +1026,95 @@ object SelfCheck {
         }
     }
 
+    private sealed interface Verdict {
+        /** Reached, answered, and this build is the current one. */
+        object Current : Verdict
+
+        /** Reached and answered: there is a newer release than this build. */
+        data class Update(val latest: String, val forced: Boolean, val url: String?) : Verdict
+
+        /** Reached, but today's allowance is spent. A normal state, not a fault. */
+        object QuotaSpent : Verdict
+
+        /** Could not be determined. Never a fault for the user to act on. */
+        data class Unreachable(val detail: String) : Verdict
+    }
+
+    /**
+     * One GET against the version service — the only outbound call in this app
+     * that is not addressed to a host the user configured.
+     *
+     * Bounded by [VERSION_CALL_MS] through `callTimeout` rather than by the read
+     * timeout [probeBackend] uses, because this call is the least important of
+     * the three probes. `callTimeout` is a ceiling on the whole call — connect,
+     * retries and body — so this row can never add more than its own budget to
+     * the wall-clock of a black-holed network.
+     *
+     * The URL is built through [toHttpUrlOrNull] rather than by string
+     * concatenation because `Build.MODEL` is not URL-safe on the devices this
+     * ships to: it carries spaces and brackets ("SM-T970", and a trailing
+     * "(wifi)" on some clones). Hand-joined, those go out raw and the service
+     * records a truncated model name.
+     */
+    private fun probeVersion(base: String, current: String, deviceId: String): Verdict {
+        val url = base.toHttpUrlOrNull()
+            ?.newBuilder()
+            ?.addPathSegments("api/version")
+            ?.addQueryParameter("current", current)
+            ?.addQueryParameter("platform", "android")
+            ?.addQueryParameter("model", Build.MODEL)
+            ?.addQueryParameter("brand", Build.BRAND)
+            ?.addQueryParameter("os_version", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+            ?.addQueryParameter("device_id", deviceId)
+            ?.addQueryParameter("app_package", BuildConfig.APPLICATION_ID)
+            ?.addQueryParameter("lang", Locale.getDefault().toLanguageTag())
+            ?.build()
+            ?: return Verdict.Unreachable("bad address: $base")
+
+        val http = OkHttpClient.Builder()
+            .connectTimeout(PROBE_CONNECT_S, TimeUnit.SECONDS)
+            .readTimeout(PROBE_READ_S, TimeUnit.SECONDS)
+            .callTimeout(VERSION_CALL_MS, TimeUnit.MILLISECONDS)
+            .build()
+
+        return try {
+            http.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
+                // The allowance is ten per address per day and 重新检查 spends
+                // one per tap, so a user can exhaust their own quota just by
+                // poking at this page. The service answers 429 with `code: 4290`
+                // to mean "already checked enough today" — read as such, and
+                // never as an error.
+                if (resp.code == 429) return Verdict.QuotaSpent
+
+                val json = runCatching { JSONObject(resp.body?.string().orEmpty()) }.getOrNull()
+                    ?: return Verdict.Unreachable("HTTP ${resp.code}")
+                if (json.optInt("code", -1) != 0) {
+                    return Verdict.Unreachable("HTTP ${resp.code} code=${json.optInt("code")}")
+                }
+                val data = json.optJSONObject("data")
+                    ?: return Verdict.Unreachable("HTTP ${resp.code}: no data")
+                if (!data.optBoolean("has_update", false)) return Verdict.Current
+
+                // `org.json.optString` hands back the four-letter *string*
+                // "null" for a JSON null, and the service sends exactly that
+                // when no download URL is published. So the scheme is what gets
+                // checked, not emptiness: a Fix.Link holding "null" opens a
+                // browser at a broken address.
+                val raw = data.optString("download_url").orEmpty()
+                Verdict.Update(
+                    latest = data.optString("latest_version").ifEmpty { "?" },
+                    forced = data.optBoolean("force_update", false),
+                    url = raw.takeIf { it.startsWith("http://") || it.startsWith("https://") },
+                )
+            }
+        } catch (e: Exception) {
+            // IOException is the expected one (DNS, refused, timeout). Anything
+            // else here is still "we could not talk to this address", which is
+            // the same sentence as far as the user is concerned.
+            Verdict.Unreachable(e.message ?: e.javaClass.simpleName)
+        }
+    }
+
     /** @return null when the connection opened, else why it did not. */
     private fun tcpProbe(host: String, port: Int): String? = try {
         Socket().use { s -> s.connect(InetSocketAddress(host, port), PROBE_CONNECT_MS) }
@@ -965,6 +1170,35 @@ object SelfCheck {
     private const val PROBE_CONNECT_S = 6L
     private const val PROBE_CONNECT_MS = 6000
     private const val PROBE_READ_S = 20L
+
+    /**
+     * Where the version check asks. Hardcoded on purpose — see [version]'s KDoc
+     * for why this one is not a setting.
+     *
+     * HTTPS, so there is nothing to declare in `network_security_config.xml`: that
+     * file exists to punch holes for cleartext HTTP, and a hole for a host we no
+     * longer call is a hole that only makes the app more permissive. If this ever
+     * goes back to a plain-HTTP address, the host has to be added there or every
+     * call dies as `CLEARTEXT communication ... not permitted`.
+     *
+     * The domain resolves to the same host `:8099` used to be reached at. It is
+     * reachable over TLS only once that host serves 443 **and** the domain is
+     * ICP-filed — an unfiled domain on a mainland server is answered with a 403
+     * block page rather than reaching the app at all, which reads here as
+     * 查不到. Until both are true this row reports Unreachable everywhere; that
+     * is the intended failure, not a bug in the check.
+     */
+    private const val VERSION_API_BASE = "https://andee.kuafuai.net"
+
+    /**
+     * The whole-call ceiling on the version probe, in milliseconds.
+     *
+     * Deliberately *not* 20 s like the read timeout beside it: this is the third
+     * probe in [run], the user is not waiting on it, and the deployed service
+     * answers a LAN-adjacent request in tens of milliseconds. Eight seconds is
+     * generous for a healthy call and still bounds what a dead one can cost.
+     */
+    private const val VERSION_CALL_MS = 8000L
     private const val MODEL_SAMPLE = 8
     private const val DISK_WARN_MB = 500L
     private const val DISK_FAIL_MB = 100L
