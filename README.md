@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://www.codeflying.app">Build online</a> ·
-  <a href="https://www.codeflying.net/andi">Try now</a> ·
+  <a href="https://www.codeflying.app/andee">Try now</a> ·
   <a href="#key-features">Features</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#provisioning">Provisioning</a> ·
@@ -254,7 +254,7 @@ up tokens.**
 (中文) is a general platform for exactly that shape of problem — **you describe the app you want in
 words, and it develops and publishes it for you.** No Android knowledge required. Ask it for Andee and
 it hands you an installable package with the keys already configured. Or open the
-**[one-click page](https://www.codeflying.net/andi)**, tap "立即打包", and get a pre-configured
+**[one-click page](https://www.codeflying.app/andee)**, tap "立即打包", and get a pre-configured
 package with a QR code — scan to download.
 
 **It is a separate service with no direct relationship to this project** — not Andee's build channel,
