@@ -10,6 +10,31 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
+ * A non-2xx answer from the backend. A type of its own so the status code
+ * survives to [LocalBrain], which has a `Context` and can turn it into a
+ * sentence the user can act on; this class has none and must not grow one.
+ * The message stays `LLM HTTP <code>: <body>` so logs read as they always did.
+ */
+class LlmHttpException(val code: Int, val body: String) :
+    IllegalStateException("LLM HTTP $code: ${body.take(600)}") {
+
+    /**
+     * The gateway's own words for what it disliked, without the JSON around
+     * them. Falls back to the raw body for gateways that don't follow the
+     * `{"error":{"message":…}}` shape.
+     */
+    val detail: String
+        get() = runCatching {
+            val err = JSONObject(body).opt("error")
+            when (err) {
+                is JSONObject -> err.optString("message")
+                is String -> err
+                else -> ""
+            }
+        }.getOrDefault("").ifBlank { body }.trim()
+}
+
+/**
  * One blocking call to an OpenAI-compatible `/chat/completions`, aimed at
  * DeepSeek.
  *
@@ -130,7 +155,7 @@ class LlmClient(
                 // place entirely.
                 val raw = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) {
-                    throw IllegalStateException("LLM HTTP ${resp.code}: ${raw.take(600)}")
+                    throw LlmHttpException(resp.code, raw)
                 }
                 raw
             }

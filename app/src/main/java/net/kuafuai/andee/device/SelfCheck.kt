@@ -359,6 +359,7 @@ object SelfCheck {
                 detail = when (r.kind) {
                     Kind.URL -> R.string.check_detail_model_url
                     Kind.KEY -> R.string.check_detail_model_key
+                    Kind.BALANCE -> R.string.check_detail_model_balance
                     Kind.MODEL -> R.string.check_detail_model_name
                     Kind.OTHER -> R.string.check_detail_model_other
                 },
@@ -804,7 +805,7 @@ object SelfCheck {
         data class Bad(val kind: Kind, val detail: String) : Reach
     }
 
-    private enum class Kind { URL, KEY, MODEL, OTHER }
+    private enum class Kind { URL, KEY, BALANCE, MODEL, OTHER }
 
     /**
      * Ask the backend who it is, without paying for an answer.
@@ -843,6 +844,8 @@ object SelfCheck {
                     }.getOrDefault(emptyList())
 
                     resp.code == 401 || resp.code == 403 -> return Reach.Bad(Kind.KEY, "HTTP ${resp.code}")
+
+                    resp.code == 402 -> return Reach.Bad(Kind.BALANCE, "HTTP 402")
 
                     resp.code == 429 -> return Reach.Throttled
 
@@ -892,6 +895,7 @@ object SelfCheck {
                 when {
                     resp.isSuccessful -> Reach.Ok
                     resp.code == 401 || resp.code == 403 -> Reach.Bad(Kind.KEY, "HTTP ${resp.code}")
+                    resp.code == 402 -> Reach.Bad(Kind.BALANCE, "HTTP 402")
                     resp.code == 429 -> Reach.Throttled
                     // 400 is what a bad model name comes back as, and the body
                     // is where the gateway says which part of it it disliked.

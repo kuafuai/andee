@@ -74,7 +74,7 @@
     <string name="settings_brain_codeflying">CodeFlying</string>
     <string name="settings_show_hub">Show cloud option</string>
     <string name="settings_show_hub_note">Adds a Cloud backend tab for connecting to a hub you host yourself.</string>
-    <string name="settings_brain_codeflying_note">CodeFlying is connected: models and voice are set up and ready to go. You can also tap into a long list of third-party services — AI image, video and music generation, location, weather, PDF conversion, search, news, stocks and more. CodeFlying wraps and bills all of them in one place, so you never have to sign up with each provider or juggle their keys and invoices.\n\nNote: using CodeFlying backend services may incur charges.</string>
+    <string name="settings_brain_codeflying_note">CodeFlying (CodeFlying.app) is connected: models and voice are set up and ready to go. You can also tap into a long list of third-party services — AI image, video and music generation, location, weather, PDF conversion, search, news, stocks and more. CodeFlying wraps and bills all of them in one place, so you never have to sign up with each provider or juggle their keys and invoices.\n\nAccount and top-ups: open CodeFlying.app in a computer browser and sign in. If you see a balance error (HTTP 402), top up there.\n\nNote: using CodeFlying backend services may incur charges.</string>
     <string name="settings_brain_codeflying_unconfigured">Want Andee to draw, make videos, write music, check the weather, search the news, convert PDFs, or watch stocks for you? Connect CodeFlying: models and voice come set up, and a long list of third-party services is one hookup away, with no separate sign-ups, keys or invoices.\n\nTo get started, open CodeFlying.app in a computer browser and generate your own Andee install package in one click, then install it over this app. New users get free credit, so you can try it first.\n\nNote: using CodeFlying backend services may incur charges.</string>
     <string name="settings_hub_url">Hub URL</string>
     <!-- The hub URL box is empty on a fresh install — the hint is what the
@@ -343,6 +343,15 @@
     <!-- LocalBrain — display half only; see the comment on the Chinese side. -->
     <string name="brain_no_key">The on-device brain has no API key yet — long-press the ball, open settings and put a DeepSeek key in the Brain section.</string>
     <string name="brain_error">Something broke on my side: %1$s</string>
+    <string name="brain_error_402">The backend answered 402, which most likely means the account is out of balance. Open Settings → Backend to see which provider you are using, then top up on that provider\'s website and try again.</string>
+    <string name="brain_error_402_codeflying">The backend answered 402, which most likely means your CodeFlying balance has run out. Open CodeFlying.app in a computer browser, sign in, top up, and try again.</string>
+    <string name="brain_error_auth">The backend refused the request (HTTP %1$d): the key is wrong, expired or disabled. Check the key in Settings → Backend, and generate a new one on the provider\'s website if needed.</string>
+    <string name="brain_error_400">The backend rejected the request: %1$s\nThe usual cause is a misspelled model name. Check it in Settings → Backend.</string>
+    <string name="brain_error_404">The backend could not find that address (HTTP 404). Check the endpoint URL and the model name in Settings → Backend.</string>
+    <string name="brain_error_429">The backend is busy or being asked too often (HTTP 429). Say it again in a moment. If it keeps happening, check on the provider\'s website whether your quota has run out.</string>
+    <string name="brain_error_5xx">The backend itself is having trouble (HTTP %1$d). Your settings are not the problem. Try again in a few minutes, or check the provider\'s website for maintenance notices.</string>
+    <string name="brain_error_timeout">The backend took too long to answer. Check that the network is working and try again in a moment.</string>
+    <string name="brain_error_network">I could not reach the backend. Check this device\'s network; if that is fine, check the endpoint URL in Settings → Backend.</string>
     <string name="brain_no_result">I got nothing back that time — say it again.</string>
     <string name="brain_repeat_stop">I kept doing the same thing over and over (%1$s), so I stopped — that way is blocked. Try saying it differently, or take over.</string>
     <string name="brain_max_steps">I have spent %1$d steps on this without finishing, so I stopped to ask: shall I try another way, or will you take over?</string>
@@ -402,6 +411,7 @@
     <string name="check_detail_model_throttled">Reachable but rate-limited (HTTP 429). The configuration is right; it recovers on its own.</string>
     <string name="check_detail_model_url">Could not connect: %1$s</string>
     <string name="check_detail_model_key">Key rejected: %1$s</string>
+    <string name="check_detail_model_balance">The server answered %1$s: most likely the account is out of balance. Top up on the current provider\'s website and try again.</string>
     <string name="check_detail_model_name">No model called “%1$s” on this server. It offers: %2$s</string>
     <string name="check_detail_model_other">%1$s</string>
     <string name="check_detail_notif_on">Granted, and the listener is bound.</string>
