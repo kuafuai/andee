@@ -44,10 +44,15 @@
     <string name="settings_clear_notes_confirm_title">清空小本本？</string>
     <string name="settings_clear_notes_confirm_body">它记下的事、你的偏好、还没到点的提醒，都会删掉，找不回来。这场聊天记录不受影响。</string>
     <string name="settings_clear_notes_confirm">确认清空</string>
-    <string name="settings_section_brain">大脑</string>
+    <string name="settings_section_brain">后端</string>
     <string name="settings_brain_panel_note">关掉这个面板就生效，不用重开无障碍服务。</string>
     <string name="settings_brain_cloud">云端</string>
     <string name="settings_brain_local">本机</string>
+    <string name="settings_brain_codeflying">CodeFlying</string>
+    <string name="settings_show_hub">显示云端选项</string>
+    <string name="settings_show_hub_note">把「云端」加到后端选项里，用来连你自己搭的 Hub。</string>
+    <string name="settings_brain_codeflying_note">已接入 CodeFlying：默认模型和语音都配好了，开箱就能用。还能直接调用海量第三方能力 —— AI 画图/做视频/写音乐、定位、天气、PDF 转换、搜索、新闻、股票……全部由 CodeFlying 统一封装、统一计费，不用自己逐个去申请密钥、对账单。\n\n提示：使用 CodeFlying 的后端服务可能会产生费用。</string>
+    <string name="settings_brain_codeflying_unconfigured">想让 Andee 直接会画图、做视频、写音乐、查天气、搜新闻、转 PDF、看股票？接上 CodeFlying 就行：默认模型和语音都帮你配好，海量第三方能力一次接入，不用自己逐个申请密钥、对账单。\n\n怎么开始：用电脑浏览器打开 CodeFlying.net，一键生成专属于你的 Andee 安装包，装上去替换当前应用就好。新用户可免费获得额度，先试试再决定。\n\n提示：使用 CodeFlying 的后端服务可能会产生费用。</string>
     <string name="settings_hub_url">Hub 地址</string>
     <!-- The hub URL box is empty on a fresh install — the hint is what the
          user sees in that empty box, so it is the pitch, not the format. -->
@@ -66,8 +71,8 @@
     <string name="common_low">低</string>
     <string name="settings_brain_local_note">设备自己跑 agent loop，不连 Hub。没有 Key 就不会接管。</string>
     <string name="settings_section_wake">语音唤醒</string>
-    <string name="settings_wake_enrolled">已录入 —— 亮屏时说「嘿 Andee」就行</string>
-    <string name="settings_wake_not_enrolled">未录入 —— 录一次才能语音唤醒</string>
+    <string name="settings_wake_enrolled">已录入 —— 亮屏时说出你录的唤醒词就行</string>
+    <string name="settings_wake_not_enrolled">未录入 —— 自己选个词录 3 遍就能语音唤醒，例如「嘿 Andee」</string>
     <string name="settings_wake_record">录入</string>
     <string name="common_clear">清除</string>
     <string name="common_delete">删除</string>
@@ -90,7 +95,9 @@
     <string name="settings_voice_tts_sample_rate">合成采样率</string>
     <string name="settings_section_diagnostics">诊断</string>
     <string name="settings_section_advanced">高级</string>
-    <string name="settings_advanced_note">火山地址、打字、诊断和恢复出厂设置。日常用不到，都藏在这里。</string>
+    <string name="settings_max_steps">单次任务最多步数</string>
+    <string name="settings_max_steps_note">每轮任务里 AI 最多能调用多少次工具。超过就停下并给个结束语，防止死循环烧 token。默认 25，一般的任务十几步就够了。</string>
+    <string name="settings_advanced_note">显示云端选项、打字、诊断和恢复出厂设置。日常用不到，都藏在这里。</string>
     <string name="settings_grounding">接地采集</string>
     <string name="settings_grounding_note">把坐标点击和截图记到 files/grounding 供离线分析 —— 它会拍下你当时在做的事。改完要重开无障碍服务才生效。</string>
     <string name="settings_device_id">设备 ID</string>
@@ -187,21 +194,21 @@
     <string name="vault_field_card_cvv">安全码 CVV</string>
     <string name="vault_label_card_last4">尾号</string>
     <string name="vault_error_name_required">名称不能为空</string>
-    <string name="wake_title">教我认「嘿 Andee」</string>
-    <string name="wake_instructions">点「开始」，然后像平时叫我那样说一遍「嘿 Andee」，说完会自动停。一共要说 %1$d 次 —— 别刻意念得比平时清楚，不然平时那样叫我反而认不出来。</string>
+    <string name="wake_title">教我认你的唤醒词</string>
+    <string name="wake_instructions">想用什么词叫我都行，比如「嘿 Andee」。建议 3 到 5 个字，念起来半秒以上 —— 太短的词容易认错，也可能录不进去。点「开始」，然后像平时叫我那样说一遍，说完会自动停。一共要说 %1$d 次，每次都说同一个词 —— 别刻意念得比平时清楚，不然平时那样叫我反而认不出来。</string>
     <string name="wake_progress">%1$d / %2$d</string>
     <string name="wake_status_enrolled">已经录过了，再录一次会覆盖。</string>
-    <string name="wake_status_not_enrolled">还没录过。</string>
+    <string name="wake_status_not_enrolled">还没录过。想好一个词（例如「嘿 Andee」），点「开始」。</string>
     <string name="wake_close">关闭</string>
     <string name="wake_start">开始</string>
     <string name="wake_listening">听着…</string>
-    <string name="wake_speak_now">说吧 —— 「嘿 Andee」</string>
+    <string name="wake_speak_now">说吧 —— 你的唤醒词</string>
     <string name="wake_retry">再来一次</string>
     <string name="wake_not_heard">没听清 —— 离近一点，说完等半秒再看屏幕。</string>
     <string name="wake_say_again">再说一次</string>
     <string name="wake_received">收到（%1$d 毫秒）。还差 %2$d 次。</string>
     <string name="wake_rerecord">重录</string>
-    <string name="wake_done">好了，亮屏的时候叫我一声「嘿 Andee」就行。（阈值 %1$s）</string>
+    <string name="wake_done">好了，亮屏的时候说出你录的唤醒词就行。（阈值 %1$s）</string>
     <!-- device/LookActivity.kt -->
     <string name="dev_look_focusing">正在对焦…</string>
     <string name="dev_look_seen">看到了</string>
@@ -236,13 +243,13 @@
     <string name="dev_perm_say_notification">会打开通知使用权设置,找到这个应用打开开关。</string>
     <string name="history_empty">还没有对话</string>
     <string name="history_role_you">你 · %1$s</string>
-    <string name="history_role_assistant">助手 · %1$s</string>
+    <string name="history_role_assistant">Andee · %1$s</string>
     <string name="history_role_error">出错 · %1$s</string>
     <string name="history_role_page_open">界面 · %1$s · 点击重新打开</string>
     <string name="history_role_page_cleared">界面 · %1$s · 已清理</string>
     <string name="html_default_title">AI 界面</string>
     <string name="textpage_role_you">你</string>
-    <string name="textpage_role_assistant">助手</string>
+    <string name="textpage_role_assistant">Andee</string>
     <string name="textpage_role_error">出错</string>
     <string name="textpage_role_page">界面</string>
     <string name="card_ack">知道了</string>
@@ -485,7 +492,7 @@
     <string name="check_detail_voice_host_ok">%1$s 可达。</string>
     <string name="check_detail_voice_host_bad">连不上 %1$s：%2$s。识别和合成都会超时。</string>
     <string name="check_detail_wake_on">已录入，亮屏时喊得醒。</string>
-    <string name="check_detail_wake_off">还没录。不录也能用，只是喊不醒 —— 得点球。</string>
+    <string name="check_detail_wake_off">还没录。自己选个词（例如「嘿 Andee」）录 3 遍就能喊醒。不录也能用，只是得点球。</string>
     <string name="check_detail_battery_on">已在白名单，待办闹钟不会被推迟。</string>
     <string name="check_detail_battery_off">不在电池优化白名单里。点右边「去开启」，系统会问「是否忽略电池优化？」，选「忽略」就好。\n厂商自己的「应用启动管理 / 后台运行」是另一套，在那里怎么改这项都是红的。息屏后待办提醒会晚到，唤醒词也会停。</string>
     <string name="check_detail_disk_ok">剩余 %1$d MB。</string>
@@ -543,7 +550,7 @@
     <string name="wizard_welcome_body">接下来几步，把这台设备配好就能用了。每一步都需要你去开一个权限或填个设置，做完点「下一步」就行。</string>
 
     <string name="wizard_wake_title">唤醒词</string>
-    <string name="wizard_wake_body">录一个唤醒词，亮屏时喊得醒。不录也能用，只是得点球。</string>
+    <string name="wizard_wake_body">自己选个词录 3 遍（例如「嘿 Andee」），亮屏时喊得醒。不录也能用，只是得点球。</string>
     <string name="wizard_wake_button">去录</string>
 
     <string name="wizard_look_title">看一眼周围</string>

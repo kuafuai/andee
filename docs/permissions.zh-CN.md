@@ -38,7 +38,7 @@
 |---|---|---|---|
 | 悬浮窗<br>`SYSTEM_ALERT_WINDOW` | 悬浮窗(我的脸) | 球、字幕、设置面板本身 | **应用起来什么都看不到。** 这是唯一一个"不开就完全不能用"的 |
 | 无障碍服务<br>`BIND_ACCESSIBILITY_SERVICE` | 看屏幕、点界面、打字 | `get_screen_element` / `tap_screen_element` / `swipe_by_coordinates` / `type_text` / `submit_input` / `take_screenshot` 等全部 `screen.*` | **所有屏幕操作报错。** 这是核心能力，其它权限都是围着它转的 |
-| 麦克风<br>`RECORD_AUDIO` | 语音说话、唤醒词「嘿 Andee」 | 流式 ASR + 本机唤醒词匹配 | 点球没反应；唤醒词监听不启动（顺带：Android 12+ 的绿点也不会出现） |
+| 麦克风<br>`RECORD_AUDIO` | 语音说话、用户自己录的唤醒词 | 流式 ASR + 本机唤醒词匹配 | 点球没反应；唤醒词监听不启动（顺带：Android 12+ 的绿点也不会出现） |
 | 通知监听<br>`BIND_NOTIFICATION_LISTENER_SERVICE` | 通知感知(微信来消息我知道) | `get_notifications` | 来消息不会主动知道；其余功能不受影响 |
 | 位置<br>`ACCESS_FINE_LOCATION` | 位置(在哪/导航) | `get_location` | 问"我在哪"答不出来 |
 | 运动步数<br>`ACTIVITY_RECOGNITION` | 运动步数 | `get_step_count` | 问步数答不出来 |

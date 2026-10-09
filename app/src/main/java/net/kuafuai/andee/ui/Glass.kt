@@ -387,14 +387,21 @@ object Glass {
                 done()
             }
         }
+        // Hide for real and let a blank frame commit before the window goes, so no card frame is left behind.
+        val blankThenDone = Runnable {
+            v.visibility = View.INVISIBLE
+            ui.postDelayed(once, BLANK_FRAME_MS)
+        }
         v.animate()
             .alpha(0f).scaleX(0.96f).scaleY(0.96f).translationY(dp(v.context, 8).toFloat())
             .setDuration(170)
             .setInterpolator(EASE_IN)
-            .withEndAction(once)
+            .withEndAction(blankThenDone)
             .start()
         ui.postDelayed(once, 400)
     }
+
+    private const val BLANK_FRAME_MS = 34L
 
     /** Cross-fade one root view for another — see `SettingsUi.rebuild`. */
     fun fadeOut(v: View, then: () -> Unit) {

@@ -15,6 +15,11 @@ static def escapeStringLiteral(String value) {
 def buildConfigString = { String key ->
     escapeStringLiteral(localProps.getProperty(key, ''))
 }
+// Boolean config: anything case-insensitive-matching "true"/"1"/"yes" counts.
+def buildConfigBool = { String key ->
+    def raw = localProps.getProperty(key, '').trim().toLowerCase()
+    (raw == 'true' || raw == '1' || raw == 'yes') ? 'true' : 'false'
+}
 
 android {
     namespace 'net.kuafuai.andee'
@@ -34,12 +39,17 @@ android {
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField "String", "ASR_ENDPOINT",      buildConfigString('ASR_ENDPOINT')
-        buildConfigField "String", "TTS_ENDPOINT",      buildConfigString('TTS_ENDPOINT')
-        buildConfigField "String", "API_KEY",      buildConfigString('API_KEY')
-        buildConfigField "String", "LLM_BASE_URL",      buildConfigString('LLM_BASE_URL')
-        buildConfigField "String", "DEFAULT_LANG",      buildConfigString('DEFAULT_LANG')
-        buildConfigField "String", "DEFAULT_THINKING",      buildConfigString('DEFAULT_THINKING')
+        // The CodeFlying mode: a hosted backend that proxies LLM, ASR and TTS
+        // from one domain. When ENABLED and DOMAIN is set, "codeflying" is the
+        // out-of-box backend choice; URL scheme follows SSL_ENABLED
+        // (ws/wss, http/https). Everything is derived at runtime from these
+        // four fields — the user does not configure the endpoints themselves.
+        buildConfigField "boolean", "CODEFLYING_ENABLED",      buildConfigBool('CODEFLYING_ENABLED')
+        buildConfigField "String",  "CODEFLYING_KEY",          buildConfigString('CODEFLYING_KEY')
+        buildConfigField "String",  "CODEFLYING_DOMAIN",       buildConfigString('CODEFLYING_DOMAIN')
+        buildConfigField "boolean", "CODEFLYING_SSL_ENABLED",  buildConfigBool('CODEFLYING_SSL_ENABLED')
+        buildConfigField "String",  "DEFAULT_LANG",            buildConfigString('DEFAULT_LANG')
+        buildConfigField "String",  "DEFAULT_THINKING",        buildConfigString('DEFAULT_THINKING')
     }
 
     buildTypes {

@@ -502,7 +502,12 @@ class LocalBrain(
         var lastSignature = ""
         var repeats = 0
 
-        for (step in 1..MAX_ITERATIONS) {
+        // Read once per turn so the setting can change without a brain
+        // restart — see [VoiceConfig.maxSteps]. Values outside 1..200 are
+        // clamped by the reader; a 0 saved by hand would otherwise refuse
+        // every turn before it started.
+        val maxSteps = net.kuafuai.andee.config.VoiceConfig.maxSteps(appContext)
+        for (step in 1..maxSteps) {
             if (gen != generation.get()) return
             // `enter_scene` mid-turn should change how the rest of this turn
             // reads, not only the next one. A string compare, free when nothing
@@ -588,14 +593,14 @@ class LocalBrain(
             if (images.isNotEmpty()) attachImages(images)
         }
 
-        Log.w(TAG, "hit MAX_ITERATIONS")
-        BrainTrace.end(gen, "hit MAX_ITERATIONS")
+        Log.w(TAG, "hit max steps ($maxSteps)")
+        BrainTrace.end(gen, "hit max steps ($maxSteps)")
         if (!internal) {
             onFinal(
                 AppLocale.str(
                     appContext,
                     R.string.brain_max_steps,
-                    MAX_ITERATIONS,
+                    maxSteps,
                 )
             )
         }
@@ -1084,12 +1089,9 @@ class LocalBrain(
     companion object {
         private const val TAG = "Brain"
 
-        /**
-         * A real task is a dozen steps; this is the runaway guard, and hitting
-         * it produces a final answer rather than silence — a ball that just
-         * stops is the one failure the user cannot interpret.
-         */
-        private const val MAX_ITERATIONS = 25
+        // The per-turn step cap moved to [VoiceConfig.maxSteps] / "max_steps"
+        // pref so a user who wants longer tasks can raise it from the settings
+        // card. See the runTurn loop and [VoiceConfig.DEFAULT_MAX_STEPS].
 
         /** Lower than the cloud's 10: a local round costs the user a minute. */
         private const val MAX_REPEATS = 3

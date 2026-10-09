@@ -1018,7 +1018,7 @@ class ScreenBodyService : AccessibilityService() {
     }
 
     /**
-     * "嘿 Andee" as a second way to press the ball.
+     * The user's own wake word as a second way to press the ball.
      *
      * The gate is the whole contract with [WakeWord]: it holds the microphone
      * only while every one of these is true, and lets go within ~100 ms of any
@@ -1028,8 +1028,8 @@ class ScreenBodyService : AccessibilityService() {
      *   bedside table from listening all night.
      * - **ASR idle.** The turn's own recorder must never lose a race to the one
      *   listening for a wake word.
-     * - **TTS quiet.** Otherwise Andee hears itself say "嘿" and wakes up to
-     *   its own voice.
+     * - **TTS quiet.** Otherwise Andee can hear itself say something close to
+     *   the wake word and wake up to its own voice.
      * - **No meeting running.** `asr.isActive()` happens to cover this today
      *   (it is `audio.isStreaming()`, which a meeting also sets), but that is a
      *   coincidence inside a method named for the ASR. Spelled out so a future

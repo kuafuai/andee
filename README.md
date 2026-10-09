@@ -280,9 +280,16 @@ behind it falls back to something else. The ball does at least say so out loud, 
 doing nothing.
 
 **2. The voice key — optional.** A [Volcengine Speech](https://www.volcengine.com/product/voice-tech)
-API key, in the **Voice API key** field. Without it ASR and TTS fail during the WebSocket
-handshake, which surfaces as a **connect timeout** — the device looks like it has a network problem
-when what it has is a blank field. Everything else still works; it is just mute and deaf.
+API key, in the **火山 API key** field of the same **Backend → On-device** tab. Without it ASR and
+TTS fail during the WebSocket handshake, which surfaces as a **connect timeout** — the device looks
+like it has a network problem when what it has is a blank field. Everything else still works; it is
+just mute and deaf.
+
+> **If you took the CodeFlying route in [Quick Start](#quick-start), both keys are already baked in.**
+> ⚙ → **Backend** will show **CodeFlying** as the active tab; LLM, ASR, TTS and the long tail of
+> third-party APIs (image / video / music generation, geolocation, weather, PDF, search, news,
+> stocks, …) all go through one key, wrapped and billed by CodeFlying so you don't sign up for each
+> provider yourself. The two keys above only apply to the **On-device** tab you configure yourself.
 
 You do not have to remember this: the first run is a stepped setup that walks you through both, and
 afterwards the **✓** button in the ball's control bar opens the self-check list, which says which of
@@ -640,24 +647,31 @@ For a first install, this order is the shortest path:
 2. Go straight to "display over other apps" and grant the overlay → come back and the ball is there
 3. Go to Accessibility → enable Andee
 4. Tap the ball, and allow the microphone prompt
-5. Open the ⚙ on the ball, set `hub_url` = `ws://<your Mac's IP>:9100`, set `device_name` to anything,
-   and save
+5. Open the ⚙ on the ball. In **Advanced**, turn on **Show cloud option** (the **Cloud** tab is
+   hidden by default). Go back to **Backend**, flip the picker to **Cloud**, set `hub_url` =
+   `ws://<your Mac's IP>:9100` and `device_name` to anything, and save
 6. logcat should show `hub: registered as body-xxx with N tools`, and the brain side should log
    `[body_hub] 'body-xxx' registered (…) with N tools`
 
 If any step does not line up, go back to that section's **Verify**.
 
-> If you only want the brain on this device, replace step 5 with `brain` = `local` plus an
-> OpenAI-compatible endpoint, and leave `hub_url` empty — running without a hub is a supported mode,
-> not a degraded one.
+> If you only want the brain on this device, replace step 5 with **Backend → On-device** and fill in
+> an OpenAI-compatible endpoint plus `llm_api_key` — running without a hub is a supported mode, not a
+> degraded one. If your APK was packaged via CodeFlying, the **CodeFlying** tab is the default and
+> there is nothing to fill in.
 
-## Wake word ("Hey Andee")
+## Wake word
 
 If you would rather not tap the ball every time, teach it your voice: **⚙ → wake word → record wake
-word**, and say "Hey Andee" three times as prompted. After that, saying it **while the screen is on**
-does exactly what tapping the ball does.
+word**, and say the phrase you want to use three times as prompted (for example "Hey Andee" — any
+other phrase works too, as long as you say the same one each time). After that, saying it **while the
+screen is on** does exactly what tapping the ball does.
 
 A few things worth knowing first:
+
+- **Do not pick something too short.** Aim for a phrase that takes at least half a second to say.
+  Very short words are easy to confuse with other sounds, and anything under 350 ms is dropped before
+  it is recorded.
 
 - **It is fully offline.** Recognition is local MFCC + DTW template matching (`app/.../wake/`): no
   network, no cost, and all it stores is a feature vector — the audio itself never touches disk. The

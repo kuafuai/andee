@@ -7,7 +7,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * The enrolled "嘿 Andee" takes, on disk.
+ * The enrolled wake-word takes, on disk.
  *
  * Three recordings reduced to [Mfcc] frames — a few hundred floats each, no
  * audio kept. That is a deliberate privacy property as much as a size one:
