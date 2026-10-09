@@ -108,6 +108,18 @@ build time would close this hole; it is not implemented yet.)
   to be. The rule to carry forward is that this file tracks the addresses actually in use — adding a
   line is part of pointing the app at plain HTTP, and removing it is part of moving away.
 
+### Fixed
+
+- **A failed voice turn crashed the app with `StackOverflowError` instead of reporting the failure.**
+  `AsrController`'s listener implements `onError(msg)`, and its body called `onError(msg)` — written
+  meaning the constructor's `(String) -> Unit` callback that routes the message to the owner. Kotlin
+  resolves an unqualified call to the nearest scope first, so the line called *itself*: one recognizer
+  error became infinite recursion until the stack ran out (`stack size 1039KB`, thousands of frames of
+  `AsrController.kt:152`). Any 火山 failure — a dead network, an expired token, a rejected handshake —
+  took the whole process down, which is the opposite of what the callback is for. Now qualified
+  `this@AsrController.onError(msg)`. The listener's three other callbacks are unaffected: none of them
+  shares a name with an outer member.
+
 ### Changed
 
 - **The APK went from ~39 MB to ~8 MB.** Two causes, both structural rather than a matter of

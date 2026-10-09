@@ -149,7 +149,11 @@ class AsrController(
                 // up as a card and as a red row, and "听着…" is no longer true.
                 window.clearSubtitle()
                 window.setState(FloatingWindowUi.State.ERROR)
-                onError(msg)
+                // Qualified on purpose: this block overrides the listener's own
+                // onError(msg), so a bare `onError(msg)` would resolve to *this*
+                // function and recurse until the stack blows. The intent is the
+                // constructor's callback — hand the failure to the owner.
+                this@AsrController.onError(msg)
                 executor.execute { runCatching { stopImpl() } }
             }
 
