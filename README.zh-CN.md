@@ -829,13 +829,6 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
   目的地，不是这个事实。
 - **他能被屏幕上的字操纵。** 任何能让你打开一个页面的人，都可能影响到他。
 
-## Star History
-
-<!-- 项目公开托管到 GitHub 后启用：
-     <a href="https://star-history.com/#kuafuai/andee&Date">
-       <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=kuafuai/andee&type=Date" />
-     </a> -->
-
 ## 许可
 
 [Apache-2.0 **加附加条件**](LICENSE) —— 禁止多租户 SaaS、禁止去 LOGO 白标。GitHub 会把它显示成
