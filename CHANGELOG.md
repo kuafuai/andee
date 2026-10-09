@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`1` / `"0.1.0"`**.
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`2` / `"0.1.1"`**.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
   Android refuses the upgrade; the same number must never be reused for two different builds.
@@ -13,19 +13,22 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 **The project starts at `0.x`, and that is the accurate number rather than a modest one.** Nothing is
 frozen. The tool-schema contract a hub brain speaks has been rewritten repeatedly
-(`net/ToolSchemas.kt` alone has changed in seven commits since the first), the `local.properties`
+(`net/ToolSchemas.kt` alone has changed in eight commits since the first), the `local.properties`
 build flags that decide the first-install language, the thinking default and whether CodeFlying is
 compiled in have all been added since, and a saved scene is a shape that only appeared in this
 release. Each of those is something a user or a second implementation would have to rebuild against,
 so `0.x` is being honest that MINOR may break. The release that moves off `0` should be the one where
 the wire contract is written down well enough that a second implementation could be built from it.
 
-**A version number does not identify a build yet.** `versionCode` is `1` and will stay `1` until a
-second release exists, so "which build is this?" still cannot be answered from the installed app.
-Until then, identify builds by the short commit hash they were built from. (Embedding the hash into
-`versionName` at build time would close this hole; it is not implemented yet.)
+**A version number identifies a release, not a build.** `versionCode` now moves with each release,
+so the installed app can say which *release* it came from — but nothing in it moves when `main`
+does. A build made from a commit between two tags reports the older release's number, so for
+anything not built at a tag, identify it by the short commit hash it was built from. (Embedding that
+hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.1.1] - 2026-10-09
 
 ### Fixed
 
@@ -64,6 +67,72 @@ Until then, identify builds by the short commit hash they were built from. (Embe
 - `README.md` named the Volcengine field as **火山 API key** — the Chinese label — while the English
   build displays **Volcengine API key** (`settings_voice_api_key`). The Chinese README already had
   this right; only the English file was pointing at a word that never appears on an English screen.
+- **A picture, a video or a clip now goes into a page, instead of being handed over as a URL.** The
+  prompt said the opposite, and said it wrongly: *"this device cannot turn an image into a URL, so an
+  `img` tag will not open"*. That is false for anything on the network — the page is served against a
+  fake `https://` origin, the app holds `INTERNET`, and WebView loads an absolute `https://`
+  subresource without complaint. What is true is narrower, and the old sentence flattened it into a
+  blanket ban: a *local* file has no address a page can point at, and `http://` is refused. So the
+  model, obeying its instructions, could not put a picture on screen — and what it did instead was
+  hand the user a URL to open, on the device they were already holding. §7 now asks for the embedding
+  directly (`<img>`, `<video controls>`, `<audio controls>`, absolute `https://` only), separates a
+  media file from a *site* — the latter belongs in Chrome through `open_url`, not in an `iframe`,
+  which most sites refuse — and says outright that passing over a bare URL is not an answer. The
+  wrong half of the same sentence sat in the `show_html` description too, which is the text the model
+  reads while composing; media is carved out there as well, because what that rule protects is a
+  self-contained shell. Verified by compiling and by reading both strings back out of the compiled
+  classes — the new text is present, all three old phrasings gone. **Not verified on a device**: none
+  was attached, so a real `https` image and a real `.mp4` rendering in the page are still
+  unconfirmed.
+- **The launcher icon could become a permanent dead end, because the overlay was inferred from a view
+  object instead of asked for as a grant.** First run, accessibility on, 悬浮球权限 off: the checklist
+  came up, the user closed it, and from then on the icon did nothing — no screen, no error, no way
+  back in short of reinstalling. Nothing was removing the ball's window. On HONOR/MagicOS a denied
+  `SYSTEM_ALERT_WINDOW` does not make `addView` throw: it succeeds, and the system hides the window
+  instead — present in the window list with `alpha=0.0`, `mAppOpVisibility=false`,
+  `isReadyForDisplay()=false`. So the view object outlives the grant, and `FloatingWindowUi.isShown()`
+  — which is only `root != null`, a memory marker and nothing more — keeps answering true while the
+  user can see nothing at all. `ensureOverlays()` opened with exactly that test, so
+  `SelfCheckActivity` took its expand-and-finish branch, called `expand()` on a card that cannot be
+  drawn, finished itself, and left an empty screen; the checklist branch, which is the one that names
+  this failure in red, never ran. The grant is now asked **first and directly**, as
+  `Settings.canDrawOverlays()` — the same predicate `SelfCheck.overlay` uses for the 悬浮窗 row, so the
+  page and the door can no longer contradict each other (which is what the user hit: the page said
+  没开 while the door said 在屏). It also covers revoking a grant that was already given, when `root`
+  stays non-null for the life of the process. `showSelfCheckCard()` guarded with the same marker,
+  where its own comment had claimed it already did. Verified on the device (LIO-TL00) on **both**
+  paths, because this edits the working path's entry test too — grant denied now reaches the
+  checklist (13 activity records), grant allowed still takes the expand branch (0 records); checking
+  only the first would have shipped "the icon always shows the checklist".
+
+### Changed
+
+- **The 悬浮窗权限 row now leads the self-check list**, ahead of 无障碍服务. Both are hard gates and
+  the order between them was arbitrary; what settles it is that they fail in opposite directions.
+  With the service off the app is visibly inert — nothing to run, and every row below is decoration.
+  With the grant off it *looks* broken instead: the service runs perfectly well, silently cannot
+  draw, and tapping the icon appears to do nothing at all. That second shape is the one users misread
+  as "the app is dead", so it goes first.
+- 无障碍服务's off-state copy named the row's list position — 「后面几条都不用看」 / *"the rest of this
+  list does not matter yet"* — which the reorder above invalidated. It is now 「其他都不用看」 /
+  *"nothing else here matters either"*: same meaning, no longer positional. Same edit in both string
+  files.
+
+### Removed
+
+- **The first-run wizard is gone** (`ui/FirstRunUi.kt`, its wiring in `ScreenBodyService`, the 重新设置
+  button on the self-check card, and its strings in both languages). The wizard and the startup
+  self-check both wanted to put a card up on a first start, and when the check found a problem it
+  covered the wizard, so a new user saw whichever lost the race. The wizard was removed rather than
+  arbitrate between the two. The self-check's own prefs file stays, as does
+  `PermissionRequestActivity`, which the check still uses; an old `wizard_done` flag on existing
+  installs is simply never read. The wake word is now offered only from settings and as a note row on
+  the self-check. The two READMEs had promised this wizard — see the *Fixed* entry above.
+- `check_page_no_overlay` and the `SelfCheckUi.note()` helper it was the only caller of. The note
+  explained that the settings sheet is drawn as an overlay — a fact the page does not need to teach,
+  because the 悬浮窗 row directly below it already carries the fix, in that row's own words and with a
+  button. `fixButton()`'s comment used to point at "the note above the list"; it now states the rule
+  on its own: a button that does nothing is worse than no button.
 
 ## [0.1.0] - 2026-10-09
 
@@ -182,23 +251,6 @@ because a release this size is the norm.
   took the whole process down, which is the opposite of what the callback is for. Now qualified
   `this@AsrController.onError(msg)`. The listener's three other callbacks are unaffected: none of them
   shares a name with an outer member.
-- **A picture, a video or a sound now goes into a page rather than being named as a URL.** The prompt
-  said the opposite, and said it wrongly: *"this device cannot turn an image into a URL, so an `img`
-  tag will not open"*. That is false for anything on the network — the page is served against a fake
-  `https://` origin, the app holds `INTERNET`, and WebView loads an absolute `https://` subresource
-  without complaint. What is true is narrower, and the old sentence flattened it into a blanket ban:
-  a *local* file has no address a page can point at, and `http://` is refused. So the model, obeying
-  its instructions, could not put a picture on screen — and what it did instead was hand the user a
-  URL to go and open, on the device they were already holding. §7 now asks for the embedding directly
-  (`<img>`, `<video controls>`, `<audio controls>`, absolute `https://` only), separates a media file
-  from a *site* — the latter belongs in Chrome through `open_url`, not in an `iframe`, which most
-  sites refuse — and says outright that passing over a bare URL is not an answer. The wrong half of
-  the same sentence sat in the `show_html` description too ("a page that fetches a font, a framework
-  or *an image* over the network renders broken"), which is the text the model reads while composing;
-  media is carved out there as well, because what that rule protects is a self-contained shell.
-  Verified by compiling and by reading both strings back out of the compiled classes — the new text is
-  present, all three old phrasings gone. **Not verified on a device**: none was attached, so a real
-  `https` image and a real `.mp4` rendering in the page are still unconfirmed.
 
 ### Changed
 
