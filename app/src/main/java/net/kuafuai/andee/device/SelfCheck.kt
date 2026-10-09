@@ -178,8 +178,15 @@ object SelfCheck {
         val online = isOnline(context)
         val a11yIme = imeChannelOpen()
         return listOf(
-            accessibility(context),
+            // Overlay first, ahead of the service itself. Both are hard gates,
+            // but they fail in opposite directions: no accessibility service and
+            // the app is visibly inert (nothing to run), no overlay grant and
+            // the app *looks* broken instead — the service is running fine and
+            // silently cannot draw, so tapping the icon appears to do nothing.
+            // That is the failure users misread as "the app is dead", and it is
+            // the one worth putting in front of them first.
             overlay(context),
+            accessibility(context),
             network(online),
             brain(context),
             backend(context, probe, online),

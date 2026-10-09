@@ -350,13 +350,6 @@ class SelfCheckUi(
 
         hero?.removeAllViews()
         hero?.addView(summary(attention.size))
-        // The one case where the card has to say it cannot help: our sheet is an
-        // overlay either way, so with the overlay grant missing there is nowhere
-        // for 打开设置 to go. Say that instead of showing a button that would do
-        // nothing — and note the row itself has no button either, see
-        // [fixButton]. Only reachable in host mode: the window host is already
-        // drawing overlays, so if it is drawing this at all the grant is there.
-        if (!canOpenSettings) hero?.addView(note(lctx.getString(R.string.check_page_no_overlay)))
 
         rows?.removeAllViews()
         attention.forEach { rows?.addView(row(it)) }
@@ -693,9 +686,9 @@ class SelfCheckUi(
      * colour is this app's established "this is tappable" mark.
      */
     private fun fixButton(f: SelfCheck.Finding): TextView? {
-        // Ours, and unreachable: see [canOpenSettings]. The note above the list
-        // has already said so, and a button that does nothing is worse than no
-        // button — it is the exact failure this list exists to avoid.
+        // Ours, and unreachable while the overlay grant is missing: see
+        // [canOpenSettings]. Better no button than one that does nothing — that
+        // is the exact failure this list exists to avoid.
         if (f.fix is SelfCheck.Fix.OurSettings && !canOpenSettings) return null
         val label = when (val fix = f.fix) {
             // Zero means "the action's own word"; a fix instance gets to
@@ -902,15 +895,6 @@ class SelfCheckUi(
         setTextColor(Color.parseColor(Glass.MUTED))
         setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.CAPTION)
         setPadding(0, dp(4), 0, dp(8))
-    }
-
-    private fun note(text: String): TextView = TextView(context).apply {
-        this.text = text
-        setTextColor(Color.parseColor(Glass.SECONDARY))
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.BODY)
-        background = Glass.panel(context, dp(12))
-        setPadding(dp(14), dp(12), dp(14), dp(12))
-        layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) }
     }
 
     private fun matchWrap() = LinearLayout.LayoutParams(MATCH, WRAP)

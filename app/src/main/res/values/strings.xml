@@ -477,7 +477,7 @@
     <string name="check_title_disk">存储空间</string>
 
     <string name="check_detail_accessibility_on">已开启，球和屏幕操作都在跑。</string>
-    <string name="check_detail_accessibility_off">没开。球、语音、点按滑动全都不存在 —— 这条不开，后面几条都不用看。开关在无障碍设置的「已下载的应用」里，不在第一屏上。</string>
+    <string name="check_detail_accessibility_off">没开。球、语音、点按滑动全都不存在 —— 这条不开，其他都不用看。开关在无障碍设置的「已下载的应用」里，不在第一屏上。</string>
     <string name="check_detail_overlay_on">已允许，球能画出来。</string>
     <string name="check_detail_overlay_off">没开。球和卡片都画不出来，而服务在后台其实跑得好好的 —— 所以看起来像「什么都没发生」。</string>
     <string name="check_detail_network_on">已联网。</string>
@@ -551,7 +551,6 @@
     <string name="check_page_done">完成</string>
     <string name="check_page_issues">%1$d 项需要处理</string>
     <string name="check_page_notes_lead">下面几条仅供参考，不影响使用。</string>
-    <string name="check_page_no_overlay">设置面板是一张悬浮窗画出来的 —— 先把下面那条「悬浮窗」开起来，再回来填。</string>
     <string name="check_card_title">有 %1$d 项需要处理</string>
     <string name="check_card_open">去处理</string>
     <string name="check_card_ack">知道了</string>
