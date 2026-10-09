@@ -492,37 +492,4 @@
     <string name="ball_look_bear">Bear</string>
     <string name="ball_look_imp">Imp</string>
 
-
-    <!-- First-run wizard -->
-    <string name="wizard_title">First-run setup</string>
-    <string name="wizard_progress_welcome">Welcome</string>
-    <string name="wizard_progress_step">Step %1$d of %2$d</string>
-    <string name="wizard_progress_done">Done</string>
-    <string name="wizard_cancel">Cancel</string>
-    <string name="wizard_back">Back</string>
-    <string name="wizard_begin">Begin</string>
-    <string name="wizard_next">Next</string>
-    <string name="wizard_finish">Finish setup</string>
-    <string name="wizard_done">Start using</string>
-
-    <string name="wizard_welcome_title">Welcome</string>
-    <string name="wizard_welcome_body">A few steps to get this device ready. Each one asks you to grant a permission or fill a setting. Tap Next when you\'re done.</string>
-
-    <string name="wizard_wake_title">Wake phrase</string>
-    <string name="wizard_wake_body">Pick a phrase and say it 3 times (e.g. “Hey Andee”) — you can then call me by voice when the screen is on. Works without one too; you\'d just tap the ball instead.</string>
-    <string name="wizard_wake_button">Record</string>
-
-    <string name="wizard_look_title">Take a look around</string>
-    <string name="wizard_look_body">Let it see where you are now so it remembers this place. Later when you ask "where am I" it can answer.</string>
-    <string name="wizard_look_button">Open camera</string>
-
-    <string name="wizard_sentence_title">Say your first sentence</string>
-    <string name="wizard_sentence_body">Tap the ball, say something — it\'ll answer, and setup is done.</string>
-    <string name="wizard_sentence_button">Tap to talk</string>
-
-    <string name="wizard_complete_title">All set</string>
-    <string name="wizard_complete_body">Go tap the ball and talk. Long-press it to unfold the card, ⚙ opens settings.</string>
-
-    <string name="check_page_rerun_wizard">Set up again</string>
-
 </resources>

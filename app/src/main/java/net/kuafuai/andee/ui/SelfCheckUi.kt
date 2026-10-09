@@ -110,12 +110,6 @@ class SelfCheckUi(
      * has anything to do, and it is the only host that passes this.
      */
     private val onYieldScreen: () -> Unit = {},
-    /**
-     * Fired when the user taps 重新设置 — the manual entry point into the wizard.
-     * Null ⇒ the button is not drawn. Default null, because `SelfCheckActivity`
-     * has no service to ask and therefore cannot open it.
-     */
-    private val onRerunWizard: (() -> Unit)? = null,
     /** Non-null ⇒ that host places the card and this class owns no window. */
     private val host: FrameLayout? = null,
 ) {
@@ -563,20 +557,6 @@ class SelfCheckUi(
             },
             LinearLayout.LayoutParams(0, WRAP, 1f),
         )
-        // 重新设置 sits beside 重新检查 and not in a row of its own, because the
-        // two are the same shape of thing — the one door here that is *not* a fix
-        // for a listed failure has to look like the door that is. It is
-        // deliberately not a filled button either: 完成 is the way out of this
-        // card and must stay the only one that looks like a way out.
-        if (onRerunWizard != null) {
-            row.addView(
-                textButton(lctx.getString(R.string.check_page_rerun_wizard), Glass.LABEL) {
-                    hide()
-                    onRerunWizard.invoke()
-                },
-                LinearLayout.LayoutParams(WRAP, WRAP).apply { marginEnd = dp(16) },
-            )
-        }
         row.addView(button(lctx.getString(R.string.check_page_done), filled = true) { hide() })
         return row
     }

@@ -565,37 +565,4 @@
     <string name="ball_look_bear">憨憨熊</string>
     <string name="ball_look_imp">小恶魔</string>
 
-
-    <!-- 首次引导向导 -->
-    <string name="wizard_title">首次设置</string>
-    <string name="wizard_progress_welcome">欢迎</string>
-    <string name="wizard_progress_step">第 %1$d 步，共 %2$d 步</string>
-    <string name="wizard_progress_done">完成</string>
-    <string name="wizard_cancel">取消</string>
-    <string name="wizard_back">上一步</string>
-    <string name="wizard_begin">开始</string>
-    <string name="wizard_next">下一步</string>
-    <string name="wizard_finish">完成设置</string>
-    <string name="wizard_done">开始使用</string>
-
-    <string name="wizard_welcome_title">欢迎</string>
-    <string name="wizard_welcome_body">接下来几步，把这台设备配好就能用了。每一步都需要你去开一个权限或填个设置，做完点「下一步」就行。</string>
-
-    <string name="wizard_wake_title">唤醒词</string>
-    <string name="wizard_wake_body">自己选个词录 3 遍（例如「嘿 Andee」），亮屏时喊得醒。不录也能用，只是得点球。</string>
-    <string name="wizard_wake_button">去录</string>
-
-    <string name="wizard_look_title">看一眼周围</string>
-    <string name="wizard_look_body">让它看看你现在在哪儿，记住这个地方。之后问「我在哪」它就能答上来。</string>
-    <string name="wizard_look_button">打开摄像头</string>
-
-    <string name="wizard_sentence_title">说第一句话</string>
-    <string name="wizard_sentence_body">点球，说点什么 — 它会答你，配置就算完成了。</string>
-    <string name="wizard_sentence_button">点球说话</string>
-
-    <string name="wizard_complete_title">都配好了</string>
-    <string name="wizard_complete_body">去点球说话吧。长按球能回到全屏卡片，⚙ 里能改设置。</string>
-
-    <string name="check_page_rerun_wizard">重新设置</string>
-
 </resources>
