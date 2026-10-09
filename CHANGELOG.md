@@ -4,28 +4,53 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-**No release has been tagged yet.** In 207 commits the version has never moved off the values the
-Android template shipped with. Rather than pretend otherwise, this file records the policy going
-forward and states plainly where the project is:
-
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`1` / `"1.0.0"`**.
-- The first tagged release should be **`v1.0.0`**, matching the `versionName` already in the file.
-- Thereafter: releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the
-  leading `v`, and `versionCode` increases by one per release. `versionCode` must increase
-  **monotonically** or Android refuses the upgrade; the same number must never be reused for
-  two different builds.
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`1` / `"0.1.0"`**.
+- Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
+  and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
+  Android refuses the upgrade; the same number must never be reused for two different builds.
 - MAJOR for a change that breaks the wire protocol or an existing configuration; MINOR for a new
   capability; PATCH for fixes.
 
-**A version number does not currently identify a build.** Because `versionCode` has always been `1`,
-"which build is this?" cannot be answered from the installed app. Until a release exists, identify
-builds by the short commit hash they were built from. (Embedding the hash into `versionName` at
-build time would close this hole; it is not implemented yet.)
+**The project starts at `0.x`, and that is the accurate number rather than a modest one.** Nothing is
+frozen. The tool-schema contract a hub brain speaks has been rewritten repeatedly
+(`net/ToolSchemas.kt` alone has changed in seven commits since the first), the `local.properties`
+build flags that decide the first-install language, the thinking default and whether CodeFlying is
+compiled in have all been added since, and a saved scene is a shape that only appeared in this
+release. Each of those is something a user or a second implementation would have to rebuild against,
+so `0.x` is being honest that MINOR may break. The release that moves off `0` should be the one where
+the wire contract is written down well enough that a second implementation could be built from it.
+
+**A version number does not identify a build yet.** `versionCode` is `1` and will stay `1` until a
+second release exists, so "which build is this?" still cannot be answered from the installed app.
+Until then, identify builds by the short commit hash they were built from. (Embedding the hash into
+`versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-09
+
+The first tagged release. Because nothing was tagged before it, this section is the whole project
+rather than a delta from a previous version — it reads as a long list of *Added* for that reason, not
+because a release this size is the norm.
+
 ### Added
 
+- **`docs/architecture.svg` + `docs/architecture.zh-CN.svg`, and a `## Architecture` section in both
+  READMEs.** The README described pieces — the ball, the vault, the dog — and never showed how a turn
+  actually moves. Drawing it forced two corrections to the diagram before it was right, both of them
+  worth recording. The first was factual: the draft showed "two brains" when there are **three
+  mutually exclusive backends**, and it marked the hosted one as the default when an unconfigured
+  device reads as `BRAIN_LOCAL`. The second was structural and worse: the draft stopped at the
+  backend and drew nothing after it — no agent loop, no outputs, which is most of the interesting
+  half. No class is named after the harness; it is `LocalBrain` itself. The picture now shows the
+  system prompt held constant with the volatile parts (clock, notebook index, scenes, photos)
+  deliberately inlined into the user message so the provider's prefix cache still hits, the tool
+  table rebuilt every turn, and the non-streaming step loop with its guards. Outputs come back
+  through six channels, none of which had been drawn: speech, text, a full-screen page, saved
+  artifacts, long text, and the dog. Both files are hand-built SVG with hardcoded colours, because
+  GitHub renders a README image through `<img>` and `var(--color-*)` resolves to black there; both
+  were rendered at 1:1 and read back to check for overflow, which caught three layout faults that
+  reading the source alone would not have shown.
 - **Both READMEs now ask for your use case (`## Showcase` / `## 好玩的用法`).** The
   README described what the thing can do and never asked anyone to show what they did with it,
   which is how a project ends up with no idea whether the odd corners work. The section is an

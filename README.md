@@ -523,7 +523,7 @@ Pure Kotlin, no Compose; the whole thing hangs off two pillars, `WindowManager` 
 | minSdk | 30 | Android 11 — `AccessibilityAction.ACTION_IME_ENTER` and `takeScreenshot` are both API 30+ |
 | Java / Kotlin JVM target | 1.8 | `sourceCompatibility` 1.8, `jvmTarget = '1.8'` |
 | **Build JDK** | **17–20** | see [Which JDK](#which-jdk) — this is the step people get stuck on |
-| versionCode / versionName | 1 / 1.0 | no release management yet |
+| versionCode / versionName | 1 / 0.1.0 | see [CHANGELOG.md](CHANGELOG.md) for the policy |
 | applicationId / namespace | `net.kuafuai.andee` | never changed from the template. It affects nothing |
 
 **Runtime dependencies** (`app/build.gradle`):
@@ -943,8 +943,8 @@ Bundled third-party components are inventoried in [THIRD_PARTY_NOTICES.md](THIRD
 Read it before redistributing: **the ML Kit barcode SDK and the `play-services-*` stubs are not
 open-source**, and the barcode model is fetched from Google at runtime.
 
-See [CHANGELOG.md](CHANGELOG.md) for what changed, and for the versioning policy — no release has
-been tagged yet, and version numbers do not currently identify a build.
+See [CHANGELOG.md](CHANGELOG.md) for what changed and for the versioning policy. The first release is
+**`v0.1.0`** — pre-1.0 on purpose, because the wire contract and the build flags are still moving.
 
 ## Related documents
 

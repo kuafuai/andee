@@ -46,7 +46,7 @@ The second row needs spelling out: **tool results are part of the conversation.*
 **So "local mode" does not mean "processed locally."** Local mode swaps the hub for whichever provider you typed in. It does not keep a single byte on the device.
 
 Therefore:
-- *"We do not monitor or store your data"* — **mostly true, but do not overclaim it.** No database, no behavioural analysis, and no reading of anything you send; the one exception is the version check, which tells us that some device of some model on some IP is running 1.0.0.
+- *"We do not monitor or store your data"* — **mostly true, but do not overclaim it.** No database, no behavioural analysis, and no reading of anything you send; the one exception is the version check, which tells us that some device of some model on some IP is running 0.1.0.
 - *"Your data never leaves the device"* — **false. Do not claim it.**
 
 ## 3. What it can actually do (not hypotheticals — current state of the code)
