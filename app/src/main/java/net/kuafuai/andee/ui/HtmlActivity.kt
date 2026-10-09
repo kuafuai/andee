@@ -89,8 +89,17 @@ class HtmlActivity : StageActivity() {
          * near the top of a script — a high score, a saved setting, exactly what
          * a model writes without thinking about it — and the whole script dies
          * and the page renders blank. A stable fake https origin gives DOM
-         * storage somewhere to live, and never resolves, which is fine because
-         * the page is required to be self-contained anyway.
+         * storage somewhere to live, and never resolves.
+         *
+         * The page's own CSS and JS stay inline — there is no relative path to
+         * a host that never resolves. Media is the exception, and this origin
+         * is what decides it: a page served from https is a secure origin, so
+         * WebView (default `MIXED_CONTENT_NEVER_ALLOW`; this app targets 34)
+         * refuses an `http://` image or clip and loads an absolute `https://`
+         * one. §7 of `LocalPrompt` draws the model's side of that line, and
+         * relaxing it here would mean `MIXED_CONTENT_COMPATIBILITY_MODE` —
+         * with cleartext anyway refused to every host but the one named in
+         * `network_security_config.xml`.
          */
         private const val BASE_URL = "https://brain.local/"
 

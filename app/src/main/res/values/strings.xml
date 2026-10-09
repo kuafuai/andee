@@ -411,7 +411,7 @@
         tool or exception name through `%1$s`; that name is an identifier and
         stays as it is in both languages.
     -->
-    <string name="brain_no_key">本地大脑还没配 API key —— 长按小球打开设置，把 DeepSeek 的 key 填进「大脑」那一栏。</string>
+    <string name="brain_no_key">本地大脑还没配 API key。长按小球把卡片展开，点控制条上的 ⚙ 打开设置，把 Key 填进「后端」→「本机」→「DeepSeek Key」。</string>
     <string name="brain_error">我这边出错了：%1$s</string>
     <string name="brain_error_402">后端服务返回了 402，多半是账户余额不足了。到「设置」→「后端」看看当前用的是哪家服务商，打开它的官网充值后再试。</string>
     <string name="brain_error_402_codeflying">后端服务返回了 402，多半是 CodeFlying 账户余额不足了。用电脑浏览器打开 CodeFlying.net 登录后充值，再试一次。</string>
@@ -443,6 +443,14 @@
     <string name="narrate_show_html">把结果放到屏幕上…</string>
     <string name="narrate_camera">看一眼…</string>
     <string name="narrate_dog">动一下腿…</string>
+    <!--
+        市场的两个元工具。market_call 包着每一个市场 API —— 天气、航班、
+        出图、OCR —— 没有一个动词能同时说清，所以这两条是诚实的泛称。
+        不加这两条时走的是 fallback，会把标识符原样摆到屏幕上：
+        「正在 market_call…」。
+    -->
+    <string name="narrate_market_search">找工具…</string>
+    <string name="narrate_market_call">调用外部服务…</string>
     <string name="narrate_default">正在 %1$s…</string>
 
     <!--
@@ -456,6 +464,7 @@
     <string name="check_title_network">网络</string>
     <string name="check_title_brain">大脑</string>
     <string name="check_title_model">模型连通</string>
+    <string name="check_title_version">版本</string>
     <string name="check_title_microphone">麦克风</string>
     <string name="check_title_notifications">通知使用权</string>
     <string name="check_title_typing_channel">打字通道</string>
@@ -468,14 +477,14 @@
     <string name="check_title_disk">存储空间</string>
 
     <string name="check_detail_accessibility_on">已开启，球和屏幕操作都在跑。</string>
-    <string name="check_detail_accessibility_off">没开。球、语音、点按滑动全都不存在 —— 这条不开，后面几条都不用看。开关在无障碍设置的「已下载的应用」里，不在第一屏上。</string>
+    <string name="check_detail_accessibility_off">没开。球、语音、点按滑动全都不存在 —— 这条不开，其他都不用看。开关在无障碍设置的「已下载的应用」里，不在第一屏上。</string>
     <string name="check_detail_overlay_on">已允许，球能画出来。</string>
     <string name="check_detail_overlay_off">没开。球和卡片都画不出来，而服务在后台其实跑得好好的 —— 所以看起来像「什么都没发生」。</string>
     <string name="check_detail_network_on">已联网。</string>
     <string name="check_detail_network_off">没联网。语音识别、语音合成、模型调用全都走网络。</string>
     <string name="check_detail_brain_on">已配置。</string>
-    <string name="check_detail_brain_hub_missing">还没填。现在用的是云端大脑，得把你自己搭的 Hub 地址填进 ⚙ →「大脑」→「Hub 地址」。没有它，你说的话没地方送，问了不会有回答，屏幕也不会动。想让这台设备自己想，就在同一处把大脑切成「本机」。</string>
-    <string name="check_detail_brain_key_missing">还没填。现在用的是本机大脑，得你自己去 DeepSeek 开一个，把 Key 填进 ⚙ →「大脑」→「DeepSeek Key」。没有它，你说的话我收得到，却答不出、也动不了手。</string>
+    <string name="check_detail_brain_hub_missing">还没填。现在用的是云端大脑，得把你自己搭的 Hub 地址填进 ⚙ →「后端」→「云端」→「Hub 地址」。「云端」默认藏着，看不到就先去「高级」→「显示云端选项」把它打开。没有它，你说的话没地方送，问了不会有回答，屏幕也不会动。想让这台设备自己想，就在同一排把大脑切成「本机」。</string>
+    <string name="check_detail_brain_key_missing">还没填。现在用的是本机大脑，得你自己去 DeepSeek 开一个，把 Key 填进 ⚙ →「后端」→「本机」→「DeepSeek Key」。没有它，你说的话我收得到，却答不出、也动不了手。</string>
     <string name="check_detail_model_cloud">云端大脑，模型不在这台设备上。</string>
     <string name="check_detail_model_no_key">还没填 Key，填了才测得了。</string>
     <string name="check_detail_checking">检查中…</string>
@@ -487,6 +496,15 @@
     <string name="check_detail_model_balance">服务端返回 %1$s：多半是账户余额不足。去当前服务商的官网充值后再试。</string>
     <string name="check_detail_model_name">模型名「%1$s」不在服务端列表里。这台服务上有的：%2$s</string>
     <string name="check_detail_model_other">%1$s</string>
+    <!-- 版本这条是全表唯一「关于 App 自己」而不是「关于这台设备」的检查，也是
+         唯一一次主动往外发东西。%1$s 恒为「该升到的版本」，%2$s 恒为「你手上这个」，
+         两条文案的参数顺序不许对调。见 SelfCheck.version。 -->
+    <string name="check_detail_version_current">%1$s 已经是最新。</string>
+    <string name="check_detail_version_stale">有新版本 %1$s，你现在是 %2$s。旧的还能用，想换再换。</string>
+    <string name="check_detail_version_forced">请更新到 %1$s —— 你现在这个（%2$s）已经不再支持了。</string>
+    <string name="check_detail_version_offline">没网，先不测。当前 %1$s。</string>
+    <string name="check_detail_version_quota">今天的检查次数用完了，明天恢复。当前 %1$s。</string>
+    <string name="check_detail_version_unreachable">查不到：%1$s。当前是 %2$s。</string>
     <string name="check_detail_notif_on">已授权，监听器也连着。</string>
     <string name="check_detail_notif_zombie">系统显示「已授权」，但监听器没连上，通知会被静默丢掉。\n这条得关掉再打开一次才行 —— 只打开不生效。</string>
     <string name="check_detail_notif_off">没开。来电播报和通知转发都收不到。</string>
@@ -502,7 +520,7 @@
     <string name="check_detail_mic_on">已允许。</string>
     <string name="check_detail_mic_off">没允许。点球不会有任何反应 —— 这是最不像权限问题的一条。</string>
     <string name="check_detail_voice_key_ok">已填。识别和合成用它连火山。</string>
-    <string name="check_detail_voice_key_missing">还没填。源码里不带密钥，得你自己去火山引擎开一个语音服务，把 Key 填进 ⚙ →「语音（火山引擎）」→「火山 API Key」。没有它，听和说都连不上 —— 报出来的却是连接超时，看着像网络坏了。其余功能照常。</string>
+    <string name="check_detail_voice_key_missing">还没填。源码里不带密钥，得你自己去火山引擎开一个语音服务，把 Key 填进 ⚙ →「后端」→「本机」→「火山 API Key」。没有它，听和说都连不上 —— 报出来的却是连接超时，看着像网络坏了。其余功能照常。</string>
     <string name="check_detail_voice_host_ok">%1$s 可达。</string>
     <string name="check_detail_voice_host_bad">连不上 %1$s：%2$s。识别和合成都会超时。</string>
     <string name="check_detail_wake_on">已录入，亮屏时喊得醒。</string>
@@ -533,7 +551,6 @@
     <string name="check_page_done">完成</string>
     <string name="check_page_issues">%1$d 项需要处理</string>
     <string name="check_page_notes_lead">下面几条仅供参考，不影响使用。</string>
-    <string name="check_page_no_overlay">设置面板是一张悬浮窗画出来的 —— 先把下面那条「悬浮窗」开起来，再回来填。</string>
     <string name="check_card_title">有 %1$d 项需要处理</string>
     <string name="check_card_open">去处理</string>
     <string name="check_card_ack">知道了</string>
@@ -546,38 +563,5 @@
     <string name="ball_look_rabbit">贱贱兔</string>
     <string name="ball_look_bear">憨憨熊</string>
     <string name="ball_look_imp">小恶魔</string>
-
-
-    <!-- 首次引导向导 -->
-    <string name="wizard_title">首次设置</string>
-    <string name="wizard_progress_welcome">欢迎</string>
-    <string name="wizard_progress_step">第 %1$d 步，共 %2$d 步</string>
-    <string name="wizard_progress_done">完成</string>
-    <string name="wizard_cancel">取消</string>
-    <string name="wizard_back">上一步</string>
-    <string name="wizard_begin">开始</string>
-    <string name="wizard_next">下一步</string>
-    <string name="wizard_finish">完成设置</string>
-    <string name="wizard_done">开始使用</string>
-
-    <string name="wizard_welcome_title">欢迎</string>
-    <string name="wizard_welcome_body">接下来几步，把这台设备配好就能用了。每一步都需要你去开一个权限或填个设置，做完点「下一步」就行。</string>
-
-    <string name="wizard_wake_title">唤醒词</string>
-    <string name="wizard_wake_body">自己选个词录 3 遍（例如「嘿 Andee」），亮屏时喊得醒。不录也能用，只是得点球。</string>
-    <string name="wizard_wake_button">去录</string>
-
-    <string name="wizard_look_title">看一眼周围</string>
-    <string name="wizard_look_body">让它看看你现在在哪儿，记住这个地方。之后问「我在哪」它就能答上来。</string>
-    <string name="wizard_look_button">打开摄像头</string>
-
-    <string name="wizard_sentence_title">说第一句话</string>
-    <string name="wizard_sentence_body">点球，说点什么 — 它会答你，配置就算完成了。</string>
-    <string name="wizard_sentence_button">点球说话</string>
-
-    <string name="wizard_complete_title">都配好了</string>
-    <string name="wizard_complete_body">去点球说话吧。长按球能回到全屏卡片，⚙ 里能改设置。</string>
-
-    <string name="check_page_rerun_wizard">重新设置</string>
 
 </resources>

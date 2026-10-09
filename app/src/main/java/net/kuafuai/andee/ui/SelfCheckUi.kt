@@ -110,12 +110,6 @@ class SelfCheckUi(
      * has anything to do, and it is the only host that passes this.
      */
     private val onYieldScreen: () -> Unit = {},
-    /**
-     * Fired when the user taps 重新设置 — the manual entry point into the wizard.
-     * Null ⇒ the button is not drawn. Default null, because `SelfCheckActivity`
-     * has no service to ask and therefore cannot open it.
-     */
-    private val onRerunWizard: (() -> Unit)? = null,
     /** Non-null ⇒ that host places the card and this class owns no window. */
     private val host: FrameLayout? = null,
 ) {
@@ -356,13 +350,6 @@ class SelfCheckUi(
 
         hero?.removeAllViews()
         hero?.addView(summary(attention.size))
-        // The one case where the card has to say it cannot help: our sheet is an
-        // overlay either way, so with the overlay grant missing there is nowhere
-        // for 打开设置 to go. Say that instead of showing a button that would do
-        // nothing — and note the row itself has no button either, see
-        // [fixButton]. Only reachable in host mode: the window host is already
-        // drawing overlays, so if it is drawing this at all the grant is there.
-        if (!canOpenSettings) hero?.addView(note(lctx.getString(R.string.check_page_no_overlay)))
 
         rows?.removeAllViews()
         attention.forEach { rows?.addView(row(it)) }
@@ -563,20 +550,6 @@ class SelfCheckUi(
             },
             LinearLayout.LayoutParams(0, WRAP, 1f),
         )
-        // 重新设置 sits beside 重新检查 and not in a row of its own, because the
-        // two are the same shape of thing — the one door here that is *not* a fix
-        // for a listed failure has to look like the door that is. It is
-        // deliberately not a filled button either: 完成 is the way out of this
-        // card and must stay the only one that looks like a way out.
-        if (onRerunWizard != null) {
-            row.addView(
-                textButton(lctx.getString(R.string.check_page_rerun_wizard), Glass.LABEL) {
-                    hide()
-                    onRerunWizard.invoke()
-                },
-                LinearLayout.LayoutParams(WRAP, WRAP).apply { marginEnd = dp(16) },
-            )
-        }
         row.addView(button(lctx.getString(R.string.check_page_done), filled = true) { hide() })
         return row
     }
@@ -713,9 +686,9 @@ class SelfCheckUi(
      * colour is this app's established "this is tappable" mark.
      */
     private fun fixButton(f: SelfCheck.Finding): TextView? {
-        // Ours, and unreachable: see [canOpenSettings]. The note above the list
-        // has already said so, and a button that does nothing is worse than no
-        // button — it is the exact failure this list exists to avoid.
+        // Ours, and unreachable while the overlay grant is missing: see
+        // [canOpenSettings]. Better no button than one that does nothing — that
+        // is the exact failure this list exists to avoid.
         if (f.fix is SelfCheck.Fix.OurSettings && !canOpenSettings) return null
         val label = when (val fix = f.fix) {
             // Zero means "the action's own word"; a fix instance gets to
@@ -922,15 +895,6 @@ class SelfCheckUi(
         setTextColor(Color.parseColor(Glass.MUTED))
         setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.CAPTION)
         setPadding(0, dp(4), 0, dp(8))
-    }
-
-    private fun note(text: String): TextView = TextView(context).apply {
-        this.text = text
-        setTextColor(Color.parseColor(Glass.SECONDARY))
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.BODY)
-        background = Glass.panel(context, dp(12))
-        setPadding(dp(14), dp(12), dp(14), dp(12))
-        layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) }
     }
 
     private fun matchWrap() = LinearLayout.LayoutParams(MATCH, WRAP)

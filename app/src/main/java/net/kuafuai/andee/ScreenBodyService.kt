@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import net.kuafuai.andee.asr.AsrController
 import net.kuafuai.andee.audio.AudioIO
@@ -63,17 +64,6 @@ class ScreenBodyService : AccessibilityService() {
      */
     private var pendingArtifact: net.kuafuai.andee.ui.ChatHistory.Entry? = null
 
-    /**
-     * The first-run wizard, when it is up.
-     *
-     * Separate from [selfCheck] for the same reason [selfCheck] is separate from
-     * [settings]: they can be on screen at once. The one route between them is
-     * the self-check card's 重新设置 — see [openWizard] — and it closes the card
-     * it came from, so two of them are never both visible; the field exists so a
-     * second entry point could not leak a window.
-     */
-    private var wizard: net.kuafuai.andee.ui.FirstRunUi? = null
-
     private lateinit var audio: AudioIO
     private lateinit var asr: AsrController
     private lateinit var tts: TtsController
@@ -107,6 +97,15 @@ class ScreenBodyService : AccessibilityService() {
      * payload). See [net.kuafuai.andee.net.CallExtensionRegistry].
      */
     private val callExtensions = net.kuafuai.andee.net.CallExtensionRegistry()
+
+    /**
+     * The CodeFlying market as a second external tool source, or null before
+     * [startBrain] has run — and permanently null in the hub branch, which never
+     * builds one. Read inside the `forwardExternal` lambda rather than captured
+     * by value, because the dispatcher is built well before the brain is.
+     */
+    @Volatile
+    private var marketTools: net.kuafuai.andee.market.MarketTools? = null
 
     // Closed by [stopEverything], reopened when the user starts the next turn.
     // Cancelling the brain's task is asynchronous, so progress / message frames
@@ -429,14 +428,24 @@ class ScreenBodyService : AccessibilityService() {
             dogMotion,
             this,
             forwardExternal = { method, params ->
-                // Unknown to the dispatcher → try the call extension. The
-                // server enforces the timeout and turns a missing extension
-                // into a proper error; the throw here becomes brain-visible.
-                val srv = wsServer
-                    ?: throw IllegalStateException(
-                        "no local server running — cannot reach call extension"
-                    )
-                srv.forwardToExtension(method, params)
+                // Unknown to the dispatcher → the market, then the call
+                // extension. Both are "tools that live somewhere else", and the
+                // market goes first because it is the cheap check — an array
+                // walk — while the extension path throws when nothing is
+                // plugged in, which would mask a market hit.
+                val market = marketTools
+                if (market != null && market.hasMethod(method)) {
+                    market.call(method, params)
+                } else {
+                    // The server enforces the timeout and turns a missing
+                    // extension into a proper error; the throw here becomes
+                    // brain-visible.
+                    val srv = wsServer
+                        ?: throw IllegalStateException(
+                            "no local server running — cannot reach call extension"
+                        )
+                    srv.forwardToExtension(method, params)
+                }
             },
             // The page no longer blocks the tool call, so this callback is the
             // only way the brain learns the user is done with it. See
@@ -480,10 +489,6 @@ class ScreenBodyService : AccessibilityService() {
         startBrain(announce = false)
         startWakeWord()
         runStartupSelfCheck()
-        // After the check, in both senses: it is scheduled after
-        // [runStartupSelfCheck] has started, and it declines to run if that
-        // thread won the race and put a card up. See [maybeOfferWizard].
-        maybeOfferWizard()
     }
 
     /**
@@ -566,7 +571,13 @@ class ScreenBodyService : AccessibilityService() {
         // The overlay grant is one of the things being reported, so the window
         // may well not exist — a card needs the same permission it is about to
         // complain about. The launcher page is the fallback for exactly that.
-        if (!::window.isInitialized || !window.isShown()) return
+        // Asked as the grant rather than as `isShown()`, because on some ROMs
+        // the window object outlives the grant (see [ensureOverlays]): the
+        // marker would be true here and this would raise a card nobody can see,
+        // then sit waiting for a button that cannot be pressed. Same predicate
+        // as the checklist's own 悬浮窗 row.
+        if (!::window.isInitialized || !Settings.canDrawOverlays(this)) return
+        if (!window.isShown()) return
         val open = AppLocale.str(this, R.string.check_card_open)
         val body = problems.joinToString(" · ") { AppLocale.str(this, it.title) }
         net.kuafuai.andee.ui.CardUi.ask(
@@ -1242,14 +1253,6 @@ class ScreenBodyService : AccessibilityService() {
             // in this service and have to be told the same way [openSettings]
             // tells them.
             onLocaleChanged = { window.onLocaleChanged() },
-            // The manual door into the wizard. [SelfCheckUi.hide] runs first and
-            // its onDismiss clears [selfCheck] from [Glass.exit]'s completion,
-            // which is a fifth of a second later — so the wizard goes up while
-            // this card is still fading out, deliberately: [maybeOfferWizard]'s
-            // guards would otherwise have to wait out a fade they cannot see.
-            // The two never overlap on screen for longer than that fade, and both
-            // are counted by OwnCard.
-            onRerunWizard = { openWizard() },
         )
         selfCheck = s
         s.show()
@@ -1450,132 +1453,6 @@ class ScreenBodyService : AccessibilityService() {
             append(if (cut) html.take(ARTIFACT_SOURCE_MAX) else html)
             append("\n<<<END PAGE SOURCE>>>")
         }
-    }
-
-    /**
-     * The first-run wizard, in a window of its own.
-     *
-     * [net.kuafuai.andee.ui.FirstRunUi] draws it; this is only the wiring, and
-     * it mirrors [openSelfCheck] deliberately — same host, same yield, same
-     * language callback, because the two cards are reached from one another and
-     * two ways of putting up a card is how they drift apart.
-     *
-     * **Three doors, and each one is a different errand:**
-     *  * [maybeOfferWizard], on the service's own start, when nothing has been
-     *    configured yet. That is the only automatic one, and it is a question
-     *    rather than a takeover.
-     *  * [openSelfCheck]'s card, for a device already in use: 重新设置. Reachable
-     *    from the list rather than from the bar, because re-running the wizard
-     *    on a configured device means redoing six steps.
-     *  * Nothing else. In particular the launcher Activity is *not* one: it is
-     *    the door for the state where no overlay exists, and the wizard needs
-     *    overlays to show the very permissions it is about to ask for.
-     *
-     * Each of the three callbacks hands over to a surface this service already
-     * owns rather than reimplementing it: the wake recorder is
-     * [net.kuafuai.andee.ui.WakeEnrollUi] (the same one ⚙ opens), the camera is
-     * [net.kuafuai.andee.device.LookActivity] (the same one `device.look` opens,
-     * so the shutter flash and the exposure ramp are the shared ones), and the
-     * last step is [startTurn] — literally the ball's own tap.
-     */
-    private fun openWizard() {
-        if (wizard?.isShowing() == true) return
-        val w = net.kuafuai.andee.ui.FirstRunUi(
-            context = this,
-            onDismiss = { wizard = null },
-            // Marked done so a device that has been through it is not offered it
-            // again on the next start. Written on 开始使用 and not on 完成设置,
-            // because the last step is a sentence the user may well say later —
-            // the config is already complete by the time they see it, and a
-            // wizard that will not stop asking is worse than one that stops one
-            // screen early.
-            onComplete = { markWizardDone() },
-            onOpenSettings = { openSettings() },
-            onOpenWakeEnroll = {
-                // The wizard stays up underneath: that is the point of the card
-                // being an overlay, and the user comes back to 下一步 with the
-                // recorder's own 完成. Same relationship the settings sheet has
-                // to this card.
-                net.kuafuai.andee.ui.WakeEnrollUi(this) { }.show()
-            },
-            onOpenLook = {
-                // Fold first: this card is a fullscreen overlay and an Activity
-                // comes up *underneath* one. Same reason SelfCheckUi yields, and
-                // the fold is the gesture the whole app already uses for "give
-                // the screen back".
-                dispatcher.compactForUser()
-                net.kuafuai.andee.device.LookActivity.open(this, false)
-            },
-            // The last step is the ball's own tap, so the user learns the gesture
-            // by using it rather than by reading about it. The wizard closes
-            // first, or it would sit over the conversation it just started.
-            onOpenMic = { hideWizard(); startTurn() },
-            onLocaleChanged = { window.onLocaleChanged() },
-            onYieldScreen = {
-                dispatcher.compactForUser()
-                wizard?.hide()
-            },
-        )
-        wizard = w
-        w.show()
-    }
-
-    /** [openWizard]'s bookkeeping, in one place so the two call sites agree. */
-    private fun hideWizard() {
-        wizard?.hide()
-        wizard = null
-    }
-
-    /**
-     * Whether the device has already been through the wizard.
-     *
-     * Its own preference, not a read of the config: "is anything configured" is
-     * the wrong question — a user who deliberately runs with no 火山 key (the
-     * brain, the screen tools and the notebook all work mute) would be offered
-     * the wizard on every single start, and a card that comes back however many
-     * times you decline it is nagware. What this records is that it was
-     * *offered and taken*, which is a fact about the user rather than about the
-     * config.
-     */
-    private fun wizardDone(): Boolean =
-        getSharedPreferences(SELF_CHECK_PREFS, MODE_PRIVATE).getBoolean(WIZARD_DONE, false)
-
-    private fun markWizardDone() {
-        getSharedPreferences(SELF_CHECK_PREFS, MODE_PRIVATE)
-            .edit().putBoolean(WIZARD_DONE, true).apply()
-    }
-
-    /**
-     * Offer the wizard once, on a device that has never been through it.
-     *
-     * **A question, not a takeover.** The welcome card lists what is about to
-     * happen and has 取消 beside 开始; nothing is written until the user taps
-     * 开始使用 at the far end. A wizard that seized the screen on first start
-     * with no way past it is the other half of the failure this app already has
-     * — every failure here is silent, and the answer is not to make the working
-     * case loud.
-     *
-     * **It waits for the self-check.** [runStartupSelfCheck] and this both want
-     * to put a card up, and two cards arguing about the same missing permission
-     * is exactly what `startBrain(announce = false)` exists to prevent. So it
-     * yields to the check's card when there is one: a device with a broken
-     * permission gets the list, and the wizard comes back on the next start
-     * once that is dealt with. On a clean device there is no card and this runs
-     * immediately — which is the out-of-box case, the only one it is for.
-     */
-    private fun maybeOfferWizard() {
-        if (wizardDone()) return
-        if (!::window.isInitialized || !window.isShown()) return
-        if (selfCheck?.isShowing() == true) return
-        // Long enough for the ball's own enter animation and for the self-check
-        // thread to have decided. Not a race that matters — see the doc above:
-        // losing to the check's card is a correct outcome, not a bug.
-        ui.postDelayed({
-            if (wizardDone() || wizard?.isShowing() == true) return@postDelayed
-            if (selfCheck?.isShowing() == true) return@postDelayed
-            if (!::window.isInitialized || !window.isShown()) return@postDelayed
-            openWizard()
-        }, 1200)
     }
 
     /**
@@ -1911,11 +1788,21 @@ class ScreenBodyService : AccessibilityService() {
         if (bc.apiKey.isEmpty()) {
             reportNoBrain(AppLocale.str(this, R.string.svc_no_brain_local), announce)
         }
+        // CodeFlying is the only backend with a market behind it. Everywhere
+        // else this object is inert — empty tool list, `hasMethod` always false
+        // — so a local or hub brain's tool surface is exactly what it was.
+        val market = net.kuafuai.andee.market.MarketTools(
+            baseUrl = net.kuafuai.andee.config.VoiceConfig.codeFlyingMarketBaseUrl(),
+            apiKey = bc.apiKey,
+            enabled = bc.mode == net.kuafuai.andee.config.VoiceConfig.BRAIN_CODEFLYING,
+        )
+        marketTools = market
         localBrain = net.kuafuai.andee.brain.LocalBrain(
             cfg = bc,
             appContext = this,
             dispatcher = dispatcher,
             registry = callExtensions,
+            market = market,
             onProgress = ::onBrainProgress,
             onFinal = ::onBrainFinal,
             onTurnEnd = ::onTurnEnd,
@@ -2263,16 +2150,6 @@ class ScreenBodyService : AccessibilityService() {
          * immediately, because the signature is compared, not the clock.
          */
         private const val REPEAT_AFTER_MS = 6 * 60 * 60 * 1000L
-
-        /**
-         * Whether the first-run wizard has been taken to the end.
-         *
-         * Lives beside the self-check's own bookkeeping because it is the same
-         * file for the same reason — both are "what has this device already been
-         * told", neither is configuration the user edits. See [wizardDone] for
-         * why this is not derived from the config.
-         */
-        private const val WIZARD_DONE = "wizard_done"
     }
 
     /**
@@ -2510,6 +2387,13 @@ class ScreenBodyService : AccessibilityService() {
      * permission that is missing. So the app is a live process with no visible
      * surface and no voice, which is what "点不开了" looks like from outside.
      *
+     * Rejection is not the only way to arrive there, and it is not even the
+     * common one on a phone: on HONOR/MagicOS `addView` *succeeds* under a
+     * denied appop and the system hides the window instead, so `isShown()` is
+     * true and nothing here looks broken while the screen stays empty. That is
+     * why the grant is asked directly at the top of the body rather than
+     * inferred from whether a view object exists.
+     *
      * The state is reachable without anybody doing anything wrong: a package
      * rename or a fresh install loses the appop, the user grants it *after* the
      * accessibility service has already connected, and the grant alone does not
@@ -2529,6 +2413,19 @@ class ScreenBodyService : AccessibilityService() {
      */
     fun ensureOverlays(): Boolean {
         if (!::window.isInitialized) return false
+        // The grant is the ground truth, and it is asked *first* because on
+        // some ROMs (HONOR/MagicOS, seen on LIO-TL00) `addView` does not throw
+        // when the appop is denied — it succeeds, and the window is then hidden
+        // by the system: present in the window list, `alpha=0.0`,
+        // `mAppOpVisibility=false`. So `isShown()` below still answers "yes"
+        // while the user can see nothing at all, and this function would report
+        // a ball that is not there. [SelfCheckActivity] would then take its
+        // expand-and-finish branch and there would be no surface to expand —
+        // tapping the icon would look like it did nothing, which is exactly the
+        // failure this function exists to prevent. Same predicate the checklist
+        // uses for its 悬浮窗 row, so the two can never disagree: see
+        // [net.kuafuai.andee.device.SelfCheck.overlay].
+        if (!Settings.canDrawOverlays(this)) return false
         if (window.isShown()) return true
         if (!window.show()) return false
         window.setCompact(false)

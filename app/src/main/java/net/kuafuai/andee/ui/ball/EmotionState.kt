@@ -122,6 +122,14 @@ class EmotionState {
     var scan = 0f; private set
     var rimIntensity = 0.9f; private set
 
+    /**
+     * Additive glow laid over a look's dark outline while thinking; 0 otherwise.
+     * Only the looks with `rimDark` read it — the others already get this from
+     * [rimIntensity] — which is why it is its own field and not a term in that
+     * one: on a dark-outline look `rimIntensity` is ignored by design.
+     */
+    var thinkGlow = 0f; private set
+
     // ---- Core ----
     var coreScale = 0.42f; private set
     var coreAlpha = 0.16f; private set
@@ -235,10 +243,17 @@ class EmotionState {
         listen += ((if (listening) 1f else 0f) - listen) * min(1f, dt * 3.4f)
         busy = if (listening) 0.9f else th
 
-        // Gaze — eye drift while thinking. Three incommensurate low-freq sines
-        // so there's no recognizable period.
-        val gaze = th * (sin(t * 0.9f) + sin(t * 1.31f) * 0.5f)
-        val gazeY = th * (sin(t * 0.73f) * 0.6f + sin(t * 1.07f) * 0.35f)
+        // Gaze — eye drift while thinking, left and right only. Two incommensurate
+        // low-freq sines so there's no recognizable period. Twice the speed it
+        // had: the face no longer squints or furrows, so this drift is most of
+        // what tells "thinking" from "resting".
+        //
+        // There used to be a vertical term too (`gazeY`, 0.73 and 1.07 rad/s against
+        // this one's 0.9 and 1.31). Two near-equal frequencies on two axes is an
+        // orbit, not a drift: summed over a minute the eyes went round about nine
+        // times, both ways, with the horizontal swing at about one eye radius. On
+        // screen that is the eyes rolling. One axis cannot loop.
+        val gaze = th * (sin(t * 1.8f) + sin(t * 2.62f) * 0.5f)
 
         // Jitter — tense/anxious shake, two incommensurate high-freq sines
         val jx = (sin(t * 23.7f) + sin(t * 37.1f) * 0.6f) * jitter
@@ -407,7 +422,7 @@ class EmotionState {
         // rather than disappearing into the bob.
         val workBob = cling * sin(t * 3.4f) * 0.04f
         rotY = sin(t * 0.22f) * 0.12f + jx * 0.012f + gaze * 0.09f + actRotY
-        rotX = sin(t * 0.17f) * 0.06f + jy * 0.009f - gazeY * 0.05f + actRotX + workBob
+        rotX = sin(t * 0.17f) * 0.06f + jy * 0.009f + actRotX + workBob
         rotZ = tilt + th * sin(t * 0.51f) * 0.09f - clingLean
 
         // Rings group tumble. Small on purpose: the belt orientation in [RINGS]
@@ -445,6 +460,10 @@ class EmotionState {
         val listenBeat = listen * (0.5f + sin(t * 4.2f) * 0.5f)
         rimIntensity = 0.85f + open * 0.7f + listen * 0.45f + listenBeat * 0.95f +
                 thinkBeat * 0.55f + sin(t * want.pulse * 2f) * 0.05f
+        // Same beat as above, but a floor under it: the glow is the *only* sign of
+        // thinking on a look whose face no longer changes, so it has to stay
+        // visible between beats rather than going out each time.
+        thinkGlow = th * 0.45f + thinkBeat * 0.55f
 
         // Core — small pulse plus a slower "beat" that only exists while thinking
         val beat = th * (0.5f + sin(t * 2.6f) * 0.5f)
@@ -467,8 +486,8 @@ class EmotionState {
         // ball that happens to be low on screen and one looking up at you from
         // under a ledge. Without it the face aims into the bezel.
         val peek = cling * (0.055f + grip * 0.02f)
-        eyeLY = LOOK.eyeY - browL * 0.06f + gazeY * 0.05f + peek
-        eyeRY = LOOK.eyeY - browR * 0.06f + gazeY * 0.05f + peek
+        eyeLY = LOOK.eyeY - browL * 0.06f + peek
+        eyeRY = LOOK.eyeY - browR * 0.06f + peek
         eyeLX = -LOOK.eyeX + jx * 0.014f + gaze * 0.075f
         eyeRX = LOOK.eyeX + jx * 0.014f + gaze * 0.075f
         // Eye roll. Two terms, and they are on the same axis on purpose:

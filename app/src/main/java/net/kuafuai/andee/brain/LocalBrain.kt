@@ -5,6 +5,7 @@ import net.kuafuai.andee.R
 import net.kuafuai.andee.config.Notebook
 import net.kuafuai.andee.config.VoiceConfig
 import net.kuafuai.andee.i18n.AppLocale
+import net.kuafuai.andee.market.MarketTools
 import net.kuafuai.andee.net.CallExtensionRegistry
 import net.kuafuai.andee.net.CommandDispatcher
 import net.kuafuai.andee.net.ToolSchemas
@@ -68,6 +69,14 @@ class LocalBrain(
     private val appContext: android.content.Context,
     private val dispatcher: CommandDispatcher,
     private val registry: CallExtensionRegistry,
+    /**
+     * The CodeFlying market, as a second external tool source beside the call
+     * extension. Empty outside CodeFlying mode, so a local or hub brain sees the
+     * same tool list it always did — the gate lives in [MarketTools] rather than
+     * here, because "which backend is this" is the service's question, not the
+     * brain's.
+     */
+    private val market: MarketTools,
     private val onProgress: (String) -> Unit,
     private val onFinal: (String) -> Unit,
     /**
@@ -338,6 +347,7 @@ class LocalBrain(
                 // make the *next* turn refuse every device tool.
                 currentKind = TurnKind.USER
                 busy.set(false)
+                dropUnfinishedHarvest(kind)
                 if (kind == TurnKind.SWEEP) onSweepSpent(turnTokens)
                 if (gen == generation.get()) {
                     drainWakes()
@@ -533,7 +543,7 @@ class LocalBrain(
 
         if (!internal && images.isNotEmpty()) attachUserPhotos(images)
 
-        val tools = LlmClient.toolSpecs(ToolSchemas.all(), registry.tools())
+        val tools = LlmClient.toolSpecs(ToolSchemas.all(), registry.tools(), market.tools())
         var lastSignature = ""
         var repeats = 0
 
@@ -679,6 +689,7 @@ class LocalBrain(
             val builtin = ToolSchemas.methodOf(tc.name)
             val method = builtin
                 ?: tc.name.takeIf { registry.hasMethod(it) }
+                ?: tc.name.takeIf { market.hasMethod(it) }
                 ?: return toolMessage(tc.id, "No such tool: ${tc.name}")
 
             val result = dispatchWithTimeout(method, args, silent, untrusted)
@@ -978,6 +989,34 @@ class LocalBrain(
     }
 
     /**
+     * Throw away a review turn's own messages when the review did not finish.
+     *
+     * The harvest appends its prompt to [history] before calling the model — see
+     * the `internal` branch in [runTurn]. On success [applyHarvest] removes that
+     * scaffolding along with the folded conversation. On failure nothing did, so
+     * the history kept one extra message per attempt.
+     *
+     * That growth is exactly what made a failed review re-fire forever:
+     * [maybeHarvest] skips a repeat by comparing `history.size` against the size
+     * it last fired at, and one extra message per attempt deflected that check
+     * every single time. Measured on a device: 218 attempts about 5 s apart,
+     * until the app was reinstalled. Dropping the scaffolding puts the size back
+     * where it was, the guard holds, and the next turn is an ordinary one.
+     *
+     * Only [TurnKind.HARVEST]: [applyHarvest] is the only consumer of
+     * [internalFromIndex], and the sweep never calls it — clearing a *successful*
+     * sweep's messages is not this change's business.
+     */
+    private fun dropUnfinishedHarvest(kind: TurnKind) {
+        if (kind != TurnKind.HARVEST) return
+        val from = internalFromIndex
+        if (from < 0 || from >= history.size) return
+        Log.i(TAG, "harvest did not finish; dropping ${history.size - from} scaffolding message(s)")
+        history.subList(from, history.size).clear()
+        internalFromIndex = -1
+    }
+
+    /**
      * Swap the reviewed part of the conversation for the summary.
      *
      * Keeps: the system prompt, the summary, and the newest [KEEP_TAIL_MESSAGES]
@@ -1080,6 +1119,8 @@ class LocalBrain(
         toolName == "show_html" -> AppLocale.str(appContext, R.string.narrate_show_html)
         toolName == "camera_turn" -> AppLocale.str(appContext, R.string.narrate_camera)
         toolName.startsWith("dog_") -> AppLocale.str(appContext, R.string.narrate_dog)
+        toolName == "market_search" -> AppLocale.str(appContext, R.string.narrate_market_search)
+        toolName == "market_call" -> AppLocale.str(appContext, R.string.narrate_market_call)
         else -> AppLocale.str(appContext, R.string.narrate_default, toolName)
     }
 

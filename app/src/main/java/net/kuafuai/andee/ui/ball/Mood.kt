@@ -109,9 +109,8 @@ val FACE: Map<Mood, Face> = mapOf(
     // unmistakable from across a desk — and unmistakable from CALM, which it
     // used to differ from only by a shade of pale blue and a taller eye.
     //
-    // The tilt is *negative* where THINKING's is positive: both states cock the
-    // head, so the only way for either to stay readable is for them to cock it
-    // opposite ways.
+    // The tilt is *negative*: this is the one mood that cocks its head, so
+    // nothing else competes for the pose.
     Mood.LISTENING to Face(
         rgb(0x7dd3fc), 1.6f, -0.14f, 0.28f, 1.7f, -0.13f, 0f, 0f,
         blush = 0.46f, breath = 0.055f, gape = 0.12f,
@@ -122,12 +121,15 @@ val FACE: Map<Mood, Face> = mapOf(
         rgb(0xfacc15), 0.92f, 0.48f, -0.18f, 0.72f, 0f, 0f, 0f,
         blush = 0.3f, breath = 0.018f,
     ),
-    // The opposite read: eyes squeezed to a slot, brows down and uneven, head
-    // cocked. Deliberately slow and deep rather than fast — fast squinting is
-    // agitation, and this ball is meant to look like it's working the problem.
+    // The resting face, in the mood's own colour. It used to be the opposite of
+    // CALM — eyes squeezed to a slot, brows down and uneven, head cocked — and
+    // on the tablet that read as straining or stuck rather than as thinking.
+    // What says "thinking" now is not the face but what moves around it: the
+    // eyes' quick left-right drift ([EmotionState] `gaze`) and the rim, core and
+    // scan light that swell with `think`, none of which come from this row.
     Mood.THINKING to Face(
-        rgb(0xc084fc), 0.4f, 0.32f, 0.04f, 1.15f, 0.15f, 0.08f, 0f,
-        blush = 0.3f, breath = 0.042f,
+        rgb(0xc084fc), 1f, 0f, 0.26f, 1f, 0f, 0f, 0f,
+        blush = 0.38f,
     ),
     Mood.SPEAKING to Face(
         rgb(0x9db4ff), 1.05f, 0f, 0.32f, 1.5f, 0f, 0f, 0f,

@@ -194,7 +194,19 @@ class LlmClient(
             assistantMessage = sanitizeAssistant(msg),
             promptTokens = usage?.optInt("prompt_tokens") ?: 0,
             completionTokens = usage?.optInt("completion_tokens") ?: 0,
-            cachedTokens = usage?.optInt("prompt_cache_hit_tokens") ?: 0,
+            // 命中缓存的 prompt 有多少。火山方舟（现在的上游）把它放在
+            // usage.prompt_tokens_details.cached_tokens 里，扁平的
+            // prompt_cache_hit_tokens 是 DeepSeek 自家 API 的字段 —— 方舟不发。
+            // optInt 取不到就是 0，所以之前每一行日志都写 cached 0，
+            // 看着像缓存没生效，其实是根本没读对地方。
+            // 两个都认，以后换上游不用再动这里。
+            cachedTokens = usage?.let { u ->
+                // optInt 对「key 不存在」和「值是 0」返回的一样，所以先 has 再取 ——
+                // 否则嵌套块在但缺 cached_tokens 时不会回落到扁平字段。
+                val details = u.optJSONObject("prompt_tokens_details")
+                if (details != null && details.has("cached_tokens")) details.optInt("cached_tokens")
+                else u.optInt("prompt_cache_hit_tokens")
+            } ?: 0,
         )
     }
 

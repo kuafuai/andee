@@ -19,7 +19,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20conditions-155eef"></a>
   <a href="app/build.gradle"><img alt="Platform" src="https://img.shields.io/badge/platform-Android%2011%2B%20(API%2030)-3ddc84"></a>
   <a href="app/build.gradle"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.22-7f52ff"></a>
-  <a href="SECURITY.md"><img alt="无遥测" src="https://img.shields.io/badge/遥测-无-0f6e56"></a>
+  <a href="docs/permissions.zh-CN.md"><img alt="遥测不含内容" src="https://img.shields.io/badge/遥测-不含内容-0f6e56"></a>
   <a href="CONTRIBUTING.zh-CN.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-fdb062"></a>
 </p>
 
@@ -39,7 +39,7 @@
 </p>
 
 
-https://github.com/user-attachments/assets/a362d360-99a2-48be-8b5e-55cce6b63e04
+https://github.com/user-attachments/assets/866e8333-e97b-4bf5-9525-540f9fdb01cd
 
 
 你手里这台手机，本来就做得到"AI 手机"宣传的那些事 —— 缺的只是有个"人"住在里面。Andee 就是这个
@@ -53,24 +53,25 @@ https://github.com/user-attachments/assets/a362d360-99a2-48be-8b5e-55cce6b63e04
 > *「嘿 Andee —— 微信回我妈：我七点到家。」*
 
 它自己打开微信、找到聊天、打字、发送，再把对方的回复念给你听。你的手一直没离开方向盘。
-**难的从来不是那句话** —— 难的是你人在别处的时候，它以你的身份进到一个真实的 App 里。下面这些，
-是同一件事换了别的形状：
+**难的从来不是那句话** —— 难的是你人在别处的时候，它以你的身份进到一个真实的 App 里。
+
+有些事比一句话长，它把这些叫做**情景**：一套目标、说话方式和步骤，它会进入其中待一阵子。
+「情景」面板里备好了四个现成的，点「采用」就存进来，之后和你自己的情景一样，随时可以改、可以删：
 
 | 你说 | 会发生什么 |
 |---|---|
-| *「这个东西帮我在淘宝和京东比比价。」* | 它自己把两家店逛一遍，回来给你一页对比。 |
-| *「明天九点提醒我给房东打电话。」* | 说"好"之前闹钟就已经设好了。九点一到，它自己醒来叫你。 |
-| *「帮我把这个会录下来。」* | 它占着麦克风录完整场，结束后把会议纪要做成一页给你。 |
-| *（一张照片）*「这盆花怎么了？」 | 打字框可以带照片，它看完就回答。 |
-| *「每天晚上八点陪我练英语。」* | 它会提议把这件事存成一个**情景**，以后到点就自己进入。 |
-| *（你什么都没说 —— 只是来了条消息）* | 它先替你看一眼通知，再决定：直接处理、用一句话告诉你、还是不打扰你。 |
+| *「帮我盯一会儿消息。」* | 它同时看所有聊天应用的通知栏，只把现在就得处理的一条条报给你，人名在前。群聊、简报、广告一律安静；陌生人的链接或验证码，它点明「可疑」，但什么都不碰。 |
+| *「看看我每个月都在扣什么钱，不要的帮我退掉。」* | 它到你指的地方读出所有订阅，排成一张表，顶上先给一个月度总额。然后一项一项问：退订、保留、再想想。到最后的「确认退订」它会停下，也从不输入支付密码。 |
+| *「帮我把这个会录下来。」* | 它占着麦克风录完整场，结束后把纪要做成一页给你 —— 结论、待办、未决问题、重要原话 —— 再把属于你的待办挑出来，问要不要设提醒。 |
+| *「到点替我抢。」* | 到约定的时间，它自己打开 App、读页面，一路填到最后那一下之前停下。付款和最后确认永远留给你。 |
 
 ### 它和别的助手 App 不一样在哪
 
 - **任何 App 都能用，而不是「只支持某几个 App」的接入清单。** 它读无障碍树和截图，在一张带标号的网格上
   瞄准，而不是自己算坐标 —— 那恰恰是通用大模型最不擅长的事。
 - **住在手机上。** 大脑就跑在设备本机，接任意 OpenAI 兼容模型（默认 DeepSeek）。没有厂商后端、
-  不用注册账号、**没有任何遥测**。
+  不用注册账号。它唯一会发给我们的东西是版本号和机型 —— 只在你查更新的时候发，字段清单见
+  [docs/permissions.zh-CN.md](docs/permissions.zh-CN.md)。
 - **会越来越懂你。** 私人笔记本、真的定时任务、没人时自己复盘对话，还有**情景** —— 同一类事陪你
   做过几次之后，它会主动提议"要不要存成一个情景"。
 - **有性格。** 五个形象、十四种情绪，表情由模型自己挑，一句话说到一半都能换脸。
@@ -121,12 +122,12 @@ Android 13 及以上，它通过无障碍服务自带的输入通道打字 —�
 
 ### 脑 —— 它会越来越懂你
 
-**5. 情景：它和你一起摸索出来的做事方式。**（新）
+**5. 情景：现成的有，学出来的也有。**（新）
 「陪我练英语」「帮我接管微信」「帮我比价购物」—— 一个情景就是一套目标、说话方式、规则和步骤，它会
-进入其中待一阵子。情景**不是预装的，是学出来的**：同一类事做过几次之后，它会提议存一个；你说好
-之前什么都不会保存。进入方式有四种：直接说、在「情景」面板里点、到点自动进入、或者打开某个 App 时
-自动进入。自主程度由情景自己的规则决定 —— 规则里写了"微信替我回"，它就真的替你回。在情景里时，
-球下面会有一个小标签写着当前情景，点 ✕ 就退出。
+进入其中待一阵子。现成的备了四个（见上），点「采用」才存进来；除此之外的情景都是**学出来的**：
+同一类事做过几次之后，它会提议存一个，你说好之前什么都不会保存。进入方式有四种：直接说、在
+「情景」面板里点、到点自动进入、或者打开某个 App 时自动进入。自主程度由情景自己的规则决定 ——
+规则里写了"微信替我回"，它就真的替你回。在情景里时，球下面会有一个小标签写着当前情景，点 ✕ 就退出。
 
 **6. 通知先过它这一关，再决定要不要打扰你。**（新）
 每条通知都会先走一次很便宜、不带工具的模型调用（约 500 token，一次完整回合约 22000）来分诊：
@@ -197,6 +198,23 @@ WebSocket hub 连到设备。两者之间只是一份普通的工具 schema 契�
 构造函数注入；并发是 `Handler` + 独立 `Executor`。四万三千多行 Kotlin，全部自研 —— 没有一行是从
 别处拷来的。
 
+## 架构
+
+入口是一个 `AccessibilityService`，没有主界面。一轮可以从五个地方开始 —— 离线唤醒词、语音或
+打字、一条通知、一个定时、或经 WebSocket 进来的请求 —— 先写进 `ChatHistory`，再交给当时生效的
+那个后端（`brain = local` 是开箱默认）。
+
+agent loop **就是** `LocalBrain`。它让系统提示词保持不变，把会变的部分（时钟、notebook 索引、
+情景、照片）内联进 user 消息，这样服务商的前缀缓存仍然命中；工具表每轮重建；然后是一个
+**非流式**的 `for` 循环，最多 `maxSteps` 步。带工具调用的回复经 `methodOf()` 送到唯一的
+`CommandDispatcher`；不带工具调用的回复结束这一轮。结果从六个通道送出来 —— 语音、文字、
+全屏网页、产物、长文、以及物理动作。
+
+![Andee 架构](docs/architecture.zh-CN.svg)
+
+图上画的每一样都在本仓库里，连护栏也在 ——
+见[为什么你可以去核对，而不是选择相信](#为什么你可以去核对而不是选择相信)。
+
 ## 快速开始
 
 **最快的一条路，省掉的是真正卡住人的那两件事：自己打包、自己配令牌。**
@@ -258,8 +276,8 @@ OpenAI 兼容端点（`llm_api_key`，默认 `https://api.deepseek.com`）。**�
 > （AI 图片/视频/音乐生成、地理位置、天气、PDF、搜索、新闻、股票……）都走同一把 Key，由 CodeFlying
 > 统一封装并计费，免去你逐一申请密钥和维护账单的麻烦。上面两把 Key 只适用于你自己配置的**本机** tab。
 
-这些不用记：第一次启动会有一个分步引导，带你把这两样填好；之后球的控制条上的 **✓** 会打开自检
-清单，直接告诉你缺哪一个，并给出去处理的按钮。
+这些不用记。每次助手起来都会自检一遍，两把 Key 缺哪个，弹出来的卡上就会点名说清楚，卡上的按钮
+直接打开设置，Key 填在**后端 → 本机**。球的控制条上的 **✓** 则随时可以再打开这份清单。
 
 **要拿 APK 给别人装，签一个 release 包，别发 debug 包。** release 才是压过的那版
 （`minifyEnabled` + `shrinkResources`），体积小主要就小在这里——debug 包带的是没压过的 dex。
@@ -305,8 +323,10 @@ OpenAI 兼容端点（`llm_api_key`，默认 `https://api.deepseek.com`）。**�
 这一类产品里的多数说法 —— 包括那些融资充裕的 —— 都是发布时的主张，没有第三方审计过。而
 这个项目的说法更无聊，但**可以核对**，就在你现在能读的代码里：
 
-- **没有任何遥测。** 不是"我们做了匿名化"，也不是"可以在设置里关掉"。这个仓库里根本没有
-  数据分析 SDK。
+- **没有数据分析 SDK，也没有你的内容流向我们。** 不是"我们做了匿名化"，也不是"可以在设置里关掉"。
+  这个仓库里根本没有数据分析 SDK。唯一会到达维护者手上的是版本自检：版本号、手机型号、品牌、
+  系统版本、界面语言，以及一个随机安装 ID，别的什么都没有。逐字段列在
+  [docs/permissions.zh-CN.md](docs/permissions.zh-CN.md)。
 - **笔记本出不了设备。** 这不是一句政策，是一道过滤：`net/ToolSchemas.kt` 在注册之前就把所有
   `localOnly` 工具从发往 hub 的载荷里剔掉了。习惯和承诺在物理上无法被发出去。
 - **唤醒词全离线。** 本机 MFCC + DTW 模板匹配（`app/.../wake/`）。存的是特征向量，从不存录音，
@@ -362,7 +382,7 @@ OpenAI 兼容端点（`llm_api_key`，默认 `https://api.deepseek.com`）。**�
 | minSdk | 30 | Android 11 —— 因为要用 `AccessibilityAction.ACTION_IME_ENTER`（API 30+）和 `takeScreenshot`（API 30+） |
 | Java / Kotlin JVM target | 1.8 | `sourceCompatibility` 1.8、`jvmTarget = '1.8'` |
 | **构建用 JDK** | **17–20** | 见[配 JDK](#配-jdk)，这是最容易卡住的一步 |
-| versionCode / versionName | 1 / 1.0 | 还没做发版管理 |
+| versionCode / versionName | 2 / 0.1.1 | 策略见 [CHANGELOG.md](CHANGELOG.md) |
 | applicationId / namespace | `net.kuafuai.andee` | 从模板里没改，不影响功能 |
 
 **运行库依赖**（`app/build.gradle`）：
@@ -718,6 +738,7 @@ app/                    Android 应用（Kotlin，无 Compose）
     ui/                    悬浮层：球、字幕、设置、自检、情景、产物
     i18n/AppLocale.kt      悬浮层怎么拿到自己的字符串
   src/main/res/values{,-en}/strings.xml   两张面向用户的字符串表
+docs/architecture.zh-CN.svg   一页看全（英文那份在旁边）
 docs/permissions.zh-CN.md     为什么它要这些权限
 reports/                设计实验室与调研笔记（是仓库的一部分，不是草稿）
 tools/                  设备侧小工具、球脸验收 runner、许可证审计
@@ -806,16 +827,10 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
   `FLAG_SECURE`，**本项目对这条路径没有任何技术围栏**。任何涉及钱的操作都要人在场；并且请记住
   **"是 AI 自己做的"不是抗辩理由**，因为它确实不是。
 - **他发出去的东西是你的。** 消息、帖子、通话、订单，署名都是你。
-- **你的数据会离开设备。** 本仓库没有任何遥测，但语音会走火山引擎，对话连同**全部工具返回结果**
-  会走到你配置的那个大脑端点。"本机模式"换的是目的地，不是这个事实。
+- **你的数据会离开设备。** 本仓库里没有数据分析 SDK，但语音会走火山引擎，对话连同**全部工具返回
+  结果**会走到你配置的那个大脑端点，版本自检会走到一台维护者自己跑的服务器。"本机模式"换的是
+  目的地，不是这个事实。
 - **他能被屏幕上的字操纵。** 任何能让你打开一个页面的人，都可能影响到他。
-
-## Star History
-
-<!-- 项目公开托管到 GitHub 后启用：
-     <a href="https://star-history.com/#kuafuai/andee&Date">
-       <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=kuafuai/andee&type=Date" />
-     </a> -->
 
 ## 许可
 
@@ -825,12 +840,13 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
 随包分发的第三方组件清单在 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。再分发之前请先看：
 **ML Kit 扫码 SDK 和 `play-services-*` 不是开源许可**，而且扫码模型是运行时从 Google 拉的。
 
-改了什么、以及版本号策略见 [CHANGELOG.md](CHANGELOG.md) —— 目前还没有打过 tag，版本号也不能
-用来辨认是哪次构建。
+改了什么、以及版本号策略见 [CHANGELOG.md](CHANGELOG.md) —— 当前版本是 **`v0.1.1`**，故意停在
+pre-1.0：线上协议和构建开关都还在动。
 
 ## 相关文档
 
 - [docs/permissions.zh-CN.md](docs/permissions.zh-CN.md)（[English](docs/permissions.md)）—— 权限为什么这么要
+- [docs/architecture.zh-CN.svg](docs/architecture.zh-CN.svg)（[English](docs/architecture.svg)）—— 一页看全：一轮怎么进来、agent loop、六个出口
 - [DISCLAIMER.zh-CN.md](DISCLAIMER.zh-CN.md) —— 免责声明：数据去哪、能做什么、出事谁担
 - [docs/acceptable-use.zh-CN.md](docs/acceptable-use.zh-CN.md) —— 可接受使用政策（禁止用途）
 - [SECURITY.md](SECURITY.md)（英文）—— 威胁模型、已知限制、漏洞上报

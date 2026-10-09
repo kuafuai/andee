@@ -117,6 +117,26 @@ class CommandDispatcher(
 ) {
     private val ui = Handler(Looper.getMainLooper())
 
+    init {
+        // The effect snapshot after a tap is taken inside the gesture passthrough,
+        // where the ball is untouchable but still drawn. Hand the screen the same
+        // blanking every other capture gets, so there is one copy of how long to
+        // wait and which windows to hide.
+        screen.shotGuard = { shot -> blankedForCapture(shot) }
+        // Taps that would land under the ball window: park it off-screen for the
+        // duration. `passthroughForGesture` already made the window untouchable,
+        // but an untouchable overlay is still obscuring, and payment apps drop
+        // obscured taps — Alipay's bottom tabs reproduced this on 2026-10-09.
+        screen.gestureGuard = { target, body ->
+            val wraps = window.windowBounds()?.let { android.graphics.Rect.intersects(it, target) } ?: false
+            if (!wraps) body()
+            else {
+                window.parkForGesture()
+                try { body() } finally { window.unparkForGesture() }
+            }
+        }
+    }
+
     /** Leak guard, not a guess about thinking time — see [setBusy]. */
     private val endDriving = Runnable { setBusy(false) }
 

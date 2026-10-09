@@ -17,7 +17,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20conditions-155eef"></a>
   <a href="app/build.gradle"><img alt="Platform" src="https://img.shields.io/badge/platform-Android%2011%2B%20(API%2030)-3ddc84"></a>
   <a href="app/build.gradle"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.22-7f52ff"></a>
-  <a href="SECURITY.md"><img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-0f6e56"></a>
+  <a href="docs/permissions.md"><img alt="No content telemetry" src="https://img.shields.io/badge/telemetry-no%20content-0f6e56"></a>
   <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-fdb062"></a>
 </p>
 
@@ -54,16 +54,18 @@ You are driving when your mother texts you. One hand on the wheel, eyes on the r
 
 It opens WhatsApp, finds your chat with Mom, types, sends, and reads the reply back. Your hands never
 left the wheel. **The hard part was never the sentence** — it is getting into a real app, as you,
-while you are somewhere else. The rest of the list is the same job in other shapes:
+while you are somewhere else.
+
+Some jobs are longer than a sentence, and those it calls **scenes**: a goal, a voice and a routine it
+steps into for a while. Four are ready-made, under **Scenes → Ready-made scenes**. Tap **Adopt** and
+they are yours like any other — edit them, or delete them:
 
 | You say | What happens |
 |---|---|
-| *"Find this cheaper on Amazon and eBay."* | It shops both sites itself and comes back with a comparison page. |
-| *"Remind me to call the landlord at nine tomorrow."* | The alarm is set before it says "OK". At nine, it wakes up and tells you. |
-| *"Record this meeting."* | It holds the mic for the hour, then hands you the minutes as a page. |
-| *(a photo)* *"What's wrong with this plant?"* | Photos ride along with what you type; it looks and answers. |
-| *"Practice English with me — every evening at eight."* | It proposes saving that as a **scene**, and from then on steps into it on time. |
-| *(nothing — a message just arrived)* | It reads the notification first and decides: handle it, tell you in one sentence, or stay quiet. |
+| *"Keep an eye on my messages."* | It reads the notification shade across every chat app at once and tells you the ones needing you now — one line each, name first. Groups, newsletters and ads stay quiet, and a stranger's link or verification code gets named as suspicious and touched not at all. |
+| *"Show me what I'm paying for every month — and cancel the ones I don't want."* | It reads your subscriptions where you point it and lays them out with the monthly total on top. Then one at a time: Cancel, Keep, or Think about it. It stops before the final confirm, and it never enters a payment password. |
+| *"Record this meeting."* | It holds the mic for the hour, then hands you the minutes as a page — decisions, action items, open questions, key quotes — and offers to remind you about your own items. |
+| *"Book it for me the moment it opens."* | At the time you set, it opens the app, reads the page, and fills everything up to just before the last button. Payment and the final confirmation stay with you. |
 
 ### Why it is not another assistant app
 
@@ -71,7 +73,9 @@ while you are somewhere else. The rest of the list is the same job in other shap
   screenshot, and aims on a labelled grid instead of doing coordinate maths — the thing general models
   are worst at.
 - **Lives on the phone.** The brain runs on the device against any OpenAI-compatible model (DeepSeek
-  by default). No vendor backend, no account, **no telemetry at all**.
+  by default). No vendor backend, no account. The only thing it ever sends us is a version number and
+  a phone model, when it checks whether there is an update — the full field list is in
+  [docs/permissions.md](docs/permissions.md).
 - **Gets to know you.** A private notebook, a real scheduler, a nightly review of its own
   conversations, and **scenes** — ways of working it proposes after doing the same kind of thing with
   you a few times.
@@ -132,13 +136,14 @@ every fill on the ball as it happens.
 
 ### Mind — it gets to know you
 
-**5. Scenes: ways of working it learns with you.** *(new)*
-"Practice English with me", "keep an eye on my messages", "compare prices for me" — a scene is a goal,
-a voice, rules and a routine it steps into for a while. They are **not shipped, they are learned**:
-after the same kind of session comes up a few times, it proposes one; nothing is saved until you say
-yes. Enter one by saying so, from the **Scenes** panel, on a schedule, or automatically when you
-open an app. A scene's own rules decide how much it does on its own — "answer my messages for me"
-really means it answers. While you are in one, a chip under the ball names it; its ✕ leaves it.
+**5. Scenes: ways of working, ready-made or learned with you.** *(new)*
+"Keep an eye on my messages", "book it for me when it opens" — a scene is a goal, a voice, rules and a
+routine it steps into for a while. Four are ready-made and sit under **Scenes → Ready-made scenes**,
+saved only when you tap Adopt. Beyond those it **learns** its own: after the same kind of session comes
+up a few times, it proposes one; nothing is saved until you say yes. Enter one by saying so, from the
+**Scenes** panel, on a schedule, or automatically when you open an app. A scene's own rules decide how
+much it does on its own — "answer my messages for me" really means it answers. While you are in one, a
+chip under the ball names it; its ✕ leaves it.
 
 **6. It reads your notifications before they interrupt you.** *(new)*
 A cheap, tool-less model call (~500 tokens, against ~22,000 for a full turn) classifies each one:
@@ -221,6 +226,25 @@ Deliberately. Overlays cannot host Compose, so all UI is hand-written `View` cod
 service, so dependencies are constructor-injected by hand; concurrency is `Handler` plus dedicated
 executors. 43k+ lines of Kotlin, all first-party — no code copied in from anywhere.
 
+## Architecture
+
+One `AccessibilityService` is the entry point and there is no main UI. A turn can begin five ways —
+the offline wake word, voice or typing, a notification, a timer, or a request over WebSocket — is
+logged to `ChatHistory`, and is handed to whichever backend is in effect (`brain = local` is the
+out-of-box default).
+
+The agent loop **is** `LocalBrain`. It holds the system prompt constant and inlines the volatile
+parts (clock, notebook index, scenes, photos) into the user message, so the provider's prefix cache
+still hits; it rebuilds the tool table every turn; and it calls the model in a **non-streaming**
+`for` loop of up to `maxSteps` steps. A reply carrying tool calls goes through `methodOf()` to the
+one `CommandDispatcher`; a reply without any ends the turn. The result comes back out through six
+channels — speech, text, a full-screen page, saved artifacts, long text, and physical motion.
+
+![Andee architecture](docs/architecture.svg)
+
+Everything drawn here is in this repository, down to the guard rails — see
+[Why you can check this instead of trusting it](#why-you-can-check-this-instead-of-trusting-it).
+
 ## Quick start
 
 The fastest route skips the two things that actually stop people: **building it yourself, and wiring
@@ -280,8 +304,8 @@ behind it falls back to something else. The ball does at least say so out loud, 
 doing nothing.
 
 **2. The voice key — optional.** A [Volcengine Speech](https://www.volcengine.com/product/voice-tech)
-API key, in the **火山 API key** field of the same **Backend → On-device** tab. Without it ASR and
-TTS fail during the WebSocket handshake, which surfaces as a **connect timeout** — the device looks
+API key, in the **Volcengine API key** field of the same **Backend → On-device** tab. Without it
+ASR and TTS fail during the WebSocket handshake, which surfaces as a **connect timeout** — the device looks
 like it has a network problem when what it has is a blank field. Everything else still works; it is
 just mute and deaf.
 
@@ -291,9 +315,10 @@ just mute and deaf.
 > stocks, …) all go through one key, wrapped and billed by CodeFlying so you don't sign up for each
 > provider yourself. The two keys above only apply to the **On-device** tab you configure yourself.
 
-You do not have to remember this: the first run is a stepped setup that walks you through both, and
-afterwards the **✓** button in the ball's control bar opens the self-check list, which says which of
-the two is missing and offers the button that fixes it.
+You do not have to remember this. Every time the assistant comes up it checks itself, and if either
+key is missing the card it puts up names what is missing — its button opens our settings, where both
+keys live under **Backend → On-device**. The **✓** button in the ball's control bar opens that same
+list whenever you want it.
 
 **To hand someone an APK, sign a release build — not the debug one.** The release build type is the
 minified one (`minifyEnabled` + `shrinkResources`), and that is most of what makes the APK small: the
@@ -439,8 +464,11 @@ is through.
 Most claims in this category — including the well-funded ones — are launch claims that no outside
 party has audited. This project's claims are duller and checkable, in code you can read right now:
 
-- **No telemetry at all.** Not "we anonymise it", not "opt out in settings". There is no analytics
-  SDK in this repo.
+- **No analytics SDK, and none of your content reaches us.** Not "we anonymise it", not "opt out in
+  settings": there is no analytics SDK in this repo. The one thing that does reach the maintainers is
+  the version check — your version number, phone model, brand, OS release, UI language and a random
+  per-install ID, and nothing else. Field by field, in
+  [docs/permissions.md](docs/permissions.md).
 - **The notebook cannot leave the device.** It is not a policy, it is a filter:
   `net/ToolSchemas.kt` drops every `localOnly` tool from the hub payload before it is registered.
   Habits and promises are physically incapable of being sent.
@@ -499,7 +527,7 @@ Pure Kotlin, no Compose; the whole thing hangs off two pillars, `WindowManager` 
 | minSdk | 30 | Android 11 — `AccessibilityAction.ACTION_IME_ENTER` and `takeScreenshot` are both API 30+ |
 | Java / Kotlin JVM target | 1.8 | `sourceCompatibility` 1.8, `jvmTarget = '1.8'` |
 | **Build JDK** | **17–20** | see [Which JDK](#which-jdk) — this is the step people get stuck on |
-| versionCode / versionName | 1 / 1.0 | no release management yet |
+| versionCode / versionName | 2 / 0.1.1 | see [CHANGELOG.md](CHANGELOG.md) for the policy |
 | applicationId / namespace | `net.kuafuai.andee` | never changed from the template. It affects nothing |
 
 **Runtime dependencies** (`app/build.gradle`):
@@ -802,6 +830,7 @@ app/                    the Android app (Kotlin, no Compose)
     ui/                    the overlay: ball, subtitles, settings, self-check, scenes, pages
     i18n/AppLocale.kt      how the overlay reaches its strings
   src/main/res/values{,-en}/strings.xml   the two user-facing string tables
+docs/architecture.svg     the whole picture on one page (zh-CN twin beside it)
 docs/permissions.md     why it asks for what it asks for
 reports/                design labs and research notes (part of the repo, not scratch)
 tools/                  device-side helper scripts, the ball-face lab runners, license audit
@@ -902,9 +931,10 @@ The four points worth reading even if you read nothing else:
   on that path.** Keep a human present for anything financial, and treat *"the AI did it"* as no
   defence, because it is not one.
 - **What it sends is yours.** Messages, posts, calls and orders go out under your name.
-- **Your data leaves the device.** No telemetry exists in this repo — but speech goes to Volcengine,
-  and the conversation plus every tool result goes to whichever brain endpoint you configure. Local
-  mode changes the destination, not the fact.
+- **Your data leaves the device.** There is no analytics SDK in this repo — but speech goes to
+  Volcengine, the conversation plus every tool result goes to whichever brain endpoint you configure,
+  and the version check goes to a server the maintainers run. Local mode changes the destination, not
+  the fact.
 - **It can be steered by what is on screen.** Anyone who can get you to open a page can influence it.
 
 ## License
@@ -917,13 +947,15 @@ Bundled third-party components are inventoried in [THIRD_PARTY_NOTICES.md](THIRD
 Read it before redistributing: **the ML Kit barcode SDK and the `play-services-*` stubs are not
 open-source**, and the barcode model is fetched from Google at runtime.
 
-See [CHANGELOG.md](CHANGELOG.md) for what changed, and for the versioning policy — no release has
-been tagged yet, and version numbers do not currently identify a build.
+See [CHANGELOG.md](CHANGELOG.md) for what changed and for the versioning policy. The latest release is
+**`v0.1.1`** — pre-1.0 on purpose, because the wire contract and the build flags are still moving.
 
 ## Related documents
 
 - [docs/permissions.md](docs/permissions.md) ([中文](docs/permissions.zh-CN.md)) — why it asks for
   the permissions it asks for, each one against a concrete tool
+- [docs/architecture.svg](docs/architecture.svg) ([中文](docs/architecture.zh-CN.svg)) — the whole
+  thing on one page: a turn in, the agent loop, six ways out
 - [DISCLAIMER.md](DISCLAIMER.md) — where your data goes, what it can do, who bears the consequences
 - [docs/acceptable-use.md](docs/acceptable-use.md) ([中文](docs/acceptable-use.zh-CN.md)) — the
   prohibited uses
@@ -934,10 +966,3 @@ been tagged yet, and version numbers do not currently identify a build.
 - [CHANGELOG.md](CHANGELOG.md) — what changed
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community conduct
 - [CLAUDE.md](CLAUDE.md) — architecture tour
-
-## Star history
-
-<!-- Enable once the project is public on GitHub.
-     <a href="https://star-history.com/#kuafuai/andee&Date">
-       <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=kuafuai/andee&type=Date" />
-     </a> -->

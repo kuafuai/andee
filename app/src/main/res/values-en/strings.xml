@@ -344,7 +344,7 @@
     <string name="call_default_scene">Call</string>
 
     <!-- LocalBrain — display half only; see the comment on the Chinese side. -->
-    <string name="brain_no_key">The on-device brain has no API key yet — long-press the ball, open settings and put a DeepSeek key in the Brain section.</string>
+    <string name="brain_no_key">The on-device brain has no API key yet. Long-press the ball to bring the card back, tap ⚙ in the control bar, and put the key in Backend → On-device → “DeepSeek Key”.</string>
     <string name="brain_error">Something broke on my side: %1$s</string>
     <string name="brain_error_402">The backend answered 402, which most likely means the account is out of balance. Open Settings → Backend to see which provider you are using, then top up on that provider\'s website and try again.</string>
     <string name="brain_error_402_codeflying">The backend answered 402, which most likely means your CodeFlying balance has run out. Open CodeFlying.app in a computer browser, sign in, top up, and try again.</string>
@@ -371,6 +371,8 @@
     <string name="narrate_show_html">Putting it on screen…</string>
     <string name="narrate_camera">Taking a look…</string>
     <string name="narrate_dog">Moving a leg…</string>
+    <string name="narrate_market_search">Finding a tool…</string>
+    <string name="narrate_market_call">Calling an external service…</string>
     <string name="narrate_default">Running %1$s…</string>
 
     <!--
@@ -386,6 +388,7 @@
     <string name="check_title_network">Network</string>
     <string name="check_title_brain">Assistant</string>
     <string name="check_title_model">Model</string>
+    <string name="check_title_version">Version</string>
     <string name="check_title_microphone">Microphone</string>
     <string name="check_title_notifications">Notification access</string>
     <string name="check_title_typing_channel">Typing channel</string>
@@ -398,14 +401,14 @@
     <string name="check_title_disk">Storage</string>
 
     <string name="check_detail_accessibility_on">On. The ball and every screen action are running.</string>
-    <string name="check_detail_accessibility_off">Off. No ball, no voice, no tapping or swiping — with this one off, the rest of this list does not matter yet. The switch lives under "Downloaded apps" in the accessibility settings, not on the first screen.</string>
+    <string name="check_detail_accessibility_off">Off. No ball, no voice, no tapping or swiping — with this one off, nothing else here matters either. The switch lives under "Downloaded apps" in the accessibility settings, not on the first screen.</string>
     <string name="check_detail_overlay_on">Allowed. The ball can be drawn.</string>
     <string name="check_detail_overlay_off">Off. Neither the ball nor any card can be drawn, while the service runs perfectly well in the background — which is why it looks like nothing happened at all.</string>
     <string name="check_detail_network_on">Online.</string>
     <string name="check_detail_network_off">Offline. Speech recognition, speech synthesis and every model call go over the network.</string>
     <string name="check_detail_brain_on">Configured.</string>
-    <string name="check_detail_brain_hub_missing">Not set. The brain is set to the cloud, so the address of your own hub goes in ⚙ → “Brain” → “Hub URL”. Without it there is nowhere to send what you say: no answers, and nothing on screen moves. To have this device think for itself, switch the brain to “On-device” in the same place.</string>
-    <string name="check_detail_brain_key_missing">Not set. The brain is set to run on this device, so open a DeepSeek account of your own and put the key in ⚙ → “Brain” → “DeepSeek Key”. Without it, what you say arrives and nothing can be answered or acted on.</string>
+    <string name="check_detail_brain_hub_missing">Not set. The brain is set to the cloud, so the address of your own hub goes in ⚙ → Backend → Cloud → “Hub URL”. The Cloud tab is hidden by default — if you cannot see it, turn on Advanced → “Show cloud option” first. Without it there is nowhere to send what you say: no answers, and nothing on screen moves. To have this device think for itself, pick “On-device” in the same row.</string>
+    <string name="check_detail_brain_key_missing">Not set. The brain is set to run on this device, so open a DeepSeek account of your own and put the key in ⚙ → Backend → On-device → “DeepSeek Key”. Without it, what you say arrives and nothing can be answered or acted on.</string>
     <string name="check_detail_model_cloud">Cloud assistant — the model is not on this device.</string>
     <string name="check_detail_model_no_key">No key yet. Fill one in and this becomes testable.</string>
     <string name="check_detail_checking">Checking…</string>
@@ -417,6 +420,16 @@
     <string name="check_detail_model_balance">The server answered %1$s: most likely the account is out of balance. Top up on the current provider\'s website and try again.</string>
     <string name="check_detail_model_name">No model called “%1$s” on this server. It offers: %2$s</string>
     <string name="check_detail_model_other">%1$s</string>
+    <!-- The one row that is about the app rather than the device, and the one
+         place this app sends anything outward. %1$s is always the release to
+         move to and %2$s is always the build in hand; the two rows differ by a
+         word, so do not swap the arguments between them. See SelfCheck.version. -->
+    <string name="check_detail_version_current">%1$s is the current release.</string>
+    <string name="check_detail_version_stale">%1$s is available; you are on %2$s. The old one still works — update whenever you like.</string>
+    <string name="check_detail_version_forced">Update to %1$s. The build you are on (%2$s) is no longer supported.</string>
+    <string name="check_detail_version_offline">Offline, so not tested. You are on %1$s.</string>
+    <string name="check_detail_version_quota">Today\'s checks are used up; they reset tomorrow. You are on %1$s.</string>
+    <string name="check_detail_version_unreachable">Could not be checked: %1$s. You are on %2$s.</string>
     <string name="check_detail_notif_on">Granted, and the listener is bound.</string>
     <string name="check_detail_notif_zombie">Settings says “granted”, but the listener is not bound — notifications are being dropped silently.\nThis one only comes back if you turn it off and then on again; leaving it on does nothing.</string>
     <string name="check_detail_notif_off">Off. Call announcements and forwarded notifications never arrive.</string>
@@ -432,7 +445,7 @@
     <string name="check_detail_mic_on">Allowed.</string>
     <string name="check_detail_mic_off">Not allowed. Tapping the ball does nothing at all — the failure that least resembles a permission problem.</string>
     <string name="check_detail_voice_key_ok">Set. Recognition and synthesis use it to reach Volcengine.</string>
-    <string name="check_detail_voice_key_missing">Not set. The source ships without a key — open a Volcengine Speech service of your own and put the key in ⚙ → “Speech (Volcengine)” → “Volcengine API key”. Without it, hearing and speaking cannot connect, and what you get back is a connection timeout that looks like a network fault. Everything else works.</string>
+    <string name="check_detail_voice_key_missing">Not set. The source ships without a key — open a Volcengine Speech service of your own and put the key in ⚙ → Backend → On-device → “Volcengine API key”. Without it, hearing and speaking cannot connect, and what you get back is a connection timeout that looks like a network fault. Everything else works.</string>
     <string name="check_detail_voice_host_ok">%1$s is reachable.</string>
     <string name="check_detail_voice_host_bad">Could not reach %1$s: %2$s. Both recognition and synthesis will time out.</string>
     <string name="check_detail_wake_on">Taught, and it wakes while the screen is on.</string>
@@ -464,7 +477,6 @@
     <string name="check_page_done">Done</string>
     <string name="check_page_issues">%1$d to sort out</string>
     <string name="check_page_notes_lead">The rest is just for reference and changes nothing.</string>
-    <string name="check_page_no_overlay">The settings sheet is drawn as a floating window — turn on “Draw over other apps” below first, then come back and fill these in.</string>
     <string name="check_card_title">%1$d thing(s) need attention</string>
     <string name="check_card_open">Fix it</string>
     <string name="check_card_ack">Got it</string>
@@ -478,38 +490,5 @@
     <string name="ball_look_rabbit">Rascal</string>
     <string name="ball_look_bear">Bear</string>
     <string name="ball_look_imp">Imp</string>
-
-
-    <!-- First-run wizard -->
-    <string name="wizard_title">First-run setup</string>
-    <string name="wizard_progress_welcome">Welcome</string>
-    <string name="wizard_progress_step">Step %1$d of %2$d</string>
-    <string name="wizard_progress_done">Done</string>
-    <string name="wizard_cancel">Cancel</string>
-    <string name="wizard_back">Back</string>
-    <string name="wizard_begin">Begin</string>
-    <string name="wizard_next">Next</string>
-    <string name="wizard_finish">Finish setup</string>
-    <string name="wizard_done">Start using</string>
-
-    <string name="wizard_welcome_title">Welcome</string>
-    <string name="wizard_welcome_body">A few steps to get this device ready. Each one asks you to grant a permission or fill a setting. Tap Next when you\'re done.</string>
-
-    <string name="wizard_wake_title">Wake phrase</string>
-    <string name="wizard_wake_body">Pick a phrase and say it 3 times (e.g. “Hey Andee”) — you can then call me by voice when the screen is on. Works without one too; you\'d just tap the ball instead.</string>
-    <string name="wizard_wake_button">Record</string>
-
-    <string name="wizard_look_title">Take a look around</string>
-    <string name="wizard_look_body">Let it see where you are now so it remembers this place. Later when you ask "where am I" it can answer.</string>
-    <string name="wizard_look_button">Open camera</string>
-
-    <string name="wizard_sentence_title">Say your first sentence</string>
-    <string name="wizard_sentence_body">Tap the ball, say something — it\'ll answer, and setup is done.</string>
-    <string name="wizard_sentence_button">Tap to talk</string>
-
-    <string name="wizard_complete_title">All set</string>
-    <string name="wizard_complete_body">Go tap the ball and talk. Long-press it to unfold the card, ⚙ opens settings.</string>
-
-    <string name="check_page_rerun_wizard">Set up again</string>
 
 </resources>

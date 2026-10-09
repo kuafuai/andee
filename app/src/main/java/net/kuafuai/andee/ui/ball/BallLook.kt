@@ -220,6 +220,18 @@ class BallLook(
      */
     val pupilAspect: Float = 1f,
 
+    /**
+     * Colour of the `^ ^` closed eye, when it should not be [eyeColor]. Null = use
+     * [eyeColor], which is every look but two.
+     *
+     * Exists because "white eyes" is two different things. Awake, a white eye is
+     * a white *shape* with a dark pupil in it. Asleep the shape is gone and what
+     * is left is the line — and a white line on a dark body is a harsh slash with
+     * no pupil to give it a reason, which is what the rabbit and the bear were
+     * drawing. A dark line there is a lid, not a mark.
+     */
+    val sleepEyeColor: FloatArray? = null,
+
     // ---- Eye cut ----
     //
     // The glare, taken out of the eye's own geometry instead of drawn next to
@@ -1479,6 +1491,9 @@ val RABBIT = BallLook(
     // look and the imp. A slit ([pupilAspect]) is a predator; this animal is
     // prey that thinks it is in charge, which is most of the joke.
     eyeColor = floatArrayOf(1f, 1f, 1f),
+    // Asleep the white shape is gone and only the line is left; a white line on
+    // a white body is invisible and a dark one is a lid. See [sleepEyeColor].
+    sleepEyeColor = floatArrayOf(0.17f, 0.13f, 0.20f),
     pupilR = 0.092f,
     glintR = 0.030f,
     bubbleX = 0.085f,
@@ -1767,6 +1782,9 @@ val BEAR = BallLook(
     // and the eye rules in this file say a dark ball reads its features light on
     // dark. A bead eye here would be a hole.
     eyeColor = floatArrayOf(1f, 1f, 1f),
+    // Asleep the eye is a line, not a white shape with a pupil in it, and a white
+    // line on a brown body is a harsh slash. A dark brown one is a closed lid.
+    sleepEyeColor = floatArrayOf(0.10f, 0.06f, 0.04f),
     // Low and wide, and it has to clear the muzzle: the snout's lower edge is at
     // −0.165 − 0.150 = −0.315, so a mouth at −0.395 sits just under the shelf
     // rather than on it. Drawn thick, because at this size a hairline under a

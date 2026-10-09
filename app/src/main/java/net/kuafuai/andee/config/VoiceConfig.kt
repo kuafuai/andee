@@ -94,17 +94,40 @@ data class VoiceConfig(
         private fun codeFlyingHttpScheme(): String =
             if (BuildConfig.CODEFLYING_SSL_ENABLED) "https" else "http"
 
+        /** Bare host, no scheme and no trailing slash. One place, so the three URLs below cannot drift. */
+        private fun codeFlyingHost(): String =
+            BuildConfig.CODEFLYING_DOMAIN.trim().trimEnd('/')
+
+        /** Bare CodeFlying origin, e.g. `http://124.71.176.202`. */
+        fun codeFlyingBaseUrl(): String = "${codeFlyingHttpScheme()}://${codeFlyingHost()}"
+
+        /**
+         * Origin for the market tool endpoints, e.g. `http://host/baas-api`.
+         *
+         * `/baas-api/` exists because the bare `/api/` on that host is the
+         * front-end's static directory — nginx only forwards that tree to baas
+         * under this prefix. The voice endpoints need no such prefix (`/voice/`
+         * has its own location), which is why this is a separate accessor rather
+         * than folded into [codeFlyingBaseUrl]: pointing the LLM and ASR/TTS at
+         * `/baas-api/` as well would put the WebSocket upgrade on a location that
+         * may not carry the `Upgrade` headers.
+         *
+         * The `/baas-api` segment is a deployment detail, like the `/voice/llm`
+         * suffix above it — it belongs to whichever nginx the build points at.
+         */
+        fun codeFlyingMarketBaseUrl(): String = "${codeFlyingBaseUrl()}/baas-api"
+
+        /** WebSocket origin, same host on the `ws`/`wss` scheme. */
+        private fun codeFlyingWsBaseUrl(): String = "${codeFlyingWsScheme()}://${codeFlyingHost()}"
+
         /** Full LLM REST base URL for CodeFlying, e.g. `https://foo.net/voice/llm`. */
-        fun codeFlyingLlmBaseUrl(): String =
-            "${codeFlyingHttpScheme()}://${BuildConfig.CODEFLYING_DOMAIN.trim().trimEnd('/')}/voice/llm"
+        fun codeFlyingLlmBaseUrl(): String = "${codeFlyingBaseUrl()}/voice/llm"
 
         /** Full ASR WebSocket URL for CodeFlying. */
-        fun codeFlyingAsrEndpoint(): String =
-            "${codeFlyingWsScheme()}://${BuildConfig.CODEFLYING_DOMAIN.trim().trimEnd('/')}/voice/asr/bigmodel_async"
+        fun codeFlyingAsrEndpoint(): String = "${codeFlyingWsBaseUrl()}/voice/asr/bigmodel_async"
 
         /** Full TTS WebSocket URL for CodeFlying. */
-        fun codeFlyingTtsEndpoint(): String =
-            "${codeFlyingWsScheme()}://${BuildConfig.CODEFLYING_DOMAIN.trim().trimEnd('/')}/voice/tts/bidirection"
+        fun codeFlyingTtsEndpoint(): String = "${codeFlyingWsBaseUrl()}/voice/tts/bidirection"
 
         /** Whether to show the 云端 (hub) tab in the backend picker. Default off. */
         fun showHub(context: Context): Boolean =

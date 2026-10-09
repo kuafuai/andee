@@ -734,6 +734,7 @@ class FloatingWindowUi(
         return try {
             ui.removeCallbacks(strollRunnable)
             slide?.cancel()
+            parkedFrom = null
             wm.removeView(v)
             root = null
             params = null
@@ -964,6 +965,74 @@ class FloatingWindowUi(
         ui.post {
             captureHidden = !visible
             applyWindow()
+        }
+    }
+
+    /** Where the window sat before [parkForGesture] moved it; null when not parked. Main thread only. */
+    private var parkedFrom: IntArray? = null
+
+    /**
+     * Move the folded ball's window off the left edge of the screen so an
+     * injected gesture can pass through where it sat. Blocks the caller (never
+     * the main thread) until the move has been applied and had a frame or two to
+     * reach the compositor, or [PARK_WAIT_MS] has passed.
+     *
+     * Why not just `FLAG_NOT_TOUCHABLE`, which [setTouchable] already sets: a
+     * non-touchable overlay still *obscures*. Measured on a Huawei with Alipay
+     * (2026-10-09), `dispatchGesture` on the bottom tabs reported
+     * `completed:true` for every tap, and the tabs inside the ball window's frame
+     * never switched while the ones outside it did — including 消息, which sits in
+     * the transparent part of the frame, clear of the drawn sphere. The platform
+     * flags a stroke that passes under an untrusted overlay as obscured, and a
+     * payment app is entitled to drop such a stroke without saying so.
+     *
+     * No-op unless folded: the unfolded card is a full-screen surface and moving
+     * it would take the whole card off the display. The dispatcher folds before
+     * every `screen.*` call, so that case is a passive observer, not a driver.
+     */
+    fun parkForGesture() {
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var parked = false
+        ui.post {
+            try {
+                val v = root
+                val p = params
+                if (v != null && p != null && compact && parkedFrom == null) {
+                    // A slide in flight would keep writing p.x/p.y over the parked
+                    // position, and restoring a mid-flight number would strand the
+                    // ball half-way between two resting places.
+                    slide?.end()
+                    parkedFrom = intArrayOf(p.x, p.y)
+                    p.x = -p.width - dp(32)
+                    runCatching { wm.updateViewLayout(v, p) }
+                    parked = true
+                }
+            } finally {
+                latch.countDown()
+            }
+        }
+        if (!latch.await(PARK_WAIT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)) return
+        // `updateViewLayout` is posted to the compositor; the same settle the
+        // flag flip in [setTouchable] needs, and for the same reason.
+        if (parked) Thread.sleep(PARK_SETTLE_MS)
+    }
+
+    /**
+     * Put the window back where [parkForGesture] found it. Not blocking: nothing
+     * the caller does next depends on the ball being visible again. Idempotent,
+     * and a no-op when something reshaped the window in the meantime (a fold or
+     * unfold writes its own geometry, and that is the newer fact).
+     */
+    fun unparkForGesture() {
+        ui.post {
+            val from = parkedFrom ?: return@post
+            parkedFrom = null
+            val v = root ?: return@post
+            val p = params ?: return@post
+            if (!compact || p.width != dp(COMPACT_DP)) return@post
+            p.x = from[0]
+            p.y = from[1]
+            runCatching { wm.updateViewLayout(v, p) }
         }
     }
 
@@ -2711,6 +2780,12 @@ class FloatingWindowUi(
          */
         private const val COMPACT_DP = 168
         private const val COMPACT_MARGIN_DP = 16
+
+        /** How long [parkForGesture] waits for the main-thread move to run. */
+        private const val PARK_WAIT_MS = 200L
+
+        /** Compositor settle after [parkForGesture]'s window move. */
+        private const val PARK_SETTLE_MS = 50L
 
         /**
          * How much of the ball area's padding a held signboard's tail reaches

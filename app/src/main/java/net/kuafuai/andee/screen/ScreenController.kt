@@ -47,6 +47,45 @@ class ScreenController(
     private val ownArea: () -> Rect? = { null },
 ) {
 
+    /**
+     * Runs a capture with our own windows blanked. Set by the dispatcher, which
+     * owns the overlays; null where there are none, and then the capture just runs.
+     *
+     * Needed because the effect snapshot after a tap is taken from inside [tap],
+     * i.e. inside the dispatcher's gesture passthrough, which only makes the ball
+     * untouchable and leaves it drawn. Without this the brain's `after_shot` shows
+     * the ball over whatever sits in the bottom-right corner — a field report had
+     * it read the ball as covering Alipay's 我的 tab and abandon the route.
+     */
+    @Volatile
+    var shotGuard: ((() -> JSONObject) -> JSONObject)? = null
+
+    private fun guardedShot(shot: () -> JSONObject): JSONObject =
+        shotGuard?.invoke(shot) ?: shot()
+
+    /**
+     * Wraps a single injected gesture — [tap], [longPress], [swipe] — so the
+     * dispatcher can get the ball window out of the way when the stroke would
+     * land under it. The target rect is the stroke's bounding box in pixels;
+     * the wrapper decides whether moving the overlay is worth it.
+     *
+     * Measured on this hardware (2026-10-09, Alipay bottom tabs): without this,
+     * taps that landed inside the ball window's 168 dp frame returned
+     * `completed:true, screen_changed:true` from the accessibility layer but the
+     * target app never saw them — Android marks a stroke "obscured" when any
+     * untrusted overlay sits on it, and payment apps drop obscured taps. Making
+     * the overlay non-touchable (what `passthroughForGesture` already does) is
+     * not enough: an invisible non-touchable overlay still contributes to the
+     * obscuration ceiling.
+     *
+     * Null in a caller with no overlay to park.
+     */
+    @Volatile
+    var gestureGuard: ((android.graphics.Rect, () -> JSONObject) -> JSONObject)? = null
+
+    private fun guardedGesture(target: android.graphics.Rect, body: () -> JSONObject): JSONObject =
+        gestureGuard?.invoke(target, body) ?: body()
+
     /** Last meaningful accessibility event from a non-overlay app. */
     private val lastContentEventMs = AtomicLong(0L)
 
@@ -857,7 +896,9 @@ class ScreenController(
         val stroke = GestureDescription.StrokeDescription(path, 0L, 150L)
         val before = screenFingerprint()
         val beforePx = if (before.optBoolean("blind")) snapFrame ?: pixelSignature() else null
-        val result = runGesture(GestureDescription.Builder().addStroke(stroke).build(), 2000L)
+        val result = guardedGesture(android.graphics.Rect(x - 4, y - 4, x + 4, y + 4)) {
+            runGesture(GestureDescription.Builder().addStroke(stroke).build(), 2000L)
+        }
         marker?.mark(x, y, net.kuafuai.andee.ui.TapMarkerUi.Kind.TAP)
         result.put("x", x).put("y", y)
         attachEffectSnapshot(result, before, beforePx)
@@ -1111,7 +1152,7 @@ class ScreenController(
                     // reveal, then give the post a beat to land.
                     marker?.revealNow()
                     Thread.sleep(80)
-                    result.put("after_shot", screenshot("tap_after"))
+                    result.put("after_shot", guardedShot { screenshot("tap_after") })
                 }
             }
             // The NEW screen's element list, so the brain can chain its next
@@ -1159,7 +1200,7 @@ class ScreenController(
                     val ry = (tapY * 1000f / screenH).toInt()
                     val size = 300
                     val hUnits = (size * screenH.toFloat() / screenW).toInt().coerceAtLeast(1)
-                    result.put("miss_shot", lookRegion(rx, ry, size, hUnits))
+                    result.put("miss_shot", guardedShot { lookRegion(rx, ry, size, hUnits) })
                 }
             }
         }
@@ -1187,13 +1228,22 @@ class ScreenController(
             lineTo(x2.toFloat(), y2.toFloat())
         }
         val stroke = GestureDescription.StrokeDescription(path, 0L, durationMs)
-        return runGesture(GestureDescription.Builder().addStroke(stroke).build(), durationMs + 2000).put("from", "$x1,$y1").put("to", "$x2,$y2").put("duration_ms", durationMs)
+        val target = android.graphics.Rect(
+            minOf(x1, x2) - 4, minOf(y1, y2) - 4,
+            maxOf(x1, x2) + 4, maxOf(y1, y2) + 4,
+        )
+        val result = guardedGesture(target) {
+            runGesture(GestureDescription.Builder().addStroke(stroke).build(), durationMs + 2000)
+        }
+        return result.put("from", "$x1,$y1").put("to", "$x2,$y2").put("duration_ms", durationMs)
     }
 
     fun longPress(x: Int, y: Int, durationMs: Long): JSONObject {
         val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
         val stroke = GestureDescription.StrokeDescription(path, 0L, durationMs)
-        val result = runGesture(GestureDescription.Builder().addStroke(stroke).build(), durationMs + 2000)
+        val result = guardedGesture(android.graphics.Rect(x - 4, y - 4, x + 4, y + 4)) {
+            runGesture(GestureDescription.Builder().addStroke(stroke).build(), durationMs + 2000)
+        }
         marker?.mark(x, y, net.kuafuai.andee.ui.TapMarkerUi.Kind.HOLD)
         return result.put("x", x).put("y", y).put("duration_ms", durationMs)
     }
