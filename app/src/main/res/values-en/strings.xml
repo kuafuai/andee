@@ -74,8 +74,8 @@
     <string name="settings_brain_codeflying">CodeFlying</string>
     <string name="settings_show_hub">Show cloud option</string>
     <string name="settings_show_hub_note">Adds a Cloud backend tab for connecting to a hub you host yourself.</string>
-    <string name="settings_brain_codeflying_note">Powered by your backend hosted on CodeFlying.app: ships models and voice services by default, with a long tail of third-party API integrations — AI image / video / music generation, geolocation, weather, PDF conversion, search, news, stocks, and more. CodeFlying wraps and bills every third-party API in one place, so you don\'t have to sign up for each provider and juggle their keys and invoices yourself.\n\nNote: using CodeFlying backend services may incur charges.</string>
-    <string name="settings_brain_codeflying_unconfigured">CodeFlying is not configured on this Andee. From a computer, visit CodeFlying.app and have it build an Andee install package wired to your own backend — install it over this app and you get the default models, voice services, and a long list of third-party API integrations (AI image / video / music generation, weather, location, PDF, search, news, stocks, and more). CodeFlying wraps and bills every third-party API in one place, so you don\'t have to sign up for each provider and juggle their keys and invoices yourself.\n\nNote: using CodeFlying backend services may incur charges.</string>
+    <string name="settings_brain_codeflying_note">CodeFlying is connected: models and voice are set up and ready to go. You can also tap into a long list of third-party services — AI image, video and music generation, location, weather, PDF conversion, search, news, stocks and more. CodeFlying wraps and bills all of them in one place, so you never have to sign up with each provider or juggle their keys and invoices.\n\nNote: using CodeFlying backend services may incur charges.</string>
+    <string name="settings_brain_codeflying_unconfigured">Want Andee to draw, make videos, write music, check the weather, search the news, convert PDFs, or watch stocks for you? Connect CodeFlying: models and voice come set up, and a long list of third-party services is one hookup away, with no separate sign-ups, keys or invoices.\n\nTo get started, open CodeFlying.app in a computer browser and generate your own Andee install package in one click, then install it over this app. New users get free credit, so you can try it first.\n\nNote: using CodeFlying backend services may incur charges.</string>
     <string name="settings_hub_url">Hub URL</string>
     <!-- The hub URL box is empty on a fresh install — the hint is what the
          user sees in that empty box, so it is the pitch, not the format. -->
@@ -94,8 +94,8 @@
     <string name="common_low">Low</string>
     <string name="settings_brain_local_note">The device runs the agent loop itself, with no hub. Without a key it will not take over.</string>
     <string name="settings_section_wake">Wake word</string>
-    <string name="settings_wake_enrolled">Enrolled — say “Hey Andee” while the screen is on</string>
-    <string name="settings_wake_not_enrolled">Not enrolled — record it once to wake me by voice</string>
+    <string name="settings_wake_enrolled">Enrolled — say your wake word while the screen is on</string>
+    <string name="settings_wake_not_enrolled">Not enrolled — pick a phrase and say it 3 times to wake me by voice, e.g. “Hey Andee”</string>
     <string name="settings_wake_record">Record</string>
     <string name="common_clear">Clear</string>
     <string name="common_delete">Delete</string>
@@ -212,21 +212,21 @@
     <string name="vault_field_card_cvv">CVV</string>
     <string name="vault_label_card_last4">Card ending</string>
     <string name="vault_error_name_required">Name cannot be empty</string>
-    <string name="wake_title">Teach me “Hey Andee”</string>
-    <string name="wake_instructions">Tap Start, then say “Hey Andee” the way you normally call me — it stops on its own. You\'ll say it %1$d times — don\'t say it more carefully than usual, or I won\'t recognise it when you call me normally.</string>
+    <string name="wake_title">Teach me your wake word</string>
+    <string name="wake_instructions">Pick any word or phrase you like to call me by, for example “Hey Andee”. Aim for something that takes at least half a second to say — very short words are easy to confuse and may not record at all. Tap Start, then say it the way you normally would — it stops on its own. You\'ll say the same thing %1$d times — don\'t say it more carefully than usual, or I won\'t recognise it when you call me normally.</string>
     <string name="wake_progress">%1$d / %2$d</string>
     <string name="wake_status_enrolled">Already recorded — recording again will overwrite it.</string>
-    <string name="wake_status_not_enrolled">Not recorded yet.</string>
+    <string name="wake_status_not_enrolled">Not recorded yet. Think of a phrase (e.g. “Hey Andee”), then tap Start.</string>
     <string name="wake_close">Close</string>
     <string name="wake_start">Start</string>
     <string name="wake_listening">Listening…</string>
-    <string name="wake_speak_now">Go ahead — “Hey Andee”</string>
+    <string name="wake_speak_now">Go ahead — your wake word</string>
     <string name="wake_retry">Try again</string>
     <string name="wake_not_heard">Didn\'t catch that — move closer, then wait half a second after you finish before checking the screen.</string>
     <string name="wake_say_again">Say it again</string>
     <string name="wake_received">Got it (%1$d ms). %2$d to go.</string>
     <string name="wake_rerecord">Record again</string>
-    <string name="wake_done">Done — just say “Hey Andee” while the screen is on. (threshold %1$s)</string>
+    <string name="wake_done">Done — just say your wake word while the screen is on. (threshold %1$s)</string>
     <!-- device/LookActivity.kt -->
     <string name="dev_look_focusing">Focusing…</string>
     <string name="dev_look_seen">Got it</string>
@@ -423,7 +423,7 @@
     <string name="check_detail_voice_host_ok">%1$s is reachable.</string>
     <string name="check_detail_voice_host_bad">Could not reach %1$s: %2$s. Both recognition and synthesis will time out.</string>
     <string name="check_detail_wake_on">Taught, and it wakes while the screen is on.</string>
-    <string name="check_detail_wake_off">Not taught yet. Everything still works, you just have to tap the ball to talk.</string>
+    <string name="check_detail_wake_off">Not taught yet. Pick a phrase (e.g. “Hey Andee”) and say it 3 times to wake me by voice. Everything still works without it, you just tap the ball to talk.</string>
     <string name="check_detail_battery_on">Exempt, so pending reminders are not delayed.</string>
     <string name="check_detail_battery_off">Not exempt from battery optimisation. Tap “Open settings” — the system asks “Ignore battery optimisations?”; take the button that ignores them.\nThe vendor’s own “App launch / background running” controls are a separate system; changing them leaves this row red. With the screen off a pending reminder may arrive late, and the wake phrase stops listening.</string>
     <string name="check_detail_disk_ok">%1$d MB free.</string>
@@ -483,7 +483,7 @@
     <string name="wizard_welcome_body">A few steps to get this device ready. Each one asks you to grant a permission or fill a setting. Tap Next when you\'re done.</string>
 
     <string name="wizard_wake_title">Wake phrase</string>
-    <string name="wizard_wake_body">Record a wake phrase — you can call it by voice when the screen is on. Works without one too; you\'d just tap the ball instead.</string>
+    <string name="wizard_wake_body">Pick a phrase and say it 3 times (e.g. “Hey Andee”) — you can then call me by voice when the screen is on. Works without one too; you\'d just tap the ball instead.</string>
     <string name="wizard_wake_button">Record</string>
 
     <string name="wizard_look_title">Take a look around</string>

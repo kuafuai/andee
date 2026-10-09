@@ -5,7 +5,8 @@ import android.os.SystemClock
 import android.util.Log
 
 /**
- * "嘿 Andee" — the hands-free way to do what tapping the ball does.
+ * The wake word — whatever phrase the user enrolled, the hands-free way to do
+ * what tapping the ball does. Nothing here knows what the phrase is.
  *
  * Entirely on device: [WakeMic] → [VoiceSegmenter] → [Mfcc] → [Dtw] against
  * the three takes the user enrolled. No network, no model file, no per-call

@@ -15,8 +15,8 @@ import kotlin.math.sin
  *
  * These are the audible half of the ball's face. The face only works when the
  * user happens to be looking at it, and the two moments that most need an
- * acknowledgement are exactly the moments they are not: after saying "嘿
- * Andee" they are waiting to hear whether to start talking, and after
+ * acknowledgement are exactly the moments they are not: after saying the
+ * wake word they are waiting to hear whether to start talking, and after
  * finishing a sentence they are waiting to hear whether it landed.
  *
  * ## Synthesised, not shipped as assets

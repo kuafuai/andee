@@ -9,7 +9,7 @@ import kotlin.math.sqrt
  * Dynamic time warping over [Mfcc] frames.
  *
  * What it buys over comparing the two clips frame-for-frame: the user does not
- * say "嘿 Andee" at the same speed twice, and a rigid comparison turns a 15%
+ * say the wake word at the same speed twice, and a rigid comparison turns a 15%
  * slower take into a different phrase. DTW finds the cheapest alignment that
  * keeps time moving forward in both clips, so tempo stops mattering and the
  * sounds start to.

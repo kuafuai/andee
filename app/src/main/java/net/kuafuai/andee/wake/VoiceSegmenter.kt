@@ -140,7 +140,7 @@ class VoiceSegmenter(private val onSegment: (ShortArray) -> Unit) {
         const val PREROLL_FRAMES = 15      // 150 ms of run-up
         const val START_FRAMES = 3         // 30 ms above the line before it counts
         const val END_FRAMES = 30          // 300 ms of quiet ends the utterance
-        const val MIN_FRAMES = 35          // 350 ms — shorter than "嘿 Andee" can be
+        const val MIN_FRAMES = 35          // 350 ms — a word shorter than this is dropped, so it cannot be enrolled
         const val MAX_FRAMES = 180         // 1.8 s — longer than it can be
 
         const val START_MULT = 3.5f

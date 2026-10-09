@@ -657,13 +657,18 @@ If any step does not line up, go back to that section's **Verify**.
 > degraded one. If your APK was packaged via CodeFlying, the **CodeFlying** tab is the default and
 > there is nothing to fill in.
 
-## Wake word ("Hey Andee")
+## Wake word
 
 If you would rather not tap the ball every time, teach it your voice: **⚙ → wake word → record wake
-word**, and say "Hey Andee" three times as prompted. After that, saying it **while the screen is on**
-does exactly what tapping the ball does.
+word**, and say the phrase you want to use three times as prompted (for example "Hey Andee" — any
+other phrase works too, as long as you say the same one each time). After that, saying it **while the
+screen is on** does exactly what tapping the ball does.
 
 A few things worth knowing first:
+
+- **Do not pick something too short.** Aim for a phrase that takes at least half a second to say.
+  Very short words are easy to confuse with other sounds, and anything under 350 ms is dropped before
+  it is recorded.
 
 - **It is fully offline.** Recognition is local MFCC + DTW template matching (`app/.../wake/`): no
   network, no cost, and all it stores is a feature vector — the audio itself never touches disk. The
