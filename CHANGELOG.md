@@ -144,6 +144,23 @@ because a release this size is the norm.
   took the whole process down, which is the opposite of what the callback is for. Now qualified
   `this@AsrController.onError(msg)`. The listener's three other callbacks are unaffected: none of them
   shares a name with an outer member.
+- **A picture, a video or a sound now goes into a page rather than being named as a URL.** The prompt
+  said the opposite, and said it wrongly: *"this device cannot turn an image into a URL, so an `img`
+  tag will not open"*. That is false for anything on the network — the page is served against a fake
+  `https://` origin, the app holds `INTERNET`, and WebView loads an absolute `https://` subresource
+  without complaint. What is true is narrower, and the old sentence flattened it into a blanket ban:
+  a *local* file has no address a page can point at, and `http://` is refused. So the model, obeying
+  its instructions, could not put a picture on screen — and what it did instead was hand the user a
+  URL to go and open, on the device they were already holding. §7 now asks for the embedding directly
+  (`<img>`, `<video controls>`, `<audio controls>`, absolute `https://` only), separates a media file
+  from a *site* — the latter belongs in Chrome through `open_url`, not in an `iframe`, which most
+  sites refuse — and says outright that passing over a bare URL is not an answer. The wrong half of
+  the same sentence sat in the `show_html` description too ("a page that fetches a font, a framework
+  or *an image* over the network renders broken"), which is the text the model reads while composing;
+  media is carved out there as well, because what that rule protects is a self-contained shell.
+  Verified by compiling and by reading both strings back out of the compiled classes — the new text is
+  present, all three old phrasings gone. **Not verified on a device**: none was attached, so a real
+  `https` image and a real `.mp4` rendering in the page are still unconfirmed.
 
 ### Changed
 

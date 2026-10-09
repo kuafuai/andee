@@ -850,8 +850,13 @@ object ToolSchemas {
         close the page first.
 
         Inline CSS and JS ONLY. The device may have no usable internet, so a
-        page that fetches a font, a framework or an image over the network
-        renders broken.
+        page that fetches a font, a framework or a script over the network
+        renders broken. Media is the exception: an image, video or audio
+        file at an absolute https:// address embeds directly — `<img
+        src="…">`, `<video src="…" controls>`, `<audio src="…" controls>` —
+        and is how you show the user a picture or a clip instead of naming
+        a URL they would have to go and open themselves. Keep `controls` on
+        a player. A plain http:// address will not load.
 
         HOUSE STYLE — follow it unless the user asked for something else.
         This is what the rest of the device looks like; a page that ignores
