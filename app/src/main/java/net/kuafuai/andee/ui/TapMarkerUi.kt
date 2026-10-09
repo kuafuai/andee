@@ -148,9 +148,9 @@ class TapMarkerUi(private val context: Context) {
             // The label is the 0-1000 coordinate rather than the pixel one: that
             // is the only space the brain writes in, and the one that survives a
             // downscaled screenshot.
-            val dm = context.resources.displayMetrics
-            val nx = x * NORM_MAX / max(1, dm.widthPixels)
-            val ny = y * NORM_MAX / max(1, dm.heightPixels)
+            val d = net.kuafuai.andee.screen.ScreenController.displaySize(context)
+            val nx = x * NORM_MAX / max(1, d.x)
+            val ny = y * NORM_MAX / max(1, d.y)
             v.mark(kind.label, "$nx,$ny")
             showing = true
             applyWindow()

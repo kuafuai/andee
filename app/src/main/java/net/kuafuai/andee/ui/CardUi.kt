@@ -92,9 +92,12 @@ object CardUi {
     }
 
     class Result(
-        /** Which button the user tapped, or null for timeout/superseded/dismissed-elsewhere. */
+        /** Which button the user tapped or named, or null for timeout/superseded/dismissed-elsewhere. */
         val button: String?,
-        val how: String,   // "button" | "timeout" | "superseded" | "tap_outside"
+        /** "button" | "voice" | "voice_other" | "timeout" | "superseded" | "tap_outside" */
+        val how: String,
+        /** The user's own words, when they answered by voice. */
+        val heard: String? = null,
     )
 
     /**
@@ -108,9 +111,15 @@ object CardUi {
         question: String,
         buttons: List<String>,
         timeoutMs: Long = AUTO_DISMISS_MS,
+        // True only for a question the brain is blocked on (`ui.ask`). Speech
+        // that names no button then closes the card and travels back in the tool
+        // result for the model to judge. Every other card (a notification's
+        // 看看/忽略, the self-check nudge) has nobody waiting for words, so
+        // unmatched speech must stay an ordinary turn and leave the card alone.
+        captureSpeech: Boolean = false,
         onDone: (Result) -> Unit,
     ) {
-        show(question, buttons, cancelable = false, timeoutMs, onDone)
+        show(question, buttons, cancelable = false, timeoutMs, captureSpeech, onDone)
     }
 
     /**
@@ -122,7 +131,7 @@ object CardUi {
         // same condition one call later — so returning here changes nothing
         // observable, it just keeps the label lookup off a null.
         val ctx = appContext ?: return
-        show(text, listOf(AppLocale.str(ctx, R.string.card_ack)), cancelable = true, timeoutMs, onDone)
+        show(text, listOf(AppLocale.str(ctx, R.string.card_ack)), cancelable = true, timeoutMs, false, onDone)
     }
 
     /**
@@ -151,17 +160,91 @@ object CardUi {
         main.post { current?.close("superseded") }
     }
 
+    /** What [tryAnswerByVoice] did with a spoken sentence. */
+    enum class VoiceOutcome {
+        /** No card was waiting on speech; the sentence is an ordinary turn. */
+        NOT_HANDLED,
+
+        /** It named a button; the card closed as if that button was tapped. */
+        BUTTON,
+
+        /** A `ui.ask` card was waiting and the words named no button; the card
+         *  closed and the words travel back in the tool result for the model. */
+        FORWARDED,
+    }
+
+    /**
+     * Answer the card that is up with something the user said.
+     *
+     * A sentence that is (nearly) just a button label presses it. A card
+     * opened with `captureSpeech` (a `ui.ask`, the brain is blocked on it)
+     * treats any other sentence as the answer too: the card closes and the
+     * words go back in the tool result, so the model judges them against the
+     * options it offered. That is why this never starts a turn of its own: a
+     * new turn would queue behind the very tool call this card is blocking.
+     *
+     * Matching is deliberately strict. "否则帮我查一下" starts with 否 and is not
+     * a no, so a label only counts when it is most of what was said.
+     *
+     * Blocks the calling thread until the main thread has decided, with no
+     * timeout: the caller is on an ASR worker, and giving up early would let
+     * the same sentence start a second turn after it already closed the card.
+     */
+    fun tryAnswerByVoice(spokenText: String): VoiceOutcome {
+        val said = spokenText.trim()
+        if (said.isEmpty()) return VoiceOutcome.NOT_HANDLED
+        if (Looper.myLooper() == Looper.getMainLooper()) return decideVoice(said)
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var outcome = VoiceOutcome.NOT_HANDLED
+        main.post {
+            try {
+                outcome = decideVoice(said)
+            } finally {
+                latch.countDown()
+            }
+        }
+        latch.await()
+        return outcome
+    }
+
+    private fun decideVoice(said: String): VoiceOutcome {
+        val handle = current ?: return VoiceOutcome.NOT_HANDLED
+        if (handle.finished) return VoiceOutcome.NOT_HANDLED
+        val spoken = normalizeForMatch(said)
+        val hit = handle.buttons.firstOrNull { label ->
+            val l = normalizeForMatch(label)
+            l.isNotEmpty() && (spoken == l || (spoken.contains(l) && l.length * 2 >= spoken.length))
+        }
+        if (hit != null) {
+            handle.close("voice", hit, heard = said)
+            return VoiceOutcome.BUTTON
+        }
+        if (handle.captureSpeech) {
+            handle.close("voice_other", null, heard = said)
+            return VoiceOutcome.FORWARDED
+        }
+        return VoiceOutcome.NOT_HANDLED
+    }
+
+    /** Lower-cased, with spaces and punctuation dropped, so "好的。" equals "好的". */
+    private fun normalizeForMatch(s: String): String =
+        s.lowercase().filter { it.isLetterOrDigit() }
+
     // ------------------------------------------------------------------
 
     private class CardHandle(
         val view: View,
         /** The ball window hosting this card, or null for the standalone fallback. */
         val host: FloatingWindowUi?,
+        /** Button labels, in the order they were passed to show(). */
+        val buttons: List<String>,
+        /** Whether speech that names no button should still answer this card. */
+        val captureSpeech: Boolean = false,
         @Volatile var finished: Boolean = false,
         var onDone: ((Result) -> Unit)? = null,
         var timeout: Runnable? = null,
     ) {
-        fun close(how: String, button: String? = null) {
+        fun close(how: String, button: String? = null, heard: String? = null) {
             if (finished) return
             finished = true
             timeout?.let { main.removeCallbacks(it) }
@@ -174,7 +257,7 @@ object CardUi {
             // The ball can stop attending — the question is answered, timed
             // out, or was replaced by a newer one (which re-arms it below).
             ballWindow()?.setHolding(false)
-            onDone?.invoke(Result(button, how))
+            onDone?.invoke(Result(button, how, heard))
         }
     }
 
@@ -199,6 +282,7 @@ object CardUi {
         buttons: List<String>,
         cancelable: Boolean,
         timeoutMs: Long,
+        captureSpeech: Boolean,
         onDone: (Result) -> Unit,
     ) {
         val windowManager = wm ?: return
@@ -349,7 +433,7 @@ object CardUi {
                 cardReal.tailX = -1
 
                 // ---- handle + callbacks ------------------------------------
-                val handle = CardHandle(cardReal, host = null)
+                val handle = CardHandle(cardReal, host = null, buttons = buttons, captureSpeech = captureSpeech)
                 handle.onDone = { r -> main.post { onDone(r) } }
                 wireButtons(handle, btnViews, btnLabels, cancelable, cardReal, title)
                 val timeoutRunnable = Runnable { handle.close("timeout") }
@@ -387,7 +471,7 @@ object CardUi {
             cardReal.tailX = cardReal.measuredWidth / 2
 
             // ---- handle + callbacks ----------------------------------------
-            val handle = CardHandle(cardReal, host)
+            val handle = CardHandle(cardReal, host, buttons = buttons, captureSpeech = captureSpeech)
             handle.onDone = { r -> main.post { onDone(r) } }
             wireButtons(handle, btnViews, btnLabels, cancelable, cardReal, title)
             val timeoutRunnable = Runnable { handle.close("timeout") }

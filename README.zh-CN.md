@@ -39,9 +39,7 @@
 </p>
 
 
-
-https://github.com/user-attachments/assets/7383249d-c6b9-4570-b4c9-7da249bfe666
-
+https://github.com/user-attachments/assets/a362d360-99a2-48be-8b5e-55cce6b63e04
 
 
 你手里这台手机，本来就做得到"AI 手机"宣传的那些事 —— 缺的只是有个"人"住在里面。Andee 就是这个
@@ -711,6 +709,27 @@ tools/                  设备侧小工具、球脸验收 runner、许可证审�
 CLAUDE.md               给 AI 编码助手看的架构说明（英文）
 ```
 
+## 好玩的用法
+
+**用它做过什么？说来听听。** 值得收的往往不是"正经用途"—— 是你绕的那个弯、是它居然真能做成的
+那件事、是把你逗乐的那一下。**不实用也可以。**
+
+发到 **[Show and tell](https://github.com/kuafuai/andee/discussions/categories/show-and-tell)**，
+一个帖子讲一个，这样每个都能单独聊。想让下一个人看得懂，三件事最好带上：
+
+- **跑在什么机器上** —— 机型、Android 版本、ROM。这个应用和 Android 打交道的层次上，各家 ROM 是
+  有分歧的，"我手机上能用"对别人几乎等于没说。
+- **你说了什么，它真做了什么** —— 你原话那句，往往比概括出来的有意思。
+- **有链接就贴** —— YouTube、B站、微博、自己的博客，公开的就行。GitHub 的 README 放不了视频
+  播放器，它只能是个可点的链接。YouTube 的话可以做成缩略图，看起来就像个播放器：
+
+[![点开看](https://img.youtube.com/vi/VIDEO_ID/hqdefault.jpg)](https://www.youtube.com/watch?v=VIDEO_ID)
+
+（把 `VIDEO_ID` 换成视频地址里的那一段 —— `youtube.com/watch?v=VIDEO_ID`）
+
+**有一件事不是客套：这个应用是读屏幕的。** 截图或录屏，就是你消息、通知、当时开着的一切的实拍。
+发之前把涉及隐私的地方挡掉 —— 你自己和别人的都算。
+
 ## 参与贡献
 
 - **代码** —— 先读 [CONTRIBUTING.zh-CN.md](CONTRIBUTING.zh-CN.md)。里面有代码风格，以及这个仓库里**三种
@@ -744,6 +763,7 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
 |---|---|
 | Issue 跟踪 | 可复现的 bug、工程事项（**请带上设备型号 / Android 版本 / ROM / logcat**） |
 | 讨论区 / 问答 | 装机求助、想法、"这个能不能做" |
+| 好玩的用法 | 你用它做过什么，实用不实用都行 —— 见[好玩的用法](#好玩的用法) |
 | 安全 | 漏洞 —— 走私密渠道，永远不要开公开 issue。见 [SECURITY.md](SECURITY.md) |
 | 产品 / 在线 | 不想自己打包就想试 Andee —— [codeflying.net](https://www.codeflying.net) · [codeflying.app](https://www.codeflying.app) |
 

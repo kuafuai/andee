@@ -281,7 +281,6 @@
     <string name="svc_voice_failed">Voice stopped working.\n%1$s</string>
     <string name="svc_btn_type_instead">Type it instead</string>
     <string name="svc_btn_open_settings">Open settings</string>
-    <string name="svc_listening_again">(still listening…)</string>
     <string name="svc_stopped">Stopped</string>
     <string name="svc_meeting_ended_line">(Meeting recording ended — %1$d characters, drafting the minutes…)</string>
     <string name="svc_call_ended_line">(Call ended — %1$d characters, summarising…)</string>

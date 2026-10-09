@@ -623,6 +623,39 @@ class FloatingWindowUi(
     fun isHoldingSign(): Boolean = signboard != null
 
     /**
+     * Take the signboard down because the window is about to change shape, and
+     * tell [signboardEvictor] afterwards.
+     *
+     * **The view comes off before the notification, and that order is the
+     * fix.** The evictor lands in `CardUi.CardHandle.close`, which calls
+     * [hideSignboard], and that opens with `signboard ?: return`. These two
+     * paths used to clear the field first and notify second, so by the time
+     * `close` got to [hideSignboard] there was nothing to find: the card was
+     * marked finished, `current` was dropped, and the view stayed in the window
+     * with no owner. Its buttons then hit `close`'s `if (finished) return`, and
+     * nothing else could reach it — a question that could neither be answered
+     * nor dismissed, until the accessibility service was toggled and the window
+     * rebuilt.
+     *
+     * Unlike [hideSignboard] this does not reshape the window: both callers
+     * are in the middle of doing that themselves.
+     */
+    private fun evictSignboard() {
+        val content = signboard ?: return
+        signboard = null
+        runCatching { root?.removeView(content) }
+        // [showSignboard] bottom-centres the ball area while folded; left like
+        // that, the unfolded card would seat its ball at the bottom of the screen.
+        root?.ballAreaView?.let { area ->
+            (area.layoutParams as? FrameLayout.LayoutParams)?.let {
+                it.gravity = Gravity.TOP or Gravity.START
+                area.layoutParams = it
+            }
+        }
+        signboardEvictor?.invoke()
+    }
+
+    /**
      * End the card at this screen line while a typing field is up: `topPx` is
      * the field's own top edge, and `0` means no field.
      *
@@ -1715,10 +1748,7 @@ class FloatingWindowUi(
         // A signboard cannot survive the fold — the window shrinks to a corner
         // square smaller than the pane. Evict through [signboardEvictor] so
         // CardUi's own callbacks fire (timeout semantics, holding state).
-        if (signboard != null) {
-            signboard = null
-            signboardEvictor?.invoke()
-        }
+        evictSignboard()
         // A typing band shrinks the window, and this line is what a later unfold
         // would grow back to — so the real geometry has to be back in place
         // *before* it is snapshotted, or the card unfolds into a card with a
@@ -1784,10 +1814,7 @@ class FloatingWindowUi(
         // Same eviction as the fold, in the other direction: the card grows
         // and the signboard's compact geometry (ball at the window's bottom)
         // is meaningless inside it.
-        if (signboard != null) {
-            signboard = null
-            signboardEvictor?.invoke()
-        }
+        evictSignboard()
         perchApplied = false
         val g = fullGeometry ?: intArrayOf(
             0, 0,

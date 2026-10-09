@@ -30,12 +30,11 @@ PART A — ADDITIONAL CONDITIONS
 Differing from the Apache License 2.0 only in the following respects.  Where
 Part A and Part B conflict, Part A governs.
 
-A.1  COMMERCIAL USE IS PERMITTED, SUBJECT TO THREE CONDITIONS
+A.1  COMMERCIAL USE IS PERMITTED, SUBJECT TO FOUR CONDITIONS
 
 Commercial use of this software is allowed without a separate agreement —
-including using it inside a company, shipping it as a component of another
-product, modifying the source, and charging for work that incorporates it.
-The following three conditions are the exceptions.
+including using it inside a company, modifying the source, and charging for
+your own work that uses it. The following four conditions are the exceptions.
 
   (a) No white-labelling.
       If you distribute the software, or a derivative work of it, to end users,
@@ -61,6 +60,25 @@ The following three conditions are the exceptions.
       versions must carry prominent notices stating that you changed the files
       (this is Apache 2.0 §4(b), restated here because it is the condition most
       often dropped).
+
+  (d) Shipping it inside another product needs written authorisation.
+      Distributing the software, or a derivative work of it, as a component of
+      a product you offer to others requires prior written authorisation from
+      KUAFUAI. This is the condition that keeps the software from being
+      absorbed into a competing product while its own project is still being
+      built.
+
+      What this does NOT restrict: running it yourself; running it inside your
+      own organisation, on devices you are responsible for; distributing it to
+      other developers as source, including a modified fork that anyone can
+      build and run from their own copy; and selling your own services around
+      it — installing it, configuring it, supporting it — for a client who runs
+      it themselves.
+
+      The line is between a SERVICE and a PRODUCT: doing work that uses the
+      software is permitted, taking the software and putting it inside
+      something you sell is not. If you cannot tell which side a use falls on,
+      ask — the answer is usually yes, with one sentence of permission.
 
 A.2  CONTRIBUTIONS
 

@@ -37,9 +37,7 @@
 </p>
 
 
-
-https://github.com/user-attachments/assets/b32c59ce-a87f-4442-8b82-6d718c68b655
-
+https://github.com/user-attachments/assets/bf560279-d86c-4301-9bcb-01d60fa33d06
 
 
 The phone you already own can do everything an "AI phone" is sold on. What it was missing was
@@ -792,6 +790,32 @@ tools/                  device-side helper scripts, the ball-face lab runners, l
 CLAUDE.md               architecture notes written for AI coding assistants (English)
 ```
 
+## Showcase
+
+**Built something with it? Show us.** The ones worth collecting are usually the ones nobody planned
+— the odd workaround, the thing it turned out to be able to do, the one that made you laugh. It does
+not have to be useful.
+
+Post it in **[Show and tell](https://github.com/kuafuai/andee/discussions/categories/show-and-tell)**,
+one case per post, so each one can be discussed on its own. Three things make a post useful to the
+next person:
+
+- **What it ran on** — device, Android version, ROM. This app talks to Android at a level where ROMs
+  disagree, so "worked on my phone" tells a reader almost nothing.
+- **What you asked for, and what it actually did** — the sentence you really said is more
+  interesting than a summary of it.
+- **A link, if you have one** — YouTube, Bilibili, X, your own blog, anything public. GitHub cannot
+  play a video inside a README, so it will be a clickable link rather than a player. On YouTube you
+  can make it a thumbnail that looks like one:
+
+[![Watch it](https://img.youtube.com/vi/VIDEO_ID/hqdefault.jpg)](https://www.youtube.com/watch?v=VIDEO_ID)
+
+(substitute the id from the video's URL — `youtube.com/watch?v=VIDEO_ID`)
+
+**One thing here is not a formality: this app reads the screen.** A screenshot or a recording is a
+picture of your messages, your notifications, and whatever else happened to be open at the time.
+Blur or avoid anything private — yours or anyone else's — before it goes up.
+
 ## Contributing
 
 - **Code** — read [CONTRIBUTING.md](CONTRIBUTING.md) ([中文](CONTRIBUTING.zh-CN.md)) first. It covers
@@ -827,6 +851,7 @@ CLAUDE.md               architecture notes written for AI coding assistants (Eng
 | Channel | Use it for |
 |---|---|
 | Issue tracker | Reproducible bugs, engineering work |
+| Show and tell | What you built with it, fun or not — see [Showcase](#showcase) |
 | Security | Vulnerabilities — privately, never in a public issue. See [SECURITY.md](SECURITY.md) |
 | Product / online | Trying Andee without building it yourself — [codeflying.app](https://www.codeflying.app) · [codeflying.net](https://www.codeflying.net) |
 
@@ -866,9 +891,9 @@ The four points worth reading even if you read nothing else:
 
 ## License
 
-[Apache-2.0 **with additional conditions**](LICENSE) — no multi-tenant SaaS, and no white-labelling
-that removes the branding. GitHub reports this as `NOASSERTION`; that is expected, not a
-misconfiguration.
+[Apache-2.0 **with additional conditions**](LICENSE) — no multi-tenant SaaS, no white-labelling
+that removes the branding, and no embedding it in another product without written authorisation.
+GitHub reports this as `NOASSERTION`; that is expected, not a misconfiguration.
 
 Bundled third-party components are inventoried in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 Read it before redistributing: **the ML Kit barcode SDK and the `play-services-*` stubs are not

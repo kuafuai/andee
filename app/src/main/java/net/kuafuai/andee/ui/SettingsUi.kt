@@ -1416,7 +1416,14 @@ class SettingsUi(
         val updates = mutableMapOf<String, String>()
         for ((k, et) in fields) {
             val v = et.text?.toString()?.trim().orEmpty()
-            if (v.isNotEmpty()) updates[k] = v
+            // Overridable keys go in even when blank: blank is how the user
+            // says "go back to the compiled default", and VoiceConfig.save()
+            // deletes the pref when it sees one. Non-overridable keys only go
+            // in when non-empty, so an untouched field doesn't wipe a saved
+            // value.
+            if (v.isNotEmpty() || k in VoiceConfig.OVERRIDE_KEYS) {
+                updates[k] = v
+            }
         }
         // Pickers go in unconditionally: their value is never blank, which is
         // what lets a setting actually be turned back off — VoiceConfig.save()

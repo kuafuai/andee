@@ -54,7 +54,7 @@ data class VoiceConfig(
          * Keys whose blank value means "go back to the compiled default"
          * rather than "the user didn't touch this row". See [save].
          */
-        private val OVERRIDE_KEYS = setOf("api_key")
+        internal val OVERRIDE_KEYS = setOf("api_key", "asr_endpoint", "tts_endpoint")
 
         const val DEFAULT_ASR_ENDPOINT = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
         const val DEFAULT_ASR_RESOURCE = "volc.bigasr.sauc.duration"
@@ -143,7 +143,7 @@ data class VoiceConfig(
                     .orEmpty().trim().trimEnd('/').ifEmpty { DEFAULT_LLM_BASE_URL },
                 model = p.getString("llm_model", DEFAULT_LLM_MODEL)
                     .orEmpty().trim().ifEmpty { DEFAULT_LLM_MODEL },
-                thinking = p.getString("llm_thinking", "enabled")
+                thinking = p.getString("llm_thinking", defaultThinking())
                     ?.trim()?.lowercase() != "disabled",
                 reasoningEffort = p.getString("llm_reasoning_effort", DEFAULT_REASONING_EFFORT)
                     .orEmpty().trim().ifEmpty { DEFAULT_REASONING_EFFORT },
@@ -247,10 +247,21 @@ data class VoiceConfig(
                 // public source. Trim before the fallback so a field cleared to
                 // spaces behaves like a cleared field.
                 apiKey = p.getString("api_key", "").orEmpty().trim().ifEmpty { BuildConfig.API_KEY },
-                asrEndpoint = p.getString("asr_endpoint", BuildConfig.ASR_ENDPOINT)!!,
+                // asr/tts endpoints: prefs (if set) > BuildConfig (if non-empty)
+                // > official address. The BuildConfig step is how local.properties
+                // can override the default, and it sits ABOVE the official fallback
+                // so a custom endpoint survives even when the user clears the
+                // settings field (which removes the pref).
+                asrEndpoint = p.getString("asr_endpoint", null)
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: BuildConfig.ASR_ENDPOINT.takeIf { it.isNotEmpty() }
+                    ?: DEFAULT_ASR_ENDPOINT,
                 asrResourceId = p.getString("asr_resource_id", DEFAULT_ASR_RESOURCE)!!,
                 asrUid = uid,
-                ttsEndpoint = p.getString("tts_endpoint", BuildConfig.TTS_ENDPOINT)!!,
+                ttsEndpoint = p.getString("tts_endpoint", null)
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: BuildConfig.TTS_ENDPOINT.takeIf { it.isNotEmpty() }
+                    ?: DEFAULT_TTS_ENDPOINT,
                 ttsResourceId = p.getString("tts_resource_id", DEFAULT_TTS_RESOURCE)!!,
                 // The voice follows the ball's look; [TTS_SPEAKER] is the
                 // fallback for looks that don't name one.
@@ -292,11 +303,14 @@ data class VoiceConfig(
                 // The overridable credential shows what is *saved*, not what is
                 // in effect: an empty box is how the screen says "the factory
                 // value is in use", and it is the state that [save] returns to.
+                // asr_endpoint/tts_endpoint joined api_key here: they are also
+                // overridable from local.properties now, so the settings card
+                // must show saved-or-empty rather than saved-or-default.
                 "api_key" to p.getString("api_key", "").orEmpty(),
-                "asr_endpoint" to p.getString("asr_endpoint", DEFAULT_ASR_ENDPOINT)!!,
+                "asr_endpoint" to p.getString("asr_endpoint", "").orEmpty(),
                 "asr_resource_id" to p.getString("asr_resource_id", DEFAULT_ASR_RESOURCE)!!,
                 "uid" to p.getString("uid", "").orEmpty(),
-                "tts_endpoint" to p.getString("tts_endpoint", DEFAULT_TTS_ENDPOINT)!!,
+                "tts_endpoint" to p.getString("tts_endpoint", "").orEmpty(),
                 "tts_resource_id" to p.getString("tts_resource_id", DEFAULT_TTS_RESOURCE)!!,
                 "tts_sample_rate" to p.getInt("tts_sample_rate", DEFAULT_TTS_SAMPLE_RATE).toString(),
                 "hub_url" to hc.url,
@@ -340,6 +354,14 @@ data class VoiceConfig(
                 .getString("grounding", "off")
                 ?.trim()?.lowercase() == "on"
 
+        /**
+         * Thinking for a device that has never saved the setting: the build's
+         * `DEFAULT_THINKING` (local.properties, `on` / `off`), else on. Only the
+         * unset case — a saved choice always wins, same as [uiLanguage].
+         */
+        private fun defaultThinking(): String =
+            if (BuildConfig.DEFAULT_THINKING.trim().lowercase() == "off") "disabled" else "enabled"
+
         const val LANG_ZH = "zh"
         const val LANG_EN = "en"
 
@@ -362,6 +384,13 @@ data class VoiceConfig(
                 .getString("lang", "").orEmpty().trim().lowercase()
             if (saved == LANG_EN) return LANG_EN
             if (saved == LANG_ZH) return LANG_ZH
+            // The build's `DEFAULT_LANG` (local.properties) is the language of a
+            // device nobody has picked for yet. It sits below the saved choice
+            // and above the system locale; anything but zh/en reads as unset.
+            when (BuildConfig.DEFAULT_LANG.trim().lowercase()) {
+                LANG_EN -> return LANG_EN
+                LANG_ZH -> return LANG_ZH
+            }
             return if (java.util.Locale.getDefault().language == "zh") LANG_ZH else LANG_EN
         }
 

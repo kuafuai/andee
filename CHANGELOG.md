@@ -27,13 +27,36 @@ build time would close this hole; it is not implemented yet.)
 
 ### Added
 
+- **Both READMEs now ask for your use case (`## Showcase` / `## 好玩的用法`).** The
+  README described what the thing can do and never asked anyone to show what they did with it,
+  which is how a project ends up with no idea whether the odd corners work. The section is an
+  invitation and three things that make a post useful: the device and ROM (this app talks to Android
+  at a level where ROMs disagree, so "worked on my phone" is not reproducible), the sentence you
+  actually said, and a link if there is one. It goes to a Discussions **Show and tell** rather than
+  the issue tracker, which follows the rule `config.yml` already sets — the tracker is for
+  reproducible defects, and a story is not one. Two details are deliberate rather than decorative.
+  **GitHub cannot play a video inside a README** (iframes are stripped, so a YouTube link stays a
+  link), and the section hands over the thumbnail form that makes it look like a player anyway,
+  rather than letting twenty people discover that separately. And it says plainly that **a
+  screenshot of this app is a picture of your messages** — the one thing in a showcase that can do
+  real harm is posting someone's private screen content, including your own.
 - `LICENSE` — Apache-2.0 with additional conditions (Part A: no multi-tenant SaaS, no
-  white-labelling that removes the branding). Note that GitHub reports this as `NOASSERTION`.
+  white-labelling that removes the branding, no embedding it in another product without written
+  authorisation). Note that GitHub reports this as `NOASSERTION`.
 - `SECURITY.md` — threat model, the five known security limitations, and a private reporting channel.
 - `docs/permissions.md` + `docs/permissions.zh-CN.md` — why the app asks for the permissions it asks
   for, each one tied to a concrete tool and to what happens if you refuse it. One file per language.
 - `CONTRIBUTING.md` + `CONTRIBUTING.zh-CN.md` — code style, the rules for the three kinds of Chinese
   in this codebase, and the contribution licensing terms. One file per language.
+- **A `Signed-off-by:` sign-off is now required on every commit, and CI enforces it.**
+  `.github/workflows/dco.yml` checks each commit on a pull request, and both `CONTRIBUTING` files
+  plus the pull request template explain the one-line change (`git commit -s`). This is a
+  [DCO](https://developercertificate.org/), not a CLA: the contributor keeps their copyright and
+  certifies only that they had the right to submit the work. The reason it exists is LICENSE A.2 —
+  the project is relicensed under terms that differ from stock Apache 2.0, and A.2 asks contributors
+  to grant that. A term nobody has explicitly agreed to is a term a contributor can later dispute;
+  a sign-off line is a per-commit record that they did. Deliberately *not* a CLA, which would need a
+  signature process and an entity to hold it — friction that buys nothing here.
 - `CODE_OF_CONDUCT.md` — Contributor Covenant v2.1.
 - `THIRD_PARTY_NOTICES.md` — generated dependency license inventory: 93 components across 5
   licenses. Notably flags that **ML Kit and the `play-services-*` stubs are not open-source**.
@@ -60,6 +83,45 @@ build time would close this hole; it is not implemented yet.)
 
 ### Changed
 
+- **`SECURITY.md` no longer claims a safeguard the software does not have.** Its
+  prompt-injection section stated that destructive or irreversible actions are
+  *"gated behind `ask_user` / `confirm` flows"*. That is not true, and it was the
+  one sentence in the repository that could be turned against the project:
+  `ask_user` is an ordinary tool the model chooses to call, `confirm` exists on a
+  single tool (`request_permissions`, where it prevents an unwanted permission
+  dialog, not a payment), and nothing forces a confirmation before
+  `tap_by_coordinates` — which is the path a payment is completed along and the
+  very thing the disclaimer is about. `DISCLAIMER.md` and
+  `docs/acceptable-use.md` had both already said the opposite in as many words
+  ("no guardrail whatsoever", "no technical guardrail on that path"), so the three
+  files contradicted each other and the security page was the one that was wrong.
+  It now states the posture plainly: the checks on risky actions are instructions
+  to the model rather than enforcement, and the device should be assumed drivable
+  into anything its permissions and the user's own logged-in state allow —
+  including moving money — with no prompt appearing. The same edit strips detail
+  that made the page read as a recipe rather than a warning: the example request
+  frame, the per-method enumeration of what a LAN peer can reach, and the note
+  that the listening port is a fixed constant. The port number stays — it is what
+  the recommended mitigation (firewall it) refers to. Two smaller changes follow
+  from the same reasoning. The scope list no longer counts "an injection caused an
+  action the user did not ask for" as a vulnerability, because that is the
+  limitation §3 now describes rather than a promise the project can be held to;
+  and the reporting promises are now conditional ("where we can", "no timeframe is
+  promised"), so a small project is not bound to a reply it may not send. A line
+  at the top states the out-loud version: nothing in the file is a promise that
+  any particular action is prevented.
+- **`LICENSE` Part A gained a fourth condition, (d): shipping the software inside another product
+  now needs written authorisation.** Conditions (a)–(c) already stopped white-labelling, multi-tenant
+  SaaS and dropping the attribution, but nothing stopped someone taking the code and folding it into
+  a product they sell — which is the one path that makes the rest moot. (d) closes it, and is written
+  as narrowly as it can be: running it yourself, running it across your own organisation's devices,
+  forking it and distributing the source so others can build it, and charging to install, configure
+  or support it for a client who runs it themselves are all still permitted. The line drawn is
+  between a **service** and a **product** — doing work that uses the software is fine, shipping the
+  software as part of something else is not. The heading and the lead sentence were corrected from
+  "three conditions" to match. `README.md`, `DISCLAIMER.md` and `docs/acceptable-use.md` reference
+  Part A without counting the clauses, so no copy drifted — the enumerations they do carry are
+  illustrative, and only `LICENSE` itself states all four.
 - **Positioning corrected throughout the docs.** Both READMEs and `CLAUDE.md` described this as
   "the body side of a Physical Agent system" — i.e. an assistant that a brain drives. That
   contradicts the project's own first instruction, in `LocalPrompt.TEXT`: *"you are not a tablet's

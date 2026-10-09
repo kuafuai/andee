@@ -68,3 +68,5 @@ unsigned APK that will not install.
 - [ ] I have read [CONTRIBUTING.md](https://github.com/kuafuai/andee/blob/main/CONTRIBUTING.md)
       ([中文](https://github.com/kuafuai/andee/blob/main/CONTRIBUTING.zh-CN.md))
       and agree to the contribution licensing terms in [LICENSE](https://github.com/kuafuai/andee/blob/main/LICENSE) §A.2.
+- [ ] Every commit carries a `Signed-off-by:` line (`git commit -s`). CI checks this
+      ([why](https://github.com/kuafuai/andee/blob/main/CONTRIBUTING.md#sign-off-signed-off-by)).

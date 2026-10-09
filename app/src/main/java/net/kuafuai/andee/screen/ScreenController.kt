@@ -72,8 +72,12 @@ class ScreenController(
     // independent. Values outside 0-1000 are REJECTED, not clamped — a silent
     // clamp to the edge is a mis-tap the model can't even see happening.
 
-    private val screenW: Int get() = service.resources.displayMetrics.widthPixels
-    private val screenH: Int get() = service.resources.displayMetrics.heightPixels
+    // The whole display, not displayMetrics: heightPixels leaves out the
+    // navigation bar (2523 of 2560 on this tablet), while screenshots and
+    // injected gestures both live in the full display. Mapping 0-1000 against
+    // the short height put every coordinate tap ~1.4% too high.
+    private val screenW: Int get() = displaySize(service).x
+    private val screenH: Int get() = displaySize(service).y
 
     private fun Int.toPixel(max: Int): Int = this * max / NORM_MAX
 
@@ -86,7 +90,7 @@ class ScreenController(
         return v
     }
 
-    fun tapNorm(nx: Int, ny: Int): JSONObject {
+    fun tapNorm(nx: Int, ny: Int, beforePx: FloatArray? = null): JSONObject {
         requireNorm(nx, "x"); requireNorm(ny, "y")
         val w = screenW; val h = screenH
         val px = nx.toPixel(w); val py = ny.toPixel(h)
@@ -99,7 +103,7 @@ class ScreenController(
             GroundingLog.noteTapCoord(nx, ny, px, py, w, h, hold = false, refused = true, pkg = lastPkg())
         }
         GroundingLog.noteTapCoord(nx, ny, px, py, w, h, hold = false, refused = false, pkg = lastPkg())
-        return tap(px, py).put("norm", "$nx,$ny")
+        return tap(px, py, beforePx).put("norm", "$nx,$ny")
     }
 
     fun longPressNorm(nx: Int, ny: Int, durationMs: Long): JSONObject {
@@ -266,7 +270,177 @@ class ScreenController(
 
     fun tapAim(on: String?, x: Int?, y: Int?, cell: String?, part: String?): JSONObject {
         val a = resolveAim(on, x, y, cell, part)
-        return tapNorm(a.nx, a.ny).put("aimed_at", a.label)
+        val s = if (treeBlind()) snapToShape(a.nx, a.ny) else null
+        val nx = s?.nx ?: a.nx
+        val ny = s?.ny ?: a.ny
+        val r = tapNorm(nx, ny, s?.signature).put("aimed_at", a.label)
+        if (s?.moved == true) {
+            r.put("snapped_from", "${a.nx},${a.ny}")
+                .put("snapped_to", "$nx,$ny")
+                .put(
+                    "snap_note",
+                    "Your point was on blank background ${s.distPx} px from one small isolated " +
+                        "shape, so the device tapped that shape's centre instead. If that shape " +
+                        "was not your target, aim again further from it."
+                )
+        }
+        return r
+    }
+
+    private class Snap(val nx: Int, val ny: Int, val moved: Boolean, val distPx: Int, val signature: FloatArray?)
+
+    /** A tree of a handful of nodes says nothing about what is on screen — see [BLIND_TREE_NODES]. */
+    private fun treeBlind(): Boolean {
+        val root = runCatching { activeRoot() }.getOrNull() ?: return false
+        return try {
+            countNodes(root, BLIND_TREE_NODES + 1) <= BLIND_TREE_NODES
+        } finally {
+            root.recycle()
+        }
+    }
+
+    private fun countNodes(node: AccessibilityNodeInfo, cap: Int): Int {
+        var n = 1
+        for (i in 0 until node.childCount) {
+            if (n >= cap) break
+            val c = runCatching { childOf(node, i) }.getOrNull() ?: continue
+            try {
+                n += countNodes(c, cap - n)
+            } finally {
+                c.recycle()
+            }
+        }
+        return n
+    }
+
+    /**
+     * Pull a coordinate tap that landed on blank background onto the one small
+     * shape beside it.
+     *
+     * Measured on WeChat Moments with the tree withheld: the "··" button is
+     * ~70×44 px, and four aimed taps in a row missed it — the last one inside
+     * its column and 2 px above its top edge. Vision models read *which* thing
+     * well and *where exactly* poorly, and a miss by a few pixels onto blank
+     * space does nothing at all. So when the point is on uniform background and
+     * exactly one compact shape sits within [SNAP_RADIUS_DP], the device taps
+     * that shape's centre. Anything less clear-cut — the point is on content,
+     * nothing is near, two things are near, the near thing is large or runs out
+     * of the search patch — leaves the tap where it was aimed.
+     *
+     * Only for blind trees: with a real tree the brain has e-numbers and does
+     * not need this. The same frame doubles as the before-image for the pixel
+     * comparison in [tap], so snapping costs no extra capture there.
+     */
+    private fun snapToShape(nx: Int, ny: Int): Snap? {
+        val mask = ownArea()
+        val density = service.resources.displayMetrics.density
+        val radius = (SNAP_RADIUS_DP * density).toInt()
+        val minSide = (SNAP_MIN_DP * density).toInt().coerceAtLeast(4)
+        val maxSide = (SNAP_MAX_DP * density).toInt()
+        val half = radius + maxSide
+        return captureFrame { hw ->
+            val sig = signatureOf(hw, mask)
+            val w = hw.width; val h = hw.height
+            val tx = nx.toPixel(w); val ty = ny.toPixel(h)
+            val unmoved = Snap(nx, ny, false, 0, sig)
+            val x0 = (tx - half).coerceAtLeast(0)
+            val y0 = (ty - half).coerceAtLeast(0)
+            val x1 = (tx + half).coerceAtMost(w)
+            val y1 = (ty + half).coerceAtMost(h)
+            val pw = x1 - x0; val ph = y1 - y0
+            if (pw <= 0 || ph <= 0) return@captureFrame unmoved
+            val crop = Bitmap.createBitmap(hw, x0, y0, pw, ph)
+            val soft = if (crop.config == Bitmap.Config.HARDWARE) {
+                crop.copy(Bitmap.Config.ARGB_8888, false).also { crop.recycle() }
+            } else crop
+            val px = IntArray(pw * ph)
+            soft.getPixels(px, 0, pw, 0, 0, pw, ph)
+            soft.recycle()
+            val found = findSnapTarget(px, pw, ph, tx - x0, ty - y0, x0, y0, mask, radius, minSide, maxSide)
+                ?: return@captureFrame unmoved
+            val sx = ((found[0] + x0) * NORM_MAX + w / 2) / w
+            val sy = ((found[1] + y0) * NORM_MAX + h / 2) / h
+            Snap(sx.coerceIn(0, NORM_MAX), sy.coerceIn(0, NORM_MAX), true, found[2], sig)
+        }
+    }
+
+    /**
+     * Connected components of "not the background" in the patch, joined across
+     * gaps of up to one block so the two dots of a "··" count as one shape.
+     * Returns {centreX, centreY, distance} in patch pixels, or null.
+     */
+    private fun findSnapTarget(
+        px: IntArray, pw: Int, ph: Int, tx: Int, ty: Int, ox: Int, oy: Int,
+        mask: Rect?, radius: Int, minSide: Int, maxSide: Int,
+    ): IntArray? {
+        if (tx !in 0 until pw || ty !in 0 until ph) return null
+        if (mask != null && mask.contains(tx + ox, ty + oy)) return null
+        val bg = px[ty * pw + tx]
+        fun fg(c: Int): Boolean {
+            val d = maxOf(
+                kotlin.math.abs(Color.red(c) - Color.red(bg)),
+                kotlin.math.abs(Color.green(c) - Color.green(bg)),
+                kotlin.math.abs(Color.blue(c) - Color.blue(bg)),
+            )
+            return d >= SNAP_FG_DELTA
+        }
+        // Only the pixel itself: the miss this exists for was 2 px off the plate's edge.
+        if (fg(px[ty * pw + tx])) return null
+
+        val b = SNAP_BLOCK
+        val bw = (pw + b - 1) / b; val bh = (ph + b - 1) / b
+        val blockFg = BooleanArray(bw * bh)
+        val blockMasked = BooleanArray(bw * bh)
+        for (yy in 0 until ph) for (xx in 0 until pw) {
+            val bi = (yy / b) * bw + xx / b
+            if (mask != null && mask.contains(xx + ox, yy + oy)) blockMasked[bi] = true
+            else if (!blockFg[bi] && fg(px[yy * pw + xx])) blockFg[bi] = true
+        }
+
+        val label = IntArray(bw * bh) { -1 }
+        val queue = IntArray(bw * bh)
+        var near = 0
+        var pick: IntArray? = null
+        var comp = 0
+        for (start in 0 until bw * bh) {
+            if (!blockFg[start] || label[start] >= 0) continue
+            var head = 0; var tail = 0
+            queue[tail++] = start; label[start] = comp
+            var bx0 = Int.MAX_VALUE; var by0 = Int.MAX_VALUE; var bx1 = -1; var by1 = -1
+            var spoiled = false
+            while (head < tail) {
+                val i = queue[head++]
+                val cx = i % bw; val cy = i / bw
+                bx0 = minOf(bx0, cx); by0 = minOf(by0, cy); bx1 = maxOf(bx1, cx); by1 = maxOf(by1, cy)
+                if (cx == 0 || cy == 0 || cx == bw - 1 || cy == bh - 1) spoiled = true
+                for (dy in -SNAP_GAP_BLOCKS..SNAP_GAP_BLOCKS) for (dx in -SNAP_GAP_BLOCKS..SNAP_GAP_BLOCKS) {
+                    val nxb = cx + dx; val nyb = cy + dy
+                    if (nxb !in 0 until bw || nyb !in 0 until bh) continue
+                    val j = nyb * bw + nxb
+                    if (blockMasked[j]) spoiled = true
+                    if (blockFg[j] && label[j] < 0) { label[j] = comp; queue[tail++] = j }
+                }
+            }
+            // Pixel-exact bounds of the component, not block-rounded.
+            var l = Int.MAX_VALUE; var t = Int.MAX_VALUE; var r = -1; var btm = -1
+            for (yy in by0 * b until minOf((by1 + 1) * b, ph)) for (xx in bx0 * b until minOf((bx1 + 1) * b, pw)) {
+                if (label[(yy / b) * bw + xx / b] == comp && fg(px[yy * pw + xx])) {
+                    if (xx < l) l = xx; if (xx > r) r = xx
+                    if (yy < t) t = yy; if (yy > btm) btm = yy
+                }
+            }
+            comp++
+            if (r < 0) continue
+            val dx = maxOf(l - tx, 0, tx - r); val dy = maxOf(t - ty, 0, ty - btm)
+            val dist = kotlin.math.sqrt((dx * dx + dy * dy).toDouble()).toInt()
+            if (dist > radius) continue
+            near++
+            if (near > 1) return null
+            val sw = r - l + 1; val sh = btm - t + 1
+            pick = if (spoiled || sw < minSide || sh < minSide || sw > maxSide || sh > maxSide) null
+            else intArrayOf((l + r) / 2, (t + btm) / 2, dist)
+        }
+        return if (near == 1) pick else null
     }
 
     fun longPressAim(
@@ -670,7 +844,7 @@ class ScreenController(
         return null
     }
 
-    fun tap(x: Int, y: Int): JSONObject {
+    fun tap(x: Int, y: Int, snapFrame: FloatArray? = null): JSONObject {
         val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
         // 150ms, not the classic 100ms: WeChat's Moments like/comment buttons
         // (and other touch-filtering surfaces) ignore injections shorter than
@@ -682,7 +856,7 @@ class ScreenController(
         // a long-press.
         val stroke = GestureDescription.StrokeDescription(path, 0L, 150L)
         val before = screenFingerprint()
-        val beforePx = if (before.optBoolean("blind")) pixelSignature() else null
+        val beforePx = if (before.optBoolean("blind")) snapFrame ?: pixelSignature() else null
         val result = runGesture(GestureDescription.Builder().addStroke(stroke).build(), 2000L)
         marker?.mark(x, y, net.kuafuai.andee.ui.TapMarkerUi.Kind.TAP)
         result.put("x", x).put("y", y)
@@ -772,7 +946,11 @@ class ScreenController(
      */
     private fun pixelSignature(): FloatArray? {
         val mask = ownArea()
-        return captureFrame { hw ->
+        return captureFrame { hw -> signatureOf(hw, mask) }
+    }
+
+    private fun signatureOf(hw: Bitmap, mask: Rect?): FloatArray {
+        return run {
             val sw = PX_COLS * PX_SAMPLE
             val sh = PX_ROWS * PX_SAMPLE
             val scaled = Bitmap.createScaledBitmap(hw, sw, sh, true)
@@ -2732,6 +2910,12 @@ class ScreenController(
     }
 
     companion object {
+        /** Full display size in the current rotation, system bars included — the space gestures and screenshots use. */
+        fun displaySize(ctx: android.content.Context): android.graphics.Point {
+            val b = ctx.getSystemService(android.view.WindowManager::class.java).maximumWindowMetrics.bounds
+            return android.graphics.Point(b.width(), b.height())
+        }
+
         /**
          * ADBKeyboard 的广播接口。action 是裸字符串,没有包名前缀 ——
          * 加了前缀就匹配不上它注册的 filter,广播静默消失。
@@ -2797,6 +2981,17 @@ class ScreenController(
         private const val PX_MIN_CELLS = 2
         private const val STATUS_BAR_FRACTION = 0.035f
         private const val CAPTURE_GAP_MS = 350L
+
+        /** See [snapToShape]. ~50 px on this tablet; a miss further than that was not a near miss. */
+        private const val SNAP_RADIUS_DP = 24
+        private const val SNAP_MIN_DP = 2
+        /** Bigger than an icon is content, not a button the tap narrowly missed. */
+        private const val SNAP_MAX_DP = 56
+        /** Max per-channel difference from the background; WeChat's f7 button plate on ff is 8. */
+        private const val SNAP_FG_DELTA = 6
+        private const val SNAP_BLOCK = 4
+        /** Blocks of gap bridged, so the two dots of "··" are one shape. */
+        private const val SNAP_GAP_BLOCKS = 2
 
         /** See [awaitHelper]. Measured: the helper binds in about a second. */
         private const val HELPER_WAIT_MS = 3_000L
