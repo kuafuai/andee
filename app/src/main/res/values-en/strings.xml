@@ -174,6 +174,9 @@
     <string name="scenes_chip">Scene · %1$s</string>
     <string name="scenes_entered_row">(Entered scene: %1$s)</string>
     <string name="scenes_exited_row">(Left scene: %1$s)</string>
+    <string name="scenes_presets_title">Ready-made scenes</string>
+    <string name="scenes_presets_note">Nothing is saved until you tap Adopt. After that it is yours like any other scene: change it or delete it whenever you like.</string>
+    <string name="scenes_preset_adopt">Adopt</string>
     <string name="tree_helper_enabled_row">(This app was hiding its screen; turned on the system\'s accessibility enhance service so it shows it again)</string>
     <string name="settings_scenes_browse">Manage scenes</string>
 

@@ -1156,7 +1156,7 @@ class CommandDispatcher(
 
             "scene.enter" -> {
                 val s = sceneParam(params, method)
-                VoiceConfig.setActiveScene(appContext, s.name)
+                VoiceConfig.setActiveScene(appContext, s.name, byBrain = true)
                 Notebook.markSceneUsed(appContext, s.name)
                 JSONObject().put("active", s.name).put("title", s.title)
                     .put("note", "The scene's instructions apply from your next reply.")
@@ -1164,14 +1164,14 @@ class CommandDispatcher(
 
             "scene.exit" -> {
                 val was = VoiceConfig.activeScene(appContext)
-                VoiceConfig.setActiveScene(appContext, null)
+                VoiceConfig.setActiveScene(appContext, null, byBrain = true)
                 JSONObject().put("left", was ?: JSONObject.NULL).put("active", JSONObject.NULL)
             }
 
             "scene.delete" -> {
                 val s = sceneParam(params, method)
                 if (VoiceConfig.activeScene(appContext) == s.name) {
-                    VoiceConfig.setActiveScene(appContext, null)
+                    VoiceConfig.setActiveScene(appContext, null, byBrain = true)
                 }
                 Notebook.deleteScene(appContext, s.name)
                 JSONObject().put("deleted", s.name)

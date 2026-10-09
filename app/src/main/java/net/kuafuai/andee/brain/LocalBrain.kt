@@ -413,6 +413,19 @@ class LocalBrain(
     }
 
     /**
+     * Tell the brain a scene it was in has ended — a turn, not a [note], so it
+     * can act on the news (a closing report, a promise to keep) instead of
+     * holding it until the user next speaks.
+     *
+     * [wake] without a key check would turn "the user tapped ✕ on the chip"
+     * into a spoken backend error, so this refuses quietly where [notified] does.
+     */
+    fun sceneEnded(text: String) {
+        if (cfg.apiKey.isEmpty()) return
+        wake(text)
+    }
+
+    /**
      * The user hit ■. Must not block — it is called from the main thread.
      *
      * Bumping [generation] is what actually stops the loop; [LlmClient.cancel]
