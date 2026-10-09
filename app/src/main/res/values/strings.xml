@@ -51,8 +51,8 @@
     <string name="settings_brain_codeflying">CodeFlying</string>
     <string name="settings_show_hub">显示云端选项</string>
     <string name="settings_show_hub_note">把「云端」加到后端选项里，用来连你自己搭的 Hub。</string>
-    <string name="settings_brain_codeflying_note">由您在 CodeFlying.net 平台托管的后端服务提供支持：默认提供模型和语音服务，并支持独立数据库能力实现数据持久化（增删改查等业务逻辑），以及海量第三方 API 集成——AI 图片/视频/音乐生成，地理位置、天气、PDF 转换、搜索、新闻、股票等等。\n\n注意：使用 CodeFlying 的后端服务可能会产生费用。</string>
-    <string name="settings_brain_codeflying_unconfigured">这台 Andee 没有配置 CodeFlying。到电脑上访问 CodeFlying.net，用它一键生成带有您专属后端的 Andee 安装包并替换当前应用，就能用上默认模型、语音、持久化数据库和海量第三方 API（AI 图片/视频/音乐生成、天气、位置、PDF、搜索、新闻、股票等等）。\n\n注意：使用 CodeFlying 的后端服务可能会产生费用。</string>
+    <string name="settings_brain_codeflying_note">由您在 CodeFlying.net 平台托管的后端服务提供支持：默认提供模型和语音服务，并集成海量第三方 API——AI 图片/视频/音乐生成，地理位置、天气、PDF 转换、搜索、新闻、股票等等。所有第三方 API 由 CodeFlying 统一封装并计费，免去您自己逐一申请密钥和维护账单的麻烦。\n\n注意：使用 CodeFlying 的后端服务可能会产生费用。</string>
+    <string name="settings_brain_codeflying_unconfigured">这台 Andee 没有配置 CodeFlying。到电脑上访问 CodeFlying.net，用它一键生成带有您专属后端的 Andee 安装包并替换当前应用，就能用上默认模型、语音以及海量第三方 API（AI 图片/视频/音乐生成、天气、位置、PDF、搜索、新闻、股票等等）。所有第三方 API 由 CodeFlying 统一封装并计费，免去您自己逐一申请密钥和维护账单的麻烦。\n\n注意：使用 CodeFlying 的后端服务可能会产生费用。</string>
     <string name="settings_hub_url">Hub 地址</string>
     <!-- The hub URL box is empty on a fresh install — the hint is what the
          user sees in that empty box, so it is the pitch, not the format. -->
@@ -95,6 +95,8 @@
     <string name="settings_voice_tts_sample_rate">合成采样率</string>
     <string name="settings_section_diagnostics">诊断</string>
     <string name="settings_section_advanced">高级</string>
+    <string name="settings_max_steps">单次任务最多步数</string>
+    <string name="settings_max_steps_note">每轮任务里 AI 最多能调用多少次工具。超过就停下并给个结束语，防止死循环烧 token。默认 25，一般的任务十几步就够了。</string>
     <string name="settings_advanced_note">显示云端选项、打字、诊断和恢复出厂设置。日常用不到，都藏在这里。</string>
     <string name="settings_grounding">接地采集</string>
     <string name="settings_grounding_note">把坐标点击和截图记到 files/grounding 供离线分析 —— 它会拍下你当时在做的事。改完要重开无障碍服务才生效。</string>
@@ -241,13 +243,13 @@
     <string name="dev_perm_say_notification">会打开通知使用权设置,找到这个应用打开开关。</string>
     <string name="history_empty">还没有对话</string>
     <string name="history_role_you">你 · %1$s</string>
-    <string name="history_role_assistant">助手 · %1$s</string>
+    <string name="history_role_assistant">Andee · %1$s</string>
     <string name="history_role_error">出错 · %1$s</string>
     <string name="history_role_page_open">界面 · %1$s · 点击重新打开</string>
     <string name="history_role_page_cleared">界面 · %1$s · 已清理</string>
     <string name="html_default_title">AI 界面</string>
     <string name="textpage_role_you">你</string>
-    <string name="textpage_role_assistant">助手</string>
+    <string name="textpage_role_assistant">Andee</string>
     <string name="textpage_role_error">出错</string>
     <string name="textpage_role_page">界面</string>
     <string name="card_ack">知道了</string>

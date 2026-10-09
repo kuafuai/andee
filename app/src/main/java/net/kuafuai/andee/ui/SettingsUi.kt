@@ -364,6 +364,7 @@ class SettingsUi(
         notebookSection(form)
         notifySection(form)
         vaultSection(form)
+        maxStepsSection(form)
 
         advancedSection(form)
 
@@ -372,6 +373,27 @@ class SettingsUi(
 
         card.addView(footerBar(), matchWrap())
         return card
+    }
+
+    /**
+     * 单次任务最多步数: the per-task runaway guard. In 常用 rather than 高级
+     * because it is a knob a user might actually turn — "the AI gave up
+     * halfway" has one cause and one fix, and burying it behind a disclosure
+     * means the user cannot find the fix on their own.
+     */
+    private fun maxStepsSection(form: LinearLayout) {
+        val panel = group(
+            form,
+            lctx.getString(R.string.settings_max_steps),
+            lctx.getString(R.string.settings_max_steps_note),
+        )
+        field(
+            panel,
+            "max_steps",
+            lctx.getString(R.string.settings_max_steps),
+            hint = VoiceConfig.DEFAULT_MAX_STEPS.toString(),
+            numeric = true,
+        )
     }
 
     /**
@@ -857,7 +879,10 @@ class SettingsUi(
     private fun confirmBody(text: String): TextView = TextView(context).apply {
         this.text = text
         textSize = Glass.Type.CAPTION
-        setTextColor(Color.parseColor(Glass.MUTED))
+        // SECONDARY, same reason as [noteView]: this is the warning body on a
+        // factory-reset / clear-chat confirm — the one thing the user must
+        // actually read before tapping the red button.
+        setTextColor(Color.parseColor(Glass.SECONDARY))
         setLineSpacing(dp(4).toFloat(), 1f)
         setPadding(0, dp(8), 0, 0)
     }
@@ -1140,8 +1165,12 @@ class SettingsUi(
         // least of all — but at 11sp on a 690dp-wide card they end up as one
         // line each, which is both harder to read and denser-looking than the
         // rows they sit between.
+        //
+        // SECONDARY, not MUTED: these are explanations the user is meant to
+        // read, so one step brighter against the card fill — MUTED is the
+        // right shade for a timestamp or an inactive icon, not a paragraph.
         textSize = Glass.Type.CAPTION
-        setTextColor(Color.parseColor(Glass.MUTED))
+        setTextColor(Color.parseColor(Glass.SECONDARY))
         setLineSpacing(dp(4).toFloat(), 1f)
     }
 

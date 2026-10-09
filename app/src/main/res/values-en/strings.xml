@@ -74,8 +74,8 @@
     <string name="settings_brain_codeflying">CodeFlying</string>
     <string name="settings_show_hub">Show cloud option</string>
     <string name="settings_show_hub_note">Adds a Cloud backend tab for connecting to a hub you host yourself.</string>
-    <string name="settings_brain_codeflying_note">Powered by your backend hosted on CodeFlying.app: ships models and voice services by default, plus a per-device database for CRUD-style business logic, and a long tail of third-party API integrations — AI image / video / music generation, geolocation, weather, PDF conversion, search, news, stocks, and more.\n\nNote: using CodeFlying backend services may incur charges.</string>
-    <string name="settings_brain_codeflying_unconfigured">CodeFlying is not configured on this Andee. From a computer, visit CodeFlying.app and have it build an Andee install package wired to your own backend — install it over this app and you get the default models, voice services, a per-device database and a long list of third-party API integrations (AI image / video / music generation, weather, location, PDF, search, news, stocks, and more).\n\nNote: using CodeFlying backend services may incur charges.</string>
+    <string name="settings_brain_codeflying_note">Powered by your backend hosted on CodeFlying.app: ships models and voice services by default, with a long tail of third-party API integrations — AI image / video / music generation, geolocation, weather, PDF conversion, search, news, stocks, and more. CodeFlying wraps and bills every third-party API in one place, so you don\'t have to sign up for each provider and juggle their keys and invoices yourself.\n\nNote: using CodeFlying backend services may incur charges.</string>
+    <string name="settings_brain_codeflying_unconfigured">CodeFlying is not configured on this Andee. From a computer, visit CodeFlying.app and have it build an Andee install package wired to your own backend — install it over this app and you get the default models, voice services, and a long list of third-party API integrations (AI image / video / music generation, weather, location, PDF, search, news, stocks, and more). CodeFlying wraps and bills every third-party API in one place, so you don\'t have to sign up for each provider and juggle their keys and invoices yourself.\n\nNote: using CodeFlying backend services may incur charges.</string>
     <string name="settings_hub_url">Hub URL</string>
     <!-- The hub URL box is empty on a fresh install — the hint is what the
          user sees in that empty box, so it is the pitch, not the format. -->
@@ -118,6 +118,8 @@
     <string name="settings_voice_tts_sample_rate">TTS sample rate</string>
     <string name="settings_section_diagnostics">Diagnostics</string>
     <string name="settings_section_advanced">Advanced</string>
+    <string name="settings_max_steps">Max steps per task</string>
+    <string name="settings_max_steps_note">The most tool calls the AI may make in a single task before stopping with a final answer. Guards against runaway loops and bills. Default 25 — a dozen steps is enough for most tasks.</string>
     <string name="settings_advanced_note">Show the cloud option, typing, diagnostics and factory reset. Nothing here for day-to-day use.</string>
     <string name="settings_grounding">Grounding capture</string>
     <string name="settings_grounding_note">Records coordinate taps and screenshots to files/grounding for offline analysis — it photographs whatever you are doing. Needs the accessibility service restarted to take effect.</string>
@@ -260,13 +262,13 @@
     <string name="dev_perm_say_notification">I\'ll open Notification access settings — find this app and turn it on.</string>
     <string name="history_empty">No conversation yet</string>
     <string name="history_role_you">You · %1$s</string>
-    <string name="history_role_assistant">Assistant · %1$s</string>
+    <string name="history_role_assistant">Andee · %1$s</string>
     <string name="history_role_error">Error · %1$s</string>
     <string name="history_role_page_open">Page · %1$s · Tap to reopen</string>
     <string name="history_role_page_cleared">Page · %1$s · Cleared</string>
     <string name="html_default_title">AI page</string>
     <string name="textpage_role_you">You</string>
-    <string name="textpage_role_assistant">Assistant</string>
+    <string name="textpage_role_assistant">Andee</string>
     <string name="textpage_role_error">Error</string>
     <string name="textpage_role_page">Page</string>
     <string name="card_ack">Got it</string>

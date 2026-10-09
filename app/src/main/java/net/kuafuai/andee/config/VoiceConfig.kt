@@ -406,6 +406,7 @@ data class VoiceConfig(
                 "sweep_daily_cap" to p.getString(
                     "sweep_daily_cap", DEFAULT_SWEEP_DAILY_CAP.toString(),
                 )!!,
+                "max_steps" to maxSteps(context).toString(),
             )
         }
 
@@ -432,6 +433,21 @@ data class VoiceConfig(
          */
         private fun defaultThinking(): String =
             if (BuildConfig.DEFAULT_THINKING.trim().lowercase() == "off") "disabled" else "enabled"
+
+        /**
+         * Hard cap on tool-call steps per task. A real task is a dozen steps;
+         * this is the runaway guard, and hitting it produces a final answer
+         * rather than silence. Editable from the settings card so a user who
+         * routinely runs longer tasks can raise it; coerced to a sane range
+         * (1..200) so a stray zero doesn't make the brain refuse everything
+         * and a stray thousand doesn't burn an unbounded bill.
+         */
+        const val DEFAULT_MAX_STEPS = 25
+
+        fun maxSteps(context: Context): Int =
+            (context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("max_steps", "")?.trim()?.toIntOrNull()
+                ?: DEFAULT_MAX_STEPS).coerceIn(1, 200)
 
         const val LANG_ZH = "zh"
         const val LANG_EN = "en"
@@ -558,6 +574,7 @@ data class VoiceConfig(
             "lang",
             "ball",
             "sweep", "sweep_quiet_minutes", "sweep_daily_cap",
+            "max_steps",
         )
     }
 }
