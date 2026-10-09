@@ -54,8 +54,39 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    // One APK per ABI instead of one fat APK carrying all four. ML Kit's
+    // barhopper .so alone is ~4 MB per ABI, so the fat APK paid that four
+    // times over. x86 (32-bit) is deliberately dropped: no emulator has needed
+    // it for years. x86_64 stays so an emulator still installs something.
+    //
+    // `universalApk false` on purpose: a fat APK sitting next to the split ones
+    // is a trap — it is the file someone grabs when they are in a hurry, and it
+    // is four times the size. Anything the splits do not cover is a device this
+    // app cannot be provisioned on anyway.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+            universalApk false
+        }
+    }
+    // Native libs ship deflated rather than page-aligned-and-stored. AGP 8
+    // defaults to stored (`extractNativeLibs="false"`), which is the better
+    // trade for a store install — the libs are mapped straight out of the APK
+    // with no second copy on disk. This app is side-loaded instead, where the
+    // size of the file being handed over is the thing that matters, and
+    // barhopper deflates 4.2 MB → 1.8 MB. The cost is ~4 MB of extra on-device
+    // storage per install and a slightly slower install. Flip to false if that
+    // trade ever stops being the right one.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
     compileOptions {

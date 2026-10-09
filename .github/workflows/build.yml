@@ -38,5 +38,29 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          # One APK per ABI, so the glob replaces what used to be a single
+          # `app-debug.apk`: ML Kit's barhopper .so is ~4 MB and the fat APK
+          # carried four copies of it. See the `splits` block in app/build.gradle.
+          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+  # assembleRelease is its own job rather than a step above, because it is a
+  # *gate* and not a deliverable: the APK has no signingConfig and cannot be
+  # installed. What it catches is what went unnoticed until now — R8 and
+  # `lintVitalRelease` only run on release, so a missing keep rule, or a
+  # resource the lint check cannot parse, is invisible until someone tries to
+  # ship. That is exactly how a failing `assembleRelease` sat in this repo.
+  # Runs in parallel, so it costs a PR no wall-clock time.
+  release-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      - run: ./gradlew --no-daemon :app:assembleRelease
