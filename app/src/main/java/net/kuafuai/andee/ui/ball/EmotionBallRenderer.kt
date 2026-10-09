@@ -322,6 +322,9 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
     /** Scratch for [drawBody]'s mood tint — per-frame, so never allocated. */
     private val bodyColor = FloatArray(3)
 
+    /** Scratch for the `^ ^` eye colour while it fades to [BallLook.sleepEyeColor]. */
+    private val arcColor = FloatArray(3)
+
     /** Scratch for the pupil colour, which is a dark relative of the mood. */
     private val pupilColor = FloatArray(3)
 
@@ -947,7 +950,20 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
             // while the lab showed dark ones, because the lab sets this colour
             // per element. A uniform with no attribute is shared state; the
             // only safe rule in this pass is that every draw sets its own.
-            GLES20.glUniform3fv(solidShader.uniform("uColor"), 1, LOOK.eyeColor, 0)
+            val sleepEye = LOOK.sleepEyeColor
+            if (sleepEye != null) {
+                // `bubble` is the one smoothed value that only SLEEPING drives, so
+                // it doubles as "how asleep is it" — and being smoothed, the line
+                // fades from the awake colour to the dark one as the ball nods off
+                // instead of snapping. HAPPY and SUCCESS draw the same `^ ^` and
+                // must keep the look's own colour, which is why this is not keyed
+                // on the arc.
+                val k = state.bubble.coerceIn(0f, 1f)
+                for (i in 0..2) arcColor[i] = LOOK.eyeColor[i] + (sleepEye[i] - LOOK.eyeColor[i]) * k
+                GLES20.glUniform3fv(solidShader.uniform("uColor"), 1, arcColor, 0)
+            } else {
+                GLES20.glUniform3fv(solidShader.uniform("uColor"), 1, LOOK.eyeColor, 0)
+            }
             val h = arc * state.lid
             setLocalFromFace(
                 state.eyeLX, state.eyeLY - EYE_ARC_DROP,
@@ -1458,12 +1474,29 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
      * and slightly to its left, so that is the side it lands on. Getting this
      * wrong is not subtle — a glint on the wrong side reads as the ball having
      * looked away.
+     *
+     * **Where the contents sit has to follow the eye when it squints.** The eye
+     * squashes about its lower edge ([EYE_LID_PIVOT]): its centre sinks by
+     * `PIVOT·(1 − s)` and its height becomes `s` of normal. The dots keep
+     * `pivotY = 0` (see [drawDot]) and used to be placed from the *unsquashed*
+     * centre, so on a squinted eye — THINKING is 0.4 — they were left behind,
+     * above the sliver they belong to. Measured in the lab: on `cream` the
+     * catchlight floated over the slit as a loose white dash, and on `imp` the
+     * pupil sat on the top edge of the white with the white showing underneath,
+     * which is exactly an eye rolled up. Blinks did the same thing for a few
+     * frames.
+     *
+     * Only for `lidScale < 1`. A widened eye (LISTENING 1.6) also grows from the
+     * hinge and its contents are also off-centre, but those faces were tuned
+     * with the dots where they are and nobody has asked for them to move.
      */
     private fun drawEyeContents(cx: Float, cy: Float, rotZ: Float, lidScale: Float) {
+        val follow = min(lidScale, 1f)
+        val sink = EYE_LID_PIVOT * (1f - follow)
         val pr = LOOK.pupilR
         if (pr > 0f) {
             drawDot(
-                cx - pr * 0.12f, cy - pr * 0.20f, rotZ, lidScale,
+                cx - pr * 0.12f, cy + sink - pr * 0.20f * follow, rotZ, lidScale,
                 pr, eyeFrontZ, pupilColor, LOOK.pupilAspect,
             )
         }
@@ -1476,12 +1509,13 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
         // pupil barely moves off the centre of a bare eye.
         if (pr > 0f) {
             drawDot(
-                cx - pr * 0.34f, cy + pr * 0.26f, rotZ, lidScale,
+                cx - pr * 0.34f, cy + sink + pr * 0.26f * follow, rotZ, lidScale,
                 gr, eyeFrontZ + GLINT_Z_STEP, WHITE,
             )
         } else {
             drawDot(
-                cx - LOOK.eyeRadius * 0.36f, cy + LOOK.eyeRadius * 0.40f, rotZ, lidScale,
+                cx - LOOK.eyeRadius * 0.36f, cy + sink + LOOK.eyeRadius * 0.40f * follow,
+                rotZ, lidScale,
                 gr, eyeFrontZ + GLINT_Z_STEP, WHITE,
             )
         }
@@ -1631,6 +1665,21 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
         }
         rimSphere.bind(rimShader.attrib("aPos"), rimShader.attrib("aNormal"))
         rimSphere.draw()
+        // A dark-outline look has no glow of its own, so thinking used to be
+        // invisible on it once the face stopped changing. Lay one on top, after
+        // the contour so the contour is not tinted, and only while thinking.
+        // Additive: faint over a white app, which is the cost of choosing a glow
+        // over a pulsing outline — the outline's own alpha is capped, see
+        // [RIM_DARK_CAP].
+        if (LOOK.rimDark && state.thinkGlow > 0.01f) {
+            GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE)
+            GLES20.glUniform3fv(rimShader.uniform("uColor"), 1, state.nowColor, 0)
+            GLES20.glUniform1f(rimShader.uniform("uIntensity"), state.thinkGlow * LOOK.rimGain)
+            GLES20.glUniform1f(rimShader.uniform("uCap"), 1f)
+            GLES20.glUniform1f(rimShader.uniform("uPow"), THINK_GLOW_POW)
+            GLES20.glUniform1f(rimShader.uniform("uScan"), state.think * THINK_GLOW_SCAN)
+            rimSphere.draw()
+        }
     }
 
     private fun drawCore() {
@@ -1733,6 +1782,12 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
          * band reads as a stroke drawn round the ball rather than as its edge.
          */
         private const val RIM_DARK_CAP = 0.82f
+
+        /** Falloff of the thinking glow on a dark-outline look; the glow looks use 3.6–5.0. */
+        private const val THINK_GLOW_POW = 4.0f
+
+        /** Scan-band strength at full think, matching `scan = … + th * 0.5` for the glow looks. */
+        private const val THINK_GLOW_SCAN = 0.5f
 
         // ---- Pupils ----
         //
