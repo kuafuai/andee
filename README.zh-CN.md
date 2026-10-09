@@ -4,6 +4,7 @@
 
 <p align="center">
   <a href="https://www.codeflying.net">在线构建</a> ·
+  <a href="https://www.codeflying.net/andee">立即体验</a> ·
   <a href="#核心能力">核心能力</a> ·
   <a href="#快速开始">快速开始</a> ·
   <a href="#权限每一项为什么以及你拒绝了会怎样">权限</a> ·
@@ -66,7 +67,7 @@ https://github.com/user-attachments/assets/866e8333-e97b-4bf5-9525-540f9fdb01cd
 
 ### 它和别的助手 App 不一样在哪
 
-- **任何 App 都能用，而不是一张"已接入应用"清单。** 它读无障碍树和截图，在一张带标号的网格上
+- **任何 App 都能用，而不是「只支持某几个 App」的接入清单。** 它读无障碍树和截图，在一张带标号的网格上
   瞄准，而不是自己算坐标 —— 那恰恰是通用大模型最不擅长的事。
 - **住在手机上。** 大脑就跑在设备本机，接任意 OpenAI 兼容模型（默认 DeepSeek）。没有厂商后端、
   不用注册账号。它唯一会发给我们的东西是版本号和机型 —— 只在你查更新的时候发，字段清单见
@@ -220,7 +221,9 @@ agent loop **就是** `LocalBrain`。它让系统提示词保持不变，把会�
 
 **[codeflying.app](https://www.codeflying.app)**（English）· **[codeflying.net](https://www.codeflying.net)**
 （中文）就是一个干这件事的通用平台 —— **你用一句话描述想要的应用，它帮你开发并发布。** 不需要先懂
-Android。跟它要一个 Andee，它会交给你一个**已经配好令牌**的安装包。
+Android。跟它要一个 Andee，它会交给你一个**已经配好令牌**的安装包。也可以直接打开
+**[一键体验页](https://www.codeflying.net/andee)**，点「立即打包」即可复制母应用、生成一个已配好令牌的
+安装包二维码，扫码下载。
 
 **它是一个独立的服务，和本项目没有直接关系** —— 不是 Andee 的构建通道，本项目里的东西也管不到它。
 它自己的条款、定价和数据处理方式，都是它自己的。
