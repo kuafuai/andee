@@ -17,21 +17,16 @@ data class VoiceConfig(
 ) {
     companion object {
         /**
-         * The 火山 (Volcengine Speech) account the voice pipeline runs on.
+         * The 火山 (Volcengine Speech) account the voice pipeline runs on when
+         * the user is on the **本机** backend. On [BRAIN_CODEFLYING], the key
+         * is derived from [BuildConfig.CODEFLYING_KEY] and this field is not
+         * read.
          *
-         * **Empty on purpose, and it must stay empty in the repository.** This
-         * used to hold a real key so that a fresh install could hear and speak
-         * without setup. That trade is only available to a build nobody else
-         * reads: a key in public source is a key in a search index, and a bare
-         * UUID is not a shape GitHub's secret scanning recognises, so nothing
-         * would warn anyone it had leaked. Whoever ships a private build can
-         * put their own key back here; in this tree it is the user's to supply.
-         *
-         * The user supplies it in ⚙ (`api_key`). Blank in prefs falls back to
-         * this constant — see [load] — so with both empty the voice pipeline
-         * has no credential and ASR/TTS fail at connect time. That is reported
-         * *before* it happens by [net.kuafuai.andee.device.SelfCheck]'s
-         * `voice_key` row rather than being left to look like a network fault.
+         * **Empty on purpose, and it must stay empty in the repository.** A key
+         * in public source is a key in a search index, and a bare UUID is not a
+         * shape GitHub's secret scanning recognises. Whoever ships a private
+         * build either puts the key behind CodeFlying or asks the user to type
+         * it in ⚙ (`api_key`).
          *
          * On storage: the key lands in `voice_prefs.xml` in plaintext, like
          * `llm_api_key`. Neither leaves the device: `allowBackup` is off and
@@ -68,13 +63,53 @@ data class VoiceConfig(
          * than "hub_url is blank ⇒ go local": [save] drops blank values, so a
          * URL that has ever been saved cannot be cleared from the UI, and
          * inferring the mode from it would leave the user with no way back.
+         *
+         * [BRAIN_CODEFLYING] is a hosted backend that proxies the LLM, ASR
+         * and TTS from one domain. In this mode every endpoint and credential
+         * is derived from `BuildConfig.CODEFLYING_*` and the user does not
+         * fill in any voice / LLM fields.
          */
         const val BRAIN_HUB = "hub"
         const val BRAIN_LOCAL = "local"
+        const val BRAIN_CODEFLYING = "codeflying"
 
         const val DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
         const val DEFAULT_LLM_MODEL = "deepseek-flash"
         const val DEFAULT_REASONING_EFFORT = "high"
+
+        /**
+         * CodeFlying is available iff the build was configured with ENABLED and
+         * a non-empty DOMAIN. ENABLED alone with no DOMAIN silently falls back
+         * to [BRAIN_LOCAL] — the picker hides the CodeFlying tab and the
+         * default brain reads as local.
+         */
+        fun isCodeFlyingAvailable(): Boolean =
+            BuildConfig.CODEFLYING_ENABLED && BuildConfig.CODEFLYING_DOMAIN.isNotBlank()
+
+        /** `wss` / `ws` for WebSocket URLs, chosen by `CODEFLYING_SSL_ENABLED`. */
+        private fun codeFlyingWsScheme(): String =
+            if (BuildConfig.CODEFLYING_SSL_ENABLED) "wss" else "ws"
+
+        /** `https` / `http` for the LLM REST base URL. */
+        private fun codeFlyingHttpScheme(): String =
+            if (BuildConfig.CODEFLYING_SSL_ENABLED) "https" else "http"
+
+        /** Full LLM REST base URL for CodeFlying, e.g. `https://foo.net/voice/llm`. */
+        fun codeFlyingLlmBaseUrl(): String =
+            "${codeFlyingHttpScheme()}://${BuildConfig.CODEFLYING_DOMAIN.trim().trimEnd('/')}/voice/llm"
+
+        /** Full ASR WebSocket URL for CodeFlying. */
+        fun codeFlyingAsrEndpoint(): String =
+            "${codeFlyingWsScheme()}://${BuildConfig.CODEFLYING_DOMAIN.trim().trimEnd('/')}/voice/asr/bigmodel_async"
+
+        /** Full TTS WebSocket URL for CodeFlying. */
+        fun codeFlyingTtsEndpoint(): String =
+            "${codeFlyingWsScheme()}://${BuildConfig.CODEFLYING_DOMAIN.trim().trimEnd('/')}/voice/tts/bidirection"
+
+        /** Whether to show the 云端 (hub) tab in the backend picker. Default off. */
+        fun showHub(context: Context): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("show_hub", "")?.trim()?.lowercase() == "on"
 
         /**
          * Hub connection settings. Not part of the voice pipeline but stored
@@ -109,37 +144,67 @@ data class VoiceConfig(
          * device reads as [BRAIN_LOCAL], which is the out-of-box default.
          */
         data class BrainConfig(
-            /** [BRAIN_HUB] or [BRAIN_LOCAL]. */
+            /** [BRAIN_HUB], [BRAIN_LOCAL] or [BRAIN_CODEFLYING]. */
             val mode: String,
-            val apiKey: String,        // empty = local brain cannot run
+            val apiKey: String,        // empty = on-device brain cannot run
             val baseUrl: String,
             val model: String,
             val thinking: Boolean,
             val reasoningEffort: String,
         ) {
-            val isLocal: Boolean get() = mode == BRAIN_LOCAL
+            /**
+             * The agent loop runs on this device (local DeepSeek or CodeFlying
+             * — both are "the brain is here", only the backend differs). Only
+             * [BRAIN_HUB] is "run elsewhere, listen on a socket".
+             */
+            val isLocal: Boolean get() = mode == BRAIN_LOCAL || mode == BRAIN_CODEFLYING
+        }
+
+        /**
+         * The brain mode in effect, with CodeFlying availability already
+         * reconciled. Reads the saved `brain` pref; falls back to CodeFlying
+         * if the build enables it and otherwise to local. Unknown saved values
+         * fail closed to local — same rule as [groundingEnabled].
+         */
+        fun brainMode(context: Context): String {
+            val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val saved = p.getString("brain", "")?.trim()?.lowercase().orEmpty()
+            return when (saved) {
+                BRAIN_HUB -> BRAIN_HUB
+                BRAIN_LOCAL -> BRAIN_LOCAL
+                BRAIN_CODEFLYING -> if (isCodeFlyingAvailable()) BRAIN_CODEFLYING else BRAIN_LOCAL
+                "" -> if (isCodeFlyingAvailable()) BRAIN_CODEFLYING else BRAIN_LOCAL
+                else -> BRAIN_LOCAL
+            }
         }
 
         fun brainConfig(context: Context): BrainConfig {
             val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            // Anything other than the exact string "hub" is the local brain,
-            // so a typo fails closed onto the out-of-box default — same rule
-            // as [groundingEnabled]. It used to fail onto the hub, back when
-            // the hub was the default; the default moved, so the direction
-            // moved with it, and the picker's leftmost option (the fallback
-            // when the saved value matches nothing) had to move too.
-            val mode = if (p.getString("brain", BRAIN_LOCAL)?.trim()?.lowercase() == BRAIN_HUB) {
-                BRAIN_HUB
-            } else {
-                BRAIN_LOCAL
+            val mode = brainMode(context)
+            // CodeFlying derives everything from the build — the user does not
+            // see or edit the endpoints. llm_model / thinking / effort are
+            // deliberately *still* read from prefs so the same picker in
+            // [SettingsUi] applies to both local and CodeFlying.
+            if (mode == BRAIN_CODEFLYING) {
+                return BrainConfig(
+                    mode = BRAIN_CODEFLYING,
+                    apiKey = BuildConfig.CODEFLYING_KEY,
+                    baseUrl = codeFlyingLlmBaseUrl(),
+                    model = p.getString("llm_model", DEFAULT_LLM_MODEL)
+                        .orEmpty().trim().ifEmpty { DEFAULT_LLM_MODEL },
+                    thinking = p.getString("llm_thinking", defaultThinking())
+                        ?.trim()?.lowercase() != "disabled",
+                    reasoningEffort = p.getString("llm_reasoning_effort", DEFAULT_REASONING_EFFORT)
+                        .orEmpty().trim().ifEmpty { DEFAULT_REASONING_EFFORT },
+                )
             }
             return BrainConfig(
                 mode = mode,
-                apiKey = p.getString("llm_api_key", "").orEmpty().trim().ifEmpty { BuildConfig.API_KEY },
+                apiKey = p.getString("llm_api_key", "").orEmpty().trim(),
                 // trimEnd('/') because the client appends "/chat/completions"
                 // and a trailing slash from the settings field would produce a
                 // double slash, which some gateways 404 on.
-                baseUrl = p.getString("llm_base_url", BuildConfig.LLM_BASE_URL)
+                baseUrl = p.getString("llm_base_url", "")
                     .orEmpty().trim().trimEnd('/').ifEmpty { DEFAULT_LLM_BASE_URL },
                 model = p.getString("llm_model", DEFAULT_LLM_MODEL)
                     .orEmpty().trim().ifEmpty { DEFAULT_LLM_MODEL },
@@ -242,25 +307,23 @@ data class VoiceConfig(
                 uid = "tablet-body-${UUID.randomUUID().toString().take(8)}"
                 p.edit().putString("uid", uid).apply()
             }
+            // On CodeFlying every endpoint and credential is derived from the
+            // build — the user never sees these fields. On 本机 the prefs rule
+            // (user's own 火山 account); 云端 shares the same prefs because
+            // ASR/TTS still run on this device whichever brain answers.
+            val codeFlying = brainMode(context) == BRAIN_CODEFLYING
             return VoiceConfig(
-                // Empty in prefs → [API_KEY], which is itself empty in the
-                // public source. Trim before the fallback so a field cleared to
-                // spaces behaves like a cleared field.
-                apiKey = p.getString("api_key", "").orEmpty().trim().ifEmpty { BuildConfig.API_KEY },
-                // asr/tts endpoints: prefs (if set) > BuildConfig (if non-empty)
-                // > official address. The BuildConfig step is how local.properties
-                // can override the default, and it sits ABOVE the official fallback
-                // so a custom endpoint survives even when the user clears the
-                // settings field (which removes the pref).
-                asrEndpoint = p.getString("asr_endpoint", null)
+                apiKey = if (codeFlying) BuildConfig.CODEFLYING_KEY
+                else p.getString("api_key", "").orEmpty().trim().ifEmpty { API_KEY },
+                asrEndpoint = if (codeFlying) codeFlyingAsrEndpoint()
+                else p.getString("asr_endpoint", null)
                     ?.takeIf { it.isNotEmpty() }
-                    ?: BuildConfig.ASR_ENDPOINT.takeIf { it.isNotEmpty() }
                     ?: DEFAULT_ASR_ENDPOINT,
                 asrResourceId = p.getString("asr_resource_id", DEFAULT_ASR_RESOURCE)!!,
                 asrUid = uid,
-                ttsEndpoint = p.getString("tts_endpoint", null)
+                ttsEndpoint = if (codeFlying) codeFlyingTtsEndpoint()
+                else p.getString("tts_endpoint", null)
                     ?.takeIf { it.isNotEmpty() }
-                    ?: BuildConfig.TTS_ENDPOINT.takeIf { it.isNotEmpty() }
                     ?: DEFAULT_TTS_ENDPOINT,
                 ttsResourceId = p.getString("tts_resource_id", DEFAULT_TTS_RESOURCE)!!,
                 // The voice follows the ball's look; [TTS_SPEAKER] is the
@@ -317,8 +380,16 @@ data class VoiceConfig(
                 "device_id" to hc.deviceId,
                 "device_name" to hc.deviceName,
                 "brain" to bc.mode,
-                "llm_api_key" to bc.apiKey,
-                "llm_base_url" to bc.baseUrl,
+                "show_hub" to if (showHub(context)) "on" else "off",
+                // llm_api_key / llm_base_url are the 本机 tab's rows — the
+                // user's own DeepSeek credentials. They stay visible no matter
+                // which backend is active, because switching to CodeFlying and
+                // back must not look like the local-tab fields were wiped. The
+                // compiled CodeFlying key never flows through these prefs; it
+                // comes from BuildConfig at [brainConfig] time, so showing the
+                // saved values here cannot leak it.
+                "llm_api_key" to p.getString("llm_api_key", "").orEmpty(),
+                "llm_base_url" to p.getString("llm_base_url", "").orEmpty(),
                 "llm_model" to bc.model,
                 // Round-tripped as the wire words rather than a boolean: this map
                 // feeds SettingsUi's pickers and the picker's value is what comes
@@ -479,6 +550,7 @@ data class VoiceConfig(
             "tts_endpoint", "tts_resource_id", "tts_sample_rate",
             "hub_url", "device_name",
             "brain",
+            "show_hub",
             "llm_api_key", "llm_base_url", "llm_model",
             "llm_thinking", "llm_reasoning_effort",
             "grounding",

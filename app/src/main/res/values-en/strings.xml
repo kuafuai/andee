@@ -67,10 +67,15 @@
     <string name="settings_clear_notes_confirm_title">Clear the notebook?</string>
     <string name="settings_clear_notes_confirm_body">Everything it noted down, your preferences, and any reminder not yet due are deleted, with no way back. The current chat history is untouched.</string>
     <string name="settings_clear_notes_confirm">Clear it</string>
-    <string name="settings_section_brain">Brain</string>
+    <string name="settings_section_brain">Backend</string>
     <string name="settings_brain_panel_note">Takes effect when you close this panel — no need to restart the accessibility service.</string>
     <string name="settings_brain_cloud">Cloud</string>
     <string name="settings_brain_local">On-device</string>
+    <string name="settings_brain_codeflying">CodeFlying</string>
+    <string name="settings_show_hub">Show cloud option</string>
+    <string name="settings_show_hub_note">Adds a Cloud backend tab for connecting to a hub you host yourself.</string>
+    <string name="settings_brain_codeflying_note">Powered by your backend hosted on CodeFlying.app: ships models and voice services by default, plus a per-device database for CRUD-style business logic, and a long tail of third-party API integrations — AI image / video / music generation, geolocation, weather, PDF conversion, search, news, stocks, and more.\n\nNote: using CodeFlying backend services may incur charges.</string>
+    <string name="settings_brain_codeflying_unconfigured">CodeFlying is not configured on this Andee. From a computer, visit CodeFlying.app and have it build an Andee install package wired to your own backend — install it over this app and you get the default models, voice services, a per-device database and a long list of third-party API integrations (AI image / video / music generation, weather, location, PDF, search, news, stocks, and more).\n\nNote: using CodeFlying backend services may incur charges.</string>
     <string name="settings_hub_url">Hub URL</string>
     <!-- The hub URL box is empty on a fresh install — the hint is what the
          user sees in that empty box, so it is the pitch, not the format. -->
@@ -113,7 +118,7 @@
     <string name="settings_voice_tts_sample_rate">TTS sample rate</string>
     <string name="settings_section_diagnostics">Diagnostics</string>
     <string name="settings_section_advanced">Advanced</string>
-    <string name="settings_advanced_note">Volcengine endpoints, typing, diagnostics and factory reset. Nothing here for day-to-day use.</string>
+    <string name="settings_advanced_note">Show the cloud option, typing, diagnostics and factory reset. Nothing here for day-to-day use.</string>
     <string name="settings_grounding">Grounding capture</string>
     <string name="settings_grounding_note">Records coordinate taps and screenshots to files/grounding for offline analysis — it photographs whatever you are doing. Needs the accessibility service restarted to take effect.</string>
     <string name="settings_device_id">Device ID</string>

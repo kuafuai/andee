@@ -44,10 +44,15 @@
     <string name="settings_clear_notes_confirm_title">清空小本本？</string>
     <string name="settings_clear_notes_confirm_body">它记下的事、你的偏好、还没到点的提醒，都会删掉，找不回来。这场聊天记录不受影响。</string>
     <string name="settings_clear_notes_confirm">确认清空</string>
-    <string name="settings_section_brain">大脑</string>
+    <string name="settings_section_brain">后端</string>
     <string name="settings_brain_panel_note">关掉这个面板就生效，不用重开无障碍服务。</string>
     <string name="settings_brain_cloud">云端</string>
     <string name="settings_brain_local">本机</string>
+    <string name="settings_brain_codeflying">CodeFlying</string>
+    <string name="settings_show_hub">显示云端选项</string>
+    <string name="settings_show_hub_note">把「云端」加到后端选项里，用来连你自己搭的 Hub。</string>
+    <string name="settings_brain_codeflying_note">由您在 CodeFlying.net 平台托管的后端服务提供支持：默认提供模型和语音服务，并支持独立数据库能力实现数据持久化（增删改查等业务逻辑），以及海量第三方 API 集成——AI 图片/视频/音乐生成，地理位置、天气、PDF 转换、搜索、新闻、股票等等。\n\n注意：使用 CodeFlying 的后端服务可能会产生费用。</string>
+    <string name="settings_brain_codeflying_unconfigured">这台 Andee 没有配置 CodeFlying。到电脑上访问 CodeFlying.net，用它一键生成带有您专属后端的 Andee 安装包并替换当前应用，就能用上默认模型、语音、持久化数据库和海量第三方 API（AI 图片/视频/音乐生成、天气、位置、PDF、搜索、新闻、股票等等）。\n\n注意：使用 CodeFlying 的后端服务可能会产生费用。</string>
     <string name="settings_hub_url">Hub 地址</string>
     <!-- The hub URL box is empty on a fresh install — the hint is what the
          user sees in that empty box, so it is the pitch, not the format. -->
@@ -90,7 +95,7 @@
     <string name="settings_voice_tts_sample_rate">合成采样率</string>
     <string name="settings_section_diagnostics">诊断</string>
     <string name="settings_section_advanced">高级</string>
-    <string name="settings_advanced_note">火山地址、打字、诊断和恢复出厂设置。日常用不到，都藏在这里。</string>
+    <string name="settings_advanced_note">显示云端选项、打字、诊断和恢复出厂设置。日常用不到，都藏在这里。</string>
     <string name="settings_grounding">接地采集</string>
     <string name="settings_grounding_note">把坐标点击和截图记到 files/grounding 供离线分析 —— 它会拍下你当时在做的事。改完要重开无障碍服务才生效。</string>
     <string name="settings_device_id">设备 ID</string>

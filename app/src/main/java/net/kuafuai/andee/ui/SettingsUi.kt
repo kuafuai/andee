@@ -158,17 +158,8 @@ class SettingsUi(
      */
     private var lctx: Context = context
 
-    /**
-     * Survives a [rebuild], so switching language doesn't re-hide the group.
-     *
-     * This is now 高级's flag: it was the 火山 panel's, and the panel moved
-     * inside 高级 when the card split. One flag would have unfolded both, which
-     * is why [voiceOpen] exists.
-     */
+    /** Survives a [rebuild], so switching language doesn't re-hide the group. */
     private var advancedOpen = false
-
-    /** Same, for the 火山 panel. Kept apart from [advancedOpen] — see there. */
-    private var voiceOpen = false
 
     /**
      * The 诊断 section is showing the factory-reset warning instead of its
@@ -369,7 +360,6 @@ class SettingsUi(
         // the credentials it can spend. 大脑 stays first because it is the one
         // setting that changes what the rest of the card means.
         brainSection(form)
-        voiceKeySection(form)
         wakeSection(form)
         notebookSection(form)
         notifySection(form)
@@ -392,14 +382,11 @@ class SettingsUi(
      * panels and putting a panel around them would nest one inside another. That
      * is what `bare = true` is for; see [collapsible].
      *
-     * It is closed by default, which is the point: 火山's endpoints, the
-     * keyboard report and the factory-reset button are all things the user goes
-     * looking for deliberately. Nothing it hides is needed to make the device
-     * work out of the box, and the one item that *would* have been an exception
-     * — the 火山 key, which a fresh install genuinely needs — is deliberately
-     * **not** in here. It sits in 常用 under 语音 as [voiceKeySection], because
-     * the setup wizard sends the user to it and a wizard that then asks them to
-     * unfold 高级 is a wizard with a fold in the middle of it.
+     * It is closed by default, which is the point: nothing it hides is needed
+     * to make the device work out of the box. The 火山 key and endpoints
+     * (which used to live here) are now rows of the 本机 tab under 后端, next
+     * to the LLM they power; this disclosure now carries show-cloud-option,
+     * typing diagnostics and the factory-reset button.
      *
      * The note under the heading is not decoration and is not optional: a
      * collapsed disclosure gives no account of itself, so a user who has lost
@@ -412,11 +399,35 @@ class SettingsUi(
             lctx.getString(R.string.settings_advanced_note),
             bare = true,
         )
-        // The three go in the bare container directly, so their own section
-        // titles and panels land at the form's own width and rhythm.
-        voiceSection(body)
+        // 火山 (the voice section) used to live here. It is now a sub-panel
+        // of 后端 → 本机, so a user looking for its rows finds them next to
+        // the backend they belong to — see [brainSection].
+        showHubSection(body)
         typingSection(body)
         diagnosticsSection(body)
+    }
+
+    /**
+     * 显示云端选项: lives in 高级 rather than beside the backend picker because
+     * it is a knob a user turns once (if ever) to reveal a tab they want. It
+     * writes eagerly and rebuilds the whole card, so flipping it on and
+     * scrolling back up finds the 云端 tab already in the backend picker.
+     */
+    private fun showHubSection(form: LinearLayout) {
+        val panel = group(
+            form,
+            lctx.getString(R.string.settings_show_hub),
+            lctx.getString(R.string.settings_show_hub_note),
+        )
+        val row = segments(
+            options = listOf("off" to lctx.getString(R.string.common_off), "on" to lctx.getString(R.string.common_on)),
+            picked = if (VoiceConfig.showHub(context)) "on" else "off",
+            radius = dp(13),
+        ) { v ->
+            VoiceConfig.save(context, mapOf("show_hub" to v))
+            rebuild()
+        }
+        panel.addView(row, rowParams(dp(7)))
     }
 
     @SuppressLint("SetTextI18n")
@@ -522,6 +533,26 @@ class SettingsUi(
      * (`ScreenBodyService.startBrain` builds one brain or the other), so the
      * picker folds away the half that is not in play.
      */
+    /**
+     * The backend section. Three tabs — 本机 / CodeFlying / 云端 — only one is
+     * ever in play, and the picker folds away the two that are not.
+     *
+     * Visibility rules:
+     *  * **CodeFlying** is only in the picker when the build enables it with a
+     *    non-empty domain (see [VoiceConfig.isCodeFlyingAvailable]). The tab
+     *    itself has no editable rows — endpoints and credential are compiled
+     *    in — just a note describing what the hosted backend offers.
+     *  * **云端** is only in the picker when the user has turned the "显示
+     *    云端选项" toggle on (`show_hub`, saved eagerly so the picker rebuilds
+     *    at once). It is off by default: a device nobody has configured for a
+     *    hub is better off not seeing an option it has nothing to fill in.
+     *
+     * Voice (`asr_endpoint` / `tts_endpoint` / `api_key` and the resource IDs)
+     * used to live inside 高级 → 火山. It now lives inside the **本机** tab,
+     * because voice runs on this device whichever backend answers, but a
+     * CodeFlying device never touches these fields and a 云端 device cares
+     * about hub plumbing instead.
+     */
     private fun brainSection(form: LinearLayout) {
         val panel = group(
             form,
@@ -529,21 +560,27 @@ class SettingsUi(
             lctx.getString(R.string.settings_brain_panel_note),
         )
 
-        // Assigned below, once both blocks exist; the picker's callback runs
-        // only on a tap, so the null window closes before anyone can tap.
+        // Tab picker. 本机 and CodeFlying are always visible — CodeFlying stays
+        // in the row even when the build didn't configure it, so the user is
+        // told what it is and how to turn it on. 云端 is still gated on the
+        // user's own show_hub toggle: it is the only tab that is pure extra
+        // configuration surface, so nobody who hasn't asked for it needs to
+        // see it. If the user picks CodeFlying without a configured build,
+        // [VoiceConfig.brainMode] silently falls back to local at runtime —
+        // the saved value sticks, so the picker rebuilds correctly, and
+        // installing a configured build later flips the behaviour on without
+        // the user having to re-pick.
+        val options = buildList {
+            add(VoiceConfig.BRAIN_LOCAL to lctx.getString(R.string.settings_brain_local))
+            add(VoiceConfig.BRAIN_CODEFLYING to lctx.getString(R.string.settings_brain_codeflying))
+            if (VoiceConfig.showHub(context)) {
+                add(VoiceConfig.BRAIN_HUB to lctx.getString(R.string.settings_brain_cloud))
+            }
+        }
         var applyMode: ((String, Boolean) -> Unit)? = null
-        val mode = segmented(
-            panel,
-            "brain",
-            listOf(
-                // Local leftmost because the leftmost option is the fallback
-                // when the saved value matches nothing, and local is the
-                // out-of-box default — see [VoiceConfig.brainConfig].
-                VoiceConfig.BRAIN_LOCAL to lctx.getString(R.string.settings_brain_local),
-                VoiceConfig.BRAIN_HUB to lctx.getString(R.string.settings_brain_cloud),
-            ),
-        ) { applyMode?.invoke(it, true) }
+        val mode = segmented(panel, "brain", options) { applyMode?.invoke(it, true) }
 
+        // ---- 云端 tab ----
         val hubBlock = block(panel)
         field(
             hubBlock,
@@ -557,11 +594,21 @@ class SettingsUi(
             lctx.getString(R.string.settings_device_name),
             hint = lctx.getString(R.string.settings_device_name_hint),
         )
-        note(
-            hubBlock,
-            lctx.getString(R.string.settings_brain_cloud_note),
-        )
+        note(hubBlock, lctx.getString(R.string.settings_brain_cloud_note))
 
+        // ---- CodeFlying tab (description only) ----
+        // Which note depends on whether this build was configured for
+        // CodeFlying: configured says "what this is, you may be billed",
+        // unconfigured says "it's not set up on this APK, go to the website".
+        val cfBlock = block(panel)
+        val cfNoteKey = if (VoiceConfig.isCodeFlyingAvailable()) {
+            R.string.settings_brain_codeflying_note
+        } else {
+            R.string.settings_brain_codeflying_unconfigured
+        }
+        note(cfBlock, lctx.getString(cfNoteKey))
+
+        // ---- 本机 tab: LLM + 火山 voice rows ----
         val localBlock = block(panel)
         field(localBlock, "llm_api_key", "DeepSeek Key", hint = "sk-…", secret = true)
         field(localBlock, "llm_model", lctx.getString(R.string.settings_llm_model), hint = VoiceConfig.DEFAULT_LLM_MODEL)
@@ -591,18 +638,29 @@ class SettingsUi(
                 "low" to lctx.getString(R.string.common_low),
             ),
         )
-        note(
-            localBlock,
-            lctx.getString(R.string.settings_brain_local_note),
-        )
+        note(localBlock, lctx.getString(R.string.settings_brain_local_note))
 
+        // 火山: previously in 高级 → 火山. Rows copy that section's labels,
+        // which still describe exactly these keys.
+        field(
+            localBlock,
+            "api_key",
+            lctx.getString(R.string.settings_voice_api_key),
+            hint = lctx.getString(R.string.settings_voice_api_key_hint),
+            secret = true,
+        )
+        field(localBlock, "asr_endpoint", lctx.getString(R.string.settings_voice_asr_endpoint))
+        field(localBlock, "asr_resource_id", lctx.getString(R.string.settings_voice_asr_resource_id))
+        field(localBlock, "tts_endpoint", lctx.getString(R.string.settings_voice_tts_endpoint))
+        field(localBlock, "tts_resource_id", lctx.getString(R.string.settings_voice_tts_resource_id))
+        field(localBlock, "tts_sample_rate", lctx.getString(R.string.settings_voice_tts_sample_rate), numeric = true)
+
+        // One block visible at a time. Simultaneous flips so the card's total
+        // height barely moves — see the old comment, still true.
         applyMode = { m, animate ->
-            val local = m == VoiceConfig.BRAIN_LOCAL
-            // Both at once, not one after the other: one block shrinking while
-            // the other grows keeps the card's total height almost still, and
-            // sequencing them makes the whole form jump twice.
-            Glass.setVisible(hubBlock, !local, animate)
-            Glass.setVisible(localBlock, local, animate)
+            Glass.setVisible(hubBlock, m == VoiceConfig.BRAIN_HUB, animate)
+            Glass.setVisible(cfBlock, m == VoiceConfig.BRAIN_CODEFLYING, animate)
+            Glass.setVisible(localBlock, m == VoiceConfig.BRAIN_LOCAL, animate)
         }
         applyMode(mode, false)
         applyThinking = { th, animate ->
@@ -647,40 +705,6 @@ class SettingsUi(
     }
 
     /**
-     * 语音 *without* an engine in the name: the one row here is the key.
-     *
-     * 火山's endpoints are three more rows about a service the user did not know
-     * they were using, so they live in [advancedSection] under their own heading
-     * — which is why this exists as a separate method from [voiceSection] and
-     * why the two carry different titles. What matters here is the key: a fresh
-     * install has none, `VoiceConfig.API_KEY` ships empty on purpose, and
-     * without it the device is mute. A key behind a 高级 disclosure is a key the
-     * setup flow hides mid-setup, so it stays out in 常用.
-     */
-    private fun voiceKeySection(form: LinearLayout) {
-        val panel = group(form, lctx.getString(R.string.settings_section_voice_key))
-        // Blank means *factory*, which is what an untouched box shows — see
-        // VoiceConfig.save / OVERRIDE_KEYS. Masked like any other credential.
-        field(
-            panel, "api_key",
-            lctx.getString(R.string.settings_voice_api_key),
-            hint = lctx.getString(R.string.settings_voice_api_key_hint),
-            secret = true,
-        )
-        // Feedback for the row above. Without it, "did my key actually take
-        // effect?" is only answerable by reading shared_prefs over adb.
-        readOnly(
-            panel,
-            lctx.getString(R.string.settings_voice_in_use),
-            if (VoiceConfig.usingOwnCredentials(context)) {
-                lctx.getString(R.string.settings_voice_in_use_own)
-            } else {
-                lctx.getString(R.string.settings_voice_in_use_factory)
-            },
-        )
-    }
-
-    /**
      * Same shape as [wakeSection], and for the same reason: the real screen is
      * its own overlay ([VaultUi]) because the list grows and this card is
      * already full. Only the count and the door belong here.
@@ -709,28 +733,6 @@ class SettingsUi(
             VaultUi(context) { state.text = summary() }.show()
         })
         panel.addView(row, rowParams(dp(12)))
-    }
-
-    /**
-     * 火山 endpoints. Collapsed, because they ship working and rarely move.
-     *
-     * The key is **not** in here — it is the one row in this group that a fresh
-     * device actually needs, so it lives in [voiceKeySection] out in 常用 and
-     * only the endpoints fold away. See there.
-     */
-    private fun voiceSection(form: LinearLayout) {
-        val panel = collapsible(
-            form,
-            lctx.getString(R.string.settings_section_voice),
-            lctx.getString(R.string.settings_voice_factory_note),
-            isOpen = { voiceOpen },
-            setOpen = { voiceOpen = it },
-        )
-        field(panel, "asr_endpoint", lctx.getString(R.string.settings_voice_asr_endpoint))
-        field(panel, "asr_resource_id", lctx.getString(R.string.settings_voice_asr_resource_id))
-        field(panel, "tts_endpoint", lctx.getString(R.string.settings_voice_tts_endpoint))
-        field(panel, "tts_resource_id", lctx.getString(R.string.settings_voice_tts_resource_id))
-        field(panel, "tts_sample_rate", lctx.getString(R.string.settings_voice_tts_sample_rate), numeric = true)
     }
 
     private fun diagnosticsSection(form: LinearLayout) {
