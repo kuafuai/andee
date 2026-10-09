@@ -411,7 +411,7 @@
         tool or exception name through `%1$s`; that name is an identifier and
         stays as it is in both languages.
     -->
-    <string name="brain_no_key">本地大脑还没配 API key —— 长按小球打开设置，把 DeepSeek 的 key 填进「大脑」那一栏。</string>
+    <string name="brain_no_key">本地大脑还没配 API key。长按小球把卡片展开，点控制条上的 ⚙ 打开设置，把 Key 填进「后端」→「本机」→「DeepSeek Key」。</string>
     <string name="brain_error">我这边出错了：%1$s</string>
     <string name="brain_error_402">后端服务返回了 402，多半是账户余额不足了。到「设置」→「后端」看看当前用的是哪家服务商，打开它的官网充值后再试。</string>
     <string name="brain_error_402_codeflying">后端服务返回了 402，多半是 CodeFlying 账户余额不足了。用电脑浏览器打开 CodeFlying.net 登录后充值，再试一次。</string>
@@ -483,8 +483,8 @@
     <string name="check_detail_network_on">已联网。</string>
     <string name="check_detail_network_off">没联网。语音识别、语音合成、模型调用全都走网络。</string>
     <string name="check_detail_brain_on">已配置。</string>
-    <string name="check_detail_brain_hub_missing">还没填。现在用的是云端大脑，得把你自己搭的 Hub 地址填进 ⚙ →「大脑」→「Hub 地址」。没有它，你说的话没地方送，问了不会有回答，屏幕也不会动。想让这台设备自己想，就在同一处把大脑切成「本机」。</string>
-    <string name="check_detail_brain_key_missing">还没填。现在用的是本机大脑，得你自己去 DeepSeek 开一个，把 Key 填进 ⚙ →「大脑」→「DeepSeek Key」。没有它，你说的话我收得到，却答不出、也动不了手。</string>
+    <string name="check_detail_brain_hub_missing">还没填。现在用的是云端大脑，得把你自己搭的 Hub 地址填进 ⚙ →「后端」→「云端」→「Hub 地址」。「云端」默认藏着，看不到就先去「高级」→「显示云端选项」把它打开。没有它，你说的话没地方送，问了不会有回答，屏幕也不会动。想让这台设备自己想，就在同一排把大脑切成「本机」。</string>
+    <string name="check_detail_brain_key_missing">还没填。现在用的是本机大脑，得你自己去 DeepSeek 开一个，把 Key 填进 ⚙ →「后端」→「本机」→「DeepSeek Key」。没有它，你说的话我收得到，却答不出、也动不了手。</string>
     <string name="check_detail_model_cloud">云端大脑，模型不在这台设备上。</string>
     <string name="check_detail_model_no_key">还没填 Key，填了才测得了。</string>
     <string name="check_detail_checking">检查中…</string>
@@ -520,7 +520,7 @@
     <string name="check_detail_mic_on">已允许。</string>
     <string name="check_detail_mic_off">没允许。点球不会有任何反应 —— 这是最不像权限问题的一条。</string>
     <string name="check_detail_voice_key_ok">已填。识别和合成用它连火山。</string>
-    <string name="check_detail_voice_key_missing">还没填。源码里不带密钥，得你自己去火山引擎开一个语音服务，把 Key 填进 ⚙ →「语音（火山引擎）」→「火山 API Key」。没有它，听和说都连不上 —— 报出来的却是连接超时，看着像网络坏了。其余功能照常。</string>
+    <string name="check_detail_voice_key_missing">还没填。源码里不带密钥，得你自己去火山引擎开一个语音服务，把 Key 填进 ⚙ →「后端」→「本机」→「火山 API Key」。没有它，听和说都连不上 —— 报出来的却是连接超时，看着像网络坏了。其余功能照常。</string>
     <string name="check_detail_voice_host_ok">%1$s 可达。</string>
     <string name="check_detail_voice_host_bad">连不上 %1$s：%2$s。识别和合成都会超时。</string>
     <string name="check_detail_wake_on">已录入，亮屏时喊得醒。</string>

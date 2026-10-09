@@ -27,6 +27,44 @@ Until then, identify builds by the short commit hash they were built from. (Embe
 
 ## [Unreleased]
 
+### Fixed
+
+- **Four strings sent the user to a menu label that no longer exists — and one to a gesture that does
+  not open settings at all.** The settings card has been reorganised twice since these sentences were
+  written, and the sentences stayed behind, which is the worst kind of copy bug: the user follows the
+  instructions, finds nothing, and concludes the app is broken rather than the text.
+
+  - `check_detail_brain_key_missing`, `check_detail_brain_hub_missing` and `brain_no_key` all said
+    **⚙ → 「大脑」 / "Brain"**. The section header is `settings_section_brain`, which reads
+    **「后端」 / "Backend"** — there is no label containing 大脑 in the settings card at all. The
+    火山 tab names use 大脑 only in prose ("the brain lives on a hub you run yourself"), never as a
+    destination.
+  - `check_detail_voice_key_missing` said **⚙ → 「语音（火山引擎）」 / "Speech (Volcengine)"** — a
+    section that no longer exists. The Volcengine rows were moved into 后端 → 本机, and
+    `settings_section_voice` / `settings_section_voice_key` are still in both string files but
+    referenced by nothing. The path is now the same **后端 → 本机** as the two brain keys, which is
+    where the field actually is.
+  - `brain_no_key` also said **"长按小球打开设置" / "long-press the ball, open settings"**.
+    `onLongPress` does not open settings; it calls `dispatcher.expand()`, which brings the full card
+    back. Settings is the ⚙ button in that card's control bar. The sentence now names both steps,
+    because the first one is genuinely required — the control bar only exists at full size.
+  - `check_detail_brain_hub_missing` gained the missing precondition: **「云端」 is hidden unless
+    高级 →「显示云端选项」 is on.** `showHub` gates the tab in the picker, but `brainMode` does not
+    consult it, so a device can sit in hub mode with the tab that fixes it invisible — turn the
+    toggle on, pick 云端, turn it off again, and the self-check would have pointed at nothing.
+
+  Every label these strings now name was checked against its resource value rather than transcribed
+  from the sentence being replaced — which is how the one remaining error was caught: the English
+  label is **"Show cloud option"**, singular, and the first draft of this fix wrote it plural.
+- **Both READMEs promised a first-run wizard that no longer exists.** "The first run is a stepped
+  setup that walks you through both" / 「第一次启动会有一个分步引导」 — `8dac568` deleted the wizard
+  (`ui/FirstRunUi.kt`). A missing setup guide is indistinguishable from a broken install, so this
+  read as a bug report rather than as stale prose. Both now say what the app does instead: the
+  self-check runs on every start, the card names the missing key, and its button opens settings.
+- `README.md` named the Volcengine field as **火山 API key** — the Chinese label — while the English
+  build displays **Volcengine API key** (`settings_voice_api_key`). The Chinese README already had
+  this right; only the English file was pointing at a word that never appears on an English screen.
+
 ## [0.1.0] - 2026-10-09
 
 The first tagged release. Because nothing was tagged before it, this section is the whole project

@@ -301,8 +301,8 @@ behind it falls back to something else. The ball does at least say so out loud, 
 doing nothing.
 
 **2. The voice key — optional.** A [Volcengine Speech](https://www.volcengine.com/product/voice-tech)
-API key, in the **火山 API key** field of the same **Backend → On-device** tab. Without it ASR and
-TTS fail during the WebSocket handshake, which surfaces as a **connect timeout** — the device looks
+API key, in the **Volcengine API key** field of the same **Backend → On-device** tab. Without it
+ASR and TTS fail during the WebSocket handshake, which surfaces as a **connect timeout** — the device looks
 like it has a network problem when what it has is a blank field. Everything else still works; it is
 just mute and deaf.
 
@@ -312,9 +312,10 @@ just mute and deaf.
 > stocks, …) all go through one key, wrapped and billed by CodeFlying so you don't sign up for each
 > provider yourself. The two keys above only apply to the **On-device** tab you configure yourself.
 
-You do not have to remember this: the first run is a stepped setup that walks you through both, and
-afterwards the **✓** button in the ball's control bar opens the self-check list, which says which of
-the two is missing and offers the button that fixes it.
+You do not have to remember this. Every time the assistant comes up it checks itself, and if either
+key is missing the card it puts up names what is missing — its button opens our settings, where both
+keys live under **Backend → On-device**. The **✓** button in the ball's control bar opens that same
+list whenever you want it.
 
 **To hand someone an APK, sign a release build — not the debug one.** The release build type is the
 minified one (`minifyEnabled` + `shrinkResources`), and that is most of what makes the APK small: the

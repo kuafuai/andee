@@ -344,7 +344,7 @@
     <string name="call_default_scene">Call</string>
 
     <!-- LocalBrain — display half only; see the comment on the Chinese side. -->
-    <string name="brain_no_key">The on-device brain has no API key yet — long-press the ball, open settings and put a DeepSeek key in the Brain section.</string>
+    <string name="brain_no_key">The on-device brain has no API key yet. Long-press the ball to bring the card back, tap ⚙ in the control bar, and put the key in Backend → On-device → “DeepSeek Key”.</string>
     <string name="brain_error">Something broke on my side: %1$s</string>
     <string name="brain_error_402">The backend answered 402, which most likely means the account is out of balance. Open Settings → Backend to see which provider you are using, then top up on that provider\'s website and try again.</string>
     <string name="brain_error_402_codeflying">The backend answered 402, which most likely means your CodeFlying balance has run out. Open CodeFlying.app in a computer browser, sign in, top up, and try again.</string>
@@ -407,8 +407,8 @@
     <string name="check_detail_network_on">Online.</string>
     <string name="check_detail_network_off">Offline. Speech recognition, speech synthesis and every model call go over the network.</string>
     <string name="check_detail_brain_on">Configured.</string>
-    <string name="check_detail_brain_hub_missing">Not set. The brain is set to the cloud, so the address of your own hub goes in ⚙ → “Brain” → “Hub URL”. Without it there is nowhere to send what you say: no answers, and nothing on screen moves. To have this device think for itself, switch the brain to “On-device” in the same place.</string>
-    <string name="check_detail_brain_key_missing">Not set. The brain is set to run on this device, so open a DeepSeek account of your own and put the key in ⚙ → “Brain” → “DeepSeek Key”. Without it, what you say arrives and nothing can be answered or acted on.</string>
+    <string name="check_detail_brain_hub_missing">Not set. The brain is set to the cloud, so the address of your own hub goes in ⚙ → Backend → Cloud → “Hub URL”. The Cloud tab is hidden by default — if you cannot see it, turn on Advanced → “Show cloud option” first. Without it there is nowhere to send what you say: no answers, and nothing on screen moves. To have this device think for itself, pick “On-device” in the same row.</string>
+    <string name="check_detail_brain_key_missing">Not set. The brain is set to run on this device, so open a DeepSeek account of your own and put the key in ⚙ → Backend → On-device → “DeepSeek Key”. Without it, what you say arrives and nothing can be answered or acted on.</string>
     <string name="check_detail_model_cloud">Cloud assistant — the model is not on this device.</string>
     <string name="check_detail_model_no_key">No key yet. Fill one in and this becomes testable.</string>
     <string name="check_detail_checking">Checking…</string>
@@ -445,7 +445,7 @@
     <string name="check_detail_mic_on">Allowed.</string>
     <string name="check_detail_mic_off">Not allowed. Tapping the ball does nothing at all — the failure that least resembles a permission problem.</string>
     <string name="check_detail_voice_key_ok">Set. Recognition and synthesis use it to reach Volcengine.</string>
-    <string name="check_detail_voice_key_missing">Not set. The source ships without a key — open a Volcengine Speech service of your own and put the key in ⚙ → “Speech (Volcengine)” → “Volcengine API key”. Without it, hearing and speaking cannot connect, and what you get back is a connection timeout that looks like a network fault. Everything else works.</string>
+    <string name="check_detail_voice_key_missing">Not set. The source ships without a key — open a Volcengine Speech service of your own and put the key in ⚙ → Backend → On-device → “Volcengine API key”. Without it, hearing and speaking cannot connect, and what you get back is a connection timeout that looks like a network fault. Everything else works.</string>
     <string name="check_detail_voice_host_ok">%1$s is reachable.</string>
     <string name="check_detail_voice_host_bad">Could not reach %1$s: %2$s. Both recognition and synthesis will time out.</string>
     <string name="check_detail_wake_on">Taught, and it wakes while the screen is on.</string>
