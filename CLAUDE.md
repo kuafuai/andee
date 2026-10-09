@@ -16,12 +16,21 @@ Two orientation facts that are easy to get wrong:
 ## Build and run
 
 ```bash
-./gradlew assembleDebug          # APK → app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleDebug          # APKs → app/build/outputs/apk/debug/app-<abi>-debug.apk
 ./gradlew installDebug           # build + install to the attached device
+./gradlew assembleRelease        # minified APKs → app/build/outputs/apk/release/app-<abi>-release-unsigned.apk
 ./gradlew test                   # host-side JUnit (only template tests exist)
 ./gradlew connectedAndroidTest   # instrumented tests (needs a device; only a template test exists)
 adb logcat -s Body:* BodyWs:* BodyWsClient:* Asr:* Tts:*   # the log tags this app uses
 ```
+
+**The APK path is per-ABI and there is no `app-debug.apk` any more.** An ABI split plus
+`minifyEnabled`/`shrinkResources` on release (see the comments in `app/build.gradle`) took the arm64
+arm from 39 MB to ~8 MB — the fat APK was carrying four copies of ML Kit's ~4 MB `libbarhopper_v3.so`,
+and the debug variant was carrying 13 MB of un-shrunk dex. Hand someone
+`app-arm64-v8a-release-unsigned.apk`, not the debug build, once it is signed; `assembleRelease` is
+also a CI gate now, because R8 and `lintVitalRelease` only run there and a release build that nobody
+runs is how a broken `assembleRelease` sat unnoticed.
 
 There is **no real test suite** — `ExampleUnitTest` / `ExampleInstrumentedTest` are unmodified templates. Verification is manual: install, watch logcat, drive the ball. There is no lint/format task configured beyond AGP defaults.
 

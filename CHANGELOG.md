@@ -83,6 +83,23 @@ build time would close this hole; it is not implemented yet.)
 
 ### Changed
 
+- **The APK went from ~39 MB to ~8 MB.** Two causes, both structural rather than a matter of
+  trimming assets. First, every build produced one *fat* APK for all four ABIs, and ML Kit's
+  `libbarhopper_v3.so` is ~4 MB, so it was paid for four times over. Second, the debug variant ships
+  un-shrunk dex (16.7 MB of it, against 3.2 MB after R8), and `minifyEnabled` was off on release too.
+  Fixed with an ABI split, `minifyEnabled` + `shrinkResources` on release, and deflated native libs.
+  **The output paths changed**: there is no `app-debug.apk` any more, only `app-<abi>-debug.apk` and
+  `app-<abi>-release-unsigned.apk`. `assembleRelease` also runs in CI now, as a job parallel to the
+  debug one, because R8 and `lintVitalRelease` only run on release — and that is exactly how a
+  release build that failed on every invocation sat in the repository unnoticed.
+- **`assembleRelease` builds again.** It had been failing in `lintVitalRelease` on
+  `res/xml/backup_rules.xml` and `res/xml/data_extraction_rules.xml`, both of which exclude
+  `domain="device_root"`. That is a real domain — the framework has carried
+  `DEVICE_ROOT_TREE_TOKEN` since device-protected storage landed, and the Auto Backup reference
+  defines `device_root` as "like root but for the device-protected storage". AGP 8.3's
+  `FullBackupContent` check validates against a five-value list that predates it, so the error was a
+  false positive. Both lines now carry a scoped `tools:ignore`; the check still covers everything
+  else in those files, including a genuine typo in a domain.
 - **`SECURITY.md` no longer claims a safeguard the software does not have.** Its
   prompt-injection section stated that destructive or irreversible actions are
   *"gated behind `ask_user` / `confirm` flows"*. That is not true, and it was the

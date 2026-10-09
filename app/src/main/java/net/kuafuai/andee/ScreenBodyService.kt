@@ -1298,7 +1298,10 @@ class ScreenBodyService : AccessibilityService() {
      * leaves the same record — a scrollback row and the chip — and none of them
      * speaks. Called on the writer's thread.
      */
-    private fun onSceneChanged(left: String?, entered: String?) {
+    private fun onSceneChanged(left: String?, entered: String?, byBrain: Boolean) {
+        // Read now, not inside the post: the scenes card deletes a scene right
+        // after leaving it, and by the time the post runs the title is gone.
+        val ended = left?.let { net.kuafuai.andee.config.Notebook.scene(this, it) }
         ui.post {
             val nb = net.kuafuai.andee.config.Notebook
             if (left != null) {
@@ -1317,7 +1320,38 @@ class ScreenBodyService : AccessibilityService() {
             }
             refreshSceneChip()
             scenesUi?.rebuild()
+            if (left != null && !byBrain) notifySceneEnded(left, ended?.title, entered)
         }
+    }
+
+    /**
+     * Tell the brain a scene ended — and nothing about what to do with that.
+     *
+     * Skipped when the brain's own `scene.*` tool did it: it was there, and a
+     * second turn to say "you left" would cost a model call to repeat its own
+     * sentence. Local brain only: the hub has no scenes (no chip, no auto-entry),
+     * so there is nothing on that side to tell. The scene's rules are no longer
+     * in the system prompt by now, which is why the note points at `get_scene`
+     * for a scene whose rules say something about its own ending.
+     *
+     * English, like the rest of the model-facing set — see [notifyPageClosed].
+     */
+    private fun notifySceneEnded(name: String, title: String?, next: String?) {
+        android.util.Log.i("Body", "scene ended: $name (next: ${next ?: "none"})")
+        val now = if (next == null) "" else " The user is now in the scene `$next`."
+        // The scenes card leaves a scene and then deletes it, so by the time
+        // this runs the rules may already be gone.
+        val rules = if (net.kuafuai.andee.config.Notebook.scene(this, name) != null) {
+            "If that scene's rules say what to do when it ends, get_scene(`$name`) still shows them."
+        } else {
+            "The scene was deleted, so its rules are gone."
+        }
+        localBrain?.sceneEnded(
+            "(background note: the scene 「${title ?: name}」 (`$name`) has just ended. The user or the device " +
+                "ended it, not you.$now Its rules no longer apply. $rules This is not something the user " +
+                "said. Do whatever the end of that scene calls for, or nothing — if there is nothing " +
+                "worth saying, answer with just [END].)",
+        )
     }
 
     /** The package [maybeAutoEnterScene] last looked at. Main thread only. */

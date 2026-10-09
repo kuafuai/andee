@@ -51,7 +51,7 @@
     <string name="settings_brain_codeflying">CodeFlying</string>
     <string name="settings_show_hub">显示云端选项</string>
     <string name="settings_show_hub_note">把「云端」加到后端选项里，用来连你自己搭的 Hub。</string>
-    <string name="settings_brain_codeflying_note">已接入 CodeFlying：默认模型和语音都配好了，开箱就能用。还能直接调用海量第三方能力 —— AI 画图/做视频/写音乐、定位、天气、PDF 转换、搜索、新闻、股票……全部由 CodeFlying 统一封装、统一计费，不用自己逐个去申请密钥、对账单。\n\n提示：使用 CodeFlying 的后端服务可能会产生费用。</string>
+    <string name="settings_brain_codeflying_note">已接入 CodeFlying（CodeFlying.net）：默认模型和语音都配好了，开箱就能用。还能直接调用海量第三方能力 —— AI 画图/做视频/写音乐、定位、天气、PDF 转换、搜索、新闻、股票……全部由 CodeFlying 统一封装、统一计费，不用自己逐个去申请密钥、对账单。\n\n账户管理和充值：用电脑浏览器打开 CodeFlying.net 登录。如果提示余额不足（HTTP 402），去那里充值即可。\n\n提示：使用 CodeFlying 的后端服务可能会产生费用。</string>
     <string name="settings_brain_codeflying_unconfigured">想让 Andee 直接会画图、做视频、写音乐、查天气、搜新闻、转 PDF、看股票？接上 CodeFlying 就行：默认模型和语音都帮你配好，海量第三方能力一次接入，不用自己逐个申请密钥、对账单。\n\n怎么开始：用电脑浏览器打开 CodeFlying.net，一键生成专属于你的 Andee 安装包，装上去替换当前应用就好。新用户可免费获得额度，先试试再决定。\n\n提示：使用 CodeFlying 的后端服务可能会产生费用。</string>
     <string name="settings_hub_url">Hub 地址</string>
     <!-- The hub URL box is empty on a fresh install — the hint is what the
@@ -154,6 +154,10 @@
     <!-- Scrollback rows written by the device itself when a scene starts or ends. -->
     <string name="scenes_entered_row">（进入情景：%1$s）</string>
     <string name="scenes_exited_row">（退出情景：%1$s）</string>
+    <!-- Ready-made scenes offered at the foot of the card; see config/ScenePresets.kt. -->
+    <string name="scenes_presets_title">现成的情景</string>
+    <string name="scenes_presets_note">点「采用」才会存进来，存好之后和你自己的情景一样，随时可以改、可以删。</string>
+    <string name="scenes_preset_adopt">采用</string>
     <!-- Scrollback row: the device switched on a system accessibility helper so an app would expose its UI. -->
     <string name="tree_helper_enabled_row">（这个应用把界面藏起来了，已打开系统的「无障碍增强」服务让它交出来）</string>
     <string name="settings_scenes_browse">管理情景</string>
@@ -409,6 +413,15 @@
     -->
     <string name="brain_no_key">本地大脑还没配 API key —— 长按小球打开设置，把 DeepSeek 的 key 填进「大脑」那一栏。</string>
     <string name="brain_error">我这边出错了：%1$s</string>
+    <string name="brain_error_402">后端服务返回了 402，多半是账户余额不足了。到「设置」→「后端」看看当前用的是哪家服务商，打开它的官网充值后再试。</string>
+    <string name="brain_error_402_codeflying">后端服务返回了 402，多半是 CodeFlying 账户余额不足了。用电脑浏览器打开 CodeFlying.net 登录后充值，再试一次。</string>
+    <string name="brain_error_auth">后端拒绝了请求（HTTP %1$d）：Key 填错、过期或被停用了。到「设置」→「后端」检查 Key，必要时去服务商官网重新生成一个。</string>
+    <string name="brain_error_400">后端说请求有问题：%1$s\n最常见的原因是模型名写错了，到「设置」→「后端」核对一下模型名。</string>
+    <string name="brain_error_404">后端找不到这个地址（HTTP 404）。到「设置」→「后端」检查接口地址和模型名有没有填错。</string>
+    <string name="brain_error_429">后端现在太忙或者请求太频繁了（HTTP 429），过一会儿再说一遍就行。如果一直这样，去服务商官网看看额度有没有用完。</string>
+    <string name="brain_error_5xx">后端服务自己出了问题（HTTP %1$d），不是你这边的设置有误。过几分钟再试；一直不行就去服务商官网看看是否在维护。</string>
+    <string name="brain_error_timeout">后端半天没有回应。先看看网络通不通，稍后再试一次。</string>
+    <string name="brain_error_network">连不上后端服务。检查一下这台设备的网络；如果网络没问题，到「设置」→「后端」核对接口地址。</string>
     <string name="brain_no_result">我这轮没拿到结果，你再说一遍试试。</string>
     <string name="brain_repeat_stop">我一直在重复同一个动作（%1$s），停下来了 —— 这条路走不通，换个说法或者你来操作一下。</string>
     <string name="brain_max_steps">这件事我做了 %1$d 步还没办完，先停下来问你一句：要不要换个路子，或者你来接手？</string>
@@ -471,6 +484,7 @@
     <string name="check_detail_model_throttled">连上了，但被限流（HTTP 429）。配置是对的，过一会儿会自己恢复。</string>
     <string name="check_detail_model_url">连不上：%1$s</string>
     <string name="check_detail_model_key">Key 被拒：%1$s</string>
+    <string name="check_detail_model_balance">服务端返回 %1$s：多半是账户余额不足。去当前服务商的官网充值后再试。</string>
     <string name="check_detail_model_name">模型名「%1$s」不在服务端列表里。这台服务上有的：%2$s</string>
     <string name="check_detail_model_other">%1$s</string>
     <string name="check_detail_notif_on">已授权，监听器也连着。</string>

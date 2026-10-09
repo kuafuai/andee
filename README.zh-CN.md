@@ -231,7 +231,7 @@ Android。跟它要一个 Andee，它会交给你一个**已经配好令牌**的
 > - **真机。** 这个应用本身就是那个无障碍服务；模拟器能跑，但它几乎什么都干不了
 
 ```bash
-./gradlew clean :app:assembleDebug     # 产物 app/build/outputs/apk/debug/app-debug.apk
+./gradlew clean :app:assembleDebug     # 产物 app/build/outputs/apk/debug/app-<abi>-debug.apk
 ./gradlew installDebug                 # 构建并安装到已连接的设备
 
 # 然后在设备上，按这个顺序：
@@ -261,9 +261,12 @@ OpenAI 兼容端点（`llm_api_key`，默认 `https://api.deepseek.com`）。**�
 这些不用记：第一次启动会有一个分步引导，带你把这两样填好；之后球的控制条上的 **✓** 会打开自检
 清单，直接告诉你缺哪一个，并给出去处理的按钮。
 
-**打包装 `assembleDebug`，别用 `assembleRelease`。** release 没有 `signingConfig`，仓库里也没有
-keystore，`assembleRelease` 产出的是 `app-release-unsigned.apk`，**装不上**。debug 包用 Android
-默认调试证书签名。
+**要拿 APK 给别人装，签一个 release 包，别发 debug 包。** release 才是压过的那版
+（`minifyEnabled` + `shrinkResources`），体积小主要就小在这里——debug 包带的是没压过的 dex。
+它没有 `signingConfig`，仓库里也没有 keystore，所以 `assembleRelease` 产出的是
+`app-<abi>-release-unsigned.apk`，**不签名装不上**。debug 包用 Android 默认调试证书签名，
+可以直接装。两种包都是**按 ABI 拆开的**（见 `app/build.gradle` 里的 `splits`），拿和设备对得上
+的那个——近几年买的机器基本都是 `arm64-v8a`。
 
 #### 遇到问题
 
@@ -488,7 +491,7 @@ Linux 通常是 `/home/<user>/Android/Sdk`，Windows 是
 ./gradlew installDebug         # 设备已插 USB 或已连 wifi adb
 # 或者产出 APK 后自己 adb install
 ./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
 ```
 
 ## 权限总览

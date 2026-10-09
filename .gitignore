@@ -19,3 +19,6 @@ _backup
 # tools/ 是一组 Python 脚本；导入或 py_compile 时会生成字节码缓存
 __pycache__/
 *.pyc
+
+# 助手在本仓库里的工作数据（会话记忆、项目级 skill）。是本地状态，不是源码。
+.workbuddy/

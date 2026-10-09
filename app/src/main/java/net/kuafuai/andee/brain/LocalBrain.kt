@@ -327,15 +327,7 @@ class LocalBrain(
                 if (gen == generation.get()) {
                     Log.e(TAG, "turn $gen ($kind) failed", t)
                     // A silent turn has nobody to apologise to; it just ends.
-                    if (!kind.silent) {
-                        onFinal(
-                            AppLocale.str(
-                                appContext,
-                                R.string.brain_error,
-                                t.message ?: t.javaClass.simpleName,
-                            )
-                        )
-                    }
+                    if (!kind.silent) onFinal(explainFailure(t))
                 } else {
                     // Almost always the cancelled call's own IOException.
                     Log.i(TAG, "turn $gen abandoned: ${t.message}")
@@ -353,6 +345,36 @@ class LocalBrain(
                     onTurnEnd()
                 }
             }
+        }
+    }
+
+    /**
+     * The sentence the user hears when a turn dies. A backend status code is
+     * the one failure where the user can actually do something about it, so it
+     * gets its own words instead of `HTTP 402: {"error":…}` read aloud. 402 is
+     * the one that matters most — an empty account looks, from the tablet,
+     * exactly like the ball going quiet. Anything unrecognised falls back to
+     * the old generic line with the raw message, so nothing is hidden.
+     */
+    private fun explainFailure(t: Throwable): String {
+        fun s(id: Int, vararg args: Any) = AppLocale.str(appContext, id, *args)
+        if (t is LlmHttpException) {
+            val codeFlying = cfg.mode == VoiceConfig.BRAIN_CODEFLYING
+            return when (t.code) {
+                402 -> if (codeFlying) s(R.string.brain_error_402_codeflying) else s(R.string.brain_error_402)
+                401, 403 -> s(R.string.brain_error_auth, t.code)
+                400 -> s(R.string.brain_error_400, t.detail.take(160).ifBlank { "HTTP 400" })
+                404 -> s(R.string.brain_error_404)
+                408, 429 -> s(R.string.brain_error_429)
+                in 500..599 -> s(R.string.brain_error_5xx, t.code)
+                else -> s(R.string.brain_error, t.message ?: t.javaClass.simpleName)
+            }
+        }
+        return when (t) {
+            is java.net.SocketTimeoutException -> s(R.string.brain_error_timeout)
+            is java.net.UnknownHostException,
+            is java.net.ConnectException -> s(R.string.brain_error_network)
+            else -> s(R.string.brain_error, t.message ?: t.javaClass.simpleName)
         }
     }
 
@@ -388,6 +410,19 @@ class LocalBrain(
             history += JSONObject().put("role", "user").put("content", t)
             Log.i(TAG, "note: $t")
         }
+    }
+
+    /**
+     * Tell the brain a scene it was in has ended — a turn, not a [note], so it
+     * can act on the news (a closing report, a promise to keep) instead of
+     * holding it until the user next speaks.
+     *
+     * [wake] without a key check would turn "the user tapped ✕ on the chip"
+     * into a spoken backend error, so this refuses quietly where [notified] does.
+     */
+    fun sceneEnded(text: String) {
+        if (cfg.apiKey.isEmpty()) return
+        wake(text)
     }
 
     /**

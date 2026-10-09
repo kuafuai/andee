@@ -511,23 +511,28 @@ data class VoiceConfig(
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .getString("scene", "").orEmpty().trim().ifEmpty { null }
 
-        fun setActiveScene(context: Context, name: String?) {
+        /**
+         * [byBrain] is true only for the `scene.*` tools. It exists for one
+         * reader: the scene-ended event, which must not tell the brain what the
+         * brain itself just did (a second turn to say "you left the scene").
+         */
+        fun setActiveScene(context: Context, name: String?, byBrain: Boolean = false) {
             val next = name?.trim().orEmpty()
             val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val prev = p.getString("scene", "").orEmpty()
             if (prev == next) return
             p.edit().putString("scene", next).apply()
-            onSceneChanged?.invoke(prev.ifEmpty { null }, next.ifEmpty { null })
+            onSceneChanged?.invoke(prev.ifEmpty { null }, next.ifEmpty { null }, byBrain)
         }
 
         /**
-         * `(left, entered)`, either null. Set by the service so the card's chip
-         * and the scrollback follow whoever changed it — the brain's tool, the
-         * scenes card, the chip's ✕ or an app trigger. Called on the writer's
-         * thread.
+         * `(left, entered, byBrain)`, either name null. Set by the service so the
+         * card's chip and the scrollback follow whoever changed it — the brain's
+         * tool, the scenes card, the chip's ✕ or an app trigger. Called on the
+         * writer's thread.
          */
         @Volatile
-        var onSceneChanged: ((String?, String?) -> Unit)? = null
+        var onSceneChanged: ((String?, String?, Boolean) -> Unit)? = null
 
         /**
          * The 火山 speaker for the ball's current look, falling back to

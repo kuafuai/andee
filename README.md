@@ -259,7 +259,7 @@ To build it yourself instead:
 >   nothing it does is meaningful there
 
 ```bash
-./gradlew clean :app:assembleDebug     # → app/build/outputs/apk/debug/app-debug.apk
+./gradlew clean :app:assembleDebug     # → app/build/outputs/apk/debug/app-<abi>-debug.apk
 ./gradlew installDebug                 # build + install to an attached device
 
 # then, on the device, in this order:
@@ -295,9 +295,13 @@ You do not have to remember this: the first run is a stepped setup that walks yo
 afterwards the **✓** button in the ball's control bar opens the self-check list, which says which of
 the two is missing and offers the button that fixes it.
 
-**Use `assembleDebug`, not `assembleRelease`.** The release build type has no `signingConfig` and
-there is no keystore in the repo, so `assembleRelease` emits `app-release-unsigned.apk`, which will
-not install. The debug build is signed with the standard Android debug certificate.
+**To hand someone an APK, sign a release build — not the debug one.** The release build type is the
+minified one (`minifyEnabled` + `shrinkResources`), and that is most of what makes the APK small: the
+debug variant ships un-shrunk dex. It has no `signingConfig` and there is no keystore in the repo, so
+`assembleRelease` emits `app-<abi>-release-unsigned.apk`, which will not install until you sign it.
+The debug build is signed with the standard Android debug certificate and installs as-is. Either way
+the APK is **per-ABI** (`splits` in `app/build.gradle`), so pick the one that matches the device —
+`arm64-v8a` for anything bought in the last several years.
 
 **If the build does not work, the answer is almost always the JDK.** Full from-scratch setup — the
 JDK traps, the Android SDK two different ways (including a command-line-only path for CI), and a table
@@ -636,7 +640,7 @@ Gradle reads either.
 ./gradlew installDebug         # device attached over USB, or already on wireless adb
 # or build the APK and install it yourself
 ./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
 ```
 
 ### Provisioning order

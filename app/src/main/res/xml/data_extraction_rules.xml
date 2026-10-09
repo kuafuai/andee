@@ -17,16 +17,24 @@
    The vault would not survive a restore anyway — its key lives in the hardware
    Keystore and does not travel — but an undecryptable blob arriving on a new
    device is pure downside, not a safeguard.
+
+   `device_root` is a documented domain for these rules — "like root but for
+   device-protected storage", per the Auto Backup reference. AGP 8.3's
+   `FullBackupContent` lint check still validates against the older
+   `full-backup-content` domain list, which predates `device_*`, and reports it
+   as an error; because `lintVitalRelease` runs on every release build, that
+   false positive is what used to make `assembleRelease` fail outright. The
+   ignores below are scoped to those two lines and nothing else.
 -->
-<data-extraction-rules>
+<data-extraction-rules xmlns:tools="http://schemas.android.com/tools">
     <cloud-backup>
         <exclude domain="root" path="." />
         <exclude domain="external" path="." />
-        <exclude domain="device_root" path="." />
+        <exclude domain="device_root" path="." tools:ignore="FullBackupContent" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="root" path="." />
         <exclude domain="external" path="." />
-        <exclude domain="device_root" path="." />
+        <exclude domain="device_root" path="." tools:ignore="FullBackupContent" />
     </device-transfer>
 </data-extraction-rules>

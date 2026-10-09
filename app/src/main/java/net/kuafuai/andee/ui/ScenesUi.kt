@@ -12,6 +12,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import net.kuafuai.andee.R
 import net.kuafuai.andee.config.Notebook
+import net.kuafuai.andee.config.ScenePresets
 import net.kuafuai.andee.config.VoiceConfig
 import net.kuafuai.andee.i18n.AppLocale
 
@@ -144,10 +145,68 @@ class ScenesUi(private val context: Context) {
                 matchWrap(),
             )
         }
+        addPresets(body)
         val scroll = ScrollView(context)
         scroll.addView(body, matchWrap())
         card.addView(scroll, LinearLayout.LayoutParams(MATCH, 0, 1f))
         return card
+    }
+
+    /**
+     * The ready-made scenes this notebook does not hold yet.
+     *
+     * Offered below the user's own and only while some are left, so a card
+     * that has adopted everything is exactly the card it was before. Adopting
+     * writes in the interface language at that moment; see [ScenePresets].
+     */
+    private fun addPresets(body: LinearLayout) {
+        val left = ScenePresets.notAdopted(context)
+        if (left.isEmpty()) return
+        val english = VoiceConfig.uiLanguage(context) == VoiceConfig.LANG_EN
+        body.addView(
+            TextView(context).apply {
+                text = lctx.getString(R.string.scenes_presets_title)
+                textSize = Glass.Type.CAPTION
+                setTextColor(Color.parseColor(Glass.SECONDARY))
+                setPadding(dp(4), dp(18), 0, dp(2))
+            },
+            matchWrap(),
+        )
+        body.addView(
+            TextView(context).apply {
+                text = lctx.getString(R.string.scenes_presets_note)
+                textSize = Glass.Type.MICRO
+                setTextColor(Color.parseColor(Glass.MUTED))
+                setPadding(dp(4), 0, dp(4), dp(10))
+            },
+            matchWrap(),
+        )
+        for (p in left) {
+            val t = p.text(english)
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(14), dp(12), dp(14), dp(12))
+                background = Glass.panel(context, dp(14))
+            }
+            row.addView(TextView(context).apply {
+                text = t.title
+                textSize = Glass.Type.BODY
+                setTextColor(Color.parseColor(Glass.TITLE))
+            }, matchWrap())
+            row.addView(TextView(context).apply {
+                text = t.summary
+                textSize = Glass.Type.CAPTION
+                setTextColor(Color.parseColor(Glass.SECONDARY))
+                setPadding(0, dp(4), 0, dp(10))
+            }, matchWrap())
+            row.addView(
+                action(lctx.getString(R.string.scenes_preset_adopt), Glass.ACCENT) {
+                    ScenePresets.adopt(context, p, english)
+                    rebuild()
+                },
+            )
+            body.addView(row, matchWrap().apply { bottomMargin = dp(10) })
+        }
     }
 
     private fun header(): LinearLayout {
