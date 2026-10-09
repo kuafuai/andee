@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import net.kuafuai.andee.asr.AsrController
 import net.kuafuai.andee.audio.AudioIO
@@ -570,7 +571,13 @@ class ScreenBodyService : AccessibilityService() {
         // The overlay grant is one of the things being reported, so the window
         // may well not exist — a card needs the same permission it is about to
         // complain about. The launcher page is the fallback for exactly that.
-        if (!::window.isInitialized || !window.isShown()) return
+        // Asked as the grant rather than as `isShown()`, because on some ROMs
+        // the window object outlives the grant (see [ensureOverlays]): the
+        // marker would be true here and this would raise a card nobody can see,
+        // then sit waiting for a button that cannot be pressed. Same predicate
+        // as the checklist's own 悬浮窗 row.
+        if (!::window.isInitialized || !Settings.canDrawOverlays(this)) return
+        if (!window.isShown()) return
         val open = AppLocale.str(this, R.string.check_card_open)
         val body = problems.joinToString(" · ") { AppLocale.str(this, it.title) }
         net.kuafuai.andee.ui.CardUi.ask(
@@ -2380,6 +2387,13 @@ class ScreenBodyService : AccessibilityService() {
      * permission that is missing. So the app is a live process with no visible
      * surface and no voice, which is what "点不开了" looks like from outside.
      *
+     * Rejection is not the only way to arrive there, and it is not even the
+     * common one on a phone: on HONOR/MagicOS `addView` *succeeds* under a
+     * denied appop and the system hides the window instead, so `isShown()` is
+     * true and nothing here looks broken while the screen stays empty. That is
+     * why the grant is asked directly at the top of the body rather than
+     * inferred from whether a view object exists.
+     *
      * The state is reachable without anybody doing anything wrong: a package
      * rename or a fresh install loses the appop, the user grants it *after* the
      * accessibility service has already connected, and the grant alone does not
@@ -2399,6 +2413,19 @@ class ScreenBodyService : AccessibilityService() {
      */
     fun ensureOverlays(): Boolean {
         if (!::window.isInitialized) return false
+        // The grant is the ground truth, and it is asked *first* because on
+        // some ROMs (HONOR/MagicOS, seen on LIO-TL00) `addView` does not throw
+        // when the appop is denied — it succeeds, and the window is then hidden
+        // by the system: present in the window list, `alpha=0.0`,
+        // `mAppOpVisibility=false`. So `isShown()` below still answers "yes"
+        // while the user can see nothing at all, and this function would report
+        // a ball that is not there. [SelfCheckActivity] would then take its
+        // expand-and-finish branch and there would be no surface to expand —
+        // tapping the icon would look like it did nothing, which is exactly the
+        // failure this function exists to prevent. Same predicate the checklist
+        // uses for its 悬浮窗 row, so the two can never disagree: see
+        // [net.kuafuai.andee.device.SelfCheck.overlay].
+        if (!Settings.canDrawOverlays(this)) return false
         if (window.isShown()) return true
         if (!window.show()) return false
         window.setCompact(false)

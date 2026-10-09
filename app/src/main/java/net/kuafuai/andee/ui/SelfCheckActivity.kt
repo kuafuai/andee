@@ -159,6 +159,13 @@ class SelfCheckActivity : StageActivity() {
         // see `ScreenBodyService.ensureOverlays`. When it is still not fixable
         // we fall through to the checklist, which is where the red overlay row
         // is.
+        //
+        // The report this branch got wrong: on a phone where `addView` succeeds
+        // under a denied appop and the window is merely hidden, `ensureOverlays`
+        // used to answer "the ball is up", take `expand()`, `finish()`, and
+        // leave an empty screen — so the icon did nothing, and did it again
+        // every time. The grant is now asked directly, which sends that case
+        // down to the checklist instead. See `SelfCheck.overlay`.
         val svc = ScreenBodyService.get()
         if (svc != null && svc.ensureOverlays()) {
             svc.dispatcherForNotification()?.expand()
