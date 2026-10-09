@@ -225,6 +225,25 @@ Deliberately. Overlays cannot host Compose, so all UI is hand-written `View` cod
 service, so dependencies are constructor-injected by hand; concurrency is `Handler` plus dedicated
 executors. 43k+ lines of Kotlin, all first-party — no code copied in from anywhere.
 
+## Architecture
+
+One `AccessibilityService` is the entry point and there is no main UI. A turn can begin five ways —
+the offline wake word, voice or typing, a notification, a timer, or a request over WebSocket — is
+logged to `ChatHistory`, and is handed to whichever backend is in effect (`brain = local` is the
+out-of-box default).
+
+The agent loop **is** `LocalBrain`. It holds the system prompt constant and inlines the volatile
+parts (clock, notebook index, scenes, photos) into the user message, so the provider's prefix cache
+still hits; it rebuilds the tool table every turn; and it calls the model in a **non-streaming**
+`for` loop of up to `maxSteps` steps. A reply carrying tool calls goes through `methodOf()` to the
+one `CommandDispatcher`; a reply without any ends the turn. The result comes back out through six
+channels — speech, text, a full-screen page, saved artifacts, long text, and physical motion.
+
+![Andee architecture](docs/architecture.svg)
+
+Everything drawn here is in this repository, down to the guard rails — see
+[Why you can check this instead of trusting it](#why-you-can-check-this-instead-of-trusting-it).
+
 ## Quick start
 
 The fastest route skips the two things that actually stop people: **building it yourself, and wiring
@@ -807,6 +826,7 @@ app/                    the Android app (Kotlin, no Compose)
     ui/                    the overlay: ball, subtitles, settings, self-check, scenes, pages
     i18n/AppLocale.kt      how the overlay reaches its strings
   src/main/res/values{,-en}/strings.xml   the two user-facing string tables
+docs/architecture.svg     the whole picture on one page (zh-CN twin beside it)
 docs/permissions.md     why it asks for what it asks for
 reports/                design labs and research notes (part of the repo, not scratch)
 tools/                  device-side helper scripts, the ball-face lab runners, license audit
@@ -930,6 +950,8 @@ been tagged yet, and version numbers do not currently identify a build.
 
 - [docs/permissions.md](docs/permissions.md) ([中文](docs/permissions.zh-CN.md)) — why it asks for
   the permissions it asks for, each one against a concrete tool
+- [docs/architecture.svg](docs/architecture.svg) ([中文](docs/architecture.zh-CN.svg)) — the whole
+  thing on one page: a turn in, the agent loop, six ways out
 - [DISCLAIMER.md](DISCLAIMER.md) — where your data goes, what it can do, who bears the consequences
 - [docs/acceptable-use.md](docs/acceptable-use.md) ([中文](docs/acceptable-use.zh-CN.md)) — the
   prohibited uses

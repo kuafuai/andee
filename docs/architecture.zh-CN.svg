@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 1340" width="100%" role="img" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif">
+<title>Andee — 架构图</title>
+<desc>Andee 没有主界面：唯一的入口是一个 AccessibilityService，也就是 ScreenBodyService，它是唯一的协调者。能开局一轮的有五个入口——离线唤醒词、语音或打字、通知监听、定时与待办、以及从 WebSocket 服务进来的外部请求。一轮先写进 ChatHistory，然后交给三种互斥后端之一：本机 LocalBrain（自备 key，开箱默认）、CodeFlying 托管的 API market（构建进去了才启用，一个域名代理 LLM/ASR/TTS 并额外提供市场工具），以及经 socket 到达的 hub 大脑。只有前两个在本机跑 agent loop。这个 loop 就是 LocalBrain：用 LocalPrompt.withPersona 组装系统提示词，把会变的部分（时钟、notebook 索引、情景、照片）放进 user 消息，每轮重建工具表，然后在一个非流式的 for 循环里调 LlmClient.complete，最多 maxSteps 步、默认 25。带工具调用的回复经 methodOf() 送到 CommandDispatcher；不带工具调用的回复就结束这一轮。守卫：代际号取消过期轮、连续三次相同调用即停、历史裁剪并由 harvest 压缩。随后由 ScreenBodyService 和 dispatcher 把结果从六个通道送出去——语音走 TtsController，文字是气泡、字幕和卡片，网页是 HtmlActivity 里的全屏 HTML，产物存在 ChatHistory 里、说一句就能改，长文双击用 TextPage 全屏读，物理动作走 DogMotion 经 USB 串口。当改由 hub 回答时，它的循环不在本机，而是经那条 socket 到达身体。三条不变量：拒绝写在 dispatcher 里而不是提示词里；通知文本是数据，通知触发的回合碰不到保险箱也不能进或建情景；模型永远不算坐标。</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="#8C959F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+
+<rect x="0" y="0" width="680" height="1340" fill="#FFFFFF"/>
+
+<text x="40" y="50" font-size="15" fill="#1F2328" font-weight="600" dominant-baseline="central">Andee — 架构图</text>
+<text x="40" y="72" font-size="12" fill="#656D76" dominant-baseline="central">入口是一个 AccessibilityService，没有主界面。</text>
+
+<text x="40" y="98" font-size="12" fill="#656D76" dominant-baseline="central">入口有五个，而且没有主界面</text>
+<rect x="40" y="110" width="112" height="52" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="52" y="132" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">唤醒词</text>
+<text x="52" y="150" font-size="12" fill="#656D76" dominant-baseline="central">离线 · DTW</text>
+<rect x="162" y="110" width="112" height="52" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="174" y="132" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">语音 · 打字</text>
+<text x="174" y="150" font-size="12" fill="#656D76" dominant-baseline="central">ASR 或文字</text>
+<rect x="284" y="110" width="112" height="52" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="296" y="132" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">通知栏</text>
+<text x="296" y="150" font-size="12" fill="#656D76" dominant-baseline="central">通知监听服务</text>
+<rect x="406" y="110" width="112" height="52" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="418" y="132" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">定时 · 待办</text>
+<text x="418" y="150" font-size="12" fill="#656D76" dominant-baseline="central">闹钟、静默复盘</text>
+<rect x="528" y="110" width="112" height="52" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="540" y="132" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Hub 请求</text>
+<text x="540" y="150" font-size="12" fill="#656D76" dominant-baseline="central">WS :9008</text>
+<path d="M96 162 V174 M218 162 V174 M340 162 V174 M462 162 V174 M584 162 V174 M96 174 H584" fill="none" stroke="#8C959F" stroke-width="1.5"/>
+<path d="M340 174 V182" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="182" width="600" height="76" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+<text x="52" y="206" font-size="13" fill="#0C447C" font-weight="600" dominant-baseline="central">ScreenBodyService — AccessibilityService</text>
+<text x="52" y="228" font-size="12" fill="#185FA5" dominant-baseline="central">唯一的协调者。它建起整个对象图，悬浮球是它唯一的脸；</text>
+<text x="52" y="250" font-size="12" fill="#185FA5" dominant-baseline="central">所有出口都落在这里 —— 一轮先写进 ChatHistory，再交给当时生效的后端。</text>
+<path d="M340 258 V276" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="276" width="600" height="132" rx="12" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="52" y="296" font-size="12" fill="#656D76" dominant-baseline="central">谁在回答 —— 三种后端，互斥</text>
+<rect x="56" y="306" width="180" height="76" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+<text x="68" y="328" font-size="13" fill="#0C447C" font-weight="600" dominant-baseline="central">LocalBrain · 默认</text>
+<text x="68" y="348" font-size="12" fill="#185FA5" dominant-baseline="central">本机 · 自备 key</text>
+<text x="68" y="368" font-size="12" fill="#185FA5" dominant-baseline="central">LlmClient → DeepSeek</text>
+<rect x="250" y="306" width="180" height="76" rx="8" fill="#FAEEDA" stroke="#EF9F27" stroke-width="1"/>
+<text x="262" y="328" font-size="13" fill="#633806" font-weight="600" dominant-baseline="central">API market</text>
+<text x="262" y="348" font-size="12" fill="#854F0B" dominant-baseline="central">CodeFlying · 托管</text>
+<text x="262" y="368" font-size="12" fill="#854F0B" dominant-baseline="central">LLM/ASR/TTS + 工具</text>
+<rect x="444" y="306" width="180" height="76" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="456" y="328" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Hub brain</text>
+<text x="456" y="348" font-size="12" fill="#656D76" dominant-baseline="central">远端 · 经 WS</text>
+<text x="456" y="368" font-size="12" fill="#656D76" dominant-baseline="central">hub_url 为空时关掉</text>
+<text x="52" y="396" font-size="12" fill="#656D76" dominant-baseline="central">只有前两个在本机跑循环；hub 的循环在对面，靠一条 socket 到达。</text>
+<path d="M340 408 V426" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="426" width="600" height="324" rx="12" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="52" y="450" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Harness —— LocalBrain。这就是 agent loop，它跑在这台平板上。</text>
+<text x="52" y="472" font-size="12" fill="#656D76" dominant-baseline="central">1 · 系统提示词 = LocalPrompt.withPersona(persona, scene)，保持不变</text>
+<text x="52" y="492" font-size="12" fill="#656D76" dominant-baseline="central">2 · 会变的东西改走 user 消息：时钟、notebook 索引、情景、照片</text>
+<text x="52" y="512" font-size="12" fill="#656D76" dominant-baseline="central">3 · 工具表每轮重建：ToolSchemas.all() + 通话扩展 + 市场</text>
+<rect x="56" y="530" width="568" height="176" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="68" y="552" font-size="12" fill="#1F2328" font-weight="600" dominant-baseline="central">for step in 1..maxSteps —— 默认 25，可调，钳在 1..200</text>
+<rect x="72" y="566" width="536" height="42" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+<text x="84" y="587" font-size="12" fill="#185FA5" dominant-baseline="central">LlmClient.complete(history, tools) · 非流式 · 读超时 180 秒</text>
+<path d="M340 608 V620 M202 620 H478" fill="none" stroke="#8C959F" stroke-width="1.5"/>
+<path d="M202 620 V628" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M478 620 V628" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="72" y="628" width="260" height="52" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="84" y="650" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">有 tool_calls</text>
+<text x="84" y="670" font-size="12" fill="#656D76" dominant-baseline="central">runTool → methodOf() → dispatcher</text>
+<rect x="348" y="628" width="260" height="52" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="360" y="650" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">没有 tool_calls</text>
+<text x="360" y="670" font-size="12" fill="#656D76" dominant-baseline="central">onFinal(content) —— 本轮结束</text>
+<path d="M202 680 V696 H64 V587 H72" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="87" y="687" width="92" height="18" rx="4" fill="#FFFFFF"/>
+<text x="133" y="696" font-size="12" fill="#656D76" text-anchor="middle" dominant-baseline="central">↻ 下一步</text>
+<rect x="56" y="714" width="568" height="28" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="68" y="728" font-size="12" fill="#656D76" dominant-baseline="central">守卫：代际号取消过期轮 · 3 次重复即停 · 历史裁到 60 轮 / 6 万字符 · harvest 压缩</text>
+
+<path d="M624 344 H656 V814 H642" fill="none" stroke="#8C959F" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+<text x="670" y="580" font-size="10" fill="#656D76" transform="rotate(-90 670 580)" dominant-baseline="central">hub 的循环在对面</text>
+
+<path d="M340 750 V782" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="782" width="186" height="52" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="52" y="804" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">LocalBrain 工具调用</text>
+<text x="52" y="824" font-size="12" fill="#656D76" dominant-baseline="central">名字已映射完毕</text>
+<rect x="247" y="782" width="186" height="52" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="259" y="804" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">BodyWsServer</text>
+<text x="259" y="824" font-size="12" fill="#656D76" dominant-baseline="central">0.0.0.0:9008，请求进来</text>
+<rect x="454" y="782" width="186" height="52" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="466" y="804" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">BodyWsClient</text>
+<text x="466" y="824" font-size="12" fill="#656D76" dominant-baseline="central">工具注册出去，请求进来</text>
+<path d="M133 834 V846 M340 834 V846 M547 834 V846 M133 846 H547" fill="none" stroke="#8C959F" stroke-width="1.5"/>
+<path d="M340 846 V854" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="854" width="600" height="92" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+<text x="52" y="876" font-size="13" fill="#0C447C" font-weight="600" dominant-baseline="central">CommandDispatcher —— 唯一出口</text>
+<text x="52" y="898" font-size="12" fill="#185FA5" dominant-baseline="central">when(method) 挑真正干活的控制器：device.* · screen.* · note.* · scene.*</text>
+<text x="52" y="918" font-size="12" fill="#185FA5" dominant-baseline="central">meeting.* · dog.* · tts.* · ui.* —— 没匹配的转给市场，再转通话扩展</text>
+<text x="52" y="936" font-size="12" fill="#185FA5" dominant-baseline="central">拒绝写在这里，不在提示词里。</text>
+<path d="M340 946 V968" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="968" width="600" height="250" rx="12" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="52" y="990" font-size="12" fill="#656D76" dominant-baseline="central">从哪儿出来 —— 六个通道</text>
+<rect x="56" y="1002" width="180" height="76" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+<text x="68" y="1024" font-size="13" fill="#0C447C" font-weight="600" dominant-baseline="central">语音</text>
+<text x="68" y="1044" font-size="12" fill="#185FA5" dominant-baseline="central">TtsController → 扬声器</text>
+<text x="68" y="1064" font-size="12" fill="#185FA5" dominant-baseline="central">整段读，一次给完</text>
+<rect x="250" y="1002" width="180" height="76" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="262" y="1024" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">文字</text>
+<text x="262" y="1044" font-size="12" fill="#656D76" dominant-baseline="central">气泡、字幕、卡片</text>
+<text x="262" y="1064" font-size="12" fill="#656D76" dominant-baseline="central">ChatHistory · CardUi</text>
+<rect x="444" y="1002" width="180" height="76" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="456" y="1024" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">网页</text>
+<text x="456" y="1044" font-size="12" fill="#656D76" dominant-baseline="central">HtmlActivity 全屏</text>
+<text x="456" y="1064" font-size="12" fill="#656D76" dominant-baseline="central">一次只留一页</text>
+<rect x="56" y="1088" width="180" height="76" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+<text x="68" y="1110" font-size="13" fill="#0C447C" font-weight="600" dominant-baseline="central">产物</text>
+<text x="68" y="1130" font-size="12" fill="#185FA5" dominant-baseline="central">ChatHistory Role.PAGE</text>
+<text x="68" y="1150" font-size="12" fill="#185FA5" dominant-baseline="central">可回看，说一句就能改</text>
+<rect x="250" y="1088" width="180" height="76" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="262" y="1110" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">长文</text>
+<text x="262" y="1130" font-size="12" fill="#656D76" dominant-baseline="central">TextPage</text>
+<text x="262" y="1150" font-size="12" fill="#656D76" dominant-baseline="central">双击消息全屏读</text>
+<rect x="444" y="1088" width="180" height="76" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="456" y="1110" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">身体</text>
+<text x="456" y="1130" font-size="12" fill="#656D76" dominant-baseline="central">DogMotion → USB 串口</text>
+<text x="456" y="1150" font-size="12" fill="#656D76" dominant-baseline="central">发完即返回</text>
+<text x="52" y="1186" font-size="12" fill="#656D76" dominant-baseline="central">语音和文字在轮次结束时由服务发出；网页、卡片和动作在轮次中由 dispatcher 指挥。</text>
+<text x="52" y="1204" font-size="12" fill="#656D76" dominant-baseline="central">眼睛也是通道：LookActivity 和 ScanActivity 占屏取帧，画面作为 vision 消息回到循环。</text>
+
+<rect x="40" y="1240" width="600" height="90" rx="12" fill="#FAEEDA" stroke="#EF9F27" stroke-width="1"/>
+<text x="52" y="1262" font-size="13" fill="#633806" font-weight="600" dominant-baseline="central">三条不变量</text>
+<text x="52" y="1284" font-size="12" fill="#854F0B" dominant-baseline="central">拒绝写在 dispatcher 里，不在提示词里 —— 提示词说不动它</text>
+<text x="52" y="1304" font-size="12" fill="#854F0B" dominant-baseline="central">通知文本是数据；通知触发的回合碰不到保险箱、也不能进或建情景</text>
+<text x="52" y="1324" font-size="12" fill="#854F0B" dominant-baseline="central">模型永远不算坐标：0-1000 相对坐标由设备换算，越界直接报错不夹紧</text>
+</svg>

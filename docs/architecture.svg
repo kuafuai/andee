@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 1340" width="100%" role="img" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif">
+<title>Andee — architecture</title>
+<desc>Andee has no main UI: a single AccessibilityService, ScreenBodyService, is the entry point and the only coordinator. Five things can start a turn - the offline wake word, voice or typed input, the notification relay, timers and TODOs, and requests arriving on the WebSocket server. A turn is logged to ChatHistory and handed to one of three mutually exclusive backends: LocalBrain on device with your own key (the out-of-box default), an API market hosted by CodeFlying (used when it is compiled in, one domain proxying LLM, ASR and TTS plus a market tool surface), or a hub brain reached over a socket. Only the first two run the agent loop here. That loop is LocalBrain: it assembles the system prompt from LocalPrompt.withPersona, keeps the volatile parts (clock, notebook index, scenes, photos) in the user message, rebuilds the tool table every turn, then calls LlmClient.complete in a non-streaming for-loop of up to maxSteps, 25 by default. A reply carrying tool calls goes through methodOf() to the CommandDispatcher; a reply without any ends the turn. Guards: a generation counter cancels stale turns, three identical calls in a row stop the loop, and history is trimmed and compacted by harvest. ScreenBodyService and the dispatcher then put the result out through six channels - speech through TtsController, text as bubbles, subtitles and cards, a full-screen HTML page in HtmlActivity, saved artifacts that can be re-opened and edited just by asking, long messages read full-screen in TextPage, and physical motion through DogMotion over USB serial. When the hub answers instead, its loop runs off-device and reaches the body over the socket. Three invariants hold: a refusal lives in the dispatcher rather than the prompt, notification text is data and a notification-driven turn cannot reach the vault or enter a scene, and the model never does coordinate maths.</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="#8C959F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+
+<rect x="0" y="0" width="680" height="1340" fill="#FFFFFF"/>
+
+<text x="40" y="50" font-size="15" fill="#1F2328" font-weight="600" dominant-baseline="central">Andee — architecture</text>
+<text x="40" y="72" font-size="12" fill="#656D76" dominant-baseline="central">One AccessibilityService is the entry point, and there is no main UI.</text>
+
+<text x="40" y="98" font-size="12" fill="#656D76" dominant-baseline="central">Ways in — five of them, and no screen to start from</text>
+<rect x="40" y="110" width="112" height="52" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="52" y="132" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Wake word</text>
+<text x="52" y="150" font-size="12" fill="#656D76" dominant-baseline="central">offline · DTW</text>
+<rect x="162" y="110" width="112" height="52" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="174" y="132" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Voice · typing</text>
+<text x="174" y="150" font-size="12" fill="#656D76" dominant-baseline="central">ASR or text</text>
+<rect x="284" y="110" width="112" height="52" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="296" y="132" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Notifications</text>
+<text x="296" y="150" font-size="12" fill="#656D76" dominant-baseline="central">relay service</text>
+<rect x="406" y="110" width="112" height="52" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="418" y="132" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Timers · TODO</text>
+<text x="418" y="150" font-size="12" fill="#656D76" dominant-baseline="central">alarms, review</text>
+<rect x="528" y="110" width="112" height="52" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="540" y="132" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Hub requests</text>
+<text x="540" y="150" font-size="12" fill="#656D76" dominant-baseline="central">WS :9008</text>
+<path d="M96 162 V174 M218 162 V174 M340 162 V174 M462 162 V174 M584 162 V174 M96 174 H584" fill="none" stroke="#8C959F" stroke-width="1.5"/>
+<path d="M340 174 V182" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="182" width="600" height="76" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+<text x="52" y="206" font-size="13" fill="#0C447C" font-weight="600" dominant-baseline="central">ScreenBodyService — AccessibilityService</text>
+<text x="52" y="228" font-size="12" fill="#185FA5" dominant-baseline="central">The only coordinator. It builds the object graph, and the floating ball is its only face;</text>
+<text x="52" y="250" font-size="12" fill="#185FA5" dominant-baseline="central">every path out ends here — the turn is logged to ChatHistory, then handed to a backend.</text>
+<path d="M340 258 V276" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="276" width="600" height="132" rx="12" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="52" y="296" font-size="12" fill="#656D76" dominant-baseline="central">Which brain answers — three, mutually exclusive</text>
+<rect x="56" y="306" width="180" height="76" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+<text x="68" y="328" font-size="13" fill="#0C447C" font-weight="600" dominant-baseline="central">LocalBrain · default</text>
+<text x="68" y="348" font-size="12" fill="#185FA5" dominant-baseline="central">on device, your own key</text>
+<text x="68" y="368" font-size="12" fill="#185FA5" dominant-baseline="central">LlmClient → DeepSeek</text>
+<rect x="250" y="306" width="180" height="76" rx="8" fill="#FAEEDA" stroke="#EF9F27" stroke-width="1"/>
+<text x="262" y="328" font-size="13" fill="#633806" font-weight="600" dominant-baseline="central">API market</text>
+<text x="262" y="348" font-size="12" fill="#854F0B" dominant-baseline="central">CodeFlying · hosted</text>
+<text x="262" y="368" font-size="12" fill="#854F0B" dominant-baseline="central">LLM/ASR/TTS + tools</text>
+<rect x="444" y="306" width="180" height="76" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="456" y="328" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Hub brain</text>
+<text x="456" y="348" font-size="12" fill="#656D76" dominant-baseline="central">remote · over WS</text>
+<text x="456" y="368" font-size="12" fill="#656D76" dominant-baseline="central">off if hub_url blank</text>
+<text x="52" y="396" font-size="12" fill="#656D76" dominant-baseline="central">Only the first two run the loop on this device; the hub's loop stays on the far side.</text>
+<path d="M340 408 V426" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="426" width="600" height="324" rx="12" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="52" y="450" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">The harness — LocalBrain. This is the agent loop, and it lives on the tablet.</text>
+<text x="52" y="472" font-size="12" fill="#656D76" dominant-baseline="central">1 · system prompt = LocalPrompt.withPersona(persona, scene), held constant</text>
+<text x="52" y="492" font-size="12" fill="#656D76" dominant-baseline="central">2 · volatile parts ride in the user message: clock, notebook index, scenes, photos</text>
+<text x="52" y="512" font-size="12" fill="#656D76" dominant-baseline="central">3 · the tool table is rebuilt every turn: ToolSchemas.all() + extensions + market</text>
+<rect x="56" y="530" width="568" height="176" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="68" y="552" font-size="12" fill="#1F2328" font-weight="600" dominant-baseline="central">for step in 1..maxSteps — 25 unless the config raises it, clamped 1..200</text>
+<rect x="72" y="566" width="536" height="42" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+<text x="84" y="587" font-size="12" fill="#185FA5" dominant-baseline="central">LlmClient.complete(history, tools) · non-streaming · 180 s read timeout</text>
+<path d="M340 608 V620 M202 620 H478" fill="none" stroke="#8C959F" stroke-width="1.5"/>
+<path d="M202 620 V628" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M478 620 V628" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="72" y="628" width="260" height="52" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="84" y="650" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">tool_calls present</text>
+<text x="84" y="670" font-size="12" fill="#656D76" dominant-baseline="central">runTool → methodOf() → the dispatcher</text>
+<rect x="348" y="628" width="260" height="52" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="360" y="650" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">no tool_calls</text>
+<text x="360" y="670" font-size="12" fill="#656D76" dominant-baseline="central">onFinal(content) — the turn ends</text>
+<path d="M202 680 V696 H64 V587 H72" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="87" y="687" width="92" height="18" rx="4" fill="#FFFFFF"/>
+<text x="133" y="696" font-size="12" fill="#656D76" text-anchor="middle" dominant-baseline="central">↻ next step</text>
+<rect x="56" y="714" width="568" height="28" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="68" y="728" font-size="12" fill="#656D76" dominant-baseline="central">Guards: generation cancel · 3-repeat stop · trim 60 turns / 60k chars · harvest</text>
+
+<path d="M624 344 H656 V814 H642" fill="none" stroke="#8C959F" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+<text x="670" y="580" font-size="10" fill="#656D76" transform="rotate(-90 670 580)" dominant-baseline="central">hub loop: off-device</text>
+
+<path d="M340 750 V782" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="782" width="186" height="52" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="52" y="804" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">LocalBrain tool calls</text>
+<text x="52" y="824" font-size="12" fill="#656D76" dominant-baseline="central">the name is already mapped</text>
+<rect x="247" y="782" width="186" height="52" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="259" y="804" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">BodyWsServer</text>
+<text x="259" y="824" font-size="12" fill="#656D76" dominant-baseline="central">0.0.0.0:9008, requests in</text>
+<rect x="454" y="782" width="186" height="52" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="466" y="804" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">BodyWsClient</text>
+<text x="466" y="824" font-size="12" fill="#656D76" dominant-baseline="central">register out, request in</text>
+<path d="M133 834 V846 M340 834 V846 M547 834 V846 M133 846 H547" fill="none" stroke="#8C959F" stroke-width="1.5"/>
+<path d="M340 846 V854" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="854" width="600" height="92" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+<text x="52" y="876" font-size="13" fill="#0C447C" font-weight="600" dominant-baseline="central">CommandDispatcher — the only way out</text>
+<text x="52" y="898" font-size="12" fill="#185FA5" dominant-baseline="central">when(method) picks the real controller: device.* · screen.* · note.* · scene.*</text>
+<text x="52" y="918" font-size="12" fill="#185FA5" dominant-baseline="central">meeting.* · dog.* · tts.* · ui.* — anything else forwards to market, then extensions</text>
+<text x="52" y="936" font-size="12" fill="#185FA5" dominant-baseline="central">A refusal lives here, not in the prompt.</text>
+<path d="M340 946 V968" fill="none" stroke="#8C959F" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="968" width="600" height="250" rx="12" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="52" y="990" font-size="12" fill="#656D76" dominant-baseline="central">Where it comes out — six channels</text>
+<rect x="56" y="1002" width="180" height="76" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+<text x="68" y="1024" font-size="13" fill="#0C447C" font-weight="600" dominant-baseline="central">Voice</text>
+<text x="68" y="1044" font-size="12" fill="#185FA5" dominant-baseline="central">TtsController → speaker</text>
+<text x="68" y="1064" font-size="12" fill="#185FA5" dominant-baseline="central">assistant audio, one take</text>
+<rect x="250" y="1002" width="180" height="76" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="262" y="1024" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Text</text>
+<text x="262" y="1044" font-size="12" fill="#656D76" dominant-baseline="central">bubbles, subtitles, cards</text>
+<text x="262" y="1064" font-size="12" fill="#656D76" dominant-baseline="central">ChatHistory · CardUi</text>
+<rect x="444" y="1002" width="180" height="76" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="456" y="1024" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Page</text>
+<text x="456" y="1044" font-size="12" fill="#656D76" dominant-baseline="central">HtmlActivity, full screen</text>
+<text x="456" y="1064" font-size="12" fill="#656D76" dominant-baseline="central">one page at a time</text>
+<rect x="56" y="1088" width="180" height="76" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+<text x="68" y="1110" font-size="13" fill="#0C447C" font-weight="600" dominant-baseline="central">Artifacts</text>
+<text x="68" y="1130" font-size="12" fill="#185FA5" dominant-baseline="central">ChatHistory Role.PAGE</text>
+<text x="68" y="1150" font-size="12" fill="#185FA5" dominant-baseline="central">re-open, edit by asking</text>
+<rect x="250" y="1088" width="180" height="76" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<text x="262" y="1110" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Long text</text>
+<text x="262" y="1130" font-size="12" fill="#656D76" dominant-baseline="central">TextPage</text>
+<text x="262" y="1150" font-size="12" fill="#656D76" dominant-baseline="central">double-tap a message</text>
+<rect x="444" y="1088" width="180" height="76" rx="8" fill="#FFFFFF" stroke="#AFB8C1" stroke-width="1"/>
+<text x="456" y="1110" font-size="13" fill="#1F2328" font-weight="600" dominant-baseline="central">Body</text>
+<text x="456" y="1130" font-size="12" fill="#656D76" dominant-baseline="central">DogMotion → USB serial</text>
+<text x="456" y="1150" font-size="12" fill="#656D76" dominant-baseline="central">fire and forget</text>
+<text x="52" y="1186" font-size="12" fill="#656D76" dominant-baseline="central">Speech and text at turn end; pages, cards and motion from the dispatcher mid-turn.</text>
+<text x="52" y="1204" font-size="12" fill="#656D76" dominant-baseline="central">Eyes: LookActivity and ScanActivity take the screen, and the frame returns as a vision message.</text>
+
+<rect x="40" y="1240" width="600" height="90" rx="12" fill="#FAEEDA" stroke="#EF9F27" stroke-width="1"/>
+<text x="52" y="1262" font-size="13" fill="#633806" font-weight="600" dominant-baseline="central">Three invariants</text>
+<text x="52" y="1284" font-size="12" fill="#854F0B" dominant-baseline="central">A refusal lives in the dispatcher, not the prompt — the prompt cannot talk it out of one</text>
+<text x="52" y="1304" font-size="12" fill="#854F0B" dominant-baseline="central">Notification text is data; a notification-driven turn cannot reach the vault or enter a scene</text>
+<text x="52" y="1324" font-size="12" fill="#854F0B" dominant-baseline="central">The model never does coordinate maths: the device computes 0-1000 and rejects out-of-range</text>
+</svg>

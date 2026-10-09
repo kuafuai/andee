@@ -197,6 +197,23 @@ WebSocket hub 连到设备。两者之间只是一份普通的工具 schema 契�
 构造函数注入；并发是 `Handler` + 独立 `Executor`。四万三千多行 Kotlin，全部自研 —— 没有一行是从
 别处拷来的。
 
+## 架构
+
+入口是一个 `AccessibilityService`，没有主界面。一轮可以从五个地方开始 —— 离线唤醒词、语音或
+打字、一条通知、一个定时、或经 WebSocket 进来的请求 —— 先写进 `ChatHistory`，再交给当时生效的
+那个后端（`brain = local` 是开箱默认）。
+
+agent loop **就是** `LocalBrain`。它让系统提示词保持不变，把会变的部分（时钟、notebook 索引、
+情景、照片）内联进 user 消息，这样服务商的前缀缓存仍然命中；工具表每轮重建；然后是一个
+**非流式**的 `for` 循环，最多 `maxSteps` 步。带工具调用的回复经 `methodOf()` 送到唯一的
+`CommandDispatcher`；不带工具调用的回复结束这一轮。结果从六个通道送出来 —— 语音、文字、
+全屏网页、产物、长文、以及物理动作。
+
+![Andee 架构](docs/architecture.zh-CN.svg)
+
+图上画的每一样都在本仓库里，连护栏也在 ——
+见[为什么你可以去核对，而不是选择相信](#为什么你可以去核对而不是选择相信)。
+
 ## 快速开始
 
 **最快的一条路，省掉的是真正卡住人的那两件事：自己打包、自己配令牌。**
@@ -718,6 +735,7 @@ app/                    Android 应用（Kotlin，无 Compose）
     ui/                    悬浮层：球、字幕、设置、自检、情景、产物
     i18n/AppLocale.kt      悬浮层怎么拿到自己的字符串
   src/main/res/values{,-en}/strings.xml   两张面向用户的字符串表
+docs/architecture.zh-CN.svg   一页看全（英文那份在旁边）
 docs/permissions.zh-CN.md     为什么它要这些权限
 reports/                设计实验室与调研笔记（是仓库的一部分，不是草稿）
 tools/                  设备侧小工具、球脸验收 runner、许可证审计
@@ -832,6 +850,7 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
 ## 相关文档
 
 - [docs/permissions.zh-CN.md](docs/permissions.zh-CN.md)（[English](docs/permissions.md)）—— 权限为什么这么要
+- [docs/architecture.zh-CN.svg](docs/architecture.zh-CN.svg)（[English](docs/architecture.svg)）—— 一页看全：一轮怎么进来、agent loop、六个出口
 - [DISCLAIMER.zh-CN.md](DISCLAIMER.zh-CN.md) —— 免责声明：数据去哪、能做什么、出事谁担
 - [docs/acceptable-use.zh-CN.md](docs/acceptable-use.zh-CN.md) —— 可接受使用政策（禁止用途）
 - [SECURITY.md](SECURITY.md)（英文）—— 威胁模型、已知限制、漏洞上报
