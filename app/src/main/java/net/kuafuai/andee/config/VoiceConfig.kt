@@ -86,6 +86,20 @@ data class VoiceConfig(
         fun isCodeFlyingAvailable(): Boolean =
             BuildConfig.CODEFLYING_ENABLED && BuildConfig.CODEFLYING_DOMAIN.isNotBlank()
 
+        /**
+         * The CodeFlying API key in effect for this install.
+         *
+         * Read from `assets/andee_key.txt` first: production APKs are built once
+         * from shared source (empty key) and the per-user `kft_` token is written
+         * into that asset at package time, so a Gradle rebuild is not needed per
+         * user. Dev builds that never had the file (or have a blank one) fall
+         * back to [BuildConfig.CODEFLYING_KEY] from local.properties.
+         */
+        fun codeFlyingKey(context: Context): String =
+            runCatching {
+                context.assets.open("andee_key.txt").bufferedReader().use { it.readText().trim() }
+            }.getOrDefault("").ifEmpty { BuildConfig.CODEFLYING_KEY }
+
         /** `wss` / `ws` for WebSocket URLs, chosen by `CODEFLYING_SSL_ENABLED`. */
         private fun codeFlyingWsScheme(): String =
             if (BuildConfig.CODEFLYING_SSL_ENABLED) "wss" else "ws"
@@ -211,7 +225,7 @@ data class VoiceConfig(
             if (mode == BRAIN_CODEFLYING) {
                 return BrainConfig(
                     mode = BRAIN_CODEFLYING,
-                    apiKey = BuildConfig.CODEFLYING_KEY,
+                    apiKey = codeFlyingKey(context),
                     baseUrl = codeFlyingLlmBaseUrl(),
                     model = p.getString("llm_model", DEFAULT_LLM_MODEL)
                         .orEmpty().trim().ifEmpty { DEFAULT_LLM_MODEL },
@@ -336,7 +350,7 @@ data class VoiceConfig(
             // ASR/TTS still run on this device whichever brain answers.
             val codeFlying = brainMode(context) == BRAIN_CODEFLYING
             return VoiceConfig(
-                apiKey = if (codeFlying) BuildConfig.CODEFLYING_KEY
+                apiKey = if (codeFlying) codeFlyingKey(context)
                 else p.getString("api_key", "").orEmpty().trim().ifEmpty { API_KEY },
                 asrEndpoint = if (codeFlying) codeFlyingAsrEndpoint()
                 else p.getString("asr_endpoint", null)
