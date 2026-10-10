@@ -207,14 +207,16 @@ class PermissionsController(private val context: Context) {
         // sheet that never came and never will. Look first — firing again is
         // the one move that cannot help.
         //
-        // And note what is NOT offered here: tapping the sheet. Measured, a
-        // system permission sheet exposes no elements and ignores an injected
-        // tap, so "tap Allow yourself" would be advice that cannot be taken.
+        // And note what is NOT offered here: aiming at the sheet. Measured, it
+        // exposes no elements — so a tap would be a guess, and the button at the
+        // bottom of this particular screen is an irreversible deny. "Tap Allow
+        // yourself" is not caution withheld; it is a step nobody should take
+        // blind.
         else -> "Look at the screen before anything else: if nothing was drawn, do not " +
             "fire again — say it did not go through and that this step needs their hand. " +
             when (mode) {
-                "solo" -> "If the sheet is there, it is waiting on their finger — you cannot " +
-                    "tap it. Say one line that it is up, and carry on with what does not need it."
+                "solo" -> "If the sheet is there, it is waiting on their finger. Say one " +
+                    "line that it is up, and carry on with what does not need it."
                 "handoff" -> "If the sheet is there it is theirs to answer — ask with ask_user, " +
                     "saying what you are waiting for."
                 else -> "A Settings page is open and only they can flip that switch — " +

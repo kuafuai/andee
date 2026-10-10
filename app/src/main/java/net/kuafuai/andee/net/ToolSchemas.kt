@@ -732,14 +732,15 @@ object ToolSchemas {
                    "no_dialog"  the system never drew a sheet at all
                    "waiting"    it is on screen and nobody has answered yet
 
-        🔴 **A system permission sheet cannot be tapped by you.** It exposes no
-        elements (get_screen_element comes back empty, with a picture and no
-        e-numbers) and it ignores a tap you inject. Putting it on screen is the
+        🔴 **You cannot read a system permission sheet, so do not aim at it.**
+        It exposes no elements at all (get_screen_element comes back empty, with
+        a picture and no e-numbers). A tap would land — that is the trap: with
+        nothing to aim by, you are guessing at a screen whose bottom button is
+        「禁止后不再提示」, which nothing can undo. Putting it on screen is the
         whole of what firing does; answering it is the user's one step. So when
         the result is "waiting", say one line — 「屏幕上弹了个权限框，点一下允许」—
         and either wait via ask_user or go on with whatever does not need it.
-        Do not tap at it, and do not read its stillness as the screen being
-        broken.
+        Do not read its stillness as the screen being broken.
 
         Never fire the same request twice in a row. "no_dialog" means the system
         has stopped asking (usually after two refusals) and firing again is
