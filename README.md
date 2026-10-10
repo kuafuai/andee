@@ -1,4 +1,9 @@
 <p align="center">
+  <img src="images/cover.png" width="100%"
+       alt="Andee — an agent that moves into your Android phone. Turn any Android phone into an AI phone.">
+</p>
+
+<p align="center">
   <a href="https://www.codeflying.app">Build online</a> ·
   <a href="https://www.codeflying.app/andee">Try now</a> ·
   <a href="#key-features">Features</a> ·
@@ -883,12 +888,11 @@ Blur or avoid anything private — yours or anyone else's — before it goes up.
 <!-- Replace with a real contributors image once the project has a public home.
      GitHub: <img alt="Contributors" src="https://contrib.rocks/image?repo=kuafuai/andee" /> -->
 
-<!-- Cover image, demo GIF and stills — the four assets this README still needs.
+<!-- Demo GIF, demo video and stills — the three assets this README still needs.
      Capture all of them on a real device; an emulator makes this app look like nothing.
-       1. images/cover.png                      1200×630, goes at the very top
-       2. images/demo.gif                       10–15s loop: the ball reacting while a task runs
-       3. a full demo video                     30–60s, GitHub attachment link (drag-drop upload), goes at the top
-       4. images/shot-{ball,phone,dog}.png      three stills, including the dog mid-motion
+       1. images/demo.gif                       10–15s loop: the ball reacting while a task runs
+       2. a full demo video                     30–60s, GitHub attachment link (drag-drop upload), goes at the top
+       3. images/shot-{ball,phone,dog}.png      three stills, including the dog mid-motion
      Shot list for the video, in order: wake it by voice → it opens an app and taps through it →
      the ball's face changes as it works → a page it wrote appears → the dog moving. The dog is the
      clearest single proof that this is a body and not a UI, so do not cut it for time. -->

@@ -3,6 +3,11 @@
 -->
 
 <p align="center">
+  <img src="images/cover.zh-CN.png" width="100%"
+       alt="Andee —— 把任何一部安卓手机，变成 AI 手机。它不是跑在手机上的工具，而是住在手机里的个体。">
+</p>
+
+<p align="center">
   <a href="https://www.codeflying.net">在线构建</a> ·
   <a href="https://www.codeflying.net/andee">立即体验</a> ·
   <a href="#核心能力">核心能力</a> ·
@@ -781,12 +786,11 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
 <!-- 项目有公开主页后换成真实的贡献者图：
      <img alt="Contributors" src="https://contrib.rocks/image?repo=kuafuai/andee" /> -->
 
-<!-- 素材清单：这四份是这份 README 与"完工"之间的全部差距。请用**真机**录 —— 模拟器会把 Andee
+<!-- 素材清单：这三份是这份 README 与"完工"之间的全部差距。请用**真机**录 —— 模拟器会把 Andee
      拍得一无是处。
-       1. images/cover.png                      1200×630，放最顶上
-       2. images/demo.gif                       10~15 秒循环：球在反应、任务在跑
-       3. 完整演示视频                          30~60 秒，GitHub 附件链接（拖进网页编辑器生成），放开头
-       4. images/shot-{ball,phone,dog}.png      三张静帧，其中一张要拍到狗在动
+       1. images/demo.gif                       10~15 秒循环：球在反应、任务在跑
+       2. 完整演示视频                          30~60 秒，GitHub 附件链接（拖进网页编辑器生成），放开头
+       3. images/shot-{ball,phone,dog}.png      三张静帧，其中一张要拍到狗在动
      **演示该拍什么**，按顺序：语音叫醒它 → 它自己打开一个 App 点进点出 → 干活时那颗球的表情在变 →
      它写的一页东西出现 → 机器狗动起来。狗是"这是身体不是界面"最直接的一条证据，别为了时长把它剪掉。 -->
 
