@@ -157,6 +157,38 @@ class ScreenBodyService : AccessibilityService() {
                 // Also barge-in. Tapping the ball while Andee is talking means
                 // the user wants the floor, so cutting TTS here keeps the
                 // agent's own voice out of the mic.
+                //
+                // And a shoulder-tap, when there is a task to shoulder-tap. A
+                // tap used to mean "listen" and nothing else, which left a gap
+                // the moment the ball was busy: the user who wanted to
+                // *redirect* it had to stop it first (three taps) and then ask
+                // again (one more) — two gestures for a single intent. Tapping
+                // something busy and having it stop and listen is what one
+                // person does to another, and it is the only reading of the tap
+                // that isn't "talk over the thing you can't hear". Triple-tap
+                // still stops, and is still the *immediate* stop — see
+                // [onStopClick] — because a single tap has to wait out the
+                // double-tap window before it knows it isn't the first of two.
+                //
+                // A meeting is not a task to interrupt: stop and listen both
+                // mean "end it" there. Decided once, here, rather than by
+                // letting the two methods below each find a live meeting and
+                // end it twice.
+                if (meeting.isActive()) {
+                    meeting.stopFromUser()
+                    return
+                }
+                // Stop is *the* definition of stopping — `stopEverything()` —
+                // reused rather than reimplemented, so the shoulder-tap and the
+                // triple-tap can't drift into two different stops and the hub
+                // gets its `task.stop` either way.
+                //
+                // Guarded on the task rather than run unconditionally: on an
+                // idle ball there is nothing to stop, and the call would still
+                // clear a pending 继续修改, tell the hub to stop, and flash
+                // 已停止 ahead of 听着… — three side effects for a tap that
+                // only ever meant "listen".
+                if (dispatcher.isTaskActive()) stopEverything()
                 startTurn()
             }
 

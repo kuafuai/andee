@@ -66,6 +66,13 @@ import kotlin.random.Random
  * [BallHostFrame.registerTap]. The swipe is the one gesture that is
  * full-card-only, which is why the tips line spells it out.
  *
+ * The first tap carries two verbs and the tips line still says one word for
+ * it, which is not an omission: tapping something busy and having it stop and
+ * listen is one intent, so it is one gesture — see [Listeners.onTalkClick] for
+ * why it isn't left to the user to sequence the stop and the ask themselves.
+ * What the tips line teaches is the vocabulary; what a tap *does* depends on
+ * what is running, which is not something a line of text can say anyway.
+ *
  * Everything the assistant hears, says, shows or fails at ends up in that one
  * list, in order. There is no separate subtitle band: [setSubtitle] writes the
  * list's live last row instead, so the user watches one surface rather than
@@ -121,6 +128,16 @@ class FloatingWindowUi(
     enum class SubtitleKind { PARTIAL, FINAL }
 
     interface Listeners {
+        /**
+         * One tap on the ball — talk, having stopped anything that was running.
+         *
+         * The stop half is deliberately the host's call and not this class's:
+         * only the service can see whether there is a task to interrupt, and
+         * only it owns what stopping one means (the brain's turn, the
+         * dispatcher's glow, the hub's `task.stop`). The window reports the
+         * gesture and nothing about the state behind it — same split as
+         * [onStopClick], which is the other half of that same decision.
+         */
         fun onTalkClick()
         fun onSettingsClick()
 
