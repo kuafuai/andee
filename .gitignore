@@ -22,3 +22,10 @@ __pycache__/
 
 # 助手在本仓库里的工作数据（会话记忆、项目级 skill）。是本地状态，不是源码。
 .workbuddy/
+
+# 站点检查器（andee-website/tools/check-site.mjs）运行时生成的临时页：
+# 它把探针注入一份副本再交给浏览器，正常跑完会自己删掉。
+# 但跑挂了或被中断（比如输出被 head 提前掐断管道）就会留下，
+# 而它和源页面几乎一样、很容易被误提交。两种后缀都要挡：
+andee-website/*.probe.html
+andee-website/*.degraded.html

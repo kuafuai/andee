@@ -66,6 +66,13 @@ import kotlin.random.Random
  * [BallHostFrame.registerTap]. The swipe is the one gesture that is
  * full-card-only, which is why the tips line spells it out.
  *
+ * The first tap carries two verbs and the tips line still says one word for
+ * it, which is not an omission: tapping something busy and having it stop and
+ * listen is one intent, so it is one gesture — see [Listeners.onTalkClick] for
+ * why it isn't left to the user to sequence the stop and the ask themselves.
+ * What the tips line teaches is the vocabulary; what a tap *does* depends on
+ * what is running, which is not something a line of text can say anyway.
+ *
  * Everything the assistant hears, says, shows or fails at ends up in that one
  * list, in order. There is no separate subtitle band: [setSubtitle] writes the
  * list's live last row instead, so the user watches one surface rather than
@@ -121,6 +128,16 @@ class FloatingWindowUi(
     enum class SubtitleKind { PARTIAL, FINAL }
 
     interface Listeners {
+        /**
+         * One tap on the ball — talk, having stopped anything that was running.
+         *
+         * The stop half is deliberately the host's call and not this class's:
+         * only the service can see whether there is a task to interrupt, and
+         * only it owns what stopping one means (the brain's turn, the
+         * dispatcher's glow, the hub's `task.stop`). The window reports the
+         * gesture and nothing about the state behind it — same split as
+         * [onStopClick], which is the other half of that same decision.
+         */
         fun onTalkClick()
         fun onSettingsClick()
 
@@ -201,6 +218,41 @@ class FloatingWindowUi(
          * sequencing belongs to whoever owns the dispatcher.
          */
         fun onTextOpen(entry: ChatHistory.Entry)
+
+        /**
+         * A message row, long-pressed, for the log behind it — see
+         * [net.kuafuai.andee.ui.TracePage].
+         *
+         * Handed out rather than built here for the same reason plus a sharper
+         * one: turning a turn id into a page means reading and parsing the trace
+         * file, which blocks and must not do so on the UI thread. The window
+         * knows how to hold a row; only the service knows how to read a log.
+         *
+         * Never fired for a row whose [ChatHistory.Entry.turn] is null — there
+         * is no log to read, and a gesture that opens an empty page is worse
+         * than one that stays still.
+         */
+        fun onTraceOpen(entry: ChatHistory.Entry)
+
+        /**
+         * A suggestion bubble on a card with no history — the user taking the
+         * assistant up on one of the things it says it can do.
+         *
+         * Handed out rather than sent from here: sending is a turn, and a turn
+         * has exactly one way in (`ScreenBodyService.submitUserTurn`), which is
+         * where the log row, the hub event and the glow all hang off. A list
+         * that sent its own would be a second way in, and the hub event is the
+         * half that gets forgotten.
+         *
+         * [name] is the scene's stored key, which is what the service adopts
+         * the scene under — a bubble has to leave the scene in the notebook, or
+         * the model it names is asked about something that does not exist.
+         * [title] is what the user read on the bubble; [example] is the
+         * sentence that is actually sent. All three come from one preset — see
+         * [net.kuafuai.andee.config.ScenePresets.Text] — so a bubble cannot
+         * name one thing and send another.
+         */
+        fun onSuggestionClick(name: String, title: String, example: String)
     }
 
     private val wm: WindowManager =
@@ -2169,6 +2221,10 @@ class FloatingWindowUi(
         val history = HistoryListView(context).apply {
             onPageClick = { listeners.onHistoryPageClick(it) }
             onTextOpen = { listeners.onTextOpen(it) }
+            onTraceOpen = { listeners.onTraceOpen(it) }
+            onSuggestionClick = { name, title, example ->
+                listeners.onSuggestionClick(name, title, example)
+            }
         }
         historyView = history
         root.addView(

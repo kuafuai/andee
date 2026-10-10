@@ -2,6 +2,7 @@ package net.kuafuai.andee.device
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import androidx.annotation.StringRes
@@ -90,6 +91,18 @@ class PermissionsController(private val context: Context) {
      * to fire the intent. Runtime permissions use the classic dialog
      * (needs an activity — we hand the request to the floating settings
      * host); special ones deep-link into Settings.
+     *
+     * confirm=true answers with what actually happened. It used to answer
+     * `{"started": true}` — a hard-coded true meaning "startActivity did not
+     * throw" — and the brain read that as "it is on" and carried on against a
+     * permission it did not have. Those are two different facts and only one
+     * of them is worth acting on, so the reply now carries:
+     *
+     *   mode    solo | handoff | settings — WHO answers the dialog, decided
+     *           here rather than by the brain's own judgement, because a
+     *           request that mixes them is answered as a whole
+     *   result  granted | denied | no_dialog | waiting
+     *   next    one line saying what to do about that result
      */
     fun request(ids: JSONArray, confirm: Boolean): JSONObject {
         // The `say` sentence is shown/spoken to the user, so it is built in
@@ -119,16 +132,25 @@ class PermissionsController(private val context: Context) {
             return JSONObject().put("say", say).put("confirm_needed", true).put("ids", ids)
         }
 
+        val mode = routeOf(wanted.map { it.id })
+
+        // Drop what is already on. Re-asking a granted permission draws no
+        // dialog and answers nothing, so the brain would sit waiting on a
+        // sheet that was never going to appear.
+        val missing = runtime.filter { !isGranted(it.permission!!) }
+
         // Fire the intents. Runtime permissions need an Activity to host the
         // dialog — the app has none in the classic sense, so route through
         // the dedicated PermissionRequestActivity (manifest-registered,
         // translucent, finishes itself).
-        if (runtime.isNotEmpty()) {
+        var fired = false
+        if (missing.isNotEmpty()) {
+            PermissionRequestActivity.arm()
             val i = Intent(context, PermissionRequestActivity::class.java).apply {
-                putExtra("permissions", runtime.mapNotNull { it.permission }.toTypedArray())
+                putExtra("permissions", missing.mapNotNull { it.permission }.toTypedArray())
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            runCatching { context.startActivity(i) }
+            fired = runCatching { context.startActivity(i) }.isSuccess
         }
         special.forEach {
             runCatching {
@@ -146,6 +168,103 @@ class PermissionsController(private val context: Context) {
                 )
             }
         }
-        return JSONObject().put("started", true).put("say", say)
+
+        // Three ways this ends, in the order they can be known:
+        //  - nothing was missing   → it is on already; no dialog was owed
+        //  - a dialog was fired    → wait out the grace, because that is the
+        //                            window in which a silent block answers
+        //  - only a Settings page  → nothing to wait on but the user
+        val result = when {
+            runtime.isNotEmpty() && missing.isEmpty() -> GRANTED
+            missing.isNotEmpty() && !fired -> NO_DIALOG
+            missing.isNotEmpty() -> PermissionRequestActivity.await(DIALOG_GRACE_MS) ?: WAITING
+            else -> WAITING
+        }
+
+        return JSONObject()
+            .put("mode", mode)
+            .put("result", result)
+            .put("next", nextFor(mode, result))
+            .put("say", say)
+    }
+
+    private fun isGranted(permission: String): Boolean =
+        context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * One line telling the brain what this result means for its next call.
+     * It lives here rather than in the tool description because it depends on
+     * both the mode and the result, and a description cannot say "if what you
+     * just got back was X".
+     */
+    private fun nextFor(mode: String, result: String): String = when (result) {
+        GRANTED -> "It is on — carry on with what you needed it for."
+        DENIED -> "They saw the sheet and refused. Do not fire it again; say what you cannot do without it."
+        NO_DIALOG -> "The system never drew a sheet, so firing again is silently ignored. " +
+            "Do not retry — say it did not go through and that this step needs their hand in Settings."
+        // Nobody has answered yet, so the screen is the only thing that can
+        // still tell the two cases apart: a sheet waiting on a finger, or a
+        // sheet that never came and never will. Look first — firing again is
+        // the one move that cannot help.
+        //
+        // And note what is NOT offered here: aiming at the sheet. Measured, it
+        // exposes no elements — so a tap would be a guess, and the button at the
+        // bottom of this particular screen is an irreversible deny. "Tap Allow
+        // yourself" is not caution withheld; it is a step nobody should take
+        // blind.
+        else -> "Look at the screen before anything else: if nothing was drawn, do not " +
+            "fire again — say it did not go through and that this step needs their hand. " +
+            when (mode) {
+                "solo" -> "If the sheet is there, it is waiting on their finger. Say one " +
+                    "line that it is up, and carry on with what does not need it."
+                "handoff" -> "If the sheet is there it is theirs to answer — ask with ask_user, " +
+                    "saying what you are waiting for."
+                else -> "A Settings page is open and only they can flip that switch — " +
+                    "ask with ask_user and name the switch."
+            }
+    }
+
+    companion object {
+        /**
+         * How long a fired dialog gets to answer before it counts as "still
+         * waiting". This is a grace period, not a wait for the human: a
+         * permission the system has stopped asking about answers in
+         * milliseconds with no sheet drawn, while a real dialog stays up for
+         * as long as it takes. Waiting on the person is somebody else's job —
+         * the ball reading the screen in solo mode, or ask_user in handoff.
+         */
+        internal const val DIALOG_GRACE_MS = 800L
+
+        internal const val WAITING = "waiting"
+        private const val GRANTED = PermissionRequestActivity.GRANTED
+        private const val DENIED = PermissionRequestActivity.DENIED
+        private const val NO_DIALOG = PermissionRequestActivity.NO_DIALOG
+
+        /**
+         * The grants the ball may answer itself: data about the user's own
+         * body and their own diary, and nothing that leaves the phone.
+         *
+         * 🔴 This is a whitelist on purpose. Everything not named here routes
+         * to handoff — including a permission added to `catalog` later by
+         * someone who never read this — so the failure direction is "the user
+         * was asked once more than necessary" rather than "the ball agreed to
+         * something on their behalf".
+         */
+        private val SOLO_IDS = setOf("location", "steps", "calendar", "calendar_write")
+
+        /** Ids with no dialog at all — only a switch inside Settings. */
+        private val SETTINGS_IDS = setOf("notifications", "overlay")
+
+        /**
+         * Which route a request takes, from the ids alone, so it is testable
+         * without a device. Conservative by construction: one non-solo id
+         * hands over the whole request, because the dialogs arrive stacked and
+         * tapping one's way through a stack is how the wrong one gets answered.
+         */
+        internal fun routeOf(ids: List<String>): String = when {
+            ids.any { it in SETTINGS_IDS } -> "settings"
+            ids.isNotEmpty() && ids.all { it in SOLO_IDS } -> "solo"
+            else -> "handoff"
+        }
     }
 }

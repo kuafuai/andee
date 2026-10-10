@@ -346,6 +346,13 @@ class LocalBrain(
                 // dozen `return`s: leaving the kind set on any of them would
                 // make the *next* turn refuse every device tool.
                 currentKind = TurnKind.USER
+                // The same place, for the same reason, and one more: the trace's
+                // idea of "the turn in flight" has to end with the turn even
+                // when the turn recorded almost nothing. `submit`'s missing-key
+                // early return writes a scrollback row without ever reaching
+                // here, which is exactly why this clears rather than being
+                // consumed on read — see [BrainTrace.current].
+                BrainTrace.clearTurn()
                 busy.set(false)
                 dropUnfinishedHarvest(kind)
                 if (kind == TurnKind.SWEEP) onSweepSpent(turnTokens)

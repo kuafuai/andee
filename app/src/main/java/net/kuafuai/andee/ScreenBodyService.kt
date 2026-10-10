@@ -157,6 +157,38 @@ class ScreenBodyService : AccessibilityService() {
                 // Also barge-in. Tapping the ball while Andee is talking means
                 // the user wants the floor, so cutting TTS here keeps the
                 // agent's own voice out of the mic.
+                //
+                // And a shoulder-tap, when there is a task to shoulder-tap. A
+                // tap used to mean "listen" and nothing else, which left a gap
+                // the moment the ball was busy: the user who wanted to
+                // *redirect* it had to stop it first (three taps) and then ask
+                // again (one more) — two gestures for a single intent. Tapping
+                // something busy and having it stop and listen is what one
+                // person does to another, and it is the only reading of the tap
+                // that isn't "talk over the thing you can't hear". Triple-tap
+                // still stops, and is still the *immediate* stop — see
+                // [onStopClick] — because a single tap has to wait out the
+                // double-tap window before it knows it isn't the first of two.
+                //
+                // A meeting is not a task to interrupt: stop and listen both
+                // mean "end it" there. Decided once, here, rather than by
+                // letting the two methods below each find a live meeting and
+                // end it twice.
+                if (meeting.isActive()) {
+                    meeting.stopFromUser()
+                    return
+                }
+                // Stop is *the* definition of stopping — `stopEverything()` —
+                // reused rather than reimplemented, so the shoulder-tap and the
+                // triple-tap can't drift into two different stops and the hub
+                // gets its `task.stop` either way.
+                //
+                // Guarded on the task rather than run unconditionally: on an
+                // idle ball there is nothing to stop, and the call would still
+                // clear a pending 继续修改, tell the hub to stop, and flash
+                // 已停止 ahead of 听着… — three side effects for a tap that
+                // only ever meant "listen".
+                if (dispatcher.isTaskActive()) stopEverything()
                 startTurn()
             }
 
@@ -242,6 +274,82 @@ class ScreenBodyService : AccessibilityService() {
                     "text page: ${entry.text.length} chars → ${file.name}",
                 )
                 openPageFrom(entry, file)
+            }
+
+            /**
+             * Long-pressing a message row: the log behind it — see
+             * [net.kuafuai.andee.ui.TracePage].
+             *
+             * **Off the main thread, and this is not optional.** Building the
+             * page means reading and parsing `brain_trace.jsonl` — up to
+             * [net.kuafuai.andee.brain.BrainTrace]'s ceiling per generation —
+             * while the main thread is holding the ball's window. The read is
+             * small for one turn (measured: ~8 records, 7 KB) but the file it
+             * reads is not, and the cost of being wrong is a frozen ball.
+             *
+             * The gesture is only offered on rows that have a turn, so the
+             * `?: return` here is a backstop rather than a path the user can
+             * reach — see [net.kuafuai.andee.ui.ChatHistory.Entry.turn].
+             *
+             * Nothing is asked of the assistant, so as with [onTextOpen] this
+             * starts no task and lights no glow: the dispatcher is deliberately
+             * not involved.
+             */
+            override fun onTraceOpen(entry: net.kuafuai.andee.ui.ChatHistory.Entry) {
+                val turn = entry.turn ?: return
+                Thread {
+                    val file = net.kuafuai.andee.ui.TracePage.write(this@ScreenBodyService, turn)
+                    if (file != null) ui.post { openPageFrom(entry, file) }
+                }.start()
+            }
+
+            /**
+             * A suggestion bubble on an empty card — the one turn the device
+             * starts on the user's behalf.
+             *
+             * The user tapped a scene's *name* and gets its *example*: both are
+             * fields of one preset, so what the bubble promised and what is sent
+             * cannot drift. See [net.kuafuai.andee.config.ScenePresets.Text].
+             *
+             * **The scene is written down before the sentence is sent.** The
+             * turn below names the scene, and the model reads that name against
+             * the notebook — [net.kuafuai.andee.config.Notebook.scenesForPrompt]
+             * lists what the notebook holds. A bubble that only spoke asked the
+             * model about a scene nobody had saved, and it answered, correctly
+             * and in front of the user, that it had never seen one. Tapping the
+             * bubble *is* the yes that adoption waits for (see
+             * [net.kuafuai.andee.config.ScenePresets]), so the write happens here
+             * rather than being asked for again in the turn below.
+             *
+             * [net.kuafuai.andee.config.ScenePresets.adoptIfMissing], not
+             * `adopt`: the same bubble can be met in a later session, after the
+             * scene has been edited by the user or the model, and `saveScene`
+             * replaces the whole row — re-adopting would put the preset's text
+             * back over their version.
+             *
+             * Making the scene *active* is still deliberately **not** done here:
+             * a scene is a set of rules the model adopts, it is offered rather
+             * than imposed everywhere else (see `scene.*`), and the model reading
+             * its own name in a sentence is a better judge of whether this is
+             * that scene than a tap is. The device states the intent; the brain
+             * decides.
+             *
+             * Nothing here folds the card either. The first screen tool the
+             * brain calls goes through `CommandDispatcher.ensureCompact()`, which
+             * folds and waits for the fold — a second one fired from here would
+             * be racing it.
+             */
+            override fun onSuggestionClick(name: String, title: String, example: String) {
+                net.kuafuai.andee.config.ScenePresets.adoptIfMissing(
+                    this@ScreenBodyService,
+                    name,
+                    net.kuafuai.andee.config.VoiceConfig.uiLanguage(this@ScreenBodyService) ==
+                        net.kuafuai.andee.config.VoiceConfig.LANG_EN,
+                )
+                submitUserTurn(
+                    AppLocale.str(this@ScreenBodyService, R.string.suggestion_turn, title, example),
+                    "suggested",
+                )
             }
         })
         // Before the card is built: FloatingWindowUi.build() reads the log to
@@ -1997,6 +2105,14 @@ class ScreenBodyService : AccessibilityService() {
 
     /** The finished answer. See [onBrainProgress] for why this is not inline. */
     private fun onBrainFinal(text: String) {
+        // Read first, before anything else can end the turn. This runs inside
+        // the turn it is describing — `onFinal` is called from the loop thread
+        // while `runTurn` is still going — but `LocalBrain.launch` clears the
+        // turn in its `finally`, so the window is this function's entry, not
+        // wherever the string is finally written below. Reading late would
+        // attach null to real answers, which fails silently and looks exactly
+        // like the feature not existing. See [BrainTrace.current].
+        val turn = net.kuafuai.andee.brain.BrainTrace.currentTurn()
         if (acceptBrainOutput) {
             // The brain's own verdict on whether this conversation is still
             // open. Written before the speak below because [followUpWindow]
@@ -2027,7 +2143,7 @@ class ScreenBodyService : AccessibilityService() {
             // fires many times per task with successive drafts of the
             // same sentence — logging those would bury the answer under
             // its own rough cuts.
-            net.kuafuai.andee.ui.ChatHistory.addAssistant(plain)
+            net.kuafuai.andee.ui.ChatHistory.addAssistant(plain, turn)
             // Kept for one reason only: if speaking this fails and the card is
             // folded, the row above is `GONE` and this string is the last copy
             // of the answer on the device. See [showAnswerAsCard].

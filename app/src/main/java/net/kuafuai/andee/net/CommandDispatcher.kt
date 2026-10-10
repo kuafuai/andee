@@ -232,7 +232,8 @@ class CommandDispatcher(
             // card: asking "am I online" is a conversation, not an actuation.
             // All bounded-latency, no listeners outlive the call. `device.scan`
             // and `device.look` fold anyway, in their own branches — they are
-            // queries that draw a camera preview the user has to see.
+            // queries that draw a camera preview the user has to see. So does
+            // `device.permissions.request`, for the same reason.
             "device.connectivity" -> deviceInfo.connectivity()
             "device.apps" -> deviceInfo.installedApps()
             "device.location" -> deviceInfo.location(
@@ -381,10 +382,34 @@ class CommandDispatcher(
 
             // ---- device.* : permissions concierge + camera eye -------------
             "device.permissions" -> permissions.status()
-            "device.permissions.request" -> permissions.request(
-                ids = requireNotNull(params?.optJSONArray("ids")) { "device.permissions.request requires ids[]" },
-                confirm = params?.optBoolean("confirm", false) ?: false,
-            )
+            "device.permissions.request" -> {
+                val confirm = params?.optBoolean("confirm", false) ?: false
+                // The third exception to "device.* never folds". Every other
+                // branch in this namespace reads or acts on state the user is
+                // not being asked to look at; this one is a question addressed
+                // to them, drawn by the system in a window of its own — and our
+                // overlay sits above every activity, so an expanded card (which
+                // is a fullscreen surface) hides the sheet completely. Measured
+                // on device: the dialog really was up — GrantPermissionsActivity
+                // was both ResumedActivity and mCurrentFocus — while the
+                // screenshot showed nothing but the card. A question nobody can
+                // see is worse than no question.
+                //
+                // Folding only when confirm=true: the first call is the script
+                // the brain reads back, and that one belongs in the card.
+                if (confirm) {
+                    ensureCompact()
+                    // Folded, so the nod is the only thing left saying "the
+                    // device just did something" — same as `device.vault.fill`.
+                    window.pulseTool()
+                }
+                permissions.request(
+                    ids = requireNotNull(params?.optJSONArray("ids")) {
+                        "device.permissions.request requires ids[]"
+                    },
+                    confirm = confirm,
+                )
+            }
             "device.scan" -> {
                 // The two exceptions to "device.* never folds" above: both put a
                 // camera preview on screen, and our overlay sits above every

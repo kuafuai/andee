@@ -41,6 +41,9 @@ object ChatHistory {
     /**
      * @param page for [Role.PAGE], the archived HTML — null once it has been
      *   evicted, which is how a row knows to stop offering to re-open itself.
+     * @param turn which run of the brain produced this row, named the way
+     *   [net.kuafuai.andee.brain.BrainTrace] names it, or null when there is no
+     *   log to open — see [addAssistant].
      */
     data class Entry(
         val id: Long,
@@ -48,6 +51,7 @@ object ChatHistory {
         val role: Role,
         val text: String,
         val page: File?,
+        val turn: String? = null,
     )
 
     /**
@@ -158,7 +162,24 @@ object ChatHistory {
 
     fun addUser(text: String) = add(Role.USER, text, null)
 
-    fun addAssistant(text: String) = add(Role.ASSISTANT, text, null)
+    /**
+     * The assistant's finished answer.
+     *
+     * @param turn the run of the local brain this came out of, so the row can be
+     *   long-pressed into its own log (see [net.kuafuai.andee.ui.TracePage]).
+     *   **Null is the normal case, not an oversight.** Most answers in the
+     *   scrollback were not produced by a turn at all — a scene being entered, a
+     *   notification read out, a line from `ScreenController` — and the hub
+     *   brain writes no trace even when it did answer. A row with no [Entry.turn]
+     *   simply has no log to offer, and must not pretend otherwise: an entry
+     *   point that opens an empty page is worse than no entry point.
+     *
+     *   The caller reads it from [net.kuafuai.andee.brain.BrainTrace.currentTurn]
+     *   *while the turn is still in flight*, which is safe because this is
+     *   called from `onFinal` on the loop thread and the next turn cannot have
+     *   started.
+     */
+    fun addAssistant(text: String, turn: String? = null) = add(Role.ASSISTANT, text, null, turn)
 
     /** Call through [CardUi.error], which de-dups bursts before they get here. */
     fun addError(text: String) = add(Role.ERROR, text, null)
@@ -189,14 +210,14 @@ object ChatHistory {
         return file
     }
 
-    private fun add(role: Role, text: String, page: File?) {
+    private fun add(role: Role, text: String, page: File?, turn: String? = null) {
         if (appContext == null) return
         val clean = text.trim().let {
             if (it.length > MAX_TEXT) it.take(MAX_TEXT) + "…" else it
         }
         if (clean.isEmpty()) return
         synchronized(lock) {
-            entries.add(Entry(nextId++, System.currentTimeMillis(), role, clean, page))
+            entries.add(Entry(nextId++, System.currentTimeMillis(), role, clean, page, turn))
             trim()
             save()
         }
@@ -249,6 +270,7 @@ object ChatHistory {
                         .put("role", e.role.name)
                         .put("text", e.text)
                         .put("page", e.page?.name ?: JSONObject.NULL)
+                        .put("turn", e.turn ?: JSONObject.NULL)
                 )
             }
             f.writeText(arr.toString())
@@ -271,8 +293,12 @@ object ChatHistory {
                 // a file that isn't there is worse than one that doesn't.
                 val page = o.optString("page").takeIf { it.isNotEmpty() && it != "null" }
                     ?.let { File(dir, it) }?.takeIf { it.exists() }
+                // Same treatment as `page`: a row written before this field
+                // existed, or by a build that never had a turn for it, reads as
+                // absent rather than as a turn named "null".
+                val turn = o.optString("turn").takeIf { it.isNotEmpty() && it != "null" }
                 val id = o.optLong("id")
-                entries.add(Entry(id, o.optLong("ts"), role, o.optString("text"), page))
+                entries.add(Entry(id, o.optLong("ts"), role, o.optString("text"), page, turn))
                 if (id >= nextId) nextId = id + 1
             }
         }.onFailure {
