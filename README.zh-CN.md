@@ -3,7 +3,7 @@
 -->
 
 <p align="center">
-  <a href="https://www.codeflying.net">在线构建</a> ·
+  <a href="https://www.codeflying.net/andee">在线构建</a> ·
   <a href="https://www.codeflying.net/andee">立即体验</a> ·
   <a href="#核心能力">核心能力</a> ·
   <a href="#快速开始">快速开始</a> ·
@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.codeflying.net"><img alt="在线构建" src="https://img.shields.io/badge/在线构建-免打包、免配令牌-12b76a"></a>
+  <a href="https://www.codeflying.net/andee"><img alt="在线构建" src="https://img.shields.io/badge/在线构建-免打包、免配令牌-12b76a"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20conditions-155eef"></a>
   <a href="app/build.gradle"><img alt="Platform" src="https://img.shields.io/badge/platform-Android%2011%2B%20(API%2030)-3ddc84"></a>
   <a href="app/build.gradle"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.22-7f52ff"></a>
@@ -219,7 +219,7 @@ agent loop **就是** `LocalBrain`。它让系统提示词保持不变，把会�
 
 **最快的一条路，省掉的是真正卡住人的那两件事：自己打包、自己配令牌。**
 
-**[codeflying.app](https://www.codeflying.app)**（English）· **[codeflying.net](https://www.codeflying.net)**
+**[codeflying.app](https://www.codeflying.app/andee)**（English）· **[codeflying.net](https://www.codeflying.net/andee)**
 （中文）就是一个干这件事的通用平台 —— **你用一句话描述想要的应用，它帮你开发并发布。** 不需要先懂
 Android。跟它要一个 Andee，它会交给你一个**已经配好令牌**的安装包。也可以直接打开
 **[一键体验页](https://www.codeflying.net/andee)**，点「立即打包」即可复制母应用、生成一个已配好令牌的
@@ -232,7 +232,7 @@ Android。跟它要一个 Andee，它会交给你一个**已经配好令牌**的
 **免费 token 额度也是有限的** —— 够你上手，用完之后需要购买 token。
 
 ```text
-1. 打开  https://www.codeflying.net      （English: https://www.codeflying.app）
+1. 打开  https://www.codeflying.net/andee      （English: https://www.codeflying.app/andee）
 2. 描述你想要的 Andee
 3. 构建 → 下载安装包（令牌已配好）→ 安装
 4. 开悬浮窗，再开无障碍 → 那颗球就出现了
@@ -345,8 +345,8 @@ OpenAI 兼容端点（`llm_api_key`，默认 `https://api.deepseek.com`）。**�
 
 ## 三种使用方式
 
-- **在线 —— 不用自己打包、不用自己配令牌。** **[codeflying.net](https://www.codeflying.net)**（中文）·
-  **[codeflying.app](https://www.codeflying.app)**（English）—— 一个"用一句话描述应用、它帮你开发并
+- **在线 —— 不用自己打包、不用自己配令牌。** **[codeflying.net](https://www.codeflying.net/andee)**（中文）·
+  **[codeflying.app](https://www.codeflying.app/andee)**（English）—— 一个"用一句话描述应用、它帮你开发并
   发布"的通用平台，**是独立服务，不属于本项目。** 描述你想要的 Andee，它会给你一个已经配好令牌的
   安装包；本地不用编译，也不用先懂 Android。免费额度够上手，用完之后需要购买 token。
 
@@ -801,7 +801,7 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
 | 讨论区 / 问答 | 装机求助、想法、"这个能不能做" |
 | 好玩的用法 | 你用它做过什么，实用不实用都行 —— 见[好玩的用法](#好玩的用法) |
 | 安全 | 漏洞 —— 走私密渠道，永远不要开公开 issue。见 [SECURITY.md](SECURITY.md) |
-| 产品 / 在线 | 不想自己打包就想试 Andee —— [codeflying.net](https://www.codeflying.net) · [codeflying.app](https://www.codeflying.app) |
+| 产品 / 在线 | 不想自己打包就想试 Andee —— [codeflying.net](https://www.codeflying.net/andee) · [codeflying.app](https://www.codeflying.app/andee) |
 
 ## 安全披露
 
