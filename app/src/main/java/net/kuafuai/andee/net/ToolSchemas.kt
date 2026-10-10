@@ -714,7 +714,45 @@ object ToolSchemas {
         tool(
             name = "request_permissions",
             method = "device.permissions.request",
-            description = "Guide the user through enabling permissions. Two-step by design: first call WITHOUT confirm → you get a 'say' line (read it aloud / show it) → user agrees → call again WITH confirm=true to fire the dialogs/deep-links. Only call with confirm=true after the user said yes.",
+            description = """
+        Guide the user through enabling permissions. Two-step by design: first
+        call WITHOUT confirm → you get a 'say' line (read it aloud / show it) →
+        user agrees → call again WITH confirm=true to actually fire it. Only
+        call with confirm=true after the user said yes.
+
+        confirm=true returns what happened, and that return decides your next
+        move. Read it — never assume the dialog appeared:
+
+            mode "solo"      fired, and yours to tell them about in one line
+            mode "handoff"   fired; ask with ask_user, saying what you wait for
+            mode "settings"  no sheet exists — a Settings page was opened
+
+            result "granted"    done, carry on
+                   "denied"     they saw it and refused
+                   "no_dialog"  the system never drew a sheet at all
+                   "waiting"    it is on screen and nobody has answered yet
+
+        🔴 **A system permission sheet cannot be tapped by you.** It exposes no
+        elements (get_screen_element comes back empty, with a picture and no
+        e-numbers) and it ignores a tap you inject. Putting it on screen is the
+        whole of what firing does; answering it is the user's one step. So when
+        the result is "waiting", say one line — 「屏幕上弹了个权限框，点一下允许」—
+        and either wait via ask_user or go on with whatever does not need it.
+        Do not tap at it, and do not read its stillness as the screen being
+        broken.
+
+        Never fire the same request twice in a row. "no_dialog" means the system
+        has stopped asking (usually after two refusals) and firing again is
+        silently ignored — report it instead: say the permission did not go
+        through, and that this step needs their hand in Settings.
+
+        **The mode is the device's decision, not yours.** It follows what the
+        grant reaches — your own data is "solo", other people's data and things
+        that cannot be taken back are "handoff" — and a request that mixes the
+        two is handed over whole. What it changes for you is ceremony, not who
+        taps: after firing, LOOK at the screen before you call anything that
+        depends on the permission.
+    """.trimIndent(),
             required = listOf("ids"),
             props = mapOf(
                 "ids" to prop("array", "Permission ids from get_permissions.missing[].id, e.g. [\"location\",\"sms\"]."),
