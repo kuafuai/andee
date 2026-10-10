@@ -218,6 +218,26 @@ class FloatingWindowUi(
          * sequencing belongs to whoever owns the dispatcher.
          */
         fun onTextOpen(entry: ChatHistory.Entry)
+
+        /**
+         * A suggestion bubble on a card with no history — the user taking the
+         * assistant up on one of the things it says it can do.
+         *
+         * Handed out rather than sent from here: sending is a turn, and a turn
+         * has exactly one way in (`ScreenBodyService.submitUserTurn`), which is
+         * where the log row, the hub event and the glow all hang off. A list
+         * that sent its own would be a second way in, and the hub event is the
+         * half that gets forgotten.
+         *
+         * [name] is the scene's stored key, which is what the service adopts
+         * the scene under — a bubble has to leave the scene in the notebook, or
+         * the model it names is asked about something that does not exist.
+         * [title] is what the user read on the bubble; [example] is the
+         * sentence that is actually sent. All three come from one preset — see
+         * [net.kuafuai.andee.config.ScenePresets.Text] — so a bubble cannot
+         * name one thing and send another.
+         */
+        fun onSuggestionClick(name: String, title: String, example: String)
     }
 
     private val wm: WindowManager =
@@ -2186,6 +2206,9 @@ class FloatingWindowUi(
         val history = HistoryListView(context).apply {
             onPageClick = { listeners.onHistoryPageClick(it) }
             onTextOpen = { listeners.onTextOpen(it) }
+            onSuggestionClick = { name, title, example ->
+                listeners.onSuggestionClick(name, title, example)
+            }
         }
         historyView = history
         root.addView(

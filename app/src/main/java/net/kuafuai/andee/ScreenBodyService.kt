@@ -275,6 +275,55 @@ class ScreenBodyService : AccessibilityService() {
                 )
                 openPageFrom(entry, file)
             }
+
+            /**
+             * A suggestion bubble on an empty card — the one turn the device
+             * starts on the user's behalf.
+             *
+             * The user tapped a scene's *name* and gets its *example*: both are
+             * fields of one preset, so what the bubble promised and what is sent
+             * cannot drift. See [net.kuafuai.andee.config.ScenePresets.Text].
+             *
+             * **The scene is written down before the sentence is sent.** The
+             * turn below names the scene, and the model reads that name against
+             * the notebook — [net.kuafuai.andee.config.Notebook.scenesForPrompt]
+             * lists what the notebook holds. A bubble that only spoke asked the
+             * model about a scene nobody had saved, and it answered, correctly
+             * and in front of the user, that it had never seen one. Tapping the
+             * bubble *is* the yes that adoption waits for (see
+             * [net.kuafuai.andee.config.ScenePresets]), so the write happens here
+             * rather than being asked for again in the turn below.
+             *
+             * [net.kuafuai.andee.config.ScenePresets.adoptIfMissing], not
+             * `adopt`: the same bubble can be met in a later session, after the
+             * scene has been edited by the user or the model, and `saveScene`
+             * replaces the whole row — re-adopting would put the preset's text
+             * back over their version.
+             *
+             * Making the scene *active* is still deliberately **not** done here:
+             * a scene is a set of rules the model adopts, it is offered rather
+             * than imposed everywhere else (see `scene.*`), and the model reading
+             * its own name in a sentence is a better judge of whether this is
+             * that scene than a tap is. The device states the intent; the brain
+             * decides.
+             *
+             * Nothing here folds the card either. The first screen tool the
+             * brain calls goes through `CommandDispatcher.ensureCompact()`, which
+             * folds and waits for the fold — a second one fired from here would
+             * be racing it.
+             */
+            override fun onSuggestionClick(name: String, title: String, example: String) {
+                net.kuafuai.andee.config.ScenePresets.adoptIfMissing(
+                    this@ScreenBodyService,
+                    name,
+                    net.kuafuai.andee.config.VoiceConfig.uiLanguage(this@ScreenBodyService) ==
+                        net.kuafuai.andee.config.VoiceConfig.LANG_EN,
+                )
+                submitUserTurn(
+                    AppLocale.str(this@ScreenBodyService, R.string.suggestion_turn, title, example),
+                    "suggested",
+                )
+            }
         })
         // Before the card is built: FloatingWindowUi.build() reads the log to
         // lay out its first rows, and registers itself as the listener.

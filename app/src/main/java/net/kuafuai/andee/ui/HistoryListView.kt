@@ -15,6 +15,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import net.kuafuai.andee.R
+import net.kuafuai.andee.config.ScenePresets
+import net.kuafuai.andee.config.VoiceConfig
 import net.kuafuai.andee.i18n.AppLocale
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -64,6 +66,24 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
     var onTextOpen: ((ChatHistory.Entry) -> Unit)? = null
 
     /**
+     * A suggestion bubble was tapped — one of the ready-made scenes, offered by
+     * name, that sends its own example when taken up.
+     *
+     * This is the **only** control in the scrollback that starts something. It
+     * is handed out rather than acted on here for the same reason the rows are:
+     * starting a turn is the service's business (it writes the log, tells the
+     * hub, lights the glow), and a list that could do it would be a second way
+     * to start a turn. See `ScreenBodyService.onSuggestionClick`.
+     *
+     * Three things are passed because they are used in different places: the
+     * name is the key the scene is stored under and what adoption needs, the
+     * title is what the user read and what the turn names, the example is what
+     * actually gets sent. All three come from one preset — see
+     * [ScenePresets.Text] — so a bubble cannot name one thing and send another.
+     */
+    var onSuggestionClick: ((name: String, title: String, example: String) -> Unit)? = null
+
+    /**
      * The rows themselves.
      *
      * It used to end with a permanent dim line — "点击小球跟我对话" — as a hint
@@ -105,12 +125,50 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
     /** Laid rows drawn as re-openable pages; one losing its file forces a relayout. */
     private val laidOpen = HashSet<Long>()
 
+    /**
+     * Shown only when there is nothing to suggest either — a conversation that
+     * has not started and a build with no presets. The ordinary empty state is
+     * [suggest], which invites the user in and then offers something to do.
+     *
+     * This line only states the absence. It used to open with the same words as
+     * [suggest], so the two read as one script with half of it missing; now that
+     * the ordinary hint speaks for itself, all this one has to be is true.
+     */
     private val empty = TextView(context).apply {
         text = lctx.getString(R.string.history_empty)
         textSize = Glass.Type.CAPTION
         setTextColor(Color.parseColor(Glass.MUTED))
         gravity = Gravity.CENTER
         setPadding(0, dp(28), 0, 0)
+    }
+
+    /**
+     * The offers, for a conversation that has not started.
+     *
+     * **The one moment this app can be proactive without being early.** With no
+     * history there is nothing to be helpful *about*, and a ball in the corner
+     * has taught the user nothing about what it does — so instead of the dead
+     * "还没有对话" line, the card names a few things it is good at and sends one
+     * when tapped.
+     *
+     * Only when the log is empty, and that is the whole safety story: the
+     * moment there is a conversation, this is `GONE` and stays that way. A
+     * suggestion strip parked over a live chat would be the app talking about
+     * itself instead of answering.
+     *
+     * Built once and reused — see [buildSuggestions] — because [refresh] runs on
+     * every append and rebuilding four views per message is waste; the language
+     * change is the one thing that invalidates it, in [onLocaleChanged].
+     *
+     * No horizontal padding of its own: the rows are sized to the column's own
+     * inset, which is what [column] already reserves, so an offer lines up with
+     * the conversation underneath it instead of floating two dp to its right.
+     */
+    private val suggest = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.START
+        visibility = View.GONE
+        setPadding(0, dp(24), 0, 0)
     }
 
     /**
@@ -145,6 +203,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
         )
         column.addView(empty)
+        column.addView(suggest)
         column.addView(live)
     }
 
@@ -202,7 +261,16 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
      */
     fun refresh() {
         val all = ChatHistory.snapshot()
-        empty.visibility = if (all.isEmpty()) View.VISIBLE else View.GONE
+        // An empty log is the only time the suggestions are shown, so it is
+        // also the only time they can be worth building. Built lazily here
+        // rather than in `init` so the language is settled first.
+        val opens = all.isEmpty()
+        if (opens && suggest.childCount == 0) buildSuggestions()
+        // Which of the two mutually-exclusive empty states: the suggestions if
+        // there are any, the bare line if the table is empty.
+        val offering = opens && suggest.childCount > 0
+        suggest.visibility = if (offering) View.VISIBLE else View.GONE
+        empty.visibility = if (opens && !offering) View.VISIBLE else View.GONE
 
         val ids = all.map { it.id }.toSet()
         val open = all.filter { it.page != null }.map { it.id }.toSet()
@@ -215,6 +283,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
             // card scrolling a conversation that no longer existed.
             column.removeAllViews()
             column.addView(empty)
+            column.addView(suggest)
             column.addView(live)
             laid.clear()
             laidOpen.clear()
@@ -248,12 +317,157 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
     fun onLocaleChanged() {
         lctx = AppLocale.wrap(context)
         empty.text = lctx.getString(R.string.history_empty)
+        // The bubbles are scene names and that is translated content, so they
+        // are rebuilt rather than relabelled — same reason the rows are.
+        suggest.removeAllViews()
         laid.clear()
         laidOpen.clear()
         column.removeAllViews()
         column.addView(empty)
+        column.addView(suggest)
         column.addView(live)
         refresh()
+    }
+
+    /**
+     * The empty state's offer: one line inviting the user in, then a pane per
+     * ready-made scene, showing the scene's **title** over what it actually
+     * does, and carrying its **example**.
+     *
+     * Title on the outside, example on the send, and both read from one preset
+     * ([ScenePresets.Text.example]) so an offer cannot promise one thing and
+     * send another. The title is the label because that is what a person picks
+     * between; the example is what they would have had to invent for
+     * themselves, which is exactly the part a newcomer cannot do yet. The
+     * preset's `name` rides along with the tap and is never shown — see
+     * [offer].
+     *
+     * Every preset, not just the un-adopted ones: the state this appears in is
+     * "nothing has happened yet", and what the assistant can do does not depend
+     * on which scenes the notebook already holds. See [ScenePresets].
+     */
+    private fun buildSuggestions() {
+        suggest.removeAllViews()
+        val english = VoiceConfig.uiLanguage(context) == VoiceConfig.LANG_EN
+        suggest.addView(
+            TextView(context).apply {
+                // Speaking is named before picking, deliberately. "Pick one," on
+                // its own read as *this is the only way in*, and the ball
+                // overhead is the other door — the same two the tips at the foot
+                // of the card list. What sits below is an offer, and an offer
+                // that presents itself as the only option is not one.
+                text = lctx.getString(R.string.history_suggest_hint)
+                textSize = Glass.Type.CAPTION
+                // SECONDARY, not MUTED. MUTED is the token for a footnote on a
+                // *card*, where it sits on a surface this app controls; this
+                // line's background is the user's own app, seen through the
+                // backdrop, and on a bright one MUTED measures within a couple
+                // of steps of what is behind it. See [offer] for the same
+                // argument about the rows.
+                setTextColor(Color.parseColor(Glass.SECONDARY))
+                // 16 dp, not 4: this caption introduces the rows under it, so its
+                // text has to start where their text starts — that is the same
+                // inset [offer] puts its title at, and the pane's own edge is
+                // outside both. At 4 dp it hung eleven dp to the left of the
+                // column it was describing.
+                setPadding(dp(16), 0, dp(16), dp(10))
+            },
+            LinearLayout.LayoutParams(MATCH, WRAP),
+        )
+        for (p in ScenePresets.all) {
+            suggest.addView(
+                offer(p, p.text(english)),
+                LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(10) },
+            )
+        }
+    }
+
+    /**
+     * One offer, and the whole of it is the button.
+     *
+     * Takes the whole [ScenePresets.Preset] rather than just its [ScenePresets.Text]
+     * because the tap carries `name` too: that is the key the service adopts the
+     * scene under, and unlike the title it is not translated, so it cannot be
+     * read back off what the bubble happens to be showing.
+     *
+     * ### Why a well rather than the panel the tidy answer would pick
+     *
+     * [Glass.panel] — a 6% white film — is the right surface for a group of rows
+     * *inside* a card, and it is what `ScenesUi` gives its own preset rows. It is
+     * wrong here for a measurable reason: these have no card behind them, only
+     * the backdrop, and on the device a 6% film came out **five luminance steps**
+     * off the blurred photo underneath — invisible fill, with the one-pixel edge
+     * left doing all the work of saying a pane was there. That is the difference
+     * [Glass.GLASS] documents, and why the fix is not "a lighter film".
+     *
+     * So this takes the surface the two other things on this backdrop already
+     * use — [Glass.well], the same recessed fill as the control bar and the
+     * scene chip. Those two carry the reason in as many words: a pane over a
+     * translucent card has to be *darker* than what it sits on, or its text is
+     * read against whatever the user's app happens to be. Dark fill, light
+     * type, contrast this app owns rather than borrows.
+     *
+     * ### The two lines
+     *
+     * Name over summary, which is `ScenesUi.addPresets`' own pairing — at
+     * [Glass.Type.BODY]/[Glass.TITLE] and [Glass.Type.CAPTION]/[Glass.SECONDARY],
+     * four dp apart. A bare name was the first version and it asked the user to
+     * already know what "开会记录" means before tapping it, which is the opposite
+     * of helping someone in. The name is still the brightest thing in the row
+     * because the name is what they are choosing between; the sentence is what
+     * tells them which one they want.
+     *
+     * Two lines, and the summaries are written to fit inside that. Three was the
+     * first version and it does not survive translation: the Chinese summaries
+     * run to two lines at this width, the English ones to three, and the extra
+     * line per row added up to more than the scrollback has to give — the list
+     * then scrolled itself to the bottom on open, which pushed the hint line off
+     * the top and left the first offer flush against the edge. Sizing the copy
+     * to the layout is the fix rather than letting every row ellipsize: a
+     * sentence cut off midway through is worse than a shorter one.
+     *
+     * ### The press
+     *
+     * A ripple, held to the rounded corners by the well's own outline — the same
+     * treatment [buildRow] gives a page row, because this is the same situation:
+     * a whole row that is one control. Not [Glass.pressable] as well, which is
+     * the treatment for a small pill; scaling a full-width row under a finger
+     * moves its edges while its neighbours stay put, and two press effects on
+     * one tap is how a considered surface starts to look assembled.
+     */
+    private fun offer(p: ScenePresets.Preset, t: ScenePresets.Text): View {
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            isClickable = true
+            background = RippleDrawable(
+                ColorStateList.valueOf(RIPPLE),
+                Glass.well(context, dp(18)),
+                null,
+            )
+            setOnClickListener { onSuggestionClick?.invoke(p.name, t.title, t.example) }
+        }
+        row.addView(
+            TextView(context).apply {
+                text = t.title
+                textSize = Glass.Type.BODY
+                setTextColor(Color.parseColor(Glass.TITLE))
+            },
+            LinearLayout.LayoutParams(MATCH, WRAP),
+        )
+        row.addView(
+            TextView(context).apply {
+                text = t.summary
+                textSize = Glass.Type.CAPTION
+                setTextColor(Color.parseColor(Glass.SECONDARY))
+                setLineSpacing(dp(2).toFloat(), 1f)
+                setPadding(0, dp(4), 0, 0)
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            },
+            LinearLayout.LayoutParams(MATCH, WRAP),
+        )
+        return row
     }
 
     private fun buildRow(e: ChatHistory.Entry): View {
@@ -426,6 +640,10 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
     private companion object {
         /** How long a [FloatingWindowUi.SubtitleKind.FINAL] live line stays up. */
         const val FINAL_LINGER_MS = 5_000L
+
+        /** The suggestion column's own layout, kept short for [buildSuggestions]. */
+        const val MATCH = LinearLayout.LayoutParams.MATCH_PARENT
+        const val WRAP = LinearLayout.LayoutParams.WRAP_CONTENT
 
         /**
          * A [Glass] token seen through the film: its hue at the film's alpha.

@@ -3,13 +3,26 @@ package net.kuafuai.andee.config
 import android.content.Context
 
 /**
- * Ready-made scenes the user can adopt from the 情景 card.
+ * Ready-made scenes the user can adopt — from the 情景 card, or from a bubble
+ * on a card with no history.
  *
- * **A preset is not a scene until the user taps 采用.** Scenes are learned with
- * the person (`LocalPrompt` §11), and nothing here changes that: the card only
- * offers, and [adopt] is what writes to the notebook, so the "say yes first"
- * rule holds with the tap standing in for the sentence. From then on it is an
+ * **A preset is not a scene until the user says yes.** Scenes are learned with
+ * the person (`LocalPrompt` §11), and nothing here changes that: both doors only
+ * offer, and [adopt] is what writes to the notebook, so the "say yes first"
+ * rule holds with a tap standing in for the sentence. From then on it is an
  * ordinary scene that the user and the model can edit or delete like any other.
+ *
+ * The two taps are the same yes. 采用 on the 情景 card says it out loud; a
+ * bubble on an empty card *is* the user choosing the scene, so picking it is the
+ * answer itself. The bubble goes through [adoptIfMissing] rather than [adopt]
+ * only because it can be tapped again in a later session, by which time the
+ * scene may have been edited.
+ *
+ * Neither door *enters* the scene. Writing it down is what makes it findable;
+ * whether to step into it stays the model's call, made from the 「进入…情景」 it
+ * reads. A bubble that skipped the writing step sent the model looking for a
+ * scene nobody had saved, and it answered — correctly, and in front of the
+ * user — that it had never seen one.
  *
  * Plain Kotlin rather than string resources, on purpose. The stored form of a
  * scene is data in whatever language it was written in, so the language is
@@ -24,11 +37,32 @@ import android.content.Context
  */
 object ScenePresets {
 
-    class Text(val title: String, val summary: String, val prompt: String)
+    class Text(
+        val title: String,
+        val summary: String,
+        val prompt: String,
+        /**
+         * One sentence the user could have said, and the only part of a preset
+         * that is ever *done* rather than read.
+         *
+         * It lives here rather than in a table of its own because it is a claim
+         * about the scene: the moment the prompt and the example could drift
+         * apart, one of them is lying, and nothing would catch it. Same source
+         * means editing a scene edits what it offers.
+         *
+         * The card shows [title] on the bubble and sends this; see
+         * [net.kuafuai.andee.ui.HistoryListView] and
+         * `ScreenBodyService.onSuggestionClick`.
+         */
+        val example: String,
+    )
 
     class Preset(val name: String, private val zh: Text, private val en: Text) {
         fun text(english: Boolean): Text = if (english) en else zh
     }
+
+    /** The preset called [name], or null when the table has no such row. */
+    fun byName(name: String): Preset? = all.firstOrNull { it.name == name }
 
     /** The presets this notebook does not hold yet, in the order they are offered. */
     fun notAdopted(context: Context): List<Preset> =
@@ -47,11 +81,32 @@ object ScenePresets {
         )
     }
 
+    /**
+     * Adopt [name] only if the notebook does not hold it yet. Returns whether it
+     * wrote.
+     *
+     * This is the door the empty card's bubbles use, and the guard is the whole
+     * reason it is not plain [adopt]. A bubble is offered for *every* preset,
+     * adopted or not (see [net.kuafuai.andee.ui.HistoryListView]), and a user can
+     * meet the same bubble in a later session — after the scene has been edited
+     * by them or by the model. `saveScene` replaces the whole row including
+     * `prompt`, so running [adopt] a second time would put the preset's text
+     * back over their version and nothing would say it had happened. Skipping a
+     * name that already exists is what makes tapping a bubble safe to do twice.
+     */
+    fun adoptIfMissing(context: Context, name: String, english: Boolean): Boolean {
+        val preset = byName(name) ?: return false
+        if (Notebook.scene(context, name) != null) return false
+        adopt(context, preset, english)
+        return true
+    }
+
     private val CHAT_DUTY = Preset(
         name = "chat_duty",
         zh = Text(
             title = "消息值班台",
             summary = "盯着所有聊天应用的通知，要紧的立刻告诉你，其余保持安静。",
+            example = "帮我盯着通知，要紧的马上告诉我，其余的先别烦我",
             prompt = """
         当我处于这个场景中时，我就是这个人在设备上所有聊天应用的值班台——不管是哪一个应用，WhatsApp、Telegram、Slack、Signal、Messenger、Instagram、微信，还是别的什么。这个场景之所以存在，正是因为他们的消息分散在好几个应用里，而这些应用彼此并不互通。
 
@@ -81,7 +136,8 @@ object ScenePresets {
         ),
         en = Text(
             title = "Message desk",
-            summary = "Watches the notifications of every chat app, tells you the important ones at once, stays quiet about the rest.",
+            summary = "Tells you the important notifications at once, and leaves the rest alone.",
+            example = "Watch my notifications and tell me the important ones right away, leave the rest alone",
             prompt = """
         While I am in this scene, I am this person's duty desk for every chat app on the device — WhatsApp, Telegram, Slack, Signal, Messenger, Instagram, WeChat, whatever it is. The scene exists because their messages are scattered across several apps that do not talk to each other.
 
@@ -116,6 +172,7 @@ object ScenePresets {
         zh = Text(
             title = "订阅清理",
             summary = "查出你每月在为哪些订阅付费，问你要不要退，退之前不会动手。",
+            example = "帮我查一下我每个月都在为哪些订阅付钱",
             prompt = """
         当我处于这个场景中时，我的任务是帮这个人看清他在为哪些订阅付费，并且只在他点头之后才帮他退订。
 
@@ -134,7 +191,8 @@ object ScenePresets {
         ),
         en = Text(
             title = "Subscription cleanup",
-            summary = "Finds what you pay for every month and asks which to cancel. Nothing is cancelled without your yes.",
+            summary = "Finds what you pay for monthly, and cancels only what you approve.",
+            example = "Find out which subscriptions I am paying for every month",
             prompt = """
         While I am in this scene, my job is to help this person see which subscriptions they pay for, and to cancel one only after they say yes.
 
@@ -158,6 +216,7 @@ object ScenePresets {
         zh = Text(
             title = "开会记录",
             summary = "开会时录音，结束后整理成纪要页，并把待办挑出来问你要不要记下。",
+            example = "等下的会帮我录下来，结束后给我一份纪要",
             prompt = """
         当我处于这个场景中时，我的任务是替这个人开会：录下来，会后给他一份能直接用的纪要。
 
@@ -182,7 +241,8 @@ object ScenePresets {
         ),
         en = Text(
             title = "Meeting notes",
-            summary = "Records the meeting, turns it into a minutes page afterwards, and offers to set reminders for your action items.",
+            summary = "Records the meeting, writes the minutes, offers to set your reminders.",
+            example = "Record the meeting for me and give me the minutes afterwards",
             prompt = """
         While I am in this scene, my job is to sit through the meeting for this person: record it, and give them minutes they can use straight away.
 
@@ -212,6 +272,7 @@ object ScenePresets {
         zh = Text(
             title = "到点替我上",
             summary = "抢票、挂号、报名：到点替你进去办，付款和最后确认永远留给你。",
+            example = "帮我盯着放号，到点替我抢，最后一步留给我确认",
             prompt = """
         当我处于这个场景中时，我的任务是在约定的时间，替这个人去抢一个名额：车票、门诊号、报名。我替他冲到最后一步之前，最后一步永远是他的。
 
@@ -237,7 +298,8 @@ object ScenePresets {
         ),
         en = Text(
             title = "Book it for me at the time",
-            summary = "Tickets, appointments, sign-ups: goes in at the set time and does the legwork. Payment and the final confirmation stay with you.",
+            summary = "Goes in when the slot opens and does the legwork. Payment stays with you.",
+            example = "Watch for the slot to open and grab it for me, leaving the last step to me",
             prompt = """
         While I am in this scene, my job is to go and grab a slot for this person at an agreed time: a ticket, a clinic appointment, a registration. I run up to the last step for them, and the last step is always theirs.
 

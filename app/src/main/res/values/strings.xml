@@ -246,6 +246,8 @@
     <string name="dev_perm_say_runtime">会弹窗,点允许即可。</string>
     <string name="dev_perm_say_notification">会打开通知使用权设置,找到这个应用打开开关。</string>
     <string name="history_empty">还没有对话</string>
+    <string name="history_suggest_hint">告诉我，或者选一个</string>
+    <string name="suggestion_turn">进入「%1$s」情景。%2$s</string>
     <string name="history_role_you">你 · %1$s</string>
     <string name="history_role_assistant">Andee · %1$s</string>
     <string name="history_role_error">出错 · %1$s</string>

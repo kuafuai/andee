@@ -264,6 +264,8 @@
     <string name="dev_perm_say_runtime">A dialog will pop up — just tap Allow.</string>
     <string name="dev_perm_say_notification">I\'ll open Notification access settings — find this app and turn it on.</string>
     <string name="history_empty">No conversation yet</string>
+    <string name="history_suggest_hint">Tell me, or pick one</string>
+    <string name="suggestion_turn">Enter the \"%1$s\" scene. %2$s</string>
     <string name="history_role_you">You · %1$s</string>
     <string name="history_role_assistant">Andee · %1$s</string>
     <string name="history_role_error">Error · %1$s</string>
