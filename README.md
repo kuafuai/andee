@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.codeflying.app">Build online</a> ·
+  <a href="https://www.codeflying.app/andee">Build online</a> ·
   <a href="https://www.codeflying.app/andee">Try now</a> ·
   <a href="#key-features">Features</a> ·
   <a href="#quick-start">Quick start</a> ·
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.codeflying.app"><img alt="Build online" src="https://img.shields.io/badge/build%20online-no%20token%20setup-12b76a"></a>
+  <a href="https://www.codeflying.app/andee"><img alt="Build online" src="https://img.shields.io/badge/build%20online-no%20token%20setup-12b76a"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20conditions-155eef"></a>
   <a href="app/build.gradle"><img alt="Platform" src="https://img.shields.io/badge/platform-Android%2011%2B%20(API%2030)-3ddc84"></a>
   <a href="app/build.gradle"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.22-7f52ff"></a>
@@ -255,7 +255,7 @@ Everything drawn here is in this repository, down to the guard rails — see
 The fastest route skips the two things that actually stop people: **building it yourself, and wiring
 up tokens.**
 
-**[codeflying.app](https://www.codeflying.app)** (English) · **[codeflying.net](https://www.codeflying.net)**
+**[codeflying.app](https://www.codeflying.app/andee)** (English) · **[codeflying.net](https://www.codeflying.net/andee)**
 (中文) is a general platform for exactly that shape of problem — **you describe the app you want in
 words, and it develops and publishes it for you.** No Android knowledge required. Ask it for Andee and
 it hands you an installable package with the keys already configured. Or open the
@@ -270,7 +270,7 @@ that has to be put on the device. And **the free token allowance is finite**: it
 started, and once it runs out, tokens are purchased.
 
 ```text
-1. Open  https://www.codeflying.app        (中文: https://www.codeflying.net)
+1. Open  https://www.codeflying.app/andee        (中文: https://www.codeflying.net/andee)
 2. Describe the Andee you want
 3. Build → download the package (keys already configured) → install
 4. Grant Overlay, then Accessibility → the ball appears
@@ -503,8 +503,8 @@ If you want to see how the decisions were made rather than only what was decided
 
 ## Using Andee
 
-- **Online — no local build, no token setup.** **[codeflying.app](https://www.codeflying.app)** ·
-  **[codeflying.net](https://www.codeflying.net)** (中文) — a general platform for describing an app
+- **Online — no local build, no token setup.** **[codeflying.app](https://www.codeflying.app/andee)** ·
+  **[codeflying.net](https://www.codeflying.net/andee)** (中文) — a general platform for describing an app
   in words and having it developed and published. **A separate service, not part of this project.**
   Describe the Andee you want, and it hands you an installable package with the keys already
   configured — nothing to compile locally, and nothing about Android to understand first. A free
@@ -904,7 +904,7 @@ Blur or avoid anything private — yours or anyone else's — before it goes up.
 | Issue tracker | Reproducible bugs, engineering work |
 | Show and tell | What you built with it, fun or not — see [Showcase](#showcase) |
 | Security | Vulnerabilities — privately, never in a public issue. See [SECURITY.md](SECURITY.md) |
-| Product / online | Trying Andee without building it yourself — [codeflying.app](https://www.codeflying.app) · [codeflying.net](https://www.codeflying.net) |
+| Product / online | Trying Andee without building it yourself — [codeflying.app](https://www.codeflying.app/andee) · [codeflying.net](https://www.codeflying.net/andee) |
 
 ## Security disclosure
 
