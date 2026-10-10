@@ -57,13 +57,29 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
     var onPageClick: ((ChatHistory.Entry) -> Unit)? = null
 
     /**
-     * Double-tapping a message — read it fullscreen. See [attachDoubleTap].
+     * Double-tapping a message — read it fullscreen. See [attachRowGestures].
      *
      * Handed out rather than opened here for the same reason page rows are: the
      * reader is a fullscreen screen, so the card has to fold out of its way
      * first, and that sequencing belongs to whoever owns the dispatcher.
      */
     var onTextOpen: ((ChatHistory.Entry) -> Unit)? = null
+
+    /**
+     * Long-pressing a message row — what the device actually did to answer it.
+     *
+     * Handed out for the same reasons as the two above, and one of its own: the
+     * log lives on disk and has to be read and rendered into a page before there
+     * is anything to open, and that read must not happen on the UI thread. See
+     * `ScreenBodyService.onTraceOpen`.
+     *
+     * **Only rows that have a log fire this.** A row with no
+     * [ChatHistory.Entry.turn] — a scene being entered, a notification read out,
+     * an answer from the hub brain — has nothing behind it, so the gesture stays
+     * silent on it rather than opening a page that explains it is empty. See
+     * [attachRowGestures].
+     */
+    var onTraceOpen: ((ChatHistory.Entry) -> Unit)? = null
 
     /**
      * A suggestion bubble was tapped — one of the ready-made scenes, offered by
@@ -535,7 +551,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
             )
             bubble.setOnClickListener { onPageClick?.invoke(e) }
         } else {
-            attachDoubleTap(bubble, e)
+            attachRowGestures(bubble, e)
         }
 
         // The bubble is the row's whole width minus a shoulder on the side it
@@ -558,14 +574,21 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
     }
 
     /**
-     * Open a message fullscreen on a double tap.
+     * The gestures a message row answers to: double tap reads it, long press
+     * shows what it took to write it.
      *
-     * **Double, not single.** A single tap inside a scrollable list is how you
-     * stop a fling and how you start a drag, and a chat where one stray tap
+     * **Neither is a single tap.** A single tap inside a scrollable list is how
+     * you stop a fling and how you start a drag, and a chat where one stray tap
      * replaces the whole screen with a reader is a chat you learn to tap
-     * carefully. Nothing else on a text row wants a tap, so the gesture is free
-     * — and it is the same one the ball uses for "the other thing", which is one
-     * less thing to learn.
+     * carefully. Long press is free — nothing else on a row wanted it, and it is
+     * the gesture that already reads as "there is more here", which is exactly
+     * what it opens ([TracePage]).
+     *
+     * **One detector for both.** `setOnTouchListener` replaces rather than
+     * chains, so installing a second one for the long press would silently
+     * retire the first — leaving a row that reads fullscreen but never shows its
+     * log, or the reverse, with no error anywhere. They share a listener because
+     * they have to.
      *
      * Page rows are excluded at the call site, not here: their single tap
      * already means "open the page again", and a page is not text to be read out
@@ -580,7 +603,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
      * Main thread only.
      */
     @SuppressLint("ClickableViewAccessibility")
-    private fun attachDoubleTap(v: View, e: ChatHistory.Entry) {
+    private fun attachRowGestures(v: View, e: ChatHistory.Entry) {
         val detector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             /**
              * **Must return true, and the default is false.**
@@ -597,6 +620,16 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
             override fun onDoubleTap(ev: MotionEvent): Boolean {
                 onTextOpen?.invoke(e)
                 return true
+            }
+
+            /**
+             * Declined rather than fired-and-ignored for a row with no log: see
+             * [onTraceOpen]. Keeping the test here rather than at the call site
+             * leaves the question next to the record that answers it.
+             */
+            override fun onLongPress(ev: MotionEvent) {
+                if (e.turn == null) return
+                onTraceOpen?.invoke(e)
             }
         })
         v.setOnTouchListener { _, ev -> detector.onTouchEvent(ev) }

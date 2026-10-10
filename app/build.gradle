@@ -120,6 +120,12 @@ dependencies {
     implementation 'com.google.mlkit:barcode-scanning:17.2.0'
 
     testImplementation libs.junit
+    // Unit tests run against android.jar's stubs, whose org.json throws
+    // "not mocked" on construction. BrainTrace builds a JSONObject before it
+    // can know tracing is off, so any test that reaches it needs a real
+    // implementation on the unit-test classpath. Test scope only: the app still
+    // serializes with Android's own org.json, and no test asserts on the JSON.
+    testImplementation 'org.json:json:20240303'
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
 }

@@ -276,6 +276,27 @@
     <string name="textpage_role_assistant">Andee</string>
     <string name="textpage_role_error">Error</string>
     <string name="textpage_role_page">Page</string>
+    <!-- What called this turn into being. The old wording was just "Started",
+         which answers nothing: the first thing a log page owes a reader is
+         "why did he suddenly do something", and these five are five stories. -->
+    <string name="tracepage_kind_user">You spoke</string>
+    <string name="tracepage_kind_wake">A reminder came due</string>
+    <string name="tracepage_kind_notify">A notification arrived</string>
+    <string name="tracepage_kind_sweep">Quiet-hour review</string>
+    <string name="tracepage_kind_harvest">Reviewing before tidying up</string>
+    <string name="tracepage_kind_other">Started</string>
+    <string name="tracepage_step">Step %1$d</string>
+    <string name="tracepage_tokens">%1$s tokens in</string>
+    <string name="tracepage_calls">%1$d tool calls</string>
+    <string name="tracepage_no_calls">no tools</string>
+    <string name="tracepage_said">Said</string>
+    <string name="tracepage_thought">Thought</string>
+    <!-- The end event is only written on an ABNORMAL finish: a throw, the
+         repeat guard, or running out of steps. So this card never means "and
+         then it finished nicely", and its heading must not read that way. -->
+    <string name="tracepage_end">This turn did not finish on its own</string>
+    <string name="tracepage_gone">The log for this turn is gone</string>
+    <string name="tracepage_gone_hint">It may have been rotated out by newer entries, or this turn was not run by the local brain — only turns the local brain ran leave a log.</string>
     <string name="card_ack">Got it</string>
     <string name="bubble_tap_to_talk">Tap to talk</string>
     <string name="input_hint">Type to talk to it…</string>

@@ -220,6 +220,21 @@ class FloatingWindowUi(
         fun onTextOpen(entry: ChatHistory.Entry)
 
         /**
+         * A message row, long-pressed, for the log behind it — see
+         * [net.kuafuai.andee.ui.TracePage].
+         *
+         * Handed out rather than built here for the same reason plus a sharper
+         * one: turning a turn id into a page means reading and parsing the trace
+         * file, which blocks and must not do so on the UI thread. The window
+         * knows how to hold a row; only the service knows how to read a log.
+         *
+         * Never fired for a row whose [ChatHistory.Entry.turn] is null — there
+         * is no log to read, and a gesture that opens an empty page is worse
+         * than one that stays still.
+         */
+        fun onTraceOpen(entry: ChatHistory.Entry)
+
+        /**
          * A suggestion bubble on a card with no history — the user taking the
          * assistant up on one of the things it says it can do.
          *
@@ -2206,6 +2221,7 @@ class FloatingWindowUi(
         val history = HistoryListView(context).apply {
             onPageClick = { listeners.onHistoryPageClick(it) }
             onTextOpen = { listeners.onTextOpen(it) }
+            onTraceOpen = { listeners.onTraceOpen(it) }
             onSuggestionClick = { name, title, example ->
                 listeners.onSuggestionClick(name, title, example)
             }

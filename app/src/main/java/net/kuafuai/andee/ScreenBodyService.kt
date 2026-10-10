@@ -277,6 +277,33 @@ class ScreenBodyService : AccessibilityService() {
             }
 
             /**
+             * Long-pressing a message row: the log behind it — see
+             * [net.kuafuai.andee.ui.TracePage].
+             *
+             * **Off the main thread, and this is not optional.** Building the
+             * page means reading and parsing `brain_trace.jsonl` — up to
+             * [net.kuafuai.andee.brain.BrainTrace]'s ceiling per generation —
+             * while the main thread is holding the ball's window. The read is
+             * small for one turn (measured: ~8 records, 7 KB) but the file it
+             * reads is not, and the cost of being wrong is a frozen ball.
+             *
+             * The gesture is only offered on rows that have a turn, so the
+             * `?: return` here is a backstop rather than a path the user can
+             * reach — see [net.kuafuai.andee.ui.ChatHistory.Entry.turn].
+             *
+             * Nothing is asked of the assistant, so as with [onTextOpen] this
+             * starts no task and lights no glow: the dispatcher is deliberately
+             * not involved.
+             */
+            override fun onTraceOpen(entry: net.kuafuai.andee.ui.ChatHistory.Entry) {
+                val turn = entry.turn ?: return
+                Thread {
+                    val file = net.kuafuai.andee.ui.TracePage.write(this@ScreenBodyService, turn)
+                    if (file != null) ui.post { openPageFrom(entry, file) }
+                }.start()
+            }
+
+            /**
              * A suggestion bubble on an empty card — the one turn the device
              * starts on the user's behalf.
              *
@@ -2078,6 +2105,14 @@ class ScreenBodyService : AccessibilityService() {
 
     /** The finished answer. See [onBrainProgress] for why this is not inline. */
     private fun onBrainFinal(text: String) {
+        // Read first, before anything else can end the turn. This runs inside
+        // the turn it is describing — `onFinal` is called from the loop thread
+        // while `runTurn` is still going — but `LocalBrain.launch` clears the
+        // turn in its `finally`, so the window is this function's entry, not
+        // wherever the string is finally written below. Reading late would
+        // attach null to real answers, which fails silently and looks exactly
+        // like the feature not existing. See [BrainTrace.current].
+        val turn = net.kuafuai.andee.brain.BrainTrace.currentTurn()
         if (acceptBrainOutput) {
             // The brain's own verdict on whether this conversation is still
             // open. Written before the speak below because [followUpWindow]
@@ -2108,7 +2143,7 @@ class ScreenBodyService : AccessibilityService() {
             // fires many times per task with successive drafts of the
             // same sentence — logging those would bury the answer under
             // its own rough cuts.
-            net.kuafuai.andee.ui.ChatHistory.addAssistant(plain)
+            net.kuafuai.andee.ui.ChatHistory.addAssistant(plain, turn)
             // Kept for one reason only: if speaking this fails and the card is
             // folded, the row above is `GONE` and this string is the last copy
             // of the answer on the device. See [showAnswerAsCard].

@@ -258,6 +258,25 @@
     <string name="textpage_role_assistant">Andee</string>
     <string name="textpage_role_error">出错</string>
     <string name="textpage_role_page">界面</string>
+    <!-- 是什么把这一轮叫起来的。原来的「起因」太笼统：一条日志页的第一句
+         话要回答的就是「他为什么忽然动了」，而这五种起因讲的是五个不同的故事。 -->
+    <string name="tracepage_kind_user">你开口了</string>
+    <string name="tracepage_kind_wake">一件待办到点了</string>
+    <string name="tracepage_kind_notify">来了一条通知</string>
+    <string name="tracepage_kind_sweep">安静时段的回顾</string>
+    <string name="tracepage_kind_harvest">整理对话前的回顾</string>
+    <string name="tracepage_kind_other">起因</string>
+    <string name="tracepage_step">步骤 %1$d</string>
+    <string name="tracepage_tokens">上下文 %1$s token</string>
+    <string name="tracepage_calls">%1$d 个工具调用</string>
+    <string name="tracepage_no_calls">没有调用工具</string>
+    <string name="tracepage_said">说</string>
+    <string name="tracepage_thought">想</string>
+    <!-- end 事件只在**非正常收尾**时才写：抛异常、复读保护、超步数。
+         所以这张卡永远不是在报「顺利结束」，标题不能那么平淡。 -->
+    <string name="tracepage_end">这一轮没能自己跑完</string>
+    <string name="tracepage_gone">这一轮的日志已经不在了</string>
+    <string name="tracepage_gone_hint">它可能已经被更新的日志挤掉了，或者这一轮不是本地大脑跑的 —— 只有本地大脑跑过的轮次才留日志。</string>
     <string name="card_ack">知道了</string>
     <string name="bubble_tap_to_talk">点击说话</string>
     <string name="input_hint">打字跟它说…</string>
