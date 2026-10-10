@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`2` / `"0.1.1"`**.
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`3` / `"0.2.0"`**.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
   Android refuses the upgrade; the same number must never be reused for two different builds.
@@ -13,7 +13,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 **The project starts at `0.x`, and that is the accurate number rather than a modest one.** Nothing is
 frozen. The tool-schema contract a hub brain speaks has been rewritten repeatedly
-(`net/ToolSchemas.kt` alone has changed in eight commits since the first), the `local.properties`
+(`net/ToolSchemas.kt` alone has changed in ten commits since the first), the `local.properties`
 build flags that decide the first-install language, the thinking default and whether CodeFlying is
 compiled in have all been added since, and a saved scene is a shape that only appeared in this
 release. Each of those is something a user or a second implementation would have to rebuild against,
@@ -27,6 +27,129 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-10-10
+
+Three new capabilities and two permission fixes. A minor bump rather than a patch, because the three
+are new capabilities by this file's own definition — the first release where that rule has had to
+decide anything. The permission pair is the part worth reading: the app had been telling the model
+things about the system permission sheet that measuring on a device showed to be false, in one case
+in the direction that made the model act on a grant nobody had given.
+
+### Added
+
+- **A single tap on the ball now stops whatever is running and then listens.** A tap used to mean
+  "listen" and nothing else, which left a gap the moment the ball was busy: to redirect it the user
+  had to stop it first (three taps) and then ask again (one more) — two gestures for one intent.
+  Tapping something busy and having it stop and listen is what one person does to another, and it is
+  the only reading of the tap that is not "talk over the thing you cannot hear". The stop is
+  `stopEverything()`, reused rather than reimplemented, so the single tap and the triple tap cannot
+  drift into two different stops and the hub gets its `task.stop` either way. It is guarded on
+  `dispatcher.isTaskActive()`: on an idle ball there is nothing to stop, and the call would still
+  clear a pending 继续修改, tell the hub to stop, and flash 已停止 ahead of 听着… — three side effects
+  for a tap that only ever meant "listen". Triple-tap still stops, and is still the *immediate* stop,
+  because a single tap has to wait out the double-tap window before it knows it is not the first of
+  two. No gesture moved and no string changed: what a tap *does* depends on what is running, which is
+  not something a line of text can say. Verified on device (HONOR AMM-AN00) — an idle tap listens
+  without flashing 已停止.
+- **A device with no conversation is offered ready-made scenes instead of a dead line.** It used to
+  show 还没有对话 and nothing under it. There is nothing to be helpful *about* yet, and a ball in the
+  corner has taught a newcomer nothing about what the thing does, so the one moment this app can be
+  proactive without being early went unused. The card now shows a hint line — 告诉我，或者选一个 —
+  then a bubble per preset from `ScenePresets`, each labelled with the scene's name and carrying a
+  sentence the user could have said: the name is what a person picks between, the sentence is exactly
+  the part a newcomer cannot invent. Both are fields of one `ScenePresets.Text`, so a bubble cannot
+  promise one thing and send another. **Tapping a bubble adopts the scene before it speaks** — this
+  was wrong first and is the part worth naming: a scene is something the notebook holds, so a bubble
+  that only sent its sentence asked the model about a scene nobody had saved, and it correctly
+  answered that it had never seen one, in front of the user. It is `adoptIfMissing` rather than
+  `adopt` on purpose: a bubble is offered whether or not the preset was adopted, and `saveScene`
+  replaces the whole row including `prompt`, so adopting twice would put the preset's text back over
+  the user's own edited version with nothing to say it had happened. Pre-adopting the presets at
+  install was the other candidate and is worse — a written-down preset is an ordinary scene, so
+  deleting one would have it come back at the next install, the language would freeze to whatever the
+  device spoke then, and it contradicts `LocalPrompt` §11. Emptiness is the whole safety story and it
+  is mechanical: the moment there is a conversation the strip is `GONE` for good, because a
+  suggestion strip parked over a live chat would be the app talking about itself instead of
+  answering. Two numbers are enforced rather than asked for by `ScenePresetsTest`, which caps every
+  summary in both languages and checks that every name a bubble can send is one `byName` can look
+  back up. Verified on device (HONOR AMM-AN00) by reading the notebook over the 9008 tool port.
+- **Long-pressing a history row opens the log behind it.** The scrollback says what was said;
+  everything that earned the right to say it — which tools ran, with what arguments, what came back,
+  what the model reasoned, and what each request cost in prompt tokens — was already in
+  `files/brain_trace.jsonl` and reachable only with `run-as`. The new page is built from those
+  records and opened through `HtmlActivity`, which is where folding the card, hanging the ball off
+  the ledge and the 完成 pill were already solved. Long-press because the other two gestures on a row
+  are taken — a single tap opens a page row's page, a double tap reads a message fullscreen — and the
+  two detectors had to become **one**, because `setOnTouchListener` replaces rather than chains, so a
+  second one would have silently killed the first. **The row and its log are joined by
+  `<process start>-<gen>`, and `gen` alone would have been wrong:** it is an in-memory counter that
+  restarts at 1 with every process while the trace file is persistent, so on the test device `"gen":1`
+  accounted for 176 of 278 records, and installing the change reproduced the collision within 89
+  seconds. A scrollback matching on `gen` would have opened a reinstall's first turn onto yesterday's
+  first turn, with nothing on screen to say so; `BrainTraceTest` locks the join down, dash included.
+  Two things the page got wrong before it was ever shown to anyone, both found by reading records
+  back off the device rather than by reasoning about them: the `turn` card labelled its body "Said",
+  so the user's own sentence appeared in the assistant's mouth on the first card of the page (the
+  heading is where the origin belongs, and `kind` is the field that knows it), and the `end` card
+  said "Turn ended" when `BrainTrace.end` is only written on an *abnormal* finish — two of three
+  turns measured had none at all. Records written before this commit have no `turn` field, so a row
+  from before the upgrade offers no gesture, and the same rule keeps hub-brain rows, scene-change
+  rows and notification read-outs from offering a dead entry.
+
+### Fixed
+
+- **`request_permissions` answered `{"started": true}` no matter what actually happened.** That was a
+  hard-coded `true` meaning only that `startActivity` had not thrown. After a second refusal Android
+  11+ draws no dialog at all and the call still said true, so the brain read "it is on" and
+  immediately called `get_location`. Measured on turn `1791621839492-4`: the request returned at
+  +19.257s, `get_location` fired at +20.839s and answered `permission denied` 1 ms later — the model
+  gave the user 1.582s to find a dialog that was never drawn, then spent 34.6s looking for a way
+  around it. The reply now carries what happened rather than that something was attempted: `mode`
+  (`solo` / `handoff` / `settings`, who answers the sheet), `result` (`granted` / `denied` /
+  `no_dialog` / `waiting`) and `next`, one line saying what to do about that result. `mode` comes from
+  `routeOf`, a pure function of the ids kept on a whitelist so a permission added to the catalog later
+  falls on "the user was asked once more than necessary" rather than "the ball agreed on their
+  behalf". `result` resolves the distinction that pays for all of it: a refusal and a silent block
+  both read `PERMISSION_DENIED` and demand opposite responses, and
+  `shouldShowRequestPermissionRationale` — readable only from an Activity — is what separates them.
+  `PermissionRequestActivity` used to drop `grantResults` on the floor; it now hands the verdict back
+  through arm/await/settle, and `PermissionsController` waits `DIALOG_GRACE_MS` for it, a grace
+  period rather than a wait for the human. Verified on HONOR AMM-AN00 (location/solo/granted,
+  contacts/handoff/waiting, steps/solo/waiting, each with the sheet really on screen); 37 unit tests
+  pass, with `PermissionsRouteTest` pinning the routes from the id list without a device.
+- **The permission sheet was drawn *underneath* the expanded card, so the user could never see it.**
+  An expanded card is a fullscreen surface and our overlay sits above every activity, so
+  `GrantPermissionsActivity` was drawn below it. Verified on device: the dialog really was up — it
+  was both `ResumedActivity` and `mCurrentFocus` — while a screenshot showed nothing but the card. A
+  question nobody can see is worse than no question, and it is exactly the state `waiting` promises.
+  `device.*` deliberately never folds, on the reasoning that reading state is a conversation rather
+  than an actuation; this branch is the exception that reasoning did not cover, because it addresses
+  the user in a window of the system's own. `device.scan` and `device.vault.fill` already fold for
+  the same reason, so this joins them — and only when `confirm=true`, because the first call is the
+  script the brain reads back and that one belongs in the card.
+- **Both READMEs gained a one-click build page and had its likely-reading fixed.** The nav and the
+  CodeFlying paragraph now point at the `/andee` page — describe the app, tap 立即打包, get a
+  pre-configured package with a QR code — and the "any app" feature line was reworded in both
+  languages, because "not a list of integrations" was being read as a claim about integrations this
+  app has rather than a claim about aim. The page itself is a separate service with no direct
+  relationship to this project, as that paragraph already says.
+
+### Changed
+
+- **The prompt's rule about the system permission sheet was wrong, and is now the measured one.** It
+  said a system permission sheet "does not take a tap you inject", and that turned out to be false.
+  With the card folded, an injected tap on 「始终允许」 really does grant: `READ_CONTACTS` went
+  false → true, and one tap on 「本次使用允许」 produced an `ACCESS_FINE_LOCATION` carrying `ONE_TIME`,
+  a flag only that button can set. The earlier four failures had one cause between them and it was our
+  own card eating the touch, not the sheet refusing it. So the rule changes from "you cannot press it"
+  to **"you cannot read it, so do not aim at it"**: the sheet exposes no accessibility elements at
+  all, so any tap is blind, and the button at the bottom of this particular screen is
+  「禁止后不再提示」, which nothing can undo. That is the real reason this step stays the user's, and
+  it is a reason that survives being measured. `LocalPrompt` §0's `type_text`-only rule is stated as
+  the general one — a tool saying it pressed something is not the thing being done — and §1's list of
+  genuine exceptions gains the sheet, which is worth naming because putting it on screen is the whole
+  of what firing does.
 
 ## [0.1.1] - 2026-10-09
 
