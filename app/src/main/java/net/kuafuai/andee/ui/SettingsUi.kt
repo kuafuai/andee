@@ -19,12 +19,14 @@ import android.widget.TextView
 import androidx.annotation.StringRes
 import net.kuafuai.andee.R
 import net.kuafuai.andee.config.FactoryReset
+import net.kuafuai.andee.config.CustomAvatar
 import net.kuafuai.andee.config.Notebook
 import net.kuafuai.andee.config.Vault
 import net.kuafuai.andee.config.VoiceConfig
 import net.kuafuai.andee.i18n.AppLocale
 import net.kuafuai.andee.wake.WakeTemplates
 import net.kuafuai.andee.wake.WakeWord
+import java.lang.ref.WeakReference
 
 /**
  * Settings overlay for editing [VoiceConfig].
@@ -125,6 +127,8 @@ class SettingsUi(
         context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
     private var root: View? = null
+    private var pickingAvatar = false
+    private var expressions: ExpressionsUi? = null
 
     /**
      * The card on its way out, still on screen for the length of [Glass.exit].
@@ -186,16 +190,20 @@ class SettingsUi(
     /** Whether the compositor agreed to blur. Decides the fill — see [Glass.frost]. */
     private var frosted = false
 
-    fun isShowing(): Boolean = root != null
+    fun isShowing(): Boolean = root != null || pickingAvatar
 
     fun show() {
+        if (!pickingAvatar) showWithEdits(emptyMap())
+    }
+
+    private fun showWithEdits(edits: Map<String, String>) {
         // A re-open during the closing animation: drop the outgoing card now
         // rather than letting two of them share the screen.
         closing?.let { runCatching { wm.removeView(it) }; OwnCard.hidden() }
         closing = null
         if (root != null) return
 
-        saved = VoiceConfig.current(context)
+        saved = VoiceConfig.current(context) + edits
         english = saved["lang"] == VoiceConfig.LANG_EN
         val p = WindowManager.LayoutParams(
             cardWidth(), cardHeight(),
@@ -301,6 +309,12 @@ class SettingsUi(
     }
 
     fun hide() {
+        pickingAvatar = false
+        expressions?.hide()
+        hideThen(after = {})
+    }
+
+    private fun hideThen(after: () -> Unit, notifyDismiss: Boolean = true) {
         val v = root ?: return
         root = null
         closing = v
@@ -313,7 +327,8 @@ class SettingsUi(
                 closing = null
                 OwnCard.hidden()
             }
-            onDismiss()
+            if (notifyDismiss) onDismiss()
+            after()
         }
     }
 
@@ -907,9 +922,36 @@ class SettingsUi(
         )
         val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         row.addView(button(lctx.getString(R.string.settings_expr_open), filled = false) {
-            ExpressionsUi(context).show()
+            if (expressions == null) {
+                expressions = ExpressionsUi(context) { expressions = null }.also { it.show() }
+            }
         })
         panel.addView(row, rowParams(dp(12)))
+        panel.addView(button(lctx.getString(R.string.expr_custom_choose), filled = false) {
+            // The settings overlay must leave before the system picker can receive touches.
+            val edits = currentEdits()
+            val position = scroll?.scrollY ?: 0
+            val owner = WeakReference(this)
+            pickingAvatar = true
+            expressions?.hide()
+            hideThen(after = {
+                AvatarPickerActivity.launch(context) {
+                    val sheet = owner.get()
+                    if (sheet?.pickingAvatar == true) {
+                        sheet.pickingAvatar = false
+                        sheet.showWithEdits(edits)
+                        sheet.scroll?.post { sheet.scroll?.scrollTo(0, position) }
+                    }
+                }
+            }, notifyDismiss = false)
+        }, rowParams(dp(8)))
+        if (CustomAvatar.hasImage(context)) {
+            panel.addView(button(lctx.getString(R.string.expr_custom_remove), filled = false) {
+                CustomAvatar.clear(context)
+                rebuild()
+            }, rowParams(dp(8)))
+        }
+        note(panel, lctx.getString(R.string.expr_custom_note))
     }
 
     /**

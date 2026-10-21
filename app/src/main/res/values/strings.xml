@@ -659,6 +659,13 @@
     <string name="settings_expr_note">看看每个形象和每个表情，点一下就换。</string>
     <string name="settings_expr_open">打开</string>
     <string name="expr_title">形象与表情</string>
+    <string name="expr_custom_choose">使用我的图片</string>
+    <string name="expr_custom_remove">移除自定义图片</string>
+    <string name="expr_custom_label">我的图片</string>
+    <string name="expr_custom_note">图片保留原有面孔，语音和性格保持不变。</string>
+    <string name="expr_custom_loading">正在导入图片…</string>
+    <string name="expr_custom_error">无法使用这张图片，请换一张小于 10 MB 的图片。</string>
+    <string name="factory_reset_target_avatar">自定义形象图片</string>
     <string name="expr_section_look">形象</string>
     <string name="expr_section_mood">表情</string>
     <string name="expr_caption">%1$s · %2$s</string>

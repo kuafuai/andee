@@ -578,6 +578,13 @@
     <string name="settings_expr_note">See every character and every expression; tap one to switch.</string>
     <string name="settings_expr_open">Open</string>
     <string name="expr_title">Looks &amp; expressions</string>
+    <string name="expr_custom_choose">Use my image</string>
+    <string name="expr_custom_remove">Remove custom image</string>
+    <string name="expr_custom_label">My image</string>
+    <string name="expr_custom_note">Images keep their original face. Voice and personality stay the same.</string>
+    <string name="expr_custom_loading">Loading image…</string>
+    <string name="expr_custom_error">Could not use this image. Try a different image under 10 MB.</string>
+    <string name="factory_reset_target_avatar">Custom avatar image</string>
     <string name="expr_section_look">Look</string>
     <string name="expr_section_mood">Expression</string>
     <string name="expr_caption">%1$s · %2$s</string>

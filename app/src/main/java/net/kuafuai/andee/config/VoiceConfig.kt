@@ -704,6 +704,8 @@ data class VoiceConfig(
                     else -> p.putString(k, v.trim())
                 }
             }
+            // Selecting a built-in character wins even if the update also contains the image flag.
+            if (!updates["ball"].isNullOrBlank()) p.putString("custom_avatar", "off")
             p.apply()
         }
 
@@ -871,6 +873,10 @@ data class VoiceConfig(
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .getString("ball", "").orEmpty().trim()
 
+        fun customAvatarEnabled(context: Context): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("custom_avatar", "off") == "on"
+
         /**
          * Whether the wake phrase is still listened for with the screen off.
          *
@@ -992,6 +998,7 @@ data class VoiceConfig(
             "notify",
             "lang",
             "ball",
+            "custom_avatar",
             "sweep", "sweep_quiet_minutes", "sweep_daily_cap",
             "max_steps",
         )

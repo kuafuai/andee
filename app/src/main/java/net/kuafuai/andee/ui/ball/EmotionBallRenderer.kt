@@ -1,9 +1,11 @@
 package net.kuafuai.andee.ui.ball
 
+import android.graphics.Bitmap
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import net.kuafuai.andee.ui.ball.gl.Capsule
+import net.kuafuai.andee.ui.ball.gl.AvatarSprite
 import net.kuafuai.andee.ui.ball.gl.Ear
 import net.kuafuai.andee.ui.ball.gl.Eye
 import net.kuafuai.andee.ui.ball.gl.Horn
@@ -57,6 +59,9 @@ import kotlin.math.tan
  * [onDrawFrame] away from coming back.
  */
 class EmotionBallRenderer : GLSurfaceView.Renderer {
+
+    @Volatile var avatar: Bitmap? = null
+    private var avatarSprite: AvatarSprite? = null
 
     // Public knobs (safe to write from UI thread)
     @Volatile
@@ -429,6 +434,8 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
     private var last = start
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        // A new EGL context cannot reuse texture or mesh handles from the old one.
+        avatarSprite = null
         GLES20.glClearColor(0f, 0f, 0f, 0f)
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
         GLES20.glEnable(GLES20.GL_BLEND)
@@ -523,6 +530,22 @@ class EmotionBallRenderer : GLSurfaceView.Renderer {
 
         buildRoot()
         buildFaceMatrix()
+
+        val image = avatar
+        if (image != null) {
+            // Keep the picture facing the user while retaining the ball's breath, hops and tilt.
+            Matrix.setIdentityM(model, 0)
+            Matrix.translateM(model, 0, 0f, state.hopY, 0f)
+            Matrix.rotateM(model, 0, state.rotZ * DEG, 0f, 0f, 1f)
+            Matrix.scaleM(model, 0, state.scaleX, state.scaleY, 1f)
+            Matrix.multiplyMM(mv, 0, view, 0, model, 0)
+            Matrix.multiplyMM(mvp, 0, proj, 0, mv, 0)
+            val sprite = avatarSprite ?: AvatarSprite().also { avatarSprite = it }
+            sprite.draw(image, mvp)
+            GLES20.glDisable(GLES20.GL_SCISSOR_TEST)
+            return
+        }
+        avatarSprite?.clear()
 
         drawBody()
         drawHorns()

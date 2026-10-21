@@ -12,6 +12,7 @@ import android.os.HandlerThread
 import android.util.AttributeSet
 import android.view.Surface
 import android.view.TextureView
+import net.kuafuai.andee.config.CustomAvatar
 
 /**
  * TextureView-hosted EmotionBall.
@@ -33,6 +34,7 @@ class EmotionBallTextureView @JvmOverloads constructor(
 ) : TextureView(context, attrs), TextureView.SurfaceTextureListener {
 
     private val renderer = EmotionBallRenderer()
+    private val avatarChanged: () -> Unit = { renderer.avatar = CustomAvatar.bitmap(context) }
 
     private var glThread: HandlerThread? = null
     private var glHandler: Handler? = null
@@ -52,6 +54,17 @@ class EmotionBallTextureView @JvmOverloads constructor(
 
     fun setMood(m: Mood) {
         renderer.mood = m
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        CustomAvatar.observe(context, avatarChanged)
+        avatarChanged()
+    }
+
+    override fun onDetachedFromWindow() {
+        CustomAvatar.unobserve(avatarChanged)
+        super.onDetachedFromWindow()
     }
 
     fun setListening(l: Boolean) {

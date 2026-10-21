@@ -242,6 +242,13 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
+        <activity
+            android:name=".ui.AvatarPickerActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
         <!-- Where the system camera writes a photo taken from the typing
              field. Cache only; the file is deleted once it is encoded. -->
         <provider

@@ -14,6 +14,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import net.kuafuai.andee.R
 import net.kuafuai.andee.config.VoiceConfig
+import net.kuafuai.andee.config.CustomAvatar
 import net.kuafuai.andee.i18n.AppLocale
 import net.kuafuai.andee.ui.ball.BallLooks
 import net.kuafuai.andee.ui.ball.EmotionBallTextureView
@@ -60,6 +61,8 @@ class ExpressionsUi(
     private var pickedMood: Mood = Mood.CALM
     private val moodChips = LinkedHashMap<Mood, TextView>()
     private val lookChips = ArrayList<TextView>()
+    private var customChip: TextView? = null
+    private val avatarChanged: () -> Unit = { if (root != null) refresh() }
 
     fun show() {
         if (root != null) return
@@ -75,6 +78,7 @@ class ExpressionsUi(
             v.hideFromAccessibility()
             wm.addView(v, p)
             root = v
+            CustomAvatar.observe(context, avatarChanged)
             Glass.enter(v)
         }
     }
@@ -82,6 +86,7 @@ class ExpressionsUi(
     fun hide() {
         val v = root ?: return
         root = null
+        CustomAvatar.unobserve(avatarChanged)
         preview = null
         Glass.exit(v) {
             runCatching { wm.removeView(v) }
@@ -93,6 +98,9 @@ class ExpressionsUi(
 
     @SuppressLint("SetTextI18n")
     private fun build(): View {
+        lookChips.clear()
+        moodChips.clear()
+        customChip = null
         lctx = AppLocale.wrap(context)
         val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -138,6 +146,12 @@ class ExpressionsUi(
                 val chip = chip(lctx.getString(look.labelRes)) { pickLook(look.name) }
                 lookChips.add(chip)
                 addView(chip, chipParams())
+            }
+            if (CustomAvatar.hasImage(context)) {
+                customChip = chip(lctx.getString(R.string.expr_custom_label)) {
+                    VoiceConfig.save(context, mapOf("custom_avatar" to "on"))
+                    refresh()
+                }.also { addView(it, chipParams()) }
             }
         })
 
@@ -226,11 +240,13 @@ class ExpressionsUi(
         preview?.setMood(pickedMood)
         preview?.setListening(pickedMood == Mood.LISTENING)
         val look = BallLooks.requestedLook
-        lookChips.forEachIndexed { i, chip -> light(chip, BallLooks.ALL[i] === look) }
+        val custom = VoiceConfig.customAvatarEnabled(context) && CustomAvatar.hasImage(context)
+        lookChips.forEachIndexed { i, chip -> light(chip, !custom && BallLooks.ALL[i] === look) }
+        customChip?.let { light(it, custom) }
         for ((m, chip) in moodChips) light(chip, m == pickedMood)
         caption?.text = lctx.getString(
             R.string.expr_caption,
-            lctx.getString(look.labelRes),
+            lctx.getString(if (custom) R.string.expr_custom_label else look.labelRes),
             lctx.getString(labelOf(pickedMood)),
         )
     }

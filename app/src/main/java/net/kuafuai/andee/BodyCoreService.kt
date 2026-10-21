@@ -544,6 +544,12 @@ class BodyCoreService : Service() {
         // The camera and the photo picker are other apps' windows, and the card
         // is an overlay that sorts above them — so it steps aside while they are up.
         net.kuafuai.andee.ui.TextInputActivity.onAway = { window.setAway(it) }
+        net.kuafuai.andee.ui.AvatarPickerActivity.onAway = { away ->
+            // The self-check card may be underneath Settings and would cover the picker too.
+            if (away) selfCheck?.hide(yielding = true)
+            window.setAway(away)
+        }
+        if (net.kuafuai.andee.ui.AvatarPickerActivity.picking) window.setAway(true)
         // Fires on every way out of the field; see [typingFinished].
         net.kuafuai.andee.ui.TextInputActivity.onClosed = { typingFinished() }
         // And this is how the card knows where to stop: the field's own top
@@ -1549,6 +1555,7 @@ class BodyCoreService : Service() {
     }
 
     override fun onDestroy() {
+        net.kuafuai.andee.ui.AvatarPickerActivity.onAway = null
         // First, before anything else: the dog is the only thing this service
         // drives that keeps acting after we are gone. Every motion is supposed
         // to end on its own, but "supposed to" is not a reason to leave motors
