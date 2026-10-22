@@ -121,6 +121,10 @@
     <string name="settings_voice_tts_resource_id">TTS resource ID</string>
     <string name="settings_voice_tts_sample_rate">TTS sample rate</string>
     <string name="settings_voice_provider">Voice provider</string>
+    <string name="settings_tts_speed">Speech speed</string>
+    <string name="settings_tts_speed_normal">1x</string>
+    <string name="settings_tts_speed_double">2x</string>
+    <string name="settings_tts_speed_note">Save to apply to the next spoken reply.</string>
     <string name="settings_voice_provider_huoshan">Volcengine</string>
     <string name="settings_voice_provider_google">Google</string>
     <string name="settings_google_api_key">Google API key</string>

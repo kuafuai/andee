@@ -328,7 +328,7 @@ class TtsController(
         val listener = object : TtsEngine.Listener {
             override fun onOpen(sampleRate: Int) {
                 if (cancelled) return
-                audio.startStreamPlayback(sampleRate)
+                audio.startStreamPlayback(sampleRate, cfg.ttsSpeed)
                 // The ball's speaking face is the whole signal. The sentence
                 // itself is already a row in the scrollback — the caller logs it
                 // before handing it here — so echoing it onto the live line put

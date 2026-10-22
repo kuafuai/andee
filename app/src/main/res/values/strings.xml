@@ -98,6 +98,10 @@
     <string name="settings_voice_tts_resource_id">合成资源 ID</string>
     <string name="settings_voice_tts_sample_rate">合成采样率</string>
     <string name="settings_voice_provider">语音服务商</string>
+    <string name="settings_tts_speed">语速</string>
+    <string name="settings_tts_speed_normal">1x</string>
+    <string name="settings_tts_speed_double">2x</string>
+    <string name="settings_tts_speed_note">保存后从下一条语音回复生效。</string>
     <string name="settings_voice_provider_huoshan">火山</string>
     <string name="settings_voice_provider_google">谷歌</string>
     <string name="settings_google_api_key">Google API Key</string>

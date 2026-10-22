@@ -6,8 +6,11 @@ import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
+import android.media.PlaybackParams
+import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.ceil
 
 /**
  * Audio in/out primitives for the physical body.
@@ -280,6 +283,7 @@ class AudioIO {
     @Volatile
     private var streamTrack: AudioTrack? = null
     private var streamPlaySampleRate: Int = 24_000
+    private var streamPlaySpeed: Float = 1f
 
     /** Player thread only, after [startStreamPlayback] zeroes it. */
     @Volatile
@@ -337,7 +341,8 @@ class AudioIO {
     /** Queued by [finishStreamPlayback] to mean "no more audio is coming". */
     private val endOfStream = ByteArray(0)
 
-    fun startStreamPlayback(sampleRate: Int = 24_000) {
+    fun startStreamPlayback(sampleRate: Int = 24_000, speed: Float = 1f) {
+        require(speed == 1f || speed == 2f)
         stopStreamPlayback()
         val channelConfig = AudioFormat.CHANNEL_OUT_MONO
         val encoding = AudioFormat.ENCODING_PCM_16BIT
@@ -363,6 +368,20 @@ class AudioIO {
             .setBufferSizeInBytes(minBuf * 4)
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
+        streamPlaySpeed = 1f
+        if (speed != 1f) {
+            try {
+                // Keep the character's pitch; changing the sample rate would change it.
+                t.playbackParams = PlaybackParams()
+                    .setSpeed(speed)
+                    .setPitch(1f)
+                    .setAudioFallbackMode(PlaybackParams.AUDIO_FALLBACK_MODE_FAIL)
+                streamPlaySpeed = speed
+            } catch (e: IllegalArgumentException) {
+                // A device that rejects time stretching must still speak at normal speed.
+                Log.w(TAG, "Speech speed $speed unsupported; using 1x", e)
+            }
+        }
         streamPlaySampleRate = sampleRate
         streamBytesWritten = 0
         streamBytesQueued = 0
@@ -446,7 +465,7 @@ class AudioIO {
         val totalFrames = streamBytesWritten / bytesPerFrame
         val playedFrames = t.playbackHeadPosition.toLong() and 0xFFFFFFFFL
         val remaining = (totalFrames - playedFrames).coerceAtLeast(0)
-        val remainingMs = remaining * 1000L / streamPlaySampleRate
+        val remainingMs = drainDurationMs(remaining, streamPlaySampleRate, streamPlaySpeed)
         try {
             Thread.sleep(remainingMs + 200)
         } catch (_: InterruptedException) {
@@ -484,10 +503,14 @@ class AudioIO {
         streamBytesWritten = 0
     }
 
-    private companion object {
-        const val TAG = "AudioIO"
+    companion object {
+        private const val TAG = "AudioIO"
 
         /** 16-bit mono, everywhere in this class. */
-        const val BYTES_PER_FRAME = 2
+        private const val BYTES_PER_FRAME = 2
+
+        // Playback-head offsets stay in source frames; only wall-clock waiting scales.
+        internal fun drainDurationMs(frames: Long, sampleRate: Int, speed: Float): Long =
+            ceil(frames * 1000.0 / sampleRate / speed).toLong()
     }
 }

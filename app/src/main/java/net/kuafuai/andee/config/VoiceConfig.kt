@@ -14,6 +14,7 @@ data class VoiceConfig(
     val ttsResourceId: String,
     val ttsSpeaker: String,
     val ttsSampleRate: Int,
+    val ttsSpeed: Float,
     /**
      * [VOICE_HUOSHAN] or [VOICE_GOOGLE] — which service hears and speaks.
      *
@@ -97,6 +98,9 @@ data class VoiceConfig(
         const val DEFAULT_TTS_ENDPOINT = "wss://openspeech.bytedance.com/api/v3/tts/bidirection"
         const val DEFAULT_TTS_RESOURCE = "seed-tts-2.0"
         const val DEFAULT_TTS_SAMPLE_RATE = 24_000
+        internal fun ttsSpeedFromSaved(saved: String?): Float =
+            if (saved?.trim() == "2") 2f else 1f
+
         private const val PREFS = "voice_prefs"
 
         /**
@@ -656,6 +660,7 @@ data class VoiceConfig(
                 // this stays the one place a voice is decided.
                 ttsSpeaker = lookSpeaker(p),
                 ttsSampleRate = p.getInt("tts_sample_rate", DEFAULT_TTS_SAMPLE_RATE),
+                ttsSpeed = ttsSpeedFromSaved(p.getString("tts_speed", null)),
                 voiceProvider = voiceProvider(context),
                 // Every one of these is saved-value-else-build-default, and the
                 // card's hint under each row is the same call — see
@@ -726,6 +731,7 @@ data class VoiceConfig(
                 "tts_endpoint" to p.getString("tts_endpoint", "").orEmpty(),
                 "tts_resource_id" to p.getString("tts_resource_id", DEFAULT_TTS_RESOURCE)!!,
                 "tts_sample_rate" to p.getInt("tts_sample_rate", DEFAULT_TTS_SAMPLE_RATE).toString(),
+                "tts_speed" to ttsSpeedFromSaved(p.getString("tts_speed", null)).toInt().toString(),
                 // Which service hears and speaks, plus its rows. The Google
                 // endpoint/model rows show saved-or-empty for the same reason
                 // the 火山 ones do: an empty box is the only state in which
@@ -978,7 +984,7 @@ data class VoiceConfig(
             "uid",
             "api_key",
             "asr_endpoint", "asr_resource_id",
-            "tts_endpoint", "tts_resource_id", "tts_sample_rate",
+            "tts_endpoint", "tts_resource_id", "tts_sample_rate", "tts_speed",
             "voice_provider",
             "google_api_key", "google_base_url",
             "google_project", "google_location",

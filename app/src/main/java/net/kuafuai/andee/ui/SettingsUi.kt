@@ -686,6 +686,18 @@ class SettingsUi(
         )
         note(localBlock, lctx.getString(R.string.settings_brain_local_note))
 
+        // Playback is local, so this control also applies to the hosted backend.
+        rowLabel(panel, lctx.getString(R.string.settings_tts_speed))
+        segmented(
+            panel,
+            "tts_speed",
+            listOf(
+                "1" to lctx.getString(R.string.settings_tts_speed_normal),
+                "2" to lctx.getString(R.string.settings_tts_speed_double),
+            ),
+        )
+        note(panel, lctx.getString(R.string.settings_tts_speed_note))
+
         // ---- Which service hears and speaks ----
         //
         // One container, so that the whole block can be taken out in one move
