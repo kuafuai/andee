@@ -18,7 +18,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The agent loop, running on the tablet itself.
@@ -136,17 +135,15 @@ class LocalBrain(
     }
 
     /**
-     * Bumped by [submit] and by [cancel]. A running turn compares it against
-     * the value it started with, so "has this turn been abandoned" needs no
-     * separate flag and a late [cancel] can never silence the turn that
-     * replaced it.
+     * Each turn owns its HTTP call and tools. Replacing it cancels those calls
+     * as well as invalidating the loop, so a new request does not wait for an old one.
      */
-    private val generation = AtomicInteger(0)
+    private val turns = TurnCancellation()
 
     /**
      * A turn is in progress. Read from any thread, written on the loop thread.
      *
-     * This is what makes a wake-up deferrable. [submit] bumps [generation],
+     * This is what makes a wake-up deferrable. [submit] advances [turns],
      * which throws a running turn away mid-sentence — correct when the user
      * interrupts, wrong when a todo's alarm fires, because the user would hear
      * the answer to their own question vanish. So a wake that arrives mid-turn
@@ -437,8 +434,9 @@ class LocalBrain(
      * over — is here once, so no entry point can forget a step.
      */
     private fun launch(text: String, kind: TurnKind, images: List<String> = emptyList()) {
-        val gen = generation.incrementAndGet()
+        val gen = turns.next()
         loop.execute {
+            if (!turns.isCurrent(gen)) return@execute
             busy.set(true)
             currentKind = kind
             turnTokens = 0
@@ -447,11 +445,12 @@ class LocalBrain(
                 runTurn(text, gen, kind, images)
             } catch (t: Throwable) {
                 BrainTrace.end(gen, "threw: ${t.message ?: t.javaClass.simpleName}")
-                if (gen == generation.get()) {
+                turns.ifCurrent(gen) {
                     Log.e(TAG, "turn $gen ($kind) failed", t)
                     // A silent turn has nobody to apologise to; it just ends.
                     if (!kind.silent) onFinal(explainFailure(t))
-                } else {
+                }
+                if (!turns.isCurrent(gen)) {
                     // Almost always the cancelled call's own IOException.
                     Log.i(TAG, "turn $gen abandoned: ${t.message}")
                 }
@@ -475,9 +474,14 @@ class LocalBrain(
                 // into the old shape. Guarded on the generation like everything
                 // else: a cancelled turn's fold belongs to a conversation that
                 // is no longer the current one.
-                if (gen == generation.get()) applyPendingFolds() else pendingFolds.clear()
+                if (turns.isCurrent(gen)) {
+                    applyPendingFolds()
+                } else {
+                    pendingFolds.clear()
+                    completeCancelledToolCalls(history)
+                }
                 if (kind == TurnKind.SWEEP) onSweepSpent(turnTokens)
-                if (gen == generation.get()) {
+                turns.ifCurrent(gen) {
                     drainWakes()
                     maybeHarvest()
                     onTurnEnd()
@@ -566,14 +570,11 @@ class LocalBrain(
     /**
      * The user hit ■. Must not block — it is called from the main thread.
      *
-     * Bumping [generation] is what actually stops the loop; [LlmClient.cancel]
-     * only shortens the wait, because a turn parked in a 3-minute read would
-     * otherwise keep the ball lit until the model finished answering a question
-     * nobody is listening to anymore.
+     * Invalidates the loop and cancels its HTTP call and tool futures. A gesture
+     * already handed to Android can still finish; remaining calls are discarded.
      */
     fun cancel() {
-        generation.incrementAndGet()
-        llm.cancel()
+        turns.next()
     }
 
     /** Service teardown. Threads are daemons, so this is tidiness, not safety. */
@@ -719,13 +720,15 @@ class LocalBrain(
         // every turn before it started.
         val maxSteps = net.kuafuai.andee.config.VoiceConfig.maxSteps(appContext)
         for (step in 1..maxSteps) {
-            if (gen != generation.get()) return
+            if (!turns.isCurrent(gen)) return
             // `enter_scene` mid-turn should change how the rest of this turn
             // reads, not only the next one. A string compare, free when nothing
             // moved.
             if (step > 1) reseatPersona()
-            val reply = llm.complete(history, tools)
-            if (gen != generation.get()) return
+            val reply = turns.onCancel(gen, llm::cancel).use {
+                llm.complete(history, tools) { !turns.isCurrent(gen) }
+            }
+            if (!turns.isCurrent(gen)) return
             turnTokens += reply.promptTokens + reply.completionTokens
 
             if (reply.reasoning.isNotBlank()) {
@@ -751,23 +754,25 @@ class LocalBrain(
                 } else if (!internal) {
                     // A silent turn has nobody to answer; whatever it wrote
                     // stays in the history as its own note and that is all.
-                    onFinal(
-                        answer.ifEmpty {
-                            // A tool-call-free reply with no prose is the model
-                            // ending the turn with nothing in it. Saying so beats
-                            // the ball going dark with no explanation.
-                            AppLocale.str(appContext, R.string.brain_no_result)
-                        },
-                    )
+                    turns.ifCurrent(gen) {
+                        onFinal(
+                            answer.ifEmpty {
+                                // A tool-call-free reply with no prose still needs an answer.
+                                AppLocale.str(appContext, R.string.brain_no_result)
+                            },
+                        )
+                    }
                 }
                 return
             }
 
-            if (reply.content.isNotBlank() && !internal) onProgress(reply.content.trim())
+            if (reply.content.isNotBlank() && !internal) {
+                turns.ifCurrent(gen) { onProgress(reply.content.trim()) }
+            }
 
             val images = mutableListOf<String>()
             for (tc in reply.toolCalls) {
-                if (gen != generation.get()) return
+                if (!turns.isCurrent(gen)) return
 
                 // The repeated-call guard, which is *not* the one in
                 // ScreenController: that one counts taps at a screen location,
@@ -780,20 +785,24 @@ class LocalBrain(
                     Log.w(TAG, "same call $MAX_REPEATS× in a row: $sig")
                     BrainTrace.end(gen, "same call $MAX_REPEATS× in a row: ${tc.name}")
                     if (!internal) {
-                        onFinal(
-                            AppLocale.str(
-                                appContext,
-                                R.string.brain_repeat_stop,
-                                tc.name,
+                        turns.ifCurrent(gen) {
+                            onFinal(
+                                AppLocale.str(
+                                    appContext,
+                                    R.string.brain_repeat_stop,
+                                    tc.name,
+                                )
                             )
-                        )
+                        }
                     }
                     return
                 }
 
-                if (reply.content.isBlank() && !internal) onProgress(narrate(tc.name))
+                if (reply.content.isBlank() && !internal) {
+                    turns.ifCurrent(gen) { onProgress(narrate(tc.name)) }
+                }
                 val t0 = android.os.SystemClock.uptimeMillis()
-                val msg = runTool(tc, images, internal, kind.untrusted)
+                val msg = runTool(tc, images, internal, kind.untrusted, gen)
                 BrainTrace.tool(
                     gen, tc.name, ToolSchemas.methodOf(tc.name), tc.argumentsRaw,
                     msg.optString("content"), android.os.SystemClock.uptimeMillis() - t0,
@@ -806,7 +815,7 @@ class LocalBrain(
 
         Log.w(TAG, "hit max steps ($maxSteps)")
         BrainTrace.end(gen, "hit max steps ($maxSteps)")
-        if (!internal) {
+        if (!internal) turns.ifCurrent(gen) {
             onFinal(
                 AppLocale.str(
                     appContext,
@@ -842,6 +851,7 @@ class LocalBrain(
         images: MutableList<String>,
         silent: Boolean,
         untrusted: Boolean,
+        gen: Int,
     ): JSONObject {
         val body: String = try {
             val args = tc.argumentsOrNull()
@@ -874,7 +884,7 @@ class LocalBrain(
                 ?: tc.name.takeIf { market.hasMethod(it) }
                 ?: return toolMessage(tc.id, "No such tool: ${tc.name}")
 
-            val result = dispatchWithTimeout(method, args, silent, untrusted)
+            val result = dispatchWithTimeout(method, args, silent, untrusted, gen)
             when (result) {
                 is JSONObject -> {
                     extractImages(result, images)
@@ -909,10 +919,11 @@ class LocalBrain(
         params: JSONObject,
         silent: Boolean,
         untrusted: Boolean,
+        gen: Int,
     ): Any? {
         val declared = params.optLong("timeout_ms", 0L)
         val budget = if (declared > 0) declared + TIMEOUT_SLACK_MS else DEFAULT_TOOL_TIMEOUT_MS
-        val f = toolExec.submit<Any?> {
+        val f = turns.submit<Any?>(gen, toolExec) {
             dispatcher.dispatch(
                 method, params, driving = true, silent = silent, untrusted = untrusted,
             )

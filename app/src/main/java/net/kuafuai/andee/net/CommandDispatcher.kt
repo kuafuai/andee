@@ -310,6 +310,7 @@ class CommandDispatcher(
         silent: Boolean = false,
         untrusted: Boolean = false,
     ): Any? {
+        if (Thread.currentThread().isInterrupted) throw InterruptedException("Task stopped")
         // The quiet-hour sweep runs with nobody watching: it may think, and it
         // may write to the notebook, but it must not touch the device. Its
         // prompt says the same thing — this is the copy that cannot drift, and
@@ -1777,7 +1778,7 @@ class CommandDispatcher(
         // Bounded, and only a hint: a busy main thread costs us the wait, not
         // the command.
         if (!wait) return
-        runCatching { settled.await(COMPACT_SETTLE_MS, TimeUnit.MILLISECONDS) }
+        settled.await(COMPACT_SETTLE_MS, TimeUnit.MILLISECONDS)
         awaitUncovered()
     }
 
@@ -1825,7 +1826,7 @@ class CommandDispatcher(
             val s = screenOrNull() ?: return
             if (s.activeWindowVisible()) return
             if (System.currentTimeMillis() >= deadline) return
-            runCatching { Thread.sleep(UNCOVER_POLL_MS) }
+            Thread.sleep(UNCOVER_POLL_MS)
         }
     }
 

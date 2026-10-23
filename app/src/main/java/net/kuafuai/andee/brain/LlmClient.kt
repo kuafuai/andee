@@ -140,7 +140,11 @@ class LlmClient(
      * @param messages the full conversation, system message first.
      * @param tools OpenAI-format function specs — see [toolSpecs].
      */
-    fun complete(messages: List<JSONObject>, tools: JSONArray): Reply {
+    fun complete(
+        messages: List<JSONObject>,
+        tools: JSONArray,
+        isCancelled: () -> Boolean = { false },
+    ): Reply {
         val msgArr = JSONArray()
         for (m in messages) msgArr.put(m)
         val body = JSONObject()
@@ -166,6 +170,8 @@ class LlmClient(
 
         val call = http.newCall(req)
         current = call
+        // A stop can land before `current` is assigned, when cancel() has nothing to close.
+        if (isCancelled()) call.cancel()
         val text = try {
             call.execute().use { resp ->
                 // Read the body either way: DeepSeek puts the useful part of an

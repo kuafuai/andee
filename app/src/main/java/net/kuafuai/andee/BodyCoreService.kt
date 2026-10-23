@@ -1024,6 +1024,17 @@ class BodyCoreService : Service() {
             android.util.Log.i("Body", "$how answered card: $said")
             return
         }
+        val replacing = dispatcher.isTaskActive() || localBrain?.isBusy() == true
+        localBrain?.cancel()
+        expectFollowUp = false
+        tts.stopSpeaking()
+        if (replacing) {
+            net.kuafuai.andee.ui.CardUi.dismissCurrent()
+            // Send the stop before the replacement, on the same sockets and in order.
+            val stopped = JSONObject().put("ts", System.currentTimeMillis())
+            hubClient?.sendEvent("task.stop", stopped)
+            wsServer?.broadcastEvent("task.stop", stopped)
+        }
         android.util.Log.i("Body", "$how: $said" + if (images.isEmpty()) "" else " (+${images.size} images)")
         // Hand the keyboard back before the turn exists: the brain may call
         // `type_text` inside it, and it can only do that on ADBKeyboard.
@@ -1066,10 +1077,6 @@ class BodyCoreService : Service() {
         if (images.isNotEmpty()) payload.put("images", images.size)
         hubClient?.sendEvent("asr.final", payload)
         wsServer?.broadcastEvent("asr.final", payload)
-        // Same turn, different brain. The local one takes the text directly —
-        // there is no socket in between, and no event kind it would have to be
-        // taught (see the meeting callback).
-        localBrain?.submit(forBrain, images)
         // Task start, and deliberately at the request rather than at the
         // reply: from here the device is being worked on, whether that reaches
         // us as a tool call or as thirty seconds of thinking. Nobody listening
@@ -1079,6 +1086,8 @@ class BodyCoreService : Service() {
             dispatcher.beginTask()
             window.setState(FloatingWindowUi.State.THINKING)
         }
+        // Open the task before submitting: a fast reply must not be followed by beginTask().
+        localBrain?.submit(forBrain, images)
     }
 
     /**
