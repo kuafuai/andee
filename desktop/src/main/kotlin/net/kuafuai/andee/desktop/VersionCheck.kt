@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
  * The self-check's version row on the Mac: the phone's `SelfCheck.probeVersion`, against the same service.
  *
  * What it sends, and nothing else: this build's version, `platform=mac`, the Mac's model and macOS release, the
- * interface language, this install's own random id, and whether CodeFlying is the backend in force (on / off —
+ * interface language, this install's own random id, and whether CodeFlying is in use (the backend in force AND a key set: 1 / 0 —
  * never the key or the address). No conversation, no screen content, no file names. It is the one call the app
  * makes to a host the maintainers run, and docs/permissions.md says so.
  *
@@ -48,7 +48,8 @@ object VersionCheck {
             ?.addQueryParameter("os_version", "macOS ${System.getProperty("os.version")} (${System.getProperty("os.arch")})")
             ?.addQueryParameter("device_id", Settings.uid())
             ?.addQueryParameter("app_package", "net.kuafuai.andee.mac")
-            ?.addQueryParameter("codeflying", if (Assistant.config().mode == net.kuafuai.andee.config.BrainConfig.BRAIN_CODEFLYING) "1" else "0")
+            // "1" only if CodeFlying is the backend in force AND a key is configured for it, else "0".
+            ?.addQueryParameter("codeflying", if (usingCodeFlyingWithKey()) "1" else "0")
             ?.addQueryParameter("lang", Strings.locale().toLanguageTag())
             ?.build() ?: return Result.Unknown("bad address")
         val http = OkHttpClient.Builder()
@@ -74,6 +75,10 @@ object VersionCheck {
         } catch (e: Exception) {
             Result.Unknown(e.message ?: e.javaClass.simpleName)
         }
+    }
+
+    private fun usingCodeFlyingWithKey(): Boolean = Assistant.config().let {
+        it.mode == net.kuafuai.andee.config.BrainConfig.BRAIN_CODEFLYING && it.apiKey.isNotBlank()
     }
 
     /** "Mac14,5"-style model identifier; empty when sysctl is not answering. */

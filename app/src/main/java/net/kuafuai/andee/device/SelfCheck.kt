@@ -557,7 +557,10 @@ object SelfCheck {
         val deviceId = VoiceConfig.hubConfig(context).deviceId
         return when (val v = probeVersion(
             VERSION_API_BASE, BuildConfig.VERSION_NAME, deviceId,
-            VoiceConfig.brainMode(context) == VoiceConfig.BRAIN_CODEFLYING,
+            // True only when CodeFlying is the backend in force AND a key is set for it. The field keeps its name,
+            // `codeflying`; what it now says is "this install really can use CodeFlying".
+            VoiceConfig.brainMode(context) == VoiceConfig.BRAIN_CODEFLYING &&
+                VoiceConfig.codeFlyingKey(context).isNotBlank(),
         )) {
             is Verdict.Current -> Finding(
                 id = "version",
@@ -1354,8 +1357,8 @@ object SelfCheck {
             ?.addQueryParameter("os_version", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
             ?.addQueryParameter("device_id", deviceId)
             ?.addQueryParameter("app_package", BuildConfig.APPLICATION_ID)
-            // Whether the CodeFlying backend is the one in force right now: "1" / "0". Only the on/off fact,
-            // never the key or the address.
+            // "1" only if CodeFlying is the backend in force and a key is configured for it, else "0". Only
+            // that on/off fact is sent, never the key or the address.
             ?.addQueryParameter("codeflying", if (codeFlying) "1" else "0")
             ?.addQueryParameter("lang", Locale.getDefault().toLanguageTag())
             ?.build()
