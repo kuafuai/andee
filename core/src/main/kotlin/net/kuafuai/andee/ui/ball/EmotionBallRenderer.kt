@@ -949,6 +949,18 @@ class EmotionBallRenderer {
             }
             drawShellPart(ear)
         }
+        // Inner-ear patch: same flap, smaller, pushed forward, in its own colour.
+        val inner = LOOK.earInner ?: return
+        useShellWith(inner)
+        for (side in -1..1 step 2) {
+            composeModelFromRoot {
+                if (side < 0) Matrix.scaleM(local, 0, -1f, 1f, 1f)
+                Matrix.translateM(local, 0, LOOK.earX - 0.012f, LOOK.earY + 0.02f, LOOK.earZ + 0.016f)
+                Matrix.rotateM(local, 0, -LOOK.earTilt, 0f, 0f, 1f)
+                Matrix.scaleM(local, 0, 0.55f, 0.72f, 1f)
+            }
+            drawShellPart(ear)
+        }
     }
 
     /**
