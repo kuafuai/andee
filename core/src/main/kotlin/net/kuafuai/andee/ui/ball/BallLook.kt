@@ -1387,6 +1387,9 @@ val CREAM = BallLook(
     // [BAJIE]: a cut is only visible where the *white* of an eye survives it.
     // This eye is the dark disc itself, so a cut does not draw a brow — it just
     // makes the disc smaller.
+    // 柔美女友: soft and close, which is the kitten's whole manner. Same
+    // `*_uranus_bigtts` family as the fallback, so no `tts_resource_id` change.
+    voice = "zh_female_roumeinvyou_uranus_bigtts",
     persona = CREAM_PERSONA,
     earInner = floatArrayOf(1.00f, 0.66f, 0.72f),
 )

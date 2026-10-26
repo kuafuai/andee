@@ -359,6 +359,7 @@ class GoogleTts(
             "zh_male_lubanqihao_uranus_bigtts" to "Fenrir",
             "zh_female_peiqi_uranus_bigtts" to "Zephyr",
             "zh_male_xionger_uranus_bigtts" to "Sulafat",
+            "zh_female_roumeinvyou_uranus_bigtts" to "Kore",
         )
 
         /** [VOICE_MAP] with the default for anything it does not know. */
