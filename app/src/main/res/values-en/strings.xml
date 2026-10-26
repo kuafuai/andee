@@ -68,14 +68,13 @@
     <string name="settings_clear_notes_confirm_body">Everything it noted down, your preferences, and any reminder not yet due are deleted, with no way back. The current chat history is untouched.</string>
     <string name="settings_clear_notes_confirm">Clear it</string>
     <string name="settings_section_brain">Backend</string>
-    <string name="settings_brain_panel_note">Takes effect when you close this panel — no need to restart the accessibility service.</string>
+    <string name="settings_brain_panel_note">The AI model and voice service Andee uses to think, listen and speak.</string>
     <string name="settings_brain_cloud">Cloud</string>
     <string name="settings_brain_local">On-device</string>
     <string name="settings_brain_codeflying">CodeFlying</string>
     <string name="settings_show_hub">Show cloud option</string>
     <string name="settings_show_hub_note">Adds a Cloud backend tab for connecting to a hub you host yourself.</string>
-    <string name="settings_brain_codeflying_note">CodeFlying (CodeFlying.app) is connected: models and voice are set up and ready to go. You can also tap into a long list of third-party services — AI image, video and music generation, location, weather, PDF conversion, search, news, stocks and more. CodeFlying wraps and bills all of them in one place, so you never have to sign up with each provider or juggle their keys and invoices.\n\nAccount and top-ups: open CodeFlying.app in a computer browser and sign in. If you see a balance error (HTTP 402), top up there.\n\nNote: using CodeFlying backend services may incur charges.</string>
-    <string name="settings_brain_codeflying_unconfigured">Want Andee to draw, make videos, write music, check the weather, search the news, convert PDFs, or watch stocks for you? Connect CodeFlying: models and voice come set up, and a long list of third-party services is one hookup away, with no separate sign-ups, keys or invoices.\n\nTo get started, open CodeFlying.app in a computer browser and generate your own Andee install package in one click, then install it over this app. New users get free credit, so you can try it first.\n\nNote: using CodeFlying backend services may incur charges.</string>
+    <string name="settings_brain_codeflying_note">CodeFlying (CodeFlying.app): models and voice come set up for you; add your key and it works. You can also tap into a long list of third-party services — AI image, video and music generation, location, weather, PDF conversion, search, news, stocks and more. CodeFlying wraps and bills all of them in one place, so you never have to sign up with each provider or juggle their keys and invoices.\n\nNote: using CodeFlying backend services may incur charges.</string>
     <string name="settings_hub_url">Hub URL</string>
     <!-- The hub URL box is empty on a fresh install — the hint is what the
          user sees in that empty box, so it is the pitch, not the format. -->
@@ -94,8 +93,13 @@
     <string name="common_medium">Medium</string>
     <string name="common_low">Low</string>
     <string name="settings_brain_local_note">The device runs the agent loop itself, with no hub. Without a key it will not take over.</string>
-    <string name="settings_codeflying_not_connected">CodeFlying is not connected yet</string>
+    <string name="settings_codeflying_get_key">No key? Sign up at the link below, then paste your key into the box underneath. New users get free credit.</string>
+    <string name="settings_codeflying_open_site">Open CodeFlying.app ›</string>
+    <string name="codeflying_url" translatable="false">https://www.codeflying.app/andee</string>
     <string name="settings_no_key_use_codeflying">No key? Tap here to switch to CodeFlying</string>
+    <string name="settings_codeflying_key">CodeFlying key</string>
+    <string name="common_copy">Copy</string>
+    <string name="common_copied">Copied</string>
     <string name="settings_section_wake">Wake word</string>
     <string name="settings_wake_enrolled">Enrolled — say your wake word and it wakes up</string>
     <string name="settings_wake_not_enrolled">Not enrolled — pick a phrase and say it 3 times to wake me by voice, e.g. “Hey Andee”</string>
@@ -421,6 +425,8 @@
     <string name="svc_notification_auto_line">(%1$s has a message — taking a look myself…)</string>
     <string name="svc_no_brain_hub">No brain is connected yet, so I can\'t speak.</string>
     <string name="svc_no_brain_local">The local brain has no key yet, so I can\'t speak.</string>
+    <string name="svc_no_brain_codeflying">There is no CodeFlying key yet, so I can\'t speak.</string>
+    <string name="svc_btn_get_key">Get a key</string>
 
     <string name="notebook_dump_header">"Notebook · %1$d memories\n"</string>
     <string name="notebook_dump_sort_note">"(Listed by type and most-recently updated; read-only)\n\n"</string>
@@ -475,9 +481,9 @@
 
     <!-- LocalBrain — display half only; see the comment on the Chinese side. -->
     <string name="brain_no_key">The on-device brain has no API key yet. Long-press the ball to bring the card back, tap ⚙ in the control bar, and put the key in Backend → On-device → “DeepSeek Key”.</string>
+    <string name="brain_no_key_codeflying">There is no CodeFlying key yet. Long-press the ball to bring the card back, tap ⚙, and paste the key under Backend → CodeFlying. No key? Get one at CodeFlying.app.</string>
     <string name="brain_error">Something broke on my side: %1$s</string>
     <string name="brain_error_402">The backend answered 402, which most likely means the account is out of balance. Open Settings → Backend to see which provider you are using, then top up on that provider\'s website and try again.</string>
-    <string name="brain_error_402_codeflying">The backend answered 402, which most likely means your CodeFlying balance has run out. Open CodeFlying.app in a computer browser, sign in, top up, and try again.</string>
     <string name="brain_error_auth">The backend refused the request (HTTP %1$d): the key is wrong, expired or disabled. Check the key in Settings → Backend, and generate a new one on the provider\'s website if needed.</string>
     <string name="brain_error_400">The backend rejected the request: %1$s\nThe usual cause is a misspelled model name. Check it in Settings → Backend.</string>
     <string name="brain_error_404">The backend could not find that address (HTTP 404). Check the endpoint URL and the model name in Settings → Backend.</string>
@@ -545,6 +551,7 @@
     <string name="check_detail_brain_on">Configured.</string>
     <string name="check_detail_brain_hub_missing">Not set. The brain is set to the cloud, so the address of your own hub goes in ⚙ → Backend → Cloud → “Hub URL”. The Cloud tab is hidden by default — if you cannot see it, turn on Advanced → “Show cloud option” first. Without it there is nowhere to send what you say: no answers, and nothing on screen moves. To have this device think for itself, pick “On-device” in the same row.</string>
     <string name="check_detail_brain_key_missing">Not set. The brain is set to run on this device, so open a DeepSeek account of your own and put the key in ⚙ → Backend → On-device → “DeepSeek Key”. Without it, what you say arrives and nothing can be answered or acted on.</string>
+    <string name="check_detail_brain_codeflying_key_missing">Not set. The backend is CodeFlying: sign up at CodeFlying.app, then put the key in ⚙ → Backend → CodeFlying. Without it, what you say arrives and nothing can be answered or acted on.</string>
     <string name="check_detail_model_cloud">Cloud assistant — the model is not on this device.</string>
     <string name="check_detail_model_no_key">No key yet. Fill one in and this becomes testable.</string>
     <string name="check_detail_checking">Checking…</string>
@@ -582,6 +589,7 @@
     <string name="check_detail_mic_off">Not allowed. Tapping the ball does nothing at all — the failure that least resembles a permission problem.</string>
     <string name="check_detail_voice_key_ok">Set. Recognition and synthesis use it to reach the provider.</string>
     <string name="check_detail_voice_key_missing">Not set. The source ships without a key — open a speech service of your own and put its key in ⚙ → Backend → On-device. Without it, hearing and speaking cannot connect, and what you get back is a connection timeout that looks like a network fault. Everything else works.</string>
+    <string name="check_detail_voice_key_codeflying_missing">Voice uses the same CodeFlying key as the brain: put it in ⚙ → Backend → CodeFlying. Without it, listening and speaking cannot connect.</string>
     <string name="check_detail_voice_host_ok">%1$s is reachable.</string>
     <string name="check_detail_voice_host_bad">Could not reach %1$s: %2$s. Both recognition and synthesis will time out.</string>
     <string name="check_detail_wake_on">Taught, and it wakes when you say it.</string>

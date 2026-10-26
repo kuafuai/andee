@@ -11,10 +11,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -96,11 +101,50 @@ fun GlassHeader(title: String, subtitle: String? = null, onClose: () -> Unit, tr
     }
 }
 
+/**
+ * 中 / EN in a card's header, as the phone's LangToggle: written the instant it is tapped, and the
+ * card redraws in the new language. Settings and the self-check both carry it, so a person who
+ * lands on a card in the wrong language can change it without going anywhere.
+ */
+@Composable
+fun LangToggle() {
+    val cur = Strings.lang()
+    Row(Modifier.glassWell(16).padding(3.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        for ((tag, label) in listOf("zh" to "中", "en" to "EN")) {
+            val on = tag == cur
+            Text(
+                label, color = if (on) Palette.title else Palette.secondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.width(38.dp)
+                    .background(if (on) Palette.thumb else Color.Transparent, RoundedCornerShape(13.dp))
+                    .border(1.dp, if (on) Palette.thumbEdge else Color.Transparent, RoundedCornerShape(13.dp))
+                    .clickable { if (!on) { Settings.save(mapOf("lang" to tag)); Strings.changed() } }
+                    .padding(vertical = 5.dp),
+            )
+        }
+    }
+    Spacer(Modifier.width(10.dp))
+}
+
 @Composable
 fun SectionTitle(title: String) {
     Spacer(Modifier.height(16.dp))
     Text(title, color = Palette.secondary, fontSize = 13.sp)
     Spacer(Modifier.height(6.dp))
+}
+
+/**
+ * One block of a settings card, as the phone draws it: a small accent title above, and the rows
+ * inside one rounded panel. Settings are a stack of these, so each reads as its own thing
+ * rather than one long list.
+ */
+@Composable
+fun Section(title: String, note: String? = null, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Spacer(Modifier.height(22.dp))
+    Text(title, color = Palette.accent, fontSize = 12.sp, letterSpacing = 1.sp)
+    if (note != null) Text(note, color = Palette.secondary, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+    Spacer(Modifier.height(8.dp))
+    Column(Modifier.fillMaxWidth().glassPanel(20).padding(18.dp), content = content)
 }
 
 /** The phone's sliding-thumb segmented picker. */
@@ -127,23 +171,50 @@ fun SegmentedPicker(options: List<Pair<String, String>>, selected: String, onPic
 }
 
 @Composable
-fun GlassField(label: String, value: String, onValue: (String) -> Unit, secret: Boolean = false, hint: String = "") {
+fun GlassField(
+    label: String, value: String, onValue: (String) -> Unit, secret: Boolean = false, hint: String = "",
+    /** When set, a 复制 link sits by the 显示 toggle and copies this (or the typed text, if any). */
+    copyValue: (() -> String)? = null,
+) {
     Spacer(Modifier.height(8.dp))
     Text(label, color = Palette.secondary, fontSize = 12.sp)
     Spacer(Modifier.height(4.dp))
-    BasicTextField(
-        value = value,
-        onValueChange = onValue,
-        singleLine = true,
-        visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
-        textStyle = TextStyle(color = Palette.label, fontSize = 14.sp),
-        cursorBrush = SolidColor(Palette.accent),
-        modifier = Modifier.fillMaxWidth().glassWell(12).padding(horizontal = 12.dp, vertical = 10.dp),
-        decorationBox = { inner ->
-            // A blank row shows what it resolves to, as on the phone: the hint is the value in force.
-            Box { if (value.isEmpty() && hint.isNotEmpty()) Text(hint, color = Palette.muted, fontSize = 14.sp, maxLines = 1); inner() }
-        },
-    )
+    var shown by remember { mutableStateOf(false) }
+    var copied by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValue,
+            singleLine = true,
+            visualTransformation = if (secret && !shown) PasswordVisualTransformation() else VisualTransformation.None,
+            textStyle = TextStyle(color = Palette.label, fontSize = 14.sp),
+            cursorBrush = SolidColor(Palette.accent),
+            modifier = Modifier.weight(1f).glassWell(12).padding(horizontal = 12.dp, vertical = 10.dp),
+            decorationBox = { inner ->
+                // A blank row shows what it resolves to, as on the phone: the hint is the value in force.
+                Box { if (value.isEmpty() && hint.isNotEmpty()) Text(hint, color = Palette.muted, fontSize = 14.sp, maxLines = 1); inner() }
+            },
+        )
+        if (secret) {
+            Text(
+                Strings.get(if (shown) "s_common_hide" else "s_common_show"), color = Palette.accent, fontSize = 12.sp,
+                modifier = Modifier.padding(start = 12.dp).clickable { shown = !shown },
+            )
+            if (copyValue != null) {
+                Text(
+                    Strings.get(if (copied) "s_common_copied" else "s_common_copy"), color = Palette.accent, fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 12.dp).clickable {
+                        val v = value.trim().ifEmpty { copyValue() }
+                        if (v.isNotEmpty()) {
+                            java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                .setContents(java.awt.datatransfer.StringSelection(v), null)
+                            copied = true
+                        }
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable

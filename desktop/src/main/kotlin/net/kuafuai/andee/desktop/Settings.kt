@@ -32,7 +32,7 @@ object Settings {
 
     val KEYS = setOf(
         "brain", "llm_api_key", "llm_base_url", "llm_model", "llm_thinking", "llm_reasoning_effort",
-        "api_key", "asr_endpoint", "tts_endpoint", "asr_resource_id", "tts_resource_id", "tts_speaker",
+        "api_key", "codeflying_key", "asr_endpoint", "tts_endpoint", "asr_resource_id", "tts_resource_id", "tts_speaker",
         "voice_provider", "lang", "max_steps", "scene", "ball", "ball_pos", "notify", "sweep", "sweep_quiet_minutes", "sweep_daily_cap",
         "shell_mode", "shell_workdirs", "shell_critical_confirm", "mute",
         "google_api_key", "google_project", "google_location", "google_asr_model", "google_tts_model", "google_base_url",

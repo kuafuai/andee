@@ -1,6 +1,7 @@
 package net.kuafuai.andee.ui
 
 import android.content.Intent
+import android.net.Uri
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.provider.Settings
@@ -550,6 +551,9 @@ class SelfCheckActivity : StageActivity() {
             onFactoryReset = { FactoryReset.wipe(this) },
             onClearChat = { ChatHistory.wipe(this) },
             onClearNotes = { Notebook.wipe(this) },
+            // This host is an Activity: it can open a browser itself, and the
+            // card is hosted by the sheet that stays here when the user comes back.
+            onOpenLink = { url -> runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } },
             onLocaleChanged = {
                 paintedLang = VoiceConfig.uiLanguage(this)
                 if (::ui.isInitialized) ui.repaintForLanguage()

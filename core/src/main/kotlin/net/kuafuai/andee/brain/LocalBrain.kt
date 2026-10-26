@@ -289,7 +289,7 @@ class LocalBrain(
         if (cfg.apiKey.isEmpty()) {
             // Said out loud rather than logged: from the ball's point of view a
             // missing key is indistinguishable from a brain that never answers.
-            onFinal(host.text(BrainText.NO_KEY))
+            onFinal(noKeyText())
             return
         }
         // The quiet-hour timer measures silence from the user's last words, so
@@ -366,7 +366,7 @@ class LocalBrain(
     fun peerTask(text: String, onAnswer: (String?) -> Unit) {
         val t = text.trim()
         if (t.isEmpty()) return onAnswer(null)
-        if (cfg.apiKey.isEmpty()) return onAnswer(host.text(BrainText.NO_KEY))
+        if (cfg.apiKey.isEmpty()) return onAnswer(noKeyText())
         loop.execute {
             if (busy.get()) {
                 host.logInfo(TAG, "peer task queued behind a running turn: ${t.take(60)}")
@@ -539,12 +539,15 @@ class LocalBrain(
      * exactly like the ball going quiet. Anything unrecognised falls back to
      * the old generic line with the raw message, so nothing is hidden.
      */
+    /** The sentence for "no key": the CodeFlying one says where to get it. */
+    private fun noKeyText(): String =
+        host.text(if (cfg.mode == BrainConfig.BRAIN_CODEFLYING) BrainText.NO_KEY_CODEFLYING else BrainText.NO_KEY)
+
     private fun explainFailure(t: Throwable): String {
         fun s(id: BrainText, vararg args: Any) = host.text(id, *args)
         if (t is LlmHttpException) {
-            val codeFlying = cfg.mode == BrainConfig.BRAIN_CODEFLYING
             return when (t.code) {
-                402 -> if (codeFlying) s(BrainText.ERROR_402_CODEFLYING) else s(BrainText.ERROR_402)
+                402 -> s(BrainText.ERROR_402)
                 401, 403 -> s(BrainText.ERROR_AUTH, t.code)
                 400 -> s(BrainText.ERROR_400, t.detail.take(160).ifBlank { "HTTP 400" })
                 404 -> s(BrainText.ERROR_404)

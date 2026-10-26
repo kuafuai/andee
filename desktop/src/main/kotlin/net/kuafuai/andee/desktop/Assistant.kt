@@ -78,25 +78,56 @@ object Assistant {
     private fun secrets(): List<Pair<String, String>> = buildList {
         Settings.get("llm_api_key").takeIf { it.length >= 8 }?.let { add("Andee's model key" to it) }
         Settings.get("api_key").takeIf { it.length >= 8 }?.let { add("Andee's voice key" to it) }
+        codeFlyingKey().takeIf { it.length >= 8 }?.let { add("Andee's CodeFlying key" to it) }
         addAll(VaultSecrets.values())
     }
 
     private var brain: LocalBrain? = null
     private var builtFor: BrainConfig? = null
 
+    /** Where CodeFlying is: the build's address (null only if the build was packaged without one). */
+    fun codeFlyingEndpoint() =
+        net.kuafuai.andee.config.CodeFlyingEndpoint.parse(CodeFlyingBuild.domain, CodeFlyingBuild.ssl)
+
+    /** The key in effect: one typed in settings, else the build's. */
+    fun codeFlyingKey(): String = Settings.get("codeflying_key").ifEmpty { CodeFlyingBuild.key }
+
+    /**
+     * The backend in force. Unset is CodeFlying, key or not — the phone's rule.
+     */
+    fun brainMode(): String = when (Settings.get("brain").trim().lowercase()) {
+        BrainConfig.BRAIN_CODEFLYING -> BrainConfig.BRAIN_CODEFLYING
+        BrainConfig.BRAIN_HUB -> BrainConfig.BRAIN_HUB
+        BrainConfig.BRAIN_LOCAL -> BrainConfig.BRAIN_LOCAL
+        "" -> BrainConfig.BRAIN_CODEFLYING
+        else -> BrainConfig.BRAIN_LOCAL
+    }
+
     fun config(): BrainConfig {
-        val mode = Settings.get("brain").let { if (it == BrainConfig.BRAIN_CODEFLYING) it else BrainConfig.BRAIN_LOCAL }
         val zh = Strings.lang() == "zh"
+        val cf = codeFlyingEndpoint()
+        val thinking = Settings.get("llm_thinking") != "disabled"
+        val effort = Settings.get("llm_reasoning_effort").ifEmpty { "high" }
+        if (brainMode() == BrainConfig.BRAIN_CODEFLYING && cf != null) {
+            return BrainConfig(
+                mode = BrainConfig.BRAIN_CODEFLYING,
+                apiKey = codeFlyingKey(),
+                baseUrl = cf.llmBaseUrl,
+                model = Settings.get("llm_model").ifEmpty { "deepseek-flash" },
+                thinking = thinking,
+                reasoningEffort = effort,
+            )
+        }
         return BrainConfig(
-            mode = mode,
+            mode = BrainConfig.BRAIN_LOCAL,
             apiKey = Settings.get("llm_api_key"),
             baseUrl = Settings.get("llm_base_url").trimEnd('/').ifEmpty {
                 if (zh) "https://api.deepseek.com" else "https://api.openai.com/v1"
             },
             model = Settings.get("llm_model").ifEmpty { if (zh) "deepseek-flash" else "gpt-4o-mini" },
             // Unset reads as on, as on the phone (its build default is on); only an explicit "disabled" turns it off.
-            thinking = Settings.get("llm_thinking") != "disabled",
-            reasoningEffort = Settings.get("llm_reasoning_effort").ifEmpty { "high" },
+            thinking = thinking,
+            reasoningEffort = effort,
         )
     }
 

@@ -81,7 +81,7 @@ fun SelfCheckCard(onDone: () -> Unit, onOpenSettings: () -> Unit) {
         justChecked = false
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
-        GlassHeader(if (zh) "自检" else "Self-check", if (zh) "每一项都可能悄悄坏掉" else "Each of these can fail silently", onClose = onDone)
+        GlassHeader(if (zh) "自检" else "Self-check", if (zh) "每一项都可能悄悄坏掉" else "Each of these can fail silently", onClose = onDone, trailing = { LangToggle() })
         for (r in rows) {
             Row(
                 Modifier.fillMaxWidth().glassPanel(14).padding(12.dp),

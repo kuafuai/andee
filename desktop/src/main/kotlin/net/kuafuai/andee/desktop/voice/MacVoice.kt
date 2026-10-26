@@ -56,18 +56,25 @@ object MacVoice {
     @Volatile private var tts: TtsEngine? = null
 
     /** What the phone calls VoiceConfig.load(): the same keys, the same defaults. */
-    fun settings(): VoiceSettings = VoiceSettings(
-        apiKey = Settings.get("api_key"),
-        asrEndpoint = Settings.get("asr_endpoint").ifEmpty { "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async" },
+    fun settings(): VoiceSettings {
+        // Under CodeFlying the address and key are the hosted backend's, and the voice is 火山, as on the phone.
+        val cf = net.kuafuai.andee.desktop.Assistant.codeFlyingEndpoint()
+            ?.takeIf { net.kuafuai.andee.desktop.Assistant.config().mode == net.kuafuai.andee.config.BrainConfig.BRAIN_CODEFLYING }
+        return settings(cf)
+    }
+
+    private fun settings(codeFlying: net.kuafuai.andee.config.CodeFlyingEndpoint?): VoiceSettings = VoiceSettings(
+        apiKey = if (codeFlying != null) net.kuafuai.andee.desktop.Assistant.codeFlyingKey() else Settings.get("api_key"),
+        asrEndpoint = codeFlying?.asrEndpoint ?: Settings.get("asr_endpoint").ifEmpty { "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async" },
         asrResourceId = Settings.get("asr_resource_id").ifEmpty { "volc.bigasr.sauc.duration" },
         asrUid = Settings.uid(),
-        ttsEndpoint = Settings.get("tts_endpoint").ifEmpty { "wss://openspeech.bytedance.com/api/v3/tts/bidirection" },
+        ttsEndpoint = codeFlying?.ttsEndpoint ?: Settings.get("tts_endpoint").ifEmpty { "wss://openspeech.bytedance.com/api/v3/tts/bidirection" },
         ttsResourceId = Settings.get("tts_resource_id").ifEmpty { "seed-tts-2.0" },
         // The voice is the character's: read from the look the ball is wearing, per utterance, as the phone does.
         ttsSpeaker = net.kuafuai.andee.ui.ball.BallLooks.byName(Settings.get("ball").ifEmpty { null }).voice
             .ifEmpty { "zh_female_vv_uranus_bigtts" },
         ttsSampleRate = Settings.get("tts_sample_rate").toIntOrNull()?.takeIf { it in 8_000..48_000 } ?: 24_000,
-        voiceProvider = Settings.voiceProvider(),
+        voiceProvider = if (codeFlying != null) VoiceSettings.VOICE_HUOSHAN else Settings.voiceProvider(),
         googleApiKey = Settings.get("google_api_key"),
         googleBaseUrl = Settings.get("google_base_url").ifEmpty { "https://aiplatform.googleapis.com" },
         googleProject = Settings.get("google_project"),

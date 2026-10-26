@@ -1996,6 +1996,17 @@ class BodyCoreService : Service() {
             },
             onClearChat = { clearChatHistory() },
             onClearNotes = { clearNotebook() },
+            // The card comes down first: an overlay left up would sit over the
+            // page it just opened. Same trip as the self-check card's errand.
+            onOpenLink = { url ->
+                window.setPagePerched(true)
+                net.kuafuai.andee.ui.SelfCheckActivity.showForErrand(
+                    this,
+                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)),
+                )
+                dispatcher.compactForUser()
+                settings?.hide()
+            },
             // The card owns its own language switch; the ball, the scrollback
             // and the pinned tips live in this service and have to be told.
             // See FloatingWindowUi.onLocaleChanged.
@@ -2724,13 +2735,20 @@ class BodyCoreService : Service() {
         // with no key answers nothing at all, and "nothing at all" is the one
         // failure a user cannot diagnose from the outside.
         if (bc.apiKey.isEmpty()) {
-            reportNoBrain(AppLocale.str(this, R.string.svc_no_brain_local), announce)
+            reportNoBrain(
+                AppLocale.str(
+                    this,
+                    if (bc.mode == net.kuafuai.andee.config.VoiceConfig.BRAIN_CODEFLYING) R.string.svc_no_brain_codeflying
+                    else R.string.svc_no_brain_local,
+                ),
+                announce,
+            )
         }
         // CodeFlying is the only backend with a market behind it. Everywhere
         // else this object is inert — empty tool list, `hasMethod` always false
         // — so a local or hub brain's tool surface is exactly what it was.
         val market = net.kuafuai.andee.market.MarketTools(
-            baseUrl = net.kuafuai.andee.config.VoiceConfig.codeFlyingMarketBaseUrl(),
+            baseUrl = net.kuafuai.andee.config.VoiceConfig.codeFlyingMarketBaseUrl(this),
             apiKey = bc.apiKey,
             enabled = bc.mode == net.kuafuai.andee.config.VoiceConfig.BRAIN_CODEFLYING,
         )

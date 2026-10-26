@@ -119,6 +119,14 @@ class SettingsUi(
      * future caller) still switches its own language correctly.
      */
     private val onLocaleChanged: () -> Unit = {},
+    /**
+     * Open a web page. An overlay cannot launch a browser itself (the
+     * background-launch restriction), so the host does it: the service via
+     * `SelfCheckActivity.showForErrand`, the Activity host directly. The host
+     * also takes this card down first — an overlay left up would sit on top of
+     * the page it just opened.
+     */
+    private val onOpenLink: (String) -> Unit = {},
 ) {
 
     private val wm: WindowManager =
@@ -578,7 +586,7 @@ class SettingsUi(
      *
      * Visibility rules:
      *  * **CodeFlying** is only in the picker when the build enables it with a
-     *    non-empty domain (see [VoiceConfig.isCodeFlyingAvailable]). The tab
+     *    non-empty domain (the build's CODEFLYING_DOMAIN). The tab
      *    itself has no editable rows — endpoints and credential are compiled
      *    in — just a note describing what the hosted backend offers.
      *  * **云端** is only in the picker when the user has turned the "显示
@@ -609,9 +617,11 @@ class SettingsUi(
         // the saved value sticks, so the picker rebuilds correctly, and
         // installing a configured build later flips the behaviour on without
         // the user having to re-pick.
+        // CodeFlying leads: it is the default tab on a fresh install, and the
+        // leftmost cell is the fallback (see [segmented]).
         val options = buildList {
-            add(VoiceConfig.BRAIN_LOCAL to lctx.getString(R.string.settings_brain_local))
             add(VoiceConfig.BRAIN_CODEFLYING to lctx.getString(R.string.settings_brain_codeflying))
+            add(VoiceConfig.BRAIN_LOCAL to lctx.getString(R.string.settings_brain_local))
             if (VoiceConfig.showHub(context)) {
                 add(VoiceConfig.BRAIN_HUB to lctx.getString(R.string.settings_brain_cloud))
             }
@@ -639,28 +649,30 @@ class SettingsUi(
         )
         note(hubBlock, lctx.getString(R.string.settings_brain_cloud_note))
 
-        // ---- CodeFlying tab (description only) ----
-        // Which note depends on whether this build was configured for
-        // CodeFlying: configured says "what this is, you may be billed",
-        // unconfigured says "it's not set up on this APK, go to the website".
+        // ---- CodeFlying tab ----
+        // No "connected or not": the tab is the default, and the one thing it has
+        // to say is how to get a key while there is none. With a key it says what
+        // the backend is.
         val cfBlock = block(panel)
-        val cfReady = VoiceConfig.isCodeFlyingAvailable()
-        // A person who lands on this tab has already said "I don't have keys".
-        // If this build carries no CodeFlying either, that has to be the first
-        // thing said, not a paragraph they have to infer it from — the note
-        // below explains how to get one, but only this line says the tab in
-        // front of them is currently doing nothing.
-        if (!cfReady) {
-            cfBlock.addView(noteView(lctx.getString(R.string.settings_codeflying_not_connected)).apply {
-                setTextColor(Color.parseColor(Glass.WARN))
-            }, rowParams(dp(4)))
+        val cfKeyed = VoiceConfig.codeFlyingKey(context).isNotEmpty()
+        // Same words and same link whether or not a key is set: the tab does not
+        // describe the state, the key box below does.
+        note(cfBlock, lctx.getString(R.string.settings_brain_codeflying_note))
+        note(cfBlock, lctx.getString(R.string.settings_codeflying_get_key))
+        linkNote(cfBlock, lctx.getString(R.string.settings_codeflying_open_site)) {
+            onOpenLink(lctx.getString(R.string.codeflying_url))
         }
-        val cfNoteKey = if (cfReady) {
-            R.string.settings_brain_codeflying_note
-        } else {
-            R.string.settings_brain_codeflying_unconfigured
-        }
-        note(cfBlock, lctx.getString(cfNoteKey))
+        // Shows the key in effect (typed, else the build's); editing it overrides.
+        // The server address is the build's and has no row. The key row is always
+        // here: it is where a person who just got a key from the link above puts it.
+        field(
+            cfBlock,
+            "codeflying_key",
+            lctx.getString(R.string.settings_codeflying_key),
+            hint = "kft_…",
+            secret = true,
+            copyValue = { VoiceConfig.codeFlyingKey(context) },
+        )
 
         // ---- 本机 tab: LLM + 火山 voice rows ----
         val localBlock = block(panel)
@@ -874,11 +886,10 @@ class SettingsUi(
             Glass.setVisible(hubBlock, m == VoiceConfig.BRAIN_HUB, animate)
             Glass.setVisible(cfBlock, m == VoiceConfig.BRAIN_CODEFLYING, animate)
             Glass.setVisible(localBlock, m == VoiceConfig.BRAIN_LOCAL, animate)
-            Glass.setVisible(
-                voiceBlock,
-                VoiceConfig.resolveBrainMode(m) != VoiceConfig.BRAIN_CODEFLYING,
-                animate,
-            )
+            // Keyed on the tab the user is looking at, not on what the build
+            // can resolve it to: CodeFlying carries its own voice, and a voice
+            // key row under that tab is a row nothing reads.
+            Glass.setVisible(voiceBlock, m != VoiceConfig.BRAIN_CODEFLYING, animate)
         }
         applyMode(mode, false)
         applyThinking = { th, animate ->
@@ -1520,6 +1531,8 @@ class SettingsUi(
         hint: String? = null,
         numeric: Boolean = false,
         secret: Boolean = false,
+        /** When set, a 复制 link sits beside the 显示 toggle and copies this (the value in effect, even if the box is blank). */
+        copyValue: (() -> String)? = null,
     ) {
         rowLabel(parent, label)
         val et = EditText(context).apply {
@@ -1569,6 +1582,24 @@ class SettingsUi(
                 text = if (shown) lctx.getString(R.string.common_hide) else lctx.getString(R.string.common_show)
             }
         })
+        if (copyValue != null) {
+            row.addView(TextView(context).apply {
+                text = lctx.getString(R.string.common_copy)
+                textSize = Glass.Type.CAPTION
+                setTextColor(Color.parseColor(Glass.ACCENT))
+                setPadding(dp(10), dp(8), dp(2), dp(8))
+                isClickable = true
+                setOnClickListener {
+                    val v = et.text?.toString().orEmpty().trim().ifEmpty { copyValue() }
+                    if (v.isNotEmpty()) {
+                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("CodeFlying", v))
+                        text = lctx.getString(R.string.common_copied)
+                        postDelayed({ text = lctx.getString(R.string.common_copy) }, 1500)
+                    }
+                }
+            })
+        }
         parent.addView(row, rowParams(dp(5)))
     }
 

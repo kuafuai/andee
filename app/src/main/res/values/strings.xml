@@ -45,14 +45,13 @@
     <string name="settings_clear_notes_confirm_body">它记下的事、你的偏好、还没到点的提醒，都会删掉，找不回来。这场聊天记录不受影响。</string>
     <string name="settings_clear_notes_confirm">确认清空</string>
     <string name="settings_section_brain">后端</string>
-    <string name="settings_brain_panel_note">关掉这个面板就生效，不用重开无障碍服务。</string>
+    <string name="settings_brain_panel_note">提供 AI 模型和语音服务，Andee 靠它思考、听和说。</string>
     <string name="settings_brain_cloud">云端</string>
     <string name="settings_brain_local">本机</string>
     <string name="settings_brain_codeflying">CodeFlying</string>
     <string name="settings_show_hub">显示云端选项</string>
     <string name="settings_show_hub_note">把「云端」加到后端选项里，用来连你自己搭的 Hub。</string>
-    <string name="settings_brain_codeflying_note">已接入 CodeFlying（CodeFlying.net）：默认模型和语音都配好了，开箱就能用。还能直接调用海量第三方能力 —— AI 画图/做视频/写音乐、定位、天气、PDF 转换、搜索、新闻、股票……全部由 CodeFlying 统一封装、统一计费，不用自己逐个去申请密钥、对账单。\n\n账户管理和充值：用电脑浏览器打开 CodeFlying.net 登录。如果提示余额不足（HTTP 402），去那里充值即可。\n\n提示：使用 CodeFlying 的后端服务可能会产生费用。</string>
-    <string name="settings_brain_codeflying_unconfigured">想让 Andee 直接会画图、做视频、写音乐、查天气、搜新闻、转 PDF、看股票？接上 CodeFlying 就行：默认模型和语音都帮你配好，海量第三方能力一次接入，不用自己逐个申请密钥、对账单。\n\n怎么开始：用电脑浏览器打开 CodeFlying.net，一键生成专属于你的 Andee 安装包，装上去替换当前应用就好。新用户可免费获得额度，先试试再决定。\n\n提示：使用 CodeFlying 的后端服务可能会产生费用。</string>
+    <string name="settings_brain_codeflying_note">CodeFlying（CodeFlying.net）：默认模型和语音都帮你配好，填上密钥就能用。还能直接调用海量第三方能力 —— AI 画图/做视频/写音乐、定位、天气、PDF 转换、搜索、新闻、股票……全部由 CodeFlying 统一封装、统一计费，不用自己逐个去申请密钥、对账单。\n\n提示：使用 CodeFlying 的后端服务可能会产生费用。</string>
     <string name="settings_hub_url">Hub 地址</string>
     <!-- The hub URL box is empty on a fresh install — the hint is what the
          user sees in that empty box, so it is the pitch, not the format. -->
@@ -71,8 +70,13 @@
     <string name="common_medium">中</string>
     <string name="common_low">低</string>
     <string name="settings_brain_local_note">设备自己跑 agent loop，不连 Hub。没有 Key 就不会接管。</string>
-    <string name="settings_codeflying_not_connected">您还未接入 CodeFlying</string>
+    <string name="settings_codeflying_get_key">没有密钥？到下面的链接注册登录，复制你的密钥粘贴到下方输入框。新用户可免费获得额度。</string>
+    <string name="settings_codeflying_open_site">打开 CodeFlying.net ›</string>
+    <string name="codeflying_url" translatable="false">https://www.codeflying.net/andee</string>
     <string name="settings_no_key_use_codeflying">没有密钥？点这里切换到 CodeFlying 配置</string>
+    <string name="settings_codeflying_key">CodeFlying 密钥</string>
+    <string name="common_copy">复制</string>
+    <string name="common_copied">已复制</string>
     <string name="settings_section_wake">语音唤醒</string>
     <string name="settings_wake_enrolled">已录入 —— 说出你录的唤醒词就行</string>
     <string name="settings_wake_not_enrolled">未录入 —— 自己选个词录 3 遍就能语音唤醒，例如「嘿 Andee」</string>
@@ -432,6 +436,8 @@
     <string name="svc_notification_auto_line">（%1$s 来消息了，我自己看一眼…）</string>
     <string name="svc_no_brain_hub">还没有接上大脑，我说不上话。</string>
     <string name="svc_no_brain_local">本地大脑还没配 key，我说不上话。</string>
+    <string name="svc_no_brain_codeflying">还没有 CodeFlying 密钥，我说不上话。</string>
+    <string name="svc_btn_get_key">获取密钥</string>
 
     <!--
         config/Notebook.kt — the read-only dump the settings sheet renders. The
@@ -551,9 +557,9 @@
         stays as it is in both languages.
     -->
     <string name="brain_no_key">本地大脑还没配 API key。长按小球把卡片展开，点控制条上的 ⚙ 打开设置，把 Key 填进「后端」→「本机」→「DeepSeek Key」。</string>
+    <string name="brain_no_key_codeflying">还没有 CodeFlying 密钥。长按小球展开卡片，点 ⚙ 打开设置，在「后端」→「CodeFlying」里粘贴密钥；还没有的话，去 CodeFlying.net 注册获取。</string>
     <string name="brain_error">我这边出错了：%1$s</string>
     <string name="brain_error_402">后端服务返回了 402，多半是账户余额不足了。到「设置」→「后端」看看当前用的是哪家服务商，打开它的官网充值后再试。</string>
-    <string name="brain_error_402_codeflying">后端服务返回了 402，多半是 CodeFlying 账户余额不足了。用电脑浏览器打开 CodeFlying.net 登录后充值，再试一次。</string>
     <string name="brain_error_auth">后端拒绝了请求（HTTP %1$d）：Key 填错、过期或被停用了。到「设置」→「后端」检查 Key，必要时去服务商官网重新生成一个。</string>
     <string name="brain_error_400">后端说请求有问题：%1$s\n最常见的原因是模型名写错了，到「设置」→「后端」核对一下模型名。</string>
     <string name="brain_error_404">后端找不到这个地址（HTTP 404）。到「设置」→「后端」检查接口地址和模型名有没有填错。</string>
@@ -630,6 +636,7 @@
     <string name="check_detail_brain_on">已配置。</string>
     <string name="check_detail_brain_hub_missing">还没填。现在用的是云端大脑，得把你自己搭的 Hub 地址填进 ⚙ →「后端」→「云端」→「Hub 地址」。「云端」默认藏着，看不到就先去「高级」→「显示云端选项」把它打开。没有它，你说的话没地方送，问了不会有回答，屏幕也不会动。想让这台设备自己想，就在同一排把大脑切成「本机」。</string>
     <string name="check_detail_brain_key_missing">还没填。现在用的是本机大脑，得你自己去 DeepSeek 开一个，把 Key 填进 ⚙ →「后端」→「本机」→「DeepSeek Key」。没有它，你说的话我收得到，却答不出、也动不了手。</string>
+    <string name="check_detail_brain_codeflying_key_missing">还没填。现在用的是 CodeFlying，到 CodeFlying.net 注册登录拿到密钥，填进 ⚙ →「后端」→「CodeFlying」。没有它，你说的话我收得到，却答不出、也动不了手。</string>
     <string name="check_detail_model_cloud">云端大脑，模型不在这台设备上。</string>
     <string name="check_detail_model_no_key">还没填 Key，填了才测得了。</string>
     <string name="check_detail_checking">检查中…</string>
@@ -666,6 +673,7 @@
     <string name="check_detail_mic_off">没允许。点球不会有任何反应 —— 这是最不像权限问题的一条。</string>
     <string name="check_detail_voice_key_ok">已填。识别和合成用它连服务商。</string>
     <string name="check_detail_voice_key_missing">还没填。源码里不带密钥，得你自己去开一个语音服务,把 Key 填进 ⚙ →「后端」→「本机」。没有它，听和说都连不上 —— 报出来的却是连接超时，看着像网络坏了。其余功能照常。</string>
+    <string name="check_detail_voice_key_codeflying_missing">语音用的是 CodeFlying 的密钥，和大脑是同一个，填进 ⚙ →「后端」→「CodeFlying」即可。没有它，听和说都连不上。</string>
     <string name="check_detail_voice_host_ok">%1$s 可达。</string>
     <string name="check_detail_voice_host_bad">连不上 %1$s：%2$s。识别和合成都会超时。</string>
     <string name="check_detail_wake_on">已录入，喊一声就醒。</string>

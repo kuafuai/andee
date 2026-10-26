@@ -144,13 +144,14 @@ data class FoldedTopic(val id: Long, val title: String, val summary: String)
  */
 enum class BrainText {
     NO_KEY,
+    /** The CodeFlying backend is selected but no key is set: names where to get one. */
+    NO_KEY_CODEFLYING,
     NO_RESULT,
     REPEAT_STOP,
     MAX_STEPS,
     ERROR,
     ERROR_400,
     ERROR_402,
-    ERROR_402_CODEFLYING,
     ERROR_404,
     ERROR_429,
     ERROR_5XX,

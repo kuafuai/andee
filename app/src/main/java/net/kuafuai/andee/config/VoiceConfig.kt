@@ -45,6 +45,8 @@ object VoiceConfig {
          */
         internal val OVERRIDE_KEYS = setOf(
             "api_key", "asr_endpoint", "tts_endpoint",
+            // Blank goes back to the key the build carries.
+            "codeflying_key",
             // The Google rows all have a real value to fall back to — the
             // build's, or the constant — so an empty box means "use that",
             // which is the only way back to a baked-in key.
@@ -205,70 +207,47 @@ object VoiceConfig {
             if (uiLanguage(context) == LANG_EN) DEFAULT_LLM_MODEL_EN else DEFAULT_LLM_MODEL
 
         /**
-         * CodeFlying is available iff the build was configured with ENABLED and
-         * a non-empty DOMAIN. ENABLED alone with no DOMAIN silently falls back
-         * to [BRAIN_LOCAL] — the picker hides the CodeFlying tab and the
-         * default brain reads as local.
+         * The CodeFlying server, from the build's `CODEFLYING_DOMAIN`. There is no
+         * "available" switch: CodeFlying is always a choice and the default one, and
+         * a build packaged without a domain simply has nowhere to send it yet.
          */
-        fun isCodeFlyingAvailable(): Boolean =
-            BuildConfig.CODEFLYING_ENABLED && BuildConfig.CODEFLYING_DOMAIN.isNotBlank()
+        fun codeFlyingEndpoint(@Suppress("UNUSED_PARAMETER") context: Context): net.kuafuai.andee.config.CodeFlyingEndpoint? =
+            net.kuafuai.andee.config.CodeFlyingEndpoint.parse(
+                BuildConfig.CODEFLYING_DOMAIN, BuildConfig.CODEFLYING_SSL_ENABLED,
+            )
 
         /**
          * The CodeFlying API key in effect for this install.
          *
-         * Read from `assets/andee_key.txt` first: production APKs are built once
-         * from shared source (empty key) and the per-user `kft_` token is written
-         * into that asset at package time, so a Gradle rebuild is not needed per
-         * user. Dev builds that never had the file (or have a blank one) fall
-         * back to [BuildConfig.CODEFLYING_KEY] from local.properties.
+         * A key the user typed (`codeflying_key`) wins. Otherwise
+         * `assets/andee_key.txt`: production APKs are built once from shared
+         * source (empty key) and the per-user `kft_` token is written into that
+         * asset at package time. Dev builds fall back to
+         * [BuildConfig.CODEFLYING_KEY] from local.properties.
          */
         fun codeFlyingKey(context: Context): String =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("codeflying_key", "").orEmpty().trim()
+                .ifEmpty { codeFlyingBuiltInKey(context) }
+
+        /** The key that came with the APK, ignoring anything typed. */
+        fun codeFlyingBuiltInKey(context: Context): String =
             runCatching {
                 context.assets.open("andee_key.txt").bufferedReader().use { it.readText().trim() }
             }.getOrDefault("").ifEmpty { BuildConfig.CODEFLYING_KEY }
 
-        /** `wss` / `ws` for WebSocket URLs, chosen by `CODEFLYING_SSL_ENABLED`. */
-        private fun codeFlyingWsScheme(): String =
-            if (BuildConfig.CODEFLYING_SSL_ENABLED) "wss" else "ws"
+        /** Origin for the market tools; see [net.kuafuai.andee.config.CodeFlyingEndpoint.marketBaseUrl]. */
+        fun codeFlyingMarketBaseUrl(context: Context): String =
+            codeFlyingEndpoint(context)?.marketBaseUrl.orEmpty()
 
-        /** `https` / `http` for the LLM REST base URL. */
-        private fun codeFlyingHttpScheme(): String =
-            if (BuildConfig.CODEFLYING_SSL_ENABLED) "https" else "http"
+        fun codeFlyingLlmBaseUrl(context: Context): String =
+            codeFlyingEndpoint(context)?.llmBaseUrl.orEmpty()
 
-        /** Bare host, no scheme and no trailing slash. One place, so the three URLs below cannot drift. */
-        private fun codeFlyingHost(): String =
-            BuildConfig.CODEFLYING_DOMAIN.trim().trimEnd('/')
+        fun codeFlyingAsrEndpoint(context: Context): String =
+            codeFlyingEndpoint(context)?.asrEndpoint.orEmpty()
 
-        /** Bare CodeFlying origin, e.g. `http://124.71.176.202`. */
-        fun codeFlyingBaseUrl(): String = "${codeFlyingHttpScheme()}://${codeFlyingHost()}"
-
-        /**
-         * Origin for the market tool endpoints, e.g. `http://host/baas-api`.
-         *
-         * `/baas-api/` exists because the bare `/api/` on that host is the
-         * front-end's static directory — nginx only forwards that tree to baas
-         * under this prefix. The voice endpoints need no such prefix (`/voice/`
-         * has its own location), which is why this is a separate accessor rather
-         * than folded into [codeFlyingBaseUrl]: pointing the LLM and ASR/TTS at
-         * `/baas-api/` as well would put the WebSocket upgrade on a location that
-         * may not carry the `Upgrade` headers.
-         *
-         * The `/baas-api` segment is a deployment detail, like the `/voice/llm`
-         * suffix above it — it belongs to whichever nginx the build points at.
-         */
-        fun codeFlyingMarketBaseUrl(): String = "${codeFlyingBaseUrl()}/baas-api"
-
-        /** WebSocket origin, same host on the `ws`/`wss` scheme. */
-        private fun codeFlyingWsBaseUrl(): String = "${codeFlyingWsScheme()}://${codeFlyingHost()}"
-
-        /** Full LLM REST base URL for CodeFlying, e.g. `https://foo.net/voice/llm`. */
-        fun codeFlyingLlmBaseUrl(): String = "${codeFlyingBaseUrl()}/voice/llm"
-
-        /** Full ASR WebSocket URL for CodeFlying. */
-        fun codeFlyingAsrEndpoint(): String = "${codeFlyingWsBaseUrl()}/voice/asr/bigmodel_async"
-
-        /** Full TTS WebSocket URL for CodeFlying. */
-        fun codeFlyingTtsEndpoint(): String = "${codeFlyingWsBaseUrl()}/voice/tts/bidirection"
+        fun codeFlyingTtsEndpoint(context: Context): String =
+            codeFlyingEndpoint(context)?.ttsEndpoint.orEmpty()
 
         /**
          * Which palette the UI draws with. `true` = night, and false = day.
@@ -355,7 +334,7 @@ object VoiceConfig {
          */
         fun brainMode(context: Context): String {
             val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            return resolveBrainMode(p.getString("brain", ""))
+            return resolveBrainMode(context, p.getString("brain", ""))
         }
 
         /**
@@ -373,13 +352,13 @@ object VoiceConfig {
          * play" is how a build that does not enable it ends up hiding the very
          * voice settings it is reading from.
          */
-        fun resolveBrainMode(raw: String?): String {
+        fun resolveBrainMode(context: Context, raw: String?): String {
             val saved = raw?.trim()?.lowercase().orEmpty()
             return when (saved) {
                 BRAIN_HUB -> BRAIN_HUB
                 BRAIN_LOCAL -> BRAIN_LOCAL
-                BRAIN_CODEFLYING -> if (isCodeFlyingAvailable()) BRAIN_CODEFLYING else BRAIN_LOCAL
-                "" -> if (isCodeFlyingAvailable()) BRAIN_CODEFLYING else BRAIN_LOCAL
+                BRAIN_CODEFLYING -> BRAIN_CODEFLYING
+                "" -> BRAIN_CODEFLYING
                 else -> BRAIN_LOCAL
             }
         }
@@ -395,7 +374,7 @@ object VoiceConfig {
                 return BrainConfig(
                     mode = BRAIN_CODEFLYING,
                     apiKey = codeFlyingKey(context),
-                    baseUrl = codeFlyingLlmBaseUrl(),
+                    baseUrl = codeFlyingLlmBaseUrl(context),
                     model = p.getString("llm_model", DEFAULT_LLM_MODEL)
                         .orEmpty().trim().ifEmpty { DEFAULT_LLM_MODEL },
                     thinking = p.getString("llm_thinking", defaultThinking())
@@ -567,13 +546,13 @@ object VoiceConfig {
             return VoiceSettings(
                 apiKey = if (codeFlying) codeFlyingKey(context)
                 else p.getString("api_key", "").orEmpty().trim().ifEmpty { API_KEY },
-                asrEndpoint = if (codeFlying) codeFlyingAsrEndpoint()
+                asrEndpoint = if (codeFlying) codeFlyingAsrEndpoint(context)
                 else p.getString("asr_endpoint", null)
                     ?.takeIf { it.isNotEmpty() }
                     ?: DEFAULT_ASR_ENDPOINT,
                 asrResourceId = p.getString("asr_resource_id", DEFAULT_ASR_RESOURCE)!!,
                 asrUid = uid,
-                ttsEndpoint = if (codeFlying) codeFlyingTtsEndpoint()
+                ttsEndpoint = if (codeFlying) codeFlyingTtsEndpoint(context)
                 else p.getString("tts_endpoint", null)
                     ?.takeIf { it.isNotEmpty() }
                     ?: DEFAULT_TTS_ENDPOINT,
@@ -620,6 +599,12 @@ object VoiceConfig {
                 // keys that have a real compiled-in default: there, blank is
                 // the only way back to it. Route them before the drop, or an
                 // override once saved could never be taken out.
+                // The card shows the key in effect, so saving it back unchanged must not
+                // pin the build's key as a user override: store only a different one.
+                if (k == "codeflying_key" && v.trim() == codeFlyingBuiltInKey(context)) {
+                    p.remove(k)
+                    continue
+                }
                 if (k in OVERRIDE_KEYS) {
                     if (v.isBlank()) p.remove(k) else p.putString(k, v.trim())
                     continue
@@ -648,6 +633,7 @@ object VoiceConfig {
                 // overridable from local.properties now, so the settings card
                 // must show saved-or-empty rather than saved-or-default.
                 "api_key" to p.getString("api_key", "").orEmpty(),
+                "codeflying_key" to codeFlyingKey(context),
                 "asr_endpoint" to p.getString("asr_endpoint", "").orEmpty(),
                 "asr_resource_id" to p.getString("asr_resource_id", DEFAULT_ASR_RESOURCE)!!,
                 "uid" to p.getString("uid", "").orEmpty(),
@@ -670,7 +656,10 @@ object VoiceConfig {
                 "hub_url" to hc.url,
                 "device_id" to hc.deviceId,
                 "device_name" to hc.deviceName,
-                "brain" to bc.mode,
+                // What the card selects: nothing saved is CodeFlying (the default tab for a
+                // new install), whether or not this build can run it — the tab then says so.
+                // Not bc.mode, which has CodeFlying already resolved away to local.
+                "brain" to p.getString("brain", "").orEmpty().trim().lowercase().ifEmpty { BRAIN_CODEFLYING },
                 "show_hub" to if (showHub(context)) "on" else "off",
                 // llm_api_key / llm_base_url / llm_model are the 本机 tab's rows —
                 // the user's own credentials and the endpoint they point at.
@@ -913,6 +902,7 @@ object VoiceConfig {
             "theme",
             "uid",
             "api_key",
+            "codeflying_key",
             "asr_endpoint", "asr_resource_id",
             "tts_endpoint", "tts_resource_id", "tts_sample_rate",
             "voice_provider",

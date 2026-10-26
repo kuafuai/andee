@@ -116,13 +116,13 @@ class AndroidBrainHost(
 
     private fun res(key: BrainText): Int = when (key) {
         BrainText.NO_KEY -> R.string.brain_no_key
+        BrainText.NO_KEY_CODEFLYING -> R.string.brain_no_key_codeflying
         BrainText.NO_RESULT -> R.string.brain_no_result
         BrainText.REPEAT_STOP -> R.string.brain_repeat_stop
         BrainText.MAX_STEPS -> R.string.brain_max_steps
         BrainText.ERROR -> R.string.brain_error
         BrainText.ERROR_400 -> R.string.brain_error_400
         BrainText.ERROR_402 -> R.string.brain_error_402
-        BrainText.ERROR_402_CODEFLYING -> R.string.brain_error_402_codeflying
         BrainText.ERROR_404 -> R.string.brain_error_404
         BrainText.ERROR_429 -> R.string.brain_error_429
         BrainText.ERROR_5XX -> R.string.brain_error_5xx

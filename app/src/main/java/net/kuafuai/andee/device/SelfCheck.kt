@@ -400,6 +400,7 @@ object SelfCheck {
             level = if (missing) Level.FAIL else Level.OK,
             detail = when {
                 !missing -> R.string.check_detail_brain_on
+                bc.mode == VoiceConfig.BRAIN_CODEFLYING -> R.string.check_detail_brain_codeflying_key_missing
                 bc.isLocal -> R.string.check_detail_brain_key_missing
                 else -> R.string.check_detail_brain_hub_missing
             },
@@ -910,6 +911,7 @@ object SelfCheck {
             title = R.string.check_title_voice_key,
             level = if (has) Level.OK else Level.WARN,
             detail = if (has) R.string.check_detail_voice_key_ok
+            else if (VoiceConfig.brainMode(context) == VoiceConfig.BRAIN_CODEFLYING) R.string.check_detail_voice_key_codeflying_missing
             else R.string.check_detail_voice_key_missing,
             fix = if (has) Fix.Nothing else Fix.OurSettings,
         )

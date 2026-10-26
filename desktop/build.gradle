@@ -47,6 +47,29 @@ tasks.register('buildBridge', Exec) {
 }
 tasks.register('buildNative') { dependsOn('buildTrashTool', 'buildBridge') }
 sourceSets.main.resources.srcDir(nativeOut)
+
+// The CodeFlying build settings, read from local.properties exactly as :app does
+// (CODEFLYING_ENABLED / _DOMAIN / _SSL_ENABLED / _KEY). local.properties is gitignored, so a
+// checkout with nothing configured builds a Mac app with no CodeFlying server, as before.
+def codeFlyingOut = layout.buildDirectory.dir('generated/codeflying')
+tasks.register('generateCodeFlyingConfig') {
+    def localFile = rootProject.file('local.properties')
+    def out = codeFlyingOut.get().file('codeflying.properties').asFile
+    inputs.files(localFile).optional()
+    outputs.file(out)
+    doLast {
+        def lp = new Properties()
+        if (localFile.exists()) localFile.withInputStream { lp.load(it) }
+        def o = new Properties()
+        ['CODEFLYING_ENABLED', 'CODEFLYING_DOMAIN', 'CODEFLYING_SSL_ENABLED', 'CODEFLYING_KEY'].each {
+            o.setProperty(it, lp.getProperty(it, '').trim())
+        }
+        out.parentFile.mkdirs()
+        out.withOutputStream { o.store(it, 'generated from local.properties') }
+    }
+}
+sourceSets.main.resources.srcDir(codeFlyingOut)
+processResources.dependsOn('generateCodeFlyingConfig')
 processResources.dependsOn('buildNative')
 
 dependencies {
