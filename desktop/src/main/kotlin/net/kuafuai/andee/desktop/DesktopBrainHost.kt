@@ -130,8 +130,18 @@ object Strings {
     /** The language was just written; redraw everything that reads it. */
     fun changed() { rev.value++ }
 
+    /**
+     * The language in force. A saved choice wins; then the build's `DEFAULT_LANG`; then the system
+     * locale.
+     *
+     * The middle rung is what makes a per-language package mean anything — see
+     * [CodeFlyingBuild.defaultLang]. It sits here rather than in Settings so that a fresh install
+     * reads as the packaged language without anything having to write a preference first.
+     */
     fun lang(): String = rev.value.let { Settings.get("lang") }.ifEmpty {
-        if (Locale.getDefault().language == "zh") "zh" else "en"
+        CodeFlyingBuild.defaultLang.ifEmpty {
+            if (Locale.getDefault().language == "zh") "zh" else "en"
+        }
     }
 
     fun locale(): Locale = if (lang() == "zh") Locale.SIMPLIFIED_CHINESE else Locale.ENGLISH

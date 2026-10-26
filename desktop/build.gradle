@@ -48,30 +48,87 @@ tasks.register('buildBridge', Exec) {
 tasks.register('buildNative') { dependsOn('buildTrashTool', 'buildBridge') }
 sourceSets.main.resources.srcDir(nativeOut)
 
-// The CodeFlying build settings, read from local.properties exactly as :app does
-// (CODEFLYING_ENABLED / _DOMAIN / _SSL_ENABLED / _KEY). local.properties is gitignored, so a
-// checkout with nothing configured builds a Mac app with no CodeFlying server, as before.
+// The CodeFlying build settings. `CODEFLYING_DOMAIN` and `DEFAULT_LANG` come from the command
+// line first (`-PcodeflyingDomain=…`, `-PdefaultLang=…`) and local.properties second, matching
+// :app — one checkout, several packages, no editing the properties file between builds.
+//
+// **`CODEFLYING_KEY` and `GOOGLE_VOICE_KEY` are written empty, always.** They used to be copied
+// from local.properties, which is safe only for as long as nobody uncomments a key to test
+// something; after that the next release build ships it. A published Mac app carries no
+// credential — the user types their own into Settings, which is where it belongs.
+//
 // The product version, read from the phone's versionName so there is one number for both bodies
 // (the bundle's packageVersion below is only what macOS requires of a .dmg).
 def productVersion = (rootProject.file('app/build.gradle').text =~ /versionName\s+"([^"]+)"/).with { it.find() ? it.group(1) : '0.0.0' }
 
+// Same explicit map as :app, for the same reason: a property becomes overridable only by being
+// named here, never by accident of its spelling.
+def CLI_NAME = [
+    'CODEFLYING_DOMAIN'     : 'codeflyingDomain',
+    'DEFAULT_LANG'          : 'defaultLang',
+    // Both shipping servers are HTTPS-only (measured: https → 200, http → 404 or no connection).
+    // Part of the variant, so it travels with the domain.
+    'CODEFLYING_SSL_ENABLED': 'codeflyingSsl',
+]
+def variantProp = { Properties lp, String key ->
+    def cli = CLI_NAME[key]
+    if (cli != null) {
+        def v = project.findProperty(cli)
+        if (v != null && !v.toString().trim().isEmpty()) return v.toString().trim()
+    }
+    return lp.getProperty(key, '').trim()
+}
+
 def codeFlyingOut = layout.buildDirectory.dir('generated/codeflying')
+
+// Read once, outside doLast, so both the up-to-date inputs and the writing step see the same
+// values. Resolving these inside doLast (or with a throwaway Properties in `inputs`) would make
+// Gradle's up-to-date check disagree with what was actually written — the task would skip when
+// it should re-run, which is the failure that ships a stale variant.
+def codeFlyingProps = new Properties()
+def codeFlyingFile = rootProject.file('local.properties')
+if (codeFlyingFile.exists()) codeFlyingFile.withInputStream { codeFlyingProps.load(it) }
+def resolvedDomain = variantProp(codeFlyingProps, 'CODEFLYING_DOMAIN')
+def resolvedLang = variantProp(codeFlyingProps, 'DEFAULT_LANG')
+// A boolean, but carried as the raw string: `variantProp` already applies the
+// command-line-wins rule, and the value is written out unchanged for the app to parse.
+def resolvedSsl = variantProp(codeFlyingProps, 'CODEFLYING_SSL_ENABLED')
+
 tasks.register('generateCodeFlyingConfig') {
     def localFile = rootProject.file('local.properties')
     def out = codeFlyingOut.get().file('codeflying.properties').asFile
     inputs.files(localFile).optional()
     inputs.property('productVersion', productVersion)
+    inputs.property('codeflyingDomain', resolvedDomain)
+    inputs.property('defaultLang', resolvedLang)
+    inputs.property('codeflyingSsl', resolvedSsl)
     outputs.file(out)
     doLast {
-        def lp = new Properties()
-        if (localFile.exists()) localFile.withInputStream { lp.load(it) }
-        def o = new Properties()
-        ['CODEFLYING_ENABLED', 'CODEFLYING_DOMAIN', 'CODEFLYING_SSL_ENABLED', 'CODEFLYING_KEY'].each {
-            o.setProperty(it, lp.getProperty(it, '').trim())
+        // A key on the command line is refused rather than ignored, so a mistyped
+        // release invocation fails loudly instead of quietly shipping nothing.
+        ['codeflyingKey', 'googleVoiceKey'].each { name ->
+            def v = project.findProperty(name)
+            if (v != null && !v.toString().trim().isEmpty()) {
+                throw new GradleException(
+                    "refusing to build: -P${name} was given. A published app must not carry a " +
+                    "credential; each user types their own. Remove it from the command line.")
+            }
         }
+        def o = new Properties()
+        o.setProperty('CODEFLYING_ENABLED', codeFlyingProps.getProperty('CODEFLYING_ENABLED', '').trim())
+        o.setProperty('CODEFLYING_SSL_ENABLED', resolvedSsl)
+        o.setProperty('CODEFLYING_DOMAIN', resolvedDomain)
+        // What a fresh install comes up in. Without this the Mac reads only the saved
+        // preference and then the system locale, so a "Chinese" package opened on an
+        // English machine would come up English — the package would not be the thing
+        // its name says it is.
+        o.setProperty('DEFAULT_LANG', resolvedLang)
+        // Always empty, whatever local.properties says. See the note at the top.
+        o.setProperty('CODEFLYING_KEY', '')
+        o.setProperty('GOOGLE_VOICE_KEY', '')
         o.setProperty('PRODUCT_VERSION', productVersion)
         out.parentFile.mkdirs()
-        out.withOutputStream { o.store(it, 'generated from local.properties') }
+        out.withOutputStream { o.store(it, 'generated from local.properties + -P overrides') }
     }
 }
 sourceSets.main.resources.srcDir(codeFlyingOut)

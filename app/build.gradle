@@ -8,18 +8,114 @@ def localPropsFile = rootProject.file('local.properties')
 if (localPropsFile.exists()) {
     localPropsFile.withInputStream { localProps.load(it) }
 }
+
+// ---- Per-variant overrides ---------------------------------------------------
+//
+// One checkout has to produce several packages that differ only in two build
+// settings: which CodeFlying server to talk to, and which language a fresh
+// install comes up in. Before this, both came from `local.properties` alone, so
+// "the English build" meant editing that file and trying not to forget to edit
+// it back — which is exactly the kind of step that eventually ships the wrong
+// package, silently, because both variants build fine.
+//
+// So: `-PcodeflyingDomain=…` and `-PdefaultLang=…` win over local.properties.
+// The file stays the default for a local run, and a release build states its
+// variant on the command line where it can be read back from the build log.
+//
+// 🔴 Only these two may be overridden, and the list is deliberately short.
+//
+// `codeflyingDomain` and `defaultLang` are *not secrets*: a server address and a
+// language code. They are the two things a multi-variant release differs by.
+// Everything else below — the CodeFlying key, the Google key and its project —
+// is a credential, and a credential must not be settable from a command line
+// that ends up in a build log or a shell history.
+//
+// The map is explicit rather than derived from the property name, so adding a
+// property can never accidentally make it overridable.
+def CLI_NAME = [
+    'CODEFLYING_DOMAIN': 'codeflyingDomain',
+    'DEFAULT_LANG'     : 'defaultLang',
+    // Both shipping servers are HTTPS-only (measured: `baas.kuafuai.net` answers 200 on https
+    // and 404 on http; `myapp.codeflying.app` answers 200 on https and does not connect at all
+    // on http). It is part of the variant, so it is settable next to the domain rather than
+    // left to whatever the properties file happened to hold.
+    'CODEFLYING_SSL_ENABLED': 'codeflyingSsl',
+]
+def prop = { String key, String fallback = '' ->
+    def cli = CLI_NAME[key]
+    if (cli != null) {
+        def fromCli = project.findProperty(cli)
+        if (fromCli != null && !fromCli.toString().trim().isEmpty()) return fromCli.toString().trim()
+    }
+    return localProps.getProperty(key, fallback)
+}
+def propBool = { String key ->
+    def raw = prop(key, '').trim().toLowerCase()
+    (raw == 'true' || raw == '1' || raw == 'yes') ? 'true' : 'false'
+}
+
 static def escapeStringLiteral(String value) {
     if (value == null) return '""'
     return '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"'
 }
-def buildConfigString = { String key ->
-    escapeStringLiteral(localProps.getProperty(key, ''))
+def buildConfigString = { String key -> escapeStringLiteral(prop(key, '')) }
+
+// 🔴 Credentials are hard-coded empty, and that is the point.
+//
+// This used to read `local.properties`, which is fine until someone uncomments a
+// key to test something — then the next `assembleDebug` quietly ships it to
+// whoever downloads the result. "The key happens to be commented out right now"
+// is not a guarantee; this is. A published package carries no credential, and
+// each user types their own.
+//
+// Checked by the build below, which fails if a key is passed on the command
+// line, and by scripts/verify_artifacts.py, which reads the built artifact.
+def EMPTY_CREDENTIAL = '""'
+def buildConfigBool = { String key -> propBool(key) }
+
+// Fail the build rather than ship a credential.
+gradle.taskGraph.whenReady { graph ->
+    def building = graph.allTasks.any { t ->
+        def n = t.name.toLowerCase()
+        n.contains('release') || n.contains('assembledebug') || n.contains('packagedebug')
+    }
+    if (!building) return
+    ['codeflyingKey', 'googleVoiceKey'].each { name ->
+        def v = project.findProperty(name)
+        if (v != null && !v.toString().trim().isEmpty()) {
+            throw new GradleException(
+                "refusing to build: -P${name} was given. A published package must not carry a " +
+                "credential — keys are typed in by each user. Remove it from the command line.")
+        }
+    }
+    def staleKey = localProps.getProperty('CODEFLYING_KEY', '').trim()
+    if (!staleKey.isEmpty()) {
+        logger.lifecycle("note: local.properties has a CODEFLYING_KEY. It is NOT compiled into " +
+            "CODEFLYING_KEY (which reads the same file but is not overridable) — the field ships " +
+            "empty by design. Confirm with scripts/verify_artifacts.py before publishing.")
+    }
 }
-// Boolean config: anything case-insensitive-matching "true"/"1"/"yes" counts.
-def buildConfigBool = { String key ->
-    def raw = localProps.getProperty(key, '').trim().toLowerCase()
-    (raw == 'true' || raw == '1' || raw == 'yes') ? 'true' : 'false'
-}
+
+// 🔴 Register the variant as an input of BuildConfig generation, or a second build
+// in the same checkout reuses the first one's file.
+//
+// `-P` values are read through `project.findProperty` during configuration, which
+// AGP's up-to-date check for `generateDebugBuildConfig` does not see. So building
+// the Chinese package and then the English one produced **English APKs filed under
+// the Chinese name**: the second run rewrote BuildConfig.java and re-packaged, but
+// the first run's `assembleDebug` had been skipped as UP-TO-DATE, leaving the
+// on-disk APKs as whatever was there — and the copy step took them at face value.
+//
+// Measured, not theorised: `verify_variants.py` read `DEFAULT_LANG='en'` out of
+// `安迪-0.6.1-arm64-v8a-中文版.apk` on the first attempt at this build.
+//
+// Declaring them as inputs makes the task re-run when either changes, so the two
+// variants cannot share a BuildConfig. Cheaper and more precise than `clean`
+// between variants, and unlike deleting the file it cannot be forgotten.
+//
+// Declared at the END of this file: AGP registers `generateDebugBuildConfig` while
+// the `android {}` block is evaluated, so a `tasks.matching` above it matches
+// nothing and fails silently — the exact shape of bug this is fixing.
 
 android {
     namespace 'net.kuafuai.andee'
@@ -34,18 +130,25 @@ android {
         applicationId "net.kuafuai.andee"
         minSdk 30
         targetSdk 34
-        versionCode 13
-        versionName "0.6.0"
+        versionCode 14
+        versionName "0.6.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         // The CodeFlying mode: a hosted backend that proxies LLM, ASR and TTS
-        // from one domain. When ENABLED and DOMAIN is set, "codeflying" is the
-        // out-of-box backend choice; URL scheme follows SSL_ENABLED
-        // (ws/wss, http/https). Everything is derived at runtime from these
-        // four fields — the user does not configure the endpoints themselves.
+        // from one domain. **DOMAIN alone decides it** — there is no longer an
+        // availability switch, because CodeFlying became the default backend and
+        // a build with a domain simply uses it. (`CODEFLYING_ENABLED` is kept as
+        // a field for wire compatibility and has no reader left.)
+        //
+        // URL scheme follows SSL_ENABLED (ws/wss, http/https); every endpoint is
+        // derived at runtime from the domain — see CodeFlyingEndpoint.
+        //
+        // `-PcodeflyingDomain=…` overrides the file, which is how one checkout
+        // produces the Chinese and English packages without editing
+        // local.properties in between.
         buildConfigField "boolean", "CODEFLYING_ENABLED",      buildConfigBool('CODEFLYING_ENABLED')
-        buildConfigField "String",  "CODEFLYING_KEY",          buildConfigString('CODEFLYING_KEY')
+        buildConfigField "String",  "CODEFLYING_KEY",          EMPTY_CREDENTIAL
         buildConfigField "String",  "CODEFLYING_DOMAIN",       buildConfigString('CODEFLYING_DOMAIN')
         buildConfigField "boolean", "CODEFLYING_SSL_ENABLED",  buildConfigBool('CODEFLYING_SSL_ENABLED')
         buildConfigField "String",  "DEFAULT_LANG",            buildConfigString('DEFAULT_LANG')
@@ -64,7 +167,7 @@ android {
         // provider** — see VoiceConfig.voiceProvider. A build is packaged for
         // whoever it is packaged for, and baking a key is the most explicit
         // statement of that intent there is.
-        buildConfigField "String",  "GOOGLE_VOICE_KEY",        buildConfigString('GOOGLE_VOICE_KEY')
+        buildConfigField "String",  "GOOGLE_VOICE_KEY",        EMPTY_CREDENTIAL
         buildConfigField "String",  "GOOGLE_VOICE_PROJECT",    buildConfigString('GOOGLE_VOICE_PROJECT')
         buildConfigField "String",  "GOOGLE_VOICE_LOCATION",   buildConfigString('GOOGLE_VOICE_LOCATION')
         buildConfigField "String",  "GOOGLE_VOICE_BASE_URL",   buildConfigString('GOOGLE_VOICE_BASE_URL')
@@ -163,4 +266,16 @@ dependencies {
     testImplementation 'org.json:json:20240303'
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
+}
+// ---- Variant inputs (must come after `android {}`) ---------------------------
+//
+// See the long note above `CLI_NAME`. `-P` values are invisible to AGP's
+// up-to-date check for BuildConfig generation, so without this a second variant
+// build in the same checkout reuses the first one's file — and produces packages
+// whose contents contradict their names. Declared here because the task does not
+// exist until the `android {}` block above has been evaluated.
+tasks.matching { it.name.startsWith('generate') && it.name.endsWith('BuildConfig') }.configureEach {
+    inputs.property('variant.codeflyingDomain', prop('CODEFLYING_DOMAIN', ''))
+    inputs.property('variant.defaultLang', prop('DEFAULT_LANG', ''))
+    inputs.property('variant.codeflyingSsl', prop('CODEFLYING_SSL_ENABLED', ''))
 }

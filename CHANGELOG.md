@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`13` / `"0.6.0"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`14` / `"0.6.1"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,54 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.6.1] - 2026-10-26
+
+**One checkout now produces every shipping variant, and the packages cannot contain a key.** Four
+builds come out of it — Android and macOS, each in Chinese and English — totalling ten files, because
+Android splits by ABI and the Mac by architecture. A variant is two build settings, both non-secret and
+both given on the command line; the credentials are not settable at all.
+
+This exists because v0.6.0 shipped a Mac build with no server configured, and the Mac silently fell back
+to a different backend rather than saying so. Two causes, both fixed here.
+
+### Fixed
+
+- **The Mac had no build-time default language**, so a package built as "Chinese" came up English on an
+  English machine — the package was not the thing its name said it was. `DEFAULT_LANG` is now written
+  into the generated config and read by `Strings.lang()`, ranking below a language the user has picked
+  and above the system locale, exactly as the phone does it.
+- **A second variant build in one checkout reused the first one's `BuildConfig`.** `-P` values are read
+  during configuration, which AGP's up-to-date check for `generateDebugBuildConfig` does not see, so
+  building Chinese and then English produced **English packages filed under the Chinese name** — the
+  second run rewrote the config and re-packaged, but the first run's task had been skipped, leaving the
+  APKs as whatever was on disk. The two settings are now declared inputs of that task.
+  *Found by reading `DEFAULT_LANG` out of the finished APK, not by the build log — which said
+  `BUILD SUCCESSFUL` both times.*
+- **Credentials can no longer be baked in.** `CODEFLYING_KEY` and `GOOGLE_VOICE_KEY` are hard-coded to
+  the empty string instead of copied from `local.properties`, and both build files **refuse** a
+  `-PcodeflyingKey=` / `-PgoogleVoiceKey=` rather than ignoring it. Previously "the key ships empty"
+  held only for as long as nobody uncommented one to test something.
+
+### Added
+
+- **`build_variants.sh`** — builds all four variants from one checkout, naming the Chinese packages in
+  Chinese. It moves the runtime image aside between Mac architectures (the trap that produces a mixed
+  bundle while reporting success) and checks all four architecture points before accepting a dmg.
+- **`verify_variants.py`** — confirms each package is the variant its name claims, by reading the
+  **artifact**: the APK's own dex, and `codeflying.properties` from inside the dmg's jar. It checks
+  that the server matches the language, that the language matches the name, that the architecture
+  matches, and that no credential is present anywhere — including `assets/andee_key.txt`, which is
+  read before the build config and would override it.
+
+### Changed
+
+- **`-PcodeflyingDomain`, `-PdefaultLang` and `-PcodeflyingSsl` override `local.properties`** for both
+  platforms. The variant is stated where it can be read back from the build log, and the properties
+  file is never edited between builds — which is the step that eventually ships the wrong package.
+- **Both shipping servers are HTTPS-only**, measured rather than assumed: `baas.kuafuai.net` answers
+  200 on https and 404 on http, `myapp.codeflying.app` answers 200 on https and does not connect at all
+  on http. Hence `codeflyingSsl=true` travels with the variant rather than being left to the file.
 
 ## [0.6.0] - 2026-10-26
 
