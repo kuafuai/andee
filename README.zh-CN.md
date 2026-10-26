@@ -308,6 +308,63 @@ cp -R desktop/build/compose/binaries/main/app/Andee.app /Applications/
 macOS 按应用签名记住这两项授权，所以没签名的重新构建每次都会丢授权 ——
 [desktop/README-signing.md](desktop/README-signing.md) 讲了怎么配一个固定的本地签名。
 
+### 打包给别人装：两种芯片
+
+`createDistributable` 只为**跑它的那台机器**打包：启动器、内嵌运行时、以及那几个原生件
+（`libandeemac.dylib`、`andee-trash`、LWJGL 的 natives）全都跟着 Gradle 用的那个 JVM 的 `os.arch` 走。
+没有交叉编译开关 —— `os.arch` 直接从 JVM 读 —— 所以 Apple 芯片的包在 Intel Mac 上起不来，反过来也一样。
+所以要给两个包，Mac 软件都是这么发的：
+
+| 芯片 | 给人的包 | 用什么打 |
+| --- | --- | --- |
+| Apple 芯片（M1–M4） | `Andee-1.0.0-arm64.dmg` | 任意 JDK 17–20 |
+| Intel | `Andee-1.0.0-x64.dmg` | x86_64 的 JDK 17，跑在 Rosetta 下 |
+
+**Apple 芯片的机器两个都能打**：架构只由「跑 Gradle 的那个 JVM」决定，而 Rosetta 能跑 x86_64 的 JDK。
+装 x86_64 JDK 请用 Temurin 的 macOS x64 压缩包，别用 Homebrew —— `openjdk@17` 那个 formula 要从源码编译、
+要求完整 Xcode，而本项目其它地方并不需要 Xcode：
+
+```bash
+curl -L -o /tmp/jdk17-x64.tar.gz \
+  'https://api.adoptium.net/v3/binary/latest/17/ga/mac/x64/jdk/hotspot/normal/eclipse'
+mkdir -p ~/jdk-x64 && tar -xzf /tmp/jdk17-x64.tar.gz -C ~/jdk-x64
+
+./gradlew --stop                                    # 已经在跑的 daemon 是 arm64
+JAVA_HOME=~/jdk-x64/jdk-17.0.20.1+1/Contents/Home \
+  ./gradlew :desktop:packageDmg --no-daemon         # → Andee-1.0.0.dmg（x86_64）
+./gradlew --stop && ./gradlew :desktop:packageDmg   # → Andee-1.0.0.dmg（arm64）
+```
+
+**这里有两处失败是静默的。**
+
+只要**输入**没变，`createRuntimeImage` 就被判成 up-to-date —— 而它跑在哪个 JVM 上并不算输入。换架构时
+Gradle 会直接复用上一次的 JRE，产出「x86_64 启动器套着 arm64 的 `libjvm.dylib`」这种混合体：
+BUILD SUCCESSFUL，装上去打不开。所以每次换架构之前，先把运行时挪开：
+
+```bash
+mv desktop/build/compose/tmp/main/runtime desktop/build/compose/tmp/main/runtime-old
+```
+
+另一个是两个包写进同一个文件名，后打的会不声不响地把先打的盖掉，打完随手改名。（文件名里的 `1.0.0`
+是 macOS 的 bundle 版本，即 `desktop/build.gradle` 里的 `packageVersion` —— macOS 不接受 `0.x` 的 bundle
+版本；它不是产品版本。）
+
+发之前把四个二进制都验一遍，架构必须一致：
+
+```bash
+cd desktop/build/compose/binaries/main/app/Andee.app
+lipo -archs Contents/MacOS/Andee
+lipo -archs Contents/runtime/Contents/Home/lib/server/libjvm.dylib
+lipo -archs Contents/runtime/Contents/Home/lib/libjli.dylib
+lipo -archs Contents/app/libskiko-macos-*.dylib
+```
+
+skiko 那个文件名本身就带着架构（`libskiko-macos-arm64.dylib` / `libskiko-macos-x64.dylib`），
+看一眼名字就知道手里是哪个包。
+
+做不成「一个包通吃」：jpackage 的启动器只认一个运行时目录，一个启动器没法在两个 JRE 之间选，
+而要做 universal 的 JRE 就得分文件把整套 dylib 都 lipo 一遍。两个包才是这套构建支持的答案。
+
 想自己编译 Android 版的话：
 
 > **环境要求**

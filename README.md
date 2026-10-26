@@ -363,6 +363,66 @@ cp -R desktop/build/compose/binaries/main/app/Andee.app /Applications/
 macOS remembers those two grants against the app's signature, so an unsigned rebuild loses them every
 time — [desktop/README-signing.md](desktop/README-signing.md) sets up one fixed local identity.
 
+### Packaging it for someone else — both chips
+
+`createDistributable` packs for **the machine that runs it**: the launcher, the embedded runtime and
+the native pieces (`libandeemac.dylib`, `andee-trash`, the LWJGL natives) all follow the `os.arch` of
+the Gradle JVM. There is no cross-compile switch — `os.arch` is read straight off the JVM — so an
+Apple silicon build will not start on an Intel Mac, and the other way round. Ship two packages, as
+every other Mac app does:
+
+| Chip | Package to hand over | Built with |
+| --- | --- | --- |
+| Apple silicon (M1–M4) | `Andee-1.0.0-arm64.dmg` | any JDK 17–20 |
+| Intel | `Andee-1.0.0-x64.dmg` | an x86_64 JDK 17, under Rosetta |
+
+An Apple silicon Mac can build **both**: the architecture is decided by whichever JVM runs Gradle, and
+Rosetta runs an x86_64 one. Take Temurin's macOS x64 tarball rather than Homebrew — the `openjdk@17`
+formula compiles from source and demands a full Xcode, which this project otherwise does not need:
+
+```bash
+curl -L -o /tmp/jdk17-x64.tar.gz \
+  'https://api.adoptium.net/v3/binary/latest/17/ga/mac/x64/jdk/hotspot/normal/eclipse'
+mkdir -p ~/jdk-x64 && tar -xzf /tmp/jdk17-x64.tar.gz -C ~/jdk-x64
+
+./gradlew --stop                                    # the daemon already running is arm64
+JAVA_HOME=~/jdk-x64/jdk-17.0.20.1+1/Contents/Home \
+  ./gradlew :desktop:packageDmg --no-daemon         # → Andee-1.0.0.dmg (x86_64)
+./gradlew --stop && ./gradlew :desktop:packageDmg   # → Andee-1.0.0.dmg (arm64)
+```
+
+**Two failures here are silent.**
+
+`createRuntimeImage` is declared up to date whenever its *inputs* have not changed, and the JVM it
+runs on is not one of those inputs. Switch architecture and Gradle reuses the previous JRE, producing
+an x86_64 launcher wrapped around an arm64 `libjvm.dylib`: BUILD SUCCESSFUL, and the app dies on
+launch. Move the runtime away before each switch:
+
+```bash
+mv desktop/build/compose/tmp/main/runtime desktop/build/compose/tmp/main/runtime-old
+```
+
+And both packages are written to the same file name, so the second build replaces the first without a
+word. Rename as you go. (The `1.0.0` in that name is the macOS bundle version — `packageVersion` in
+`desktop/build.gradle`, because macOS rejects a `0.x` bundle. It is not the product version.)
+
+Check all four binaries before shipping; they have to agree:
+
+```bash
+cd desktop/build/compose/binaries/main/app/Andee.app
+lipo -archs Contents/MacOS/Andee
+lipo -archs Contents/runtime/Contents/Home/lib/server/libjvm.dylib
+lipo -archs Contents/runtime/Contents/Home/lib/libjli.dylib
+lipo -archs Contents/app/libskiko-macos-*.dylib
+```
+
+The skiko file is named for the architecture it was built for (`libskiko-macos-arm64.dylib` versus
+`libskiko-macos-x64.dylib`), so its name alone says which package you are holding.
+
+One package for both is not an option: the jpackage launcher names a single runtime directory, so a
+single launcher cannot choose between two JREs, and a universal JRE would mean lipo'ing every dylib
+by hand. Two packages is the answer this build supports.
+
 To build the Android app yourself:
 
 > **Requirements**
