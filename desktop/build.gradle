@@ -51,11 +51,16 @@ sourceSets.main.resources.srcDir(nativeOut)
 // The CodeFlying build settings, read from local.properties exactly as :app does
 // (CODEFLYING_ENABLED / _DOMAIN / _SSL_ENABLED / _KEY). local.properties is gitignored, so a
 // checkout with nothing configured builds a Mac app with no CodeFlying server, as before.
+// The product version, read from the phone's versionName so there is one number for both bodies
+// (the bundle's packageVersion below is only what macOS requires of a .dmg).
+def productVersion = (rootProject.file('app/build.gradle').text =~ /versionName\s+"([^"]+)"/).with { it.find() ? it.group(1) : '0.0.0' }
+
 def codeFlyingOut = layout.buildDirectory.dir('generated/codeflying')
 tasks.register('generateCodeFlyingConfig') {
     def localFile = rootProject.file('local.properties')
     def out = codeFlyingOut.get().file('codeflying.properties').asFile
     inputs.files(localFile).optional()
+    inputs.property('productVersion', productVersion)
     outputs.file(out)
     doLast {
         def lp = new Properties()
@@ -64,6 +69,7 @@ tasks.register('generateCodeFlyingConfig') {
         ['CODEFLYING_ENABLED', 'CODEFLYING_DOMAIN', 'CODEFLYING_SSL_ENABLED', 'CODEFLYING_KEY'].each {
             o.setProperty(it, lp.getProperty(it, '').trim())
         }
+        o.setProperty('PRODUCT_VERSION', productVersion)
         out.parentFile.mkdirs()
         out.withOutputStream { o.store(it, 'generated from local.properties') }
     }
@@ -77,6 +83,8 @@ dependencies {
     implementation compose.desktop.currentOs
     // Android has org.json built in; a JVM app has to bring it.
     implementation 'org.json:json:20240303'
+    // The version check's HTTP client; core keeps its own copy to itself. Same version.
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     // Bonjour/mDNS on the JVM, for finding the phone on the LAN (the JDK has none). Pure Java, no native part.
     implementation 'org.jmdns:jmdns:3.5.9'
     // PeerServer extends its WebSocketServer, and core keeps that dependency to itself.

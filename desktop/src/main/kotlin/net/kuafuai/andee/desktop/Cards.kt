@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun SelfCheckCard(onDone: () -> Unit, onOpenSettings: () -> Unit) {
     val zh = Strings.lang() == "zh"
-    data class CheckRow(val id: String, val name: String, val ok: Boolean, val why: String, val fix: (() -> Unit)?)
+    data class CheckRow(val id: String, val name: String, val ok: Boolean, val why: String, val fix: (() -> Unit)?, val red: Boolean = false, val quiet: Boolean = false)
     // Re-read on demand. Every row here is changed in *another* app — System
     // Settings for the three permissions, the settings card for the two keys —
     // and a card that computed its rows once would go on saying "cannot see the
@@ -48,7 +48,13 @@ fun SelfCheckCard(onDone: () -> Unit, onOpenSettings: () -> Unit) {
     // phone's card carries 重新检查: checking whether a fix took should not mean
     // closing this card and finding it again.
     var refresh by remember { mutableStateOf(0) }
-    val rows = remember(refresh) { buildList {
+    // The one row that asks the network, so it is read off the UI thread and starts as "checking".
+    var version by remember { mutableStateOf<VersionCheck.Result?>(null) }
+    LaunchedEffect(refresh) {
+        version = null
+        version = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { VersionCheck.probe() }
+    }
+    val rows = remember(refresh, version) { buildList {
         val ax = net.kuafuai.andee.desktop.mac.Bridge.axTrusted()
         add(CheckRow("ax", if (zh) "辅助功能" else "Accessibility", ax,
             if (ax) if (zh) "能读、能操作别的 app" else "Can read and drive other apps" else if (zh) "读不到屏幕，也无法操作" else "Cannot read or drive the screen",
@@ -76,6 +82,18 @@ fun SelfCheckCard(onDone: () -> Unit, onOpenSettings: () -> Unit) {
             else if (cf) if (zh) "还没填 CodeFlying 密钥，说不了话" else "No CodeFlying key — Andee cannot speak"
             else if (zh) "还没配，说不了话" else "Missing — Andee cannot speak",
             { onOpenSettings() }))
+        val v = VersionCheck.current()
+        add(when (val r = version) {
+            null -> CheckRow("version", if (zh) "版本" else "Version", true, if (zh) "检查中…（当前 $v）" else "Checking… (you are on $v)", null, quiet = true)
+            is VersionCheck.Result.Current -> CheckRow("version", if (zh) "版本" else "Version", true, if (zh) "$v 已经是最新。" else "$v is the latest.", null)
+            is VersionCheck.Result.Behind -> CheckRow("version", if (zh) "版本" else "Version", false,
+                if (r.forced) { if (zh) "请升级到 ${r.latest} —— 你现在这个（$v）已经不再支持了。到 GitHub 下载。" else "Please upgrade to ${r.latest} — this build ($v) is no longer supported. Get it from GitHub." }
+                else { if (zh) "版本落后了：最新是 ${r.latest}，你现在是 $v。请到 GitHub 下载升级。" else "Out of date: the latest is ${r.latest}, you are on $v. Please upgrade from GitHub." },
+                { runCatching { net.kuafuai.andee.desktop.mac.Bridge.open(r.url) } }, red = true)
+            // Could not be determined is never the user's fault: a quiet note that still names the build.
+            is VersionCheck.Result.Unknown -> CheckRow("version", if (zh) "版本" else "Version", true,
+                if (zh) "没能查到最新版本。当前 $v。" else "Could not check for updates. You are on $v.", null, quiet = true)
+        })
         }
     }
     // Re-reading is instant and, more often than not, changes nothing — so a tap
@@ -94,14 +112,14 @@ fun SelfCheckCard(onDone: () -> Unit, onOpenSettings: () -> Unit) {
                 Modifier.fillMaxWidth().glassPanel(14).padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(if (r.ok) AndeeIcon.CHECK_CIRCLE else AndeeIcon.ALERT_CIRCLE, if (r.ok) Palette.ok else Palette.warn, 20.dp)
+                Icon(if (r.ok) AndeeIcon.CHECK_CIRCLE else AndeeIcon.ALERT_CIRCLE, if (r.ok) (if (r.quiet) Palette.secondary else Palette.ok) else if (r.red) Palette.danger else Palette.warn, 20.dp)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(r.name, color = Palette.label, fontSize = 14.sp)
-                    Text(r.why, color = Palette.secondary, fontSize = 11.sp)
+                    Text(r.why, color = if (r.red) Palette.danger else Palette.secondary, fontSize = 11.sp)
                 }
                 if (!r.ok && r.fix != null) {
-                    Text(if (zh) "去处理" else "Fix", color = Palette.accent, fontSize = 13.sp,
+                    Text(if (r.id == "version") (if (zh) "去 GitHub" else "GitHub") else if (zh) "去处理" else "Fix", color = Palette.accent, fontSize = 13.sp,
                         modifier = Modifier.clickable { r.fix?.invoke() }.padding(6.dp))
                 }
             }

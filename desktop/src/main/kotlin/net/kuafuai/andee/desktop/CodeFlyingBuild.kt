@@ -21,4 +21,7 @@ object CodeFlyingBuild {
     val domain: String get() = p.getProperty("CODEFLYING_DOMAIN", "").trim()
     val ssl: Boolean get() = flag("CODEFLYING_SSL_ENABLED")
     val key: String get() = p.getProperty("CODEFLYING_KEY", "").trim()
+
+    /** The product's version, the phone's `versionName`: one number for both bodies. */
+    val productVersion: String get() = p.getProperty("PRODUCT_VERSION", "").trim().ifEmpty { "0.0.0" }
 }

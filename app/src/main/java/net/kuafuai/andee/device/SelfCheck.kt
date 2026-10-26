@@ -555,7 +555,10 @@ object SelfCheck {
             )
         }
         val deviceId = VoiceConfig.hubConfig(context).deviceId
-        return when (val v = probeVersion(VERSION_API_BASE, BuildConfig.VERSION_NAME, deviceId)) {
+        return when (val v = probeVersion(
+            VERSION_API_BASE, BuildConfig.VERSION_NAME, deviceId,
+            VoiceConfig.brainMode(context) == VoiceConfig.BRAIN_CODEFLYING,
+        )) {
             is Verdict.Current -> Finding(
                 id = "version",
                 title = R.string.check_title_version,
@@ -567,7 +570,9 @@ object SelfCheck {
             is Verdict.Update -> Finding(
                 id = "version",
                 title = R.string.check_title_version,
-                level = if (v.forced) Level.WARN else Level.NOTE,
+                // Behind is red, forced or not: the user asked for it to be impossible to miss, and the text
+                // says where to get the new one. (It used to be a grey note — "the old one still works".)
+                level = Level.FAIL,
                 detail = if (v.forced) R.string.check_detail_version_forced
                 else R.string.check_detail_version_stale,
                 // %1$s is always the release we want you on and %2$s is always
@@ -575,10 +580,8 @@ object SelfCheck {
                 // one word apart and swapping the order in one of them would be
                 // a silent lie about which version is which.
                 detailArgs = listOf(v.latest, BuildConfig.VERSION_NAME),
-                // No published download URL means nowhere to send the user, and
-                // a button that goes nowhere is the small lie this list exists
-                // to avoid -- see Fix.Link.
-                fix = v.url?.let { Fix.Link(it) } ?: Fix.Nothing,
+                // The release page is always a place to go, so the row never ends in a button that does nothing.
+                fix = Fix.Link(v.url ?: RELEASES_URL),
             )
 
             is Verdict.QuotaSpent -> Finding(
@@ -1340,7 +1343,7 @@ object SelfCheck {
      * "(wifi)" on some clones). Hand-joined, those go out raw and the service
      * records a truncated model name.
      */
-    private fun probeVersion(base: String, current: String, deviceId: String): Verdict {
+    private fun probeVersion(base: String, current: String, deviceId: String, codeFlying: Boolean): Verdict {
         val url = base.toHttpUrlOrNull()
             ?.newBuilder()
             ?.addPathSegments("api/version")
@@ -1351,6 +1354,9 @@ object SelfCheck {
             ?.addQueryParameter("os_version", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
             ?.addQueryParameter("device_id", deviceId)
             ?.addQueryParameter("app_package", BuildConfig.APPLICATION_ID)
+            // Whether the CodeFlying backend is the one in force right now: "1" / "0". Only the on/off fact,
+            // never the key or the address.
+            ?.addQueryParameter("codeflying", if (codeFlying) "1" else "0")
             ?.addQueryParameter("lang", Locale.getDefault().toLanguageTag())
             ?.build()
             ?: return Verdict.Unreachable("bad address: $base")
@@ -1488,6 +1494,9 @@ object SelfCheck {
      * as that lasts. That is the intended failure, not a bug in the check.
      */
     private const val VERSION_API_BASE = "https://api.heyandee.com"
+
+    /** Where a newer build is published. */
+    const val RELEASES_URL = "https://github.com/kuafuai/andee/releases"
 
     /**
      * The whole-call ceiling on the version probe, in milliseconds.
