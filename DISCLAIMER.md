@@ -35,7 +35,7 @@ An **experimental** piece of software that you install on **your own device**. I
 | What | Goes to | Default |
 |---|---|---|
 | Your speech (ASR) and its speech (TTS) | **The speech provider you select** — Volcengine / ByteDance by default, or Google | Whichever is picked in ⚙ → **Backend → Voice provider**: Volcengine → `openspeech.bytedance.com`; Google → `aiplatform.googleapis.com`. A build packaged with a Google key comes up on Google; the source checkout defaults to Volcengine |
-| The conversation, **and every tool result** | The "brain" you configured | `brain=local` (the out-of-box default) → `api.deepseek.com` on a Chinese UI and `api.openai.com` on an English one; in hub mode, your own `hub_url` |
+| The conversation, **and every tool result** | The "brain" you configured | **A fresh install starts on CodeFlying** → the server this build was packaged for, if any. A build with no server configured (like the ones attached to releases here) has nowhere to send and says so until you either type a CodeFlying key or pick another backend. Pick **on-device** and it goes to `api.deepseek.com` on a Chinese UI and `api.openai.com` on an English one; in hub mode, your own `hub_url` |
 | The private notebook (`Notebook` — what it remembers about you, what it promised) | **On this device only** | Filtered out of the hub payload |
 | **Version check**: your version number, phone model / brand / OS version, UI language, one random install ID | **A server the maintainers run** (not a third party) | Once on first launch, and once per tap on the self-check page's **Check again**; capped at 10 per IP per day |
 
@@ -46,7 +46,7 @@ The second row needs spelling out: **tool results are part of the conversation.*
 **So "local mode" does not mean "processed locally."** Local mode swaps the hub for whichever provider you typed in. It does not keep a single byte on the device.
 
 Therefore:
-- *"We do not monitor or store your data"* — **mostly true, but do not overclaim it.** No database, no behavioural analysis, and no reading of anything you send; the one exception is the version check, which tells us that some device of some model on some IP is running 0.5.3.
+- *"We do not monitor or store your data"* — **mostly true, but do not overclaim it.** No database, no behavioural analysis, and no reading of anything you send; the one exception is the version check, which tells us that some device of some model on some IP is running 0.6.0.
 - *"Your data never leaves the device"* — **false. Do not claim it.**
 
 ## 3. What it can actually do (not hypotheticals — current state of the code)

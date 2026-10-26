@@ -21,7 +21,7 @@
   <a href="https://www.codeflying.app/andee"><img alt="Build online" src="https://img.shields.io/badge/build%20online-no%20token%20setup-12b76a"></a>  
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20conditions-155eef"></a>  
   <a href="app/build.gradle"><img alt="Platform" src="https://img.shields.io/badge/platform-Android%2011%2B%20(API%2030)-3ddc84"></a>  
-  <a href="desktop/build.gradle"><img alt="macOS" src="https://img.shields.io/badge/platform-macOS%2014%2B%20(Apple%20silicon)-555555"></a>  
+  <a href="desktop/build.gradle"><img alt="macOS" src="https://img.shields.io/badge/platform-macOS%2014%2B%20(arm64%20%2F%20x64)-555555"></a>  
   <a href="app/build.gradle"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.22-7f52ff"></a>  
   <a href="docs/permissions.md"><img alt="No content telemetry" src="https://img.shields.io/badge/telemetry-no%20content-0f6e56"></a>  
   <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-fdb062"></a>  
@@ -700,7 +700,7 @@ Pure Kotlin, no Compose; the whole thing hangs off two pillars, `WindowManager` 
 | minSdk                    | 30                  | Android 11 — `AccessibilityAction.ACTION_IME_ENTER` and `takeScreenshot` are both API 30+ |
 | Java / Kotlin JVM target  | 1.8                 | `sourceCompatibility` 1.8, `jvmTarget = '1.8'`                                            |
 | **Build JDK**             | **17–20**           | see [Which JDK](#which-jdk) — this is the step people get stuck on                        |
-| versionCode / versionName | 12 / 0.5.3          | see [CHANGELOG.md](CHANGELOG.md) for the policy                                           |
+| versionCode / versionName | 13 / 0.6.0          | see [CHANGELOG.md](CHANGELOG.md) for the policy                                           |
 | applicationId / namespace | `net.kuafuai.andee` | never changed from the template. It affects nothing                                       |
 
 **Runtime dependencies** (`app/build.gradle`):
@@ -1133,7 +1133,7 @@ Read it before redistributing: **the ML Kit barcode SDK and the `play-services-*
 open-source**, and the barcode model is fetched from Google at runtime.
 
 See [CHANGELOG.md](CHANGELOG.md) for what changed and for the versioning policy. The latest release is
-**`v0.5.3`** — pre-1.0 on purpose, because the wire contract and the build flags are still moving.
+**`v0.6.0`** — pre-1.0 on purpose, because the wire contract and the build flags are still moving.
 
 ## Related documents
 

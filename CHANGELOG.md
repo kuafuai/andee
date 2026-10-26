@@ -4,7 +4,8 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`12` / `"0.5.3"`**.
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`13` / `"0.6.0"`**. The
+  Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
   Android refuses the upgrade; the same number must never be reused for two different builds.
@@ -27,6 +28,80 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.6.0] - 2026-10-26
+
+**The assistant now has a second body.** Andee runs on macOS, on the same brain as the phone: the
+agent loop, the notebook, the memory, the tools and the emotion ball are one implementation in a new
+`core/` module, and each body supplies only the parts that are genuinely its own — the accessibility
+service and the IME on Android, the accessibility API, real mouse and keyboard, and a sandboxed
+terminal on the Mac. Two devices that run it can also be **friends**: they pair by QR code and ask each
+other for help, on-body, over an encrypted link with no server in between.
+
+This is the largest release so far by a wide margin — 53 commits, 217 files, +23,976 lines — and the
+version number finally moves on capability rather than being argued about: MINOR, as the policy says.
+
+Two behavioural changes ride along that a reader should not miss. **CodeFlying is now the default
+backend** on a fresh install, replacing on-device as the starting point. And on both bodies the wake
+word, the settings, and the self-check now describe the same app, so "phone" and "Mac" differ only in
+what the body can physically do.
+
+### Added
+
+- **The Mac app** (`desktop/`, Compose Desktop). A floating ball above every window; the same chat,
+  settings, self-check, notebook, scenes, expressions, artifacts, topic and vault cards as the phone,
+  laid out as a sidebar with a glass panel on a real backdrop; voice in and out (the same four engines
+  as Android, under `desktop/.../desktop/voice/`); notifications read and triaged the way the phone
+  does; mouse, keyboard, screen and window access through the accessibility API; screenshot and
+  screen-region zoom with the same grid and crosshair; and **a sandboxed terminal** (`run_command`) as
+  one of its hands, with a policy file and a trash broker rather than a blanket shell.
+- **`:core`, a platform-neutral module.** The brain loop, the four voice engines, the notebook's logic,
+  the tool schemas, the emotion-ball renderer and the wire types moved out of `app/` so both bodies
+  share one implementation. `BrainHost` is the interface a body implements; the brain never sees an
+  Android or a desktop type. A golden-text test pins the model-facing strings *before* the split, so a
+  refactor that changes what the model reads fails loudly.
+- **Friends** (`core/peer/`). Two Andees pair by QR code — one-time, two minutes, three tries — and the
+  code carries the showing device's key fingerprint, so the scanner pins that key and no other. Every
+  link afterwards is a signed handshake against pinned keys with forward-secret session keys; replayed,
+  altered or reordered frames drop the link. Two kinds, chosen by whoever shows the code: **my device**
+  (another of your own; its requests run as your own) and **friend** (somebody else's — the owner is
+  asked first, five minutes then it counts as no answer, and the work runs over `GuestHost` with no
+  memory, no history, no vault, no personal data and no terminal: screen, ask, show a page, open an app
+  or a link, and nothing else). Off until switched on; discovery is mDNS plus the last address that
+  worked.
+- **`device.permissions.request`** on the Mac — a permission concierge that asks for what a task needs
+  and explains the grant in System Settings when macOS will not show the prompt itself.
+- **Long jobs handed to the clock** on both bodies, so a slow task stops holding the conversation.
+
+### Changed
+
+- **CodeFlying is the default backend on a fresh install.** The previous rule hid the CodeFlying tab
+  entirely unless the build was configured for it, and started on-device. Now the tab always leads, is
+  what a fresh install starts on, and says the same thing with or without a key: what it is, how to get
+  one, and a tappable link. The key row is always visible with show/hide and copy, and it displays the
+  key *in effect* — saving it back unchanged stores nothing, so a build's key is not pinned as an
+  override. **A build with no server configured, like the ones attached here, has nowhere to send and
+  says so** until a key is typed or another backend is picked.
+- **The Mac and the phone now describe themselves the same way.** The READMEs, this file and
+  `docs/permissions.md` say the project is two bodies on one brain, and the permission tables gain a
+  row for what a friend's request can and cannot reach.
+- **The Mac reads CodeFlying's build settings from `local.properties`**, like the phone — a generated
+  properties resource rather than a `BuildConfig`, because a JVM app has none.
+- **The product version comes from the phone's `versionName`**, so both bodies carry one number. The
+  bundle version macOS requires of a `.dmg` stays `1.0.0` and is not the product version.
+
+### Fixed
+
+- **The ball stops repainting a still window**, and the GPU draws it again — a Mac idle-cost fix that
+  also removed a thread leak.
+- **A tap-to-talk path on the Mac** where the microphone opened but nothing listened.
+- **A long task no longer empties the history**, a new request interrupts the old one instead of
+  queueing behind it, and voice ends on silence rather than on a timeout.
+- **Words typed or spoken over a question card answer it** instead of starting a new turn.
+- **A notebook save that did not happen fails** instead of answering "Saved."
+- **A todo set from a notification stays untrusted when it fires**, the same rule its creation had.
+- **Silent reviews no longer ask for thinking**, which was spending reasoning tokens on a turn nobody
+  reads.
 
 ## [0.5.3] - 2026-10-22
 

@@ -23,7 +23,7 @@
   <a href="https://www.codeflying.net/andee"><img alt="在线构建" src="https://img.shields.io/badge/在线构建-免打包、免配令牌-12b76a"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20conditions-155eef"></a>
   <a href="app/build.gradle"><img alt="Platform" src="https://img.shields.io/badge/platform-Android%2011%2B%20(API%2030)-3ddc84"></a>
-  <a href="desktop/build.gradle"><img alt="macOS" src="https://img.shields.io/badge/platform-macOS%2014%2B%20(Apple%20silicon)-555555"></a>
+  <a href="desktop/build.gradle"><img alt="macOS" src="https://img.shields.io/badge/platform-macOS%2014%2B%20(arm64%20%2F%20x64)-555555"></a>
   <a href="app/build.gradle"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.22-7f52ff"></a>
   <a href="docs/permissions.zh-CN.md"><img alt="遥测不含内容" src="https://img.shields.io/badge/遥测-不含内容-0f6e56"></a>
   <a href="CONTRIBUTING.zh-CN.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-fdb062"></a>
@@ -525,7 +525,7 @@ Google），再填该服务商的密钥。这是两个独立的服务，条款�
 | minSdk | 30 | Android 11 —— 因为要用 `AccessibilityAction.ACTION_IME_ENTER`（API 30+）和 `takeScreenshot`（API 30+） |
 | Java / Kotlin JVM target | 1.8 | `sourceCompatibility` 1.8、`jvmTarget = '1.8'` |
 | **构建用 JDK** | **17–20** | 见[配 JDK](#配-jdk)，这是最容易卡住的一步 |
-| versionCode / versionName | 12 / 0.5.3 | 策略见 [CHANGELOG.md](CHANGELOG.md) |
+| versionCode / versionName | 13 / 0.6.0 | 策略见 [CHANGELOG.md](CHANGELOG.md) |
 | applicationId / namespace | `net.kuafuai.andee` | 从模板里没改，不影响功能 |
 
 **运行库依赖**（`app/build.gradle`）：
@@ -992,7 +992,7 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
 随包分发的第三方组件清单在 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。再分发之前请先看：
 **ML Kit 扫码 SDK 和 `play-services-*` 不是开源许可**，而且扫码模型是运行时从 Google 拉的。
 
-改了什么、以及版本号策略见 [CHANGELOG.md](CHANGELOG.md) —— 当前版本是 **`v0.5.3`**，故意停在
+改了什么、以及版本号策略见 [CHANGELOG.md](CHANGELOG.md) —— 当前版本是 **`v0.6.0`**，故意停在
 pre-1.0：线上协议和构建开关都还在动。
 
 ## 相关文档
