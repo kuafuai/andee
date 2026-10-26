@@ -61,8 +61,25 @@ class BallRenderer(val width: Int, val height: Int, calmFrameNs: Long = CALM_FRA
 
     private val thread = thread(name = "BallGL", isDaemon = true) {
         runCatching { run() }.onFailure {
+            if (stopRequested) return@onFailure
             failure = it.message ?: it.toString()
             Log.e(TAG, "the ball cannot be drawn", it)
+        }
+    }
+
+    /**
+     * Wait up to [ns], or less: a queued command (a tap, a new face) ends the wait so the very next frame
+     * carries it — at the resting rate the loop used to sleep through up to 250 ms of a click. False when
+     * [stop] asked us to leave.
+     */
+    private fun nap(ns: Long): Boolean {
+        val end = System.nanoTime() + ns
+        while (true) {
+            if (stopRequested) return false
+            if (!commands.isEmpty()) return true
+            val left = end - System.nanoTime()
+            if (left <= 0) return true
+            java.util.concurrent.locks.LockSupport.parkNanos(left)
         }
     }
 
@@ -102,16 +119,22 @@ class BallRenderer(val width: Int, val height: Int, calmFrameNs: Long = CALM_FRA
                 if (delay == HOLD && frame != null) {
                     // Holding the last frame: draw nothing, but wake often enough that
                     // a change of face is picked up in POLL_MS, not a calm period later.
-                    Thread.sleep(POLL_NS)
+                    if (!nap(POLL_NS)) break
                     continue
                 }
+                val g0 = System.nanoTime()
                 renderer.onDrawFrame()
+                val g1 = System.nanoTime()
                 buf.clear()
                 GL11.glReadPixels(0, 0, width, height, org.lwjgl.opengl.GL12.GL_BGRA, GL11.GL_UNSIGNED_BYTE, buf)
+                val g2 = System.nanoTime()
                 frame = flipped(buf)
+                if (TRACE) GlTrace.record(g1 - g0, g2 - g1, System.nanoTime() - g2)
                 onFrame()
-                val sleep = (delay - (System.nanoTime() - t0)) / 1_000_000
-                if (sleep > 0) Thread.sleep(sleep)
+                // Nanoseconds, not truncated milliseconds: that rounding plus the sleep's own overshoot
+                // measured 25 fps for a requested 30.
+                val left = delay - (System.nanoTime() - t0)
+                if (left > 0 && !nap(left)) break
             }
             FBO.glDeleteRenderbuffers(depth)
             FBO.glDeleteRenderbuffers(color)
@@ -174,7 +197,7 @@ class BallRenderer(val width: Int, val height: Int, calmFrameNs: Long = CALM_FRA
     fun signalOutcome(ok: Boolean) = post { renderer.signalOutcome(ok); markActive() }
     fun trigger(action: Action) = post { renderer.request(action); markActive() }
 
-    private fun post(f: () -> Unit) { commands.offer(f) }
+    private fun post(f: () -> Unit) { commands.offer(f); java.util.concurrent.locks.LockSupport.unpark(thread) }
 
     /**
      * Full rate while there is something to watch — listening, speaking, thinking,
@@ -196,12 +219,21 @@ class BallRenderer(val width: Int, val height: Int, calmFrameNs: Long = CALM_FRA
     /** Hold full rate for a beat, so a pop or a nod finishes before it slows. */
     private fun markActive() { activeUntilNs = System.nanoTime() + ACTIVE_NS }
 
+    /**
+     * Ask the render thread to finish and return at once. It used to `join(2000)` on the caller, which is
+     * the UI thread (this runs from a view's onDispose): a thread parked in its frame sleep, or in a GL call,
+     * then cost the whole 2 s on every page switch — and when the join timed out the thread simply stayed,
+     * with its GL context and framebuffer, one more on every switch. The thread now notices on its own
+     * (an unpark ends the wait), frees its GL objects and exits.
+     */
     fun stop() {
         stopRequested = true
-        thread.join(2000)
+        onFrame = {}
+        java.util.concurrent.locks.LockSupport.unpark(thread)
     }
 
     companion object {
+        private val TRACE = System.getProperty("andee.ballTrace") != null
         const val TAG = "Ball"
         /**
          * 30 fps. The ball's motion is slow springs and breathing, which read the

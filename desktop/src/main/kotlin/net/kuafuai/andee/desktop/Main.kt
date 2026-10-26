@@ -87,7 +87,7 @@ fun main() {
         }
 
         FloatingBall(
-            actions = ballActions(onType = { openChat(typing = true) }, onNoVoice = { openChat("settings") })
+            actions = ballActions(onType = { openChat(typing = true) }, onNoVoice = { askToOpenSettings { openChat("settings") } })
                 .let { a -> BallActions(a.onTap, a.onDoubleTap, a.onTripleTap) { openChat() } },
             onWindow = { ballWindow = it },
         )
@@ -203,18 +203,38 @@ private fun defaultChatSize(): Pair<androidx.compose.ui.unit.Dp, androidx.compos
  * with the cursor in the box; a long press is the caller's (the floating ball opens the window, the chat's own
  * ball has nothing to open).
  */
-fun ballActions(onType: () -> Unit, onNoVoice: () -> Unit) = BallActions(
-    onTap = {
-        when {
-            Meeting.isActive() -> Meeting.stopFromUser()
-            else -> {
-                // The phone's rule: a tap is "listen to me now". Whatever was running or being read out stops
-                // first, and the mic opens in the same tap rather than needing a second one.
-                if (Assistant.working()) Assistant.stop()
-                if (!net.kuafuai.andee.desktop.voice.MacVoice.toggle()) onNoVoice()
-            }
+/**
+ * The phone's rule for a ball that cannot listen (BodyCoreService.reportVoiceFailure): say what is missing on
+ * a card, and put the way out on the same card — the settings door is a button, not something the tap does
+ * to you. A tap that silently throws a window open reads as the app misbehaving.
+ */
+fun askToOpenSettings(open: () -> Unit) {
+    val zh = Strings.lang() == "zh"
+    val go = if (zh) "打开设置" else "Open settings"
+    val ack = if (zh) "知道了" else "Got it"
+    Thread {
+        val r = AskGate.ask(noVoiceKey(), listOf(go, ack), 60_000)
+        if (r.button == go) javax.swing.SwingUtilities.invokeLater(open)
+    }.start()
+}
+
+/**
+ * One tap on the ball, or on the chat window's microphone: "listen to me now". A meeting being recorded is
+ * ended instead. Whatever was running or being read out stops first, and the mic opens in the same tap rather
+ * than needing a second one. One function, so the two doors cannot drift apart.
+ */
+fun tapToTalk(onNoVoice: () -> Unit) {
+    when {
+        Meeting.isActive() -> Meeting.stopFromUser()
+        else -> {
+            if (Assistant.working()) Assistant.stop()
+            if (!net.kuafuai.andee.desktop.voice.MacVoice.toggle()) onNoVoice()
         }
-    },
+    }
+}
+
+fun ballActions(onType: () -> Unit, onNoVoice: () -> Unit) = BallActions(
+    onTap = { tapToTalk(onNoVoice) },
     // Typing is a new request too: whatever was running or being read out stops first, as the tap does.
     onDoubleTap = { if (Assistant.working()) Assistant.stop(); onType() },
     onTripleTap = { if (Meeting.isActive()) Meeting.stopFromUser() else Assistant.stop() },

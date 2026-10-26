@@ -1,8 +1,6 @@
 package net.kuafuai.andee.desktop
 
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 
-import androidx.compose.ui.input.pointer.pointerInput
 
 import androidx.compose.ui.graphics.graphicsLayer
 
@@ -121,7 +119,7 @@ private fun openLink(url: String) {
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
-fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, onContinueTopic: (Scrollback.Topic) -> Unit = {}) {
+fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, onContinueTopic: (Scrollback.Topic) -> Unit = {}, onOpenSettings: () -> Unit = {}) {
     var rows by remember { mutableStateOf(Scrollback.snapshot()) }
     var progress by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -163,11 +161,9 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
     LaunchedEffect(Unit) { pending = Assistant.pending }
     LaunchedEffect(items.size) { if (items.isNotEmpty()) list.animateScrollToItem(items.size - 1) }
 
-    // The ball is the phone's way in: a tap talks, a second tap says "done".
-    fun toggleMic() {
-        if (Meeting.isActive()) { Meeting.stopFromUser(); return }
-        if (!net.kuafuai.andee.desktop.voice.MacVoice.toggle()) progress = noVoiceKey()
-    }
+    // The microphone does exactly what a tap on the floating ball does (tapToTalk): it stops whatever was
+    // running, listens, and a second tap says "done".
+    fun toggleMic() = tapToTalk { askToOpenSettings(onOpenSettings) }
 
     /** Pictures and files from any door — the clip button, a paste, a drop — end up on the same strip. */
     fun attach(items: List<Attachment>) {
@@ -244,18 +240,6 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
         )
 
         Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp)) {
-            // The ball above the conversation, as on the phone's unfolded card: the same Andee as the floating
-            // one (it wears the same face, see MacBall), and a tap talks to it. 产物 has its own sidebar door.
-            // Same taps as the floating ball; sideways swipe switches character, like the full card's ball on the phone.
-            val chatBall = remember { ballActions(onType = { ComposerFocus.pending = true }, onNoVoice = { progress = noVoiceKey() }) }
-            Box(Modifier.fillMaxWidth().padding(bottom = 6.dp), contentAlignment = Alignment.Center) {
-                // Holds its last frame at rest, unlike the floating ball, which keeps
-                // breathing: this one shares a window with the conversation, so each of
-                // its frames redraws all of it. It animates from the moment something
-                // happens — listening, speaking, thinking, a tap — and settles after.
-                BallView(150.dp, onClick = null, modifier = Modifier.ballTaps(chatBall).lookSwipe(),
-                    calmFrameNs = BallRenderer.HOLD)
-            }
             LazyColumn(
                 state = list, modifier = Modifier.weight(1f).fillMaxWidth().fadeTop(36.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 4.dp, bottom = 18.dp),
@@ -329,8 +313,8 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (Strings.lang() == "zh") "点小球说话 · 双击打字 · 左右拖动切换形象"
-                else "Tap the ball to talk · double-tap to type · drag sideways to switch character",
+                if (Strings.lang() == "zh") "点小球说话 · 双击打字 · 设置里切换性格"
+                else "Tap the ball to talk · double-tap to type · switch character in Settings",
                 color = Palette.photoInk, fontSize = 11.sp,
             )
             Box(Modifier.clickable { openLink(GITHUB_URL) }.padding(horizontal = 5.dp, vertical = 2.dp)) { Icon(AndeeIcon.GITHUB, Palette.photoInk, 13.dp) }
@@ -405,7 +389,7 @@ private fun InputBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         RoundButton(false.not(), onAttach, AndeeIcon.PAPERCLIP, quiet = true)
-        RoundButton(listening, onMic, if (listening) AndeeIcon.STOP else AndeeIcon.MIC)
+        RoundButton(listening, onMic, if (listening) AndeeIcon.STOP else AndeeIcon.MIC, alwaysClickable = true)
         Box(
             Modifier.weight(1f).background(Palette.well, RoundedCornerShape(18.dp))
                 .border(1.dp, Palette.hairline, RoundedCornerShape(18.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
@@ -474,14 +458,18 @@ private fun AttachmentStrip(items: List<Attachment>, onRemove: (Attachment) -> U
 }
 
 @Composable
-private fun RoundButton(enabled: Boolean, onClick: () -> Unit, icon: AndeeIcon, danger: Boolean = false, quiet: Boolean = false) {
+private fun RoundButton(
+    enabled: Boolean, onClick: () -> Unit, icon: AndeeIcon, danger: Boolean = false, quiet: Boolean = false,
+    /** Drawn as active (filled) when [enabled], but clickable either way: the microphone is both a state and a button. */
+    alwaysClickable: Boolean = false,
+) {
     // A quiet button is always available but never the main action: no fill, the same rim as a disabled one.
     val filled = enabled && !quiet
     Box(
         Modifier.size(40.dp)
             .background(if (!filled) Palette.well else if (danger) Palette.danger else Palette.accent, CircleShape)
             .border(1.dp, if (filled) Color.Transparent else Palette.hairline, CircleShape)
-            .clickable(enabled = enabled) { onClick() },
+            .clickable(enabled = enabled || alwaysClickable) { onClick() },
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, if (filled) Color(0xFF0A2540) else if (quiet) Palette.label else Palette.secondary, 18.dp)
@@ -554,8 +542,13 @@ object ComposerFocus {
     var pending by androidx.compose.runtime.mutableStateOf(false)
 }
 
-fun noVoiceKey() =
-    if (Strings.lang() == "zh") "还没配语音 Key：在设置的「语音」里填上。" else "No voice key yet: add it under Voice in Settings."
+fun noVoiceKey() = when {
+    // Under CodeFlying the one key covers the voice too, and there is no voice block to point at.
+    Assistant.config().mode == net.kuafuai.andee.config.BrainConfig.BRAIN_CODEFLYING ->
+        if (Strings.lang() == "zh") "还没有 CodeFlying 密钥：在设置的「后端」里填上。" else "No CodeFlying key yet: add it under Backend in Settings."
+    Strings.lang() == "zh" -> "还没配语音 Key：在设置的「语音」里填上。"
+    else -> "No voice key yet: add it under Voice in Settings."
+}
 
 @Composable
 private fun Bubble(r: Scrollback.Row) {
@@ -611,16 +604,3 @@ private fun Modifier.fadeTop(height: androidx.compose.ui.unit.Dp): Modifier = th
         )
     }
 
-/** A clearly sideways drag across the ball steps to the next or previous character, once per drag. */
-private fun Modifier.lookSwipe(): Modifier = this.pointerInput(Unit) {
-    var dx = 0f
-    var done = false
-    detectHorizontalDragGestures(
-        onDragStart = { dx = 0f; done = false },
-        onHorizontalDrag = { change, amount ->
-            change.consume()
-            dx += amount
-            if (!done && kotlin.math.abs(dx) > 48.dp.toPx()) { done = true; MacBall.stepLook(if (dx < 0) 1 else -1) }
-        },
-    )
-}

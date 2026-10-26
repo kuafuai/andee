@@ -45,6 +45,7 @@ fun AppRoot(nav: Nav) {
                         else -> ChatScreen(
                             onOpenArtifacts = { nav.go("artifacts") },
                             onOpenTopic = { nav.push("topic:$it") },
+                            onOpenSettings = { nav.go("settings") },
                             // 继续话题 from the card itself: the same two steps as on the topic page.
                             onContinueTopic = { Assistant.beginTopic(it); ComposerFocus.pending = true },
                         )

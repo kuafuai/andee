@@ -61,13 +61,20 @@ fun SelfCheckCard(onDone: () -> Unit, onOpenSettings: () -> Unit) {
         add(CheckRow("fda", if (zh) "完全磁盘访问" else "Full Disk Access", fda,
             if (fda) if (zh) "能读通知" else "Can read notifications" else if (zh) "读不到通知数据库" else "Cannot read the notification store",
             { openPane("Privacy_AllFiles") }))
-        val backend = Settings.get("llm_api_key").isNotBlank()
+        // Asked of the backend in force, not of one key's name: under CodeFlying the key is codeflying_key,
+        // and the same key carries the voice. Reading llm_api_key there said "missing" for a Mac that worked.
+        val cf = Assistant.config().mode == net.kuafuai.andee.config.BrainConfig.BRAIN_CODEFLYING
+        val backend = Assistant.config().apiKey.isNotBlank()
         add(CheckRow("backend", if (zh) "大脑 Key" else "Model key", backend,
-            if (backend) if (zh) "已配置" else "Configured" else if (zh) "还没配，回答不了" else "Missing — Andee cannot answer",
+            if (backend) if (zh) (if (cf) "已配置（CodeFlying）" else "已配置") else (if (cf) "Configured (CodeFlying)" else "Configured")
+            else if (cf) if (zh) "还没填 CodeFlying 密钥，回答不了" else "No CodeFlying key — Andee cannot answer"
+            else if (zh) "还没配，回答不了" else "Missing — Andee cannot answer",
             { onOpenSettings() }))
         val voice = net.kuafuai.andee.desktop.voice.MacVoice.configured()
         add(CheckRow("voice", if (zh) "语音 Key" else "Voice key", voice,
-            if (voice) if (zh) "能听能说" else "Can hear and speak" else if (zh) "还没配，说不了话" else "Missing — Andee cannot speak",
+            if (voice) if (zh) (if (cf) "能听能说（用同一个 CodeFlying 密钥）" else "能听能说") else (if (cf) "Can hear and speak (same CodeFlying key)" else "Can hear and speak")
+            else if (cf) if (zh) "还没填 CodeFlying 密钥，说不了话" else "No CodeFlying key — Andee cannot speak"
+            else if (zh) "还没配，说不了话" else "Missing — Andee cannot speak",
             { onOpenSettings() }))
         }
     }

@@ -167,9 +167,11 @@ fun BallView(
         fun paint(f: ByteArray) {
             if (queued.compareAndSet(false, true)) javax.swing.SwingUtilities.invokeLater {
                 queued.set(false)
+                val t0 = System.nanoTime()
                 bitmap.installPixels(f)
                 bitmap.notifyPixelsChanged()
                 tick++
+                if (System.getProperty("andee.ballTrace") != null) PaintTrace.record(System.nanoTime() - t0)
             }
         }
         renderer.onFrame = { renderer.frame?.let(::paint) }
