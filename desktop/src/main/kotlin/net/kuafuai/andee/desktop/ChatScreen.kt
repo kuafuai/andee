@@ -131,10 +131,14 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
     var dropping by remember { mutableStateOf(false) }
     var muted by remember { mutableStateOf(Assistant.muted) }
     var recording by remember { mutableStateOf(Meeting.isActive()) }
-    val list = rememberLazyListState()
     // A folded stretch is one card standing where its messages stood — the phone's rule, so the
     // conversation still reads top to bottom. The sidebar's topic list is only another way in.
     val items = remember(rows) { chatItems(rows) }
+    // The list is created already standing on the newest message. Opening the page used to start at the top
+    // and then animate down through the whole conversation, which read as the chat scrolling itself on every
+    // visit. (An item that is taller than the viewport is shown from its start, so a long last reply is read
+    // from its first line.)
+    val list = rememberLazyListState(initialFirstVisibleItemIndex = (items.size - 1).coerceAtLeast(0))
 
     // Registered on enter, removed on leave: the sidebar remounts this screen on every
     // navigation, and a listener left behind per visit is a leak that grows all day.
@@ -159,7 +163,13 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
         }
     }
     LaunchedEffect(Unit) { pending = Assistant.pending }
-    LaunchedEffect(items.size) { if (items.isNotEmpty()) list.animateScrollToItem(items.size - 1) }
+    // A message that arrives while the page is open scrolls into view smoothly. The first run is skipped: the
+    // list already stands on the newest one (above), and animating there would replay the slide.
+    var shown by remember { mutableStateOf(items.size) }
+    LaunchedEffect(items.size) {
+        if (items.isNotEmpty() && items.size != shown) list.animateScrollToItem(items.size - 1)
+        shown = items.size
+    }
 
     // The microphone does exactly what a tap on the floating ball does (tapToTalk): it stops whatever was
     // running, listens, and a second tap says "done".
