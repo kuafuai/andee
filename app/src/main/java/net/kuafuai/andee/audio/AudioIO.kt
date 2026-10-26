@@ -339,37 +339,17 @@ class AudioIO {
 
     fun startStreamPlayback(sampleRate: Int = 24_000) {
         stopStreamPlayback()
-        val channelConfig = AudioFormat.CHANNEL_OUT_MONO
-        val encoding = AudioFormat.ENCODING_PCM_16BIT
-        val minBuf = AudioTrack.getMinBufferSize(sampleRate, channelConfig, encoding)
-        require(minBuf > 0) { "AudioTrack.getMinBufferSize failed: $minBuf" }
-        // USAGE_ASSISTANT, not USAGE_MEDIA: this is the device answering, not
-        // the device playing something. Declaring it as media put our own voice
-        // in the same bucket as whatever video the user has open, which is both
-        // a lie to the audio policy and the wrong thing for the volume keys to
-        // land on.
-        val attrs = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_ASSISTANT)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-            .build()
-        val format = AudioFormat.Builder()
-            .setEncoding(encoding)
-            .setSampleRate(sampleRate)
-            .setChannelMask(channelConfig)
-            .build()
-        val t = AudioTrack.Builder()
-            .setAudioAttributes(attrs)
-            .setAudioFormat(format)
-            .setBufferSizeInBytes(minBuf * 4)
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .build()
-        streamPlaySampleRate = sampleRate
         streamBytesWritten = 0
         streamBytesQueued = 0
         playQueue.clear()
-        t.play()
-        streamTrack = t
         playing = true
+        // A sample rate of 0 means "not known yet": the track is built late,
+        // from the first chunk, via [setStreamSampleRate]. System TTS is the
+        // one backend that needs this — it only learns the rate after the WAV
+        // has been written, so it opens at 0 and reports the real number later.
+        if (sampleRate > 0) {
+            createStreamTrack(sampleRate)
+        }
         playThread = Thread {
             try {
                 while (playing) {
@@ -392,6 +372,51 @@ class AudioIO {
                 // and the write.
             }
         }.also { it.name = "AudioIO-Player"; it.isDaemon = true; it.start() }
+    }
+
+    /**
+     * Build the AudioTrack, once the sample rate is known. Called either from
+     * [startStreamPlayback] (rate declared up front) or from
+     * [setStreamSampleRate] (rate learned after opening).
+     *
+     * USAGE_ASSISTANT, not USAGE_MEDIA: this is the device answering, not the
+     * device playing something. Declaring it as media put our own voice in the
+     * same bucket as whatever video the user has open, which is both a lie to
+     * the audio policy and the wrong thing for the volume keys to land on.
+     */
+    private fun createStreamTrack(sampleRate: Int) {
+        val channelConfig = AudioFormat.CHANNEL_OUT_MONO
+        val encoding = AudioFormat.ENCODING_PCM_16BIT
+        val minBuf = AudioTrack.getMinBufferSize(sampleRate, channelConfig, encoding)
+        require(minBuf > 0) { "AudioTrack.getMinBufferSize failed: $minBuf" }
+        val attrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ASSISTANT)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
+        val format = AudioFormat.Builder()
+            .setEncoding(encoding)
+            .setSampleRate(sampleRate)
+            .setChannelMask(channelConfig)
+            .build()
+        val t = AudioTrack.Builder()
+            .setAudioAttributes(attrs)
+            .setAudioFormat(format)
+            .setBufferSizeInBytes(minBuf * 4)
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .build()
+        streamPlaySampleRate = sampleRate
+        t.play()
+        streamTrack = t
+    }
+
+    /**
+     * Tell a deferred playback session ([startStreamPlayback] with 0) what its
+     * sample rate is. The track is built here; a session that already knows its
+     * rate ignores the call.
+     */
+    fun setStreamSampleRate(sampleRate: Int) {
+        if (sampleRate <= 0 || streamTrack != null) return
+        createStreamTrack(sampleRate)
     }
 
     /**

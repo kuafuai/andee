@@ -744,7 +744,9 @@ class SettingsUi(
         // of the same thing: 火山's are endpoints and resource ids, Google's are
         // a project, a location and two model names.
         val voiceBlock = block(panel)
-        rowLabel(voiceBlock, lctx.getString(R.string.settings_voice_provider))
+        // 听（识别）：谁把用户的话转成文字。系统引擎没有识别器，所以这一
+        // 侧只有 火山/谷歌。
+        rowLabel(voiceBlock, lctx.getString(R.string.settings_voice_hear_provider))
         var applyProvider: ((String, Boolean) -> Unit)? = null
         val provider = segmented(
             voiceBlock,
@@ -758,6 +760,18 @@ class SettingsUi(
                 VoiceConfig.VOICE_GOOGLE to lctx.getString(R.string.settings_voice_provider_google),
             ),
         ) { applyProvider?.invoke(it, true) }
+
+        // 说（朗读）：谁把答案读出来。可以选系统自带的引擎——免费、离线。
+        rowLabel(voiceBlock, lctx.getString(R.string.settings_voice_speak_provider))
+        segmented(
+            voiceBlock,
+            "speak_provider",
+            listOf(
+                VoiceConfig.VOICE_HUOSHAN to lctx.getString(R.string.settings_voice_provider_huoshan),
+                VoiceConfig.VOICE_GOOGLE to lctx.getString(R.string.settings_voice_provider_google),
+                VoiceConfig.VOICE_SYSTEM to lctx.getString(R.string.settings_voice_provider_system),
+            ),
+        )
 
         // 火山: previously in 高级 → 火山. Rows copy that section's labels,
         // which still describe exactly these keys.

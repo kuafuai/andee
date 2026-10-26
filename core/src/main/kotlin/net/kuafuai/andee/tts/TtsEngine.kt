@@ -30,6 +30,16 @@ interface TtsEngine {
          */
         fun onOpen(sampleRate: Int)
 
+        /**
+         * The sample rate the PCM is actually in, for a backend that could not
+         * name it in [onOpen] because it only learns it after synthesising.
+         * Called at most once, after [onOpen] and before the first [onAudio].
+         *
+         * Streaming backends (火山, Google) already declared their rate in
+         * [onOpen], so this is a no-op for them and they do not override it.
+         */
+        fun onRate(sampleRate: Int) {}
+
         fun onAudio(pcm: ByteArray)
 
         fun onSentenceStart(text: String)

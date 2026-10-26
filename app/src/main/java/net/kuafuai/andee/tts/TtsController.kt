@@ -348,6 +348,11 @@ class TtsController(
                 }
             }
 
+            override fun onRate(sampleRate: Int) {
+                if (cancelled) return
+                audio.setStreamSampleRate(sampleRate)
+            }
+
             override fun onAudio(pcm: ByteArray) {
                 if (cancelled) return
                 lastProgressAt = SystemClock.elapsedRealtime()
@@ -413,9 +418,13 @@ class TtsController(
             }
         }
 
-        // Which service speaks. Same fail-to-火山 rule as the listening side.
-        val c: TtsEngine = when (cfg.voiceProvider) {
+        // Which service speaks. The listening side keeps [VoiceConfig.voiceProvider]
+        // (火山 / Google only — a system engine has no recogniser to hear with);
+        // the speaking side may additionally pick the device's own engine, which
+        // is free and works offline. Fail direction is 火山, same as listening.
+        val c: TtsEngine = when (VoiceConfig.speakProvider(context)) {
             VoiceConfig.VOICE_GOOGLE -> GoogleTts(cfg, listener)
+            VoiceConfig.VOICE_SYSTEM -> SystemTts(context, listener)
             else -> HuoshanTts(cfg, listener)
         }
         client = c

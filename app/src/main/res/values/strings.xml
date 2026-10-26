@@ -167,6 +167,9 @@
     <string name="settings_voice_provider">语音服务商</string>
     <string name="settings_voice_provider_huoshan">火山</string>
     <string name="settings_voice_provider_google">谷歌</string>
+    <string name="settings_voice_hear_provider">识别（听）</string>
+    <string name="settings_voice_speak_provider">朗读（说）</string>
+    <string name="settings_voice_provider_system">系统</string>
     <string name="settings_google_api_key">Google API Key</string>
     <string name="settings_google_api_key_hint">Vertex Express Key,听和说都用它</string>
     <string name="settings_google_key_builtin">已内置(编译时写入),留空即用它</string>
