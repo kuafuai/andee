@@ -139,16 +139,9 @@ fun BallView(
     size: Dp,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    /**
-     * The rate it breathes at when nothing is happening. Passed in because what a
-     * frame costs depends on the window the ball sits in, not on the ball: inside
-     * the chat window a frame redraws the whole conversation, so that one idles
-     * slower than the floating ball, which is 112 points of its own window.
-     */
-    calmFrameNs: Long = BallRenderer.CALM_FRAME_NS,
 ) {
     val px = with(LocalDensity.current) { size.roundToPx() }
-    val renderer = remember(px, calmFrameNs) { BallRenderer(px, px, calmFrameNs) }
+    val renderer = remember(px) { BallRenderer(px, px) }
     DisposableEffect(renderer) {
         MacBall.attach(renderer)
         onDispose { MacBall.detach(renderer); renderer.stop() }
