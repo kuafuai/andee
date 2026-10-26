@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`14` / `"0.6.1"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`15` / `"0.6.2"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,39 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.6.2] - 2026-10-26
+
+**The download list now says what each file is for, and lists them in the order you would want them.**
+Every asset carries a label naming its platform and device — `Andee 0.6.2 · Android-arm64-v8a`,
+`Andee 0.6.2 中文版 · Mac-Apple 芯片` — and the list reads Android before Mac, most common device first,
+English group before Chinese.
+
+No behaviour changed in the app itself. This is a packaging release: the same ten builds as 0.6.1,
+named and ordered better.
+
+### Changed
+
+- **Asset file names gained a platform field**: `andee-<version>-<lang>-<platform>-<device>.<ext>`, so
+  `andee-0.6.2-en-android-arm64-v8a.apk`. Three things depend on that shape, and each was decided by
+  measuring rather than by preference:
+  - **The order a reader sees is the alphabetical order of these names.** GitHub sorts the asset list by
+    name and the upload order is discarded, so the display order has to be encoded in the names —
+    `en` < `zh`, `android` < `mac`, `arm64-v8a` < `armeabi-v7a` < `x86_64`, `arm64` < `x64`. All four
+    comparisons were checked before the shape was chosen.
+  - **No Han characters.** GitHub deletes them from asset names, so a file named with the Chinese
+    wording arrives with it removed and two separators left touching. So the name is ASCII and the
+    Chinese wording goes in the label.
+  - **The name is now stable across the three scripts** (build, verify, publish) that parse it.
+- **Every asset has a label, both languages.** The Chinese ones carry the Chinese wording, which only
+  survives in the label; the English ones carry a matching one so the two groups read as a set instead of
+  the second half of the list looking bare.
+
+### Fixed
+
+- **`verify_variants.py` and `publish_variants.sh` followed the new naming.** Both parse file names to
+  decide what a package is; both were updated in the same change, because a name change that lands in
+  only one of them produces a release that either fails verification or publishes the wrong pairing.
 
 ## [0.6.1] - 2026-10-26
 
