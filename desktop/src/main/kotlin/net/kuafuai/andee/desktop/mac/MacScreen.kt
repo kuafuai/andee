@@ -252,7 +252,7 @@ class MacScreen(
      */
     private fun type(text: String): JSONObject {
         val before = Bridge.focusedValue()
-        if (!before.optBoolean("focused")) throw IllegalStateException("no field has focus — click into the field first")
+        if (!before.optBoolean("focused")) return typeBlind(text)
         // Keys go to the focused app, not to a point on screen: fading our windows changes nothing for them.
         var via = "paste"
         if (Bridge.setPasteboard(text)) {
@@ -276,6 +276,36 @@ class MacScreen(
             else -> JSONObject().put("performed", false).put("via", via).put("len", text.length)
                 .put("error", "the field reads '${now.take(30)}' instead — look at the screenshot before deciding; do not just type it again")
         }
+    }
+
+    /**
+     * The app in front reports no focused element to accessibility — Mac WeChat is the case that forced this.
+     * Refusing here ("no field has focus") was a dead end the model could only leave through the shell
+     * (`osascript` to set the clipboard and press ⌘V), and the shell is closed to a notification's turn, so
+     * a message arrived that Andee could read and could not answer. The keystroke never needed the focused
+     * element: ⌘V goes to whatever the front app has focused, exactly as a person's would.
+     *
+     * So: paste, and only paste. No ⌘A — with no idea where focus is, select-all may select the chat history
+     * rather than the box. Unverified by construction, and the result says what the screenshot must show.
+     */
+    private fun typeBlind(text: String): JSONObject {
+        // ⌘V lands in the frontmost app, and if that is Andee's own window it lands in Andee's own input.
+        if (java.awt.Window.getWindows().any { it.isActive }) {
+            throw IllegalStateException("Andee's own window is in front, so a paste would land in Andee. Click into the other app's input box first.")
+        }
+        val app = Bridge.frontmost().optString("name").ifEmpty { throw IllegalStateException("no app is in front — open the app and click into its input box first") }
+        if (!Bridge.setPasteboard(text)) throw IllegalStateException("could not put the text on the pasteboard")
+        Bridge.key(Bridge.Keys.V, Bridge.Keys.CMD)
+        Thread.sleep(350)
+        return JSONObject().put("performed", true).put("unverified", true).put("via", "paste_blind").put("len", text.length)
+            .put("app", app)
+            .put(
+                "note",
+                "$app does not tell the accessibility layer which box has focus, so I pasted into whatever it has focused " +
+                    "(⌘V, once) and cannot read it back. Look at a screenshot: the text must be in the input box before you " +
+                    "submit. If the box already had text, mine was added at the cursor, not in place of it. Do NOT type it " +
+                    "again and do NOT use the shell to paste — this is the way to type into $app.",
+            )
     }
 
     private fun submit(): JSONObject {

@@ -74,17 +74,22 @@ object ShellPolicy {
     fun decide(tier: Tier, turn: Turn, mode: Mode, alwaysAllowed: Boolean, criticalConfirm: Boolean): Decision {
         when (turn) {
             Turn.NOTIFY -> return Decision.Refuse(
-                "This turn started from a notification somebody else sent, so no command can run from it. " +
-                    "Tell the user what you were about to run and let them ask for it themselves.",
+                "This turn started from a notification somebody else sent, so no command can run from it — not in this turn " +
+                    "and not in a todo you set from it. To type into an app (a reply), use type_text, which needs no command. " +
+                    "Otherwise tell the user what you were about to run and let them ask for it themselves; do not promise a " +
+                    "later turn will run it.",
             )
             Turn.SILENT -> return Decision.Refuse("A silent review may only use the notebook; it must not run commands.")
             Turn.WAKE_OTHER -> if (tier != Tier.SAFE) return Decision.Refuse(
                 "This todo was not set by the user, and nobody is here to approve a command — only read-only " +
-                    "commands may run now. Tell the user what you wanted to run when they are back.",
+                    "commands may run now. To type into an app, use type_text, which needs no command. Tell the user what " +
+                    "you wanted to run when they are back; do not promise another automatic turn will run it.",
             )
             Turn.WAKE_OWN -> if (mode != Mode.FULL && tier != Tier.SAFE) return Decision.Refuse(
                 "A todo is running and the user may not be at the Mac to approve anything, so only read-only " +
-                    "commands may run now. Tell the user what you wanted to run when they are back.",
+                    "commands may run now (full access lifts this). To type into an app, use type_text, which needs no " +
+                    "command. Tell the user what you wanted to run when they are back; do not promise another automatic " +
+                    "turn will run it.",
             )
             Turn.USER -> Unit
         }
