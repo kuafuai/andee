@@ -522,6 +522,19 @@ class BodyCoreService : Service() {
         // windows — they need nothing but the WindowManager, but init them
         // here where the service context is alive.
         net.kuafuai.andee.ui.CardUi.init(this)
+        // Bubbles share the cards' slot on the ball; this decides when one may go up and what a tap on it
+        // starts. See [nudgeGate] and [answerNudge].
+        net.kuafuai.andee.ui.NudgeUi.init(
+            gate = ::nudgeGate,
+            onAnswer = ::answerNudge,
+            // A planned bubble's outcome goes back onto its plan item, so tonight's review can see it.
+            onOutcome = { n, how, button -> net.kuafuai.andee.config.Notebook.plans(this).recordOutcome(n, how, button) },
+            onMute = { n ->
+                net.kuafuai.andee.config.VoiceConfig.muteNudgeKind(this, n.kind)
+                // The user's setting just changed, by a gesture with no confirmation; they are owed the news.
+                net.kuafuai.andee.ui.ChatHistory.addAssistant(AppLocale.str(this, R.string.nudge_muted_row, n.text))
+            },
+        )
         // The signboard's only source of work. Its listener is a separate
         // service the system binds on its own schedule, and after an APK
         // reinstall it routinely never rebinds — the permission still reads as
@@ -782,6 +795,7 @@ class BodyCoreService : Service() {
         // and needs to be told the device is now mute.
         startBrain(announce = false)
         startWakeWord()
+        startPlanMind()
         runStartupSelfCheck()
 
         // Published last, deliberately: everything above builds the body, and
@@ -1650,6 +1664,8 @@ class BodyCoreService : Service() {
         stopWsServer()
         net.kuafuai.andee.wake.WakeWord.stop()
         runCatching { unregisterReceiver(screenReceiver) }
+        runCatching { unregisterReceiver(presentReceiver) }
+        ui.removeCallbacks(planTickRunnable)
         if (::asr.isInitialized) asr.shutdown()
         if (::tts.isInitialized) tts.shutdown()
         // Before audio.release(): it ends the recording, which needs the mic
@@ -2011,6 +2027,8 @@ class BodyCoreService : Service() {
             // and the pinned tips live in this service and have to be told.
             // See FloatingWindowUi.onLocaleChanged.
             onLocaleChanged = { window.onLocaleChanged() },
+            // 它的打算 → 告诉它一句: an ordinary typed turn, so the model adjusts its own plan.
+            onTellBrain = { text -> ui.post { submitUserTurn(text, "typed") } },
         )
         settings = s
         s.show()
@@ -2724,6 +2742,7 @@ class BodyCoreService : Service() {
             // see [catchUpPromises] — but that is still better than an alarm
             // that silently never comes back.
             catchUpPromises()
+            net.kuafuai.andee.config.Scheduler.syncPlan(this)
             return
         }
         android.util.Log.i(
@@ -2768,6 +2787,9 @@ class BodyCoreService : Service() {
         // here, on the first start that can hear about it. This runs in hub
         // mode too — see the early return above.
         catchUpPromises()
+        // And the plan's bubbles: armed from the plan itself, so a reinstall or a lost alarm cannot leave a
+        // planned item silently unscheduled.
+        net.kuafuai.andee.config.Scheduler.syncPlan(this)
         // The sweep is the other thing that only fires if the service is alive
         // when its timer lands, so a process killed mid-quiet leaves a
         // conversation that was never looked back at. Recover it here.
@@ -2878,6 +2900,11 @@ class BodyCoreService : Service() {
      * defers itself if a turn is already running.
      */
     fun wakeForTodo(todo: net.kuafuai.andee.config.Todo) {
+        // A planned bubble: shown by the device at its minute, no model involved. See [postPlanBubble].
+        if (todo.nudge.isNotEmpty()) {
+            postPlanBubble(todo)
+            return
+        }
         val brain = localBrain
         if (brain == null) {
             // Nothing on this device can run a turn (no local brain — there is
@@ -3006,6 +3033,138 @@ class BodyCoreService : Service() {
     }
 
     /** Poll until nothing is speaking, asking or listening, or [WAKE_PATIENCE_MS] passes; then run [then]. */
+    // ---- the plan, thought about without being asked (PlanMind) ----------------------------
+
+    /** One worker: the morning look and the muse each block on a model call. */
+    private val planExec = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "plan-mind").apply { isDaemon = true }
+    }
+
+    private val planTickRunnable = object : Runnable {
+        override fun run() {
+            planTick()
+            ui.postDelayed(this, PLAN_TICK_MS)
+        }
+    }
+
+    /** Unlocking is the user arriving: the natural moment for the morning look. */
+    private val presentReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: android.content.Context, i: android.content.Intent) {
+            planTick()
+        }
+    }
+
+    private fun startPlanMind() {
+        androidx.core.content.ContextCompat.registerReceiver(
+            this,
+            presentReceiver,
+            android.content.IntentFilter(android.content.Intent.ACTION_USER_PRESENT),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        ui.postDelayed(planTickRunnable, PLAN_FIRST_TICK_MS)
+    }
+
+    /**
+     * Think about the plan if it is time to ([net.kuafuai.andee.brain.PlanMind]). Only with someone in front of
+     * the screen — a plan written to an empty room is decided without the one fact that matters, that they
+     * are here — and only for the local brain. The muse also needs them not busy with us, and a level that
+     * allows a bubble at all; the morning look does not, because writing a plan interrupts nobody.
+     * Main thread; the work goes to [planExec].
+     */
+    private fun planTick() {
+        if (exitRequested || localBrain == null) return
+        val cfg = net.kuafuai.andee.config.VoiceConfig.brainConfig(this)
+        if (cfg.apiKey.isEmpty()) return
+        val power = getSystemService(android.os.PowerManager::class.java)
+        val keyguard = getSystemService(android.app.KeyguardManager::class.java)
+        if (power?.isInteractive != true || keyguard?.isKeyguardLocked == true) return
+        val free = !dispatcher.isTaskActive() && !audio.isStreamPlaying() && !asr.isActive() && !meeting.isActive()
+        planExec.execute {
+            val plans = net.kuafuai.andee.config.Notebook.plans(this)
+            val mind = net.kuafuai.andee.brain.PlanMind(cfg, plans) { warn, msg ->
+                if (warn) android.util.Log.w("Plan", msg) else android.util.Log.i("Plan", msg)
+            }
+            val lang = net.kuafuai.andee.config.VoiceConfig.uiLanguage(this)
+            val level = net.kuafuai.andee.brain.NudgeBook.Level.of(net.kuafuai.andee.config.VoiceConfig.nudgeLevel(this))
+            if (mind.morning(lang, level.perDay)) net.kuafuai.andee.config.Scheduler.syncPlan(this)
+            if (free && level != net.kuafuai.andee.brain.NudgeBook.Level.OFF) {
+                mind.muse(lang)?.let { id ->
+                    plans.bubbleForItem(id, dispatcher.nudgeBook, level, net.kuafuai.andee.config.VoiceConfig.nudgeMuted(this))
+                        ?.let(net.kuafuai.andee.ui.NudgeUi::post)
+                }
+            }
+        }
+    }
+
+    /**
+     * A planned bubble came due. The plan decides whether it is still worth showing and whether the user's
+     * limits allow it ([net.kuafuai.andee.config.Plans.bubbleFor]); the reason is written onto the item when
+     * not. Then it waits for its moment like any other bubble.
+     */
+    private fun postPlanBubble(todo: net.kuafuai.andee.config.Todo) {
+        val n = net.kuafuai.andee.config.Notebook.plans(this).bubbleFor(
+            todo,
+            dispatcher.nudgeBook,
+            net.kuafuai.andee.brain.NudgeBook.Level.of(net.kuafuai.andee.config.VoiceConfig.nudgeLevel(this)),
+            net.kuafuai.andee.config.VoiceConfig.nudgeMuted(this),
+        ) ?: return
+        net.kuafuai.andee.ui.NudgeUi.post(n)
+    }
+
+    /**
+     * Whether a bubble may go up right now. Main thread.
+     *
+     * Everything here is a reason to *hold* it, never to drop it — the bubble's own TTL decides when waiting
+     * stops being worth it. The first group is [waitForQuiet]'s own (the user is mid-exchange); then the
+     * device being busy for them (a task, a meeting, typing); then the user being somewhere else (screen off,
+     * locked, Do Not Disturb, the night). Full-screen video and games are **not** detected yet.
+     */
+    private fun nudgeGate(): net.kuafuai.andee.ui.NudgeUi.Gate {
+        val wait = net.kuafuai.andee.ui.NudgeUi.Gate.WAIT
+        if (exitRequested || !window.isShown()) return wait
+        if (net.kuafuai.andee.ui.CardUi.isCardUp() || audio.isStreamPlaying() || asr.isActive()) return wait
+        if (dispatcher.isTaskActive() || meeting.isActive() || net.kuafuai.andee.ui.TextInputActivity.isShowing) return wait
+        val power = getSystemService(android.os.PowerManager::class.java)
+        if (power != null && !power.isInteractive) return wait
+        val keyguard = getSystemService(android.app.KeyguardManager::class.java)
+        if (keyguard != null && keyguard.isKeyguardLocked) return wait
+        val nm = getSystemService(android.app.NotificationManager::class.java)
+        if (nm != null && nm.currentInterruptionFilter > android.app.NotificationManager.INTERRUPTION_FILTER_ALL) return wait
+        val now = java.util.Calendar.getInstance()
+        val minute = now.get(java.util.Calendar.HOUR_OF_DAY) * 60 + now.get(java.util.Calendar.MINUTE)
+        if (net.kuafuai.andee.brain.NudgeBook.isQuiet(minute)) return wait
+        return if (window.isCompact()) net.kuafuai.andee.ui.NudgeUi.Gate.SHOW else net.kuafuai.andee.ui.NudgeUi.Gate.LOG
+    }
+
+    /**
+     * The user tapped a bubble's button (or the body of one with buttons): that is a turn.
+     *
+     * **It runs at the trust of the turn that wrote the bubble.** A bubble raised on a notification's turn
+     * carries a stranger's influence, and a 「好」 under it must not come back as the user's own request —
+     * so that one goes in as an untrusted wake, exactly like a todo set on such a turn ([wakeBrainFor]).
+     * Only the local brain raises bubbles (`nudge` is local-only), so there is no hub branch.
+     */
+    private fun answerNudge(n: net.kuafuai.andee.brain.Nudge, button: String?) {
+        if (exitRequested) return
+        val brain = localBrain ?: return
+        val text = net.kuafuai.andee.brain.NudgeBook.answerText(n, button)
+        // Task first, turn second. `submit` can answer synchronously (no key: it calls onFinal before it
+        // returns), and both begin and end are posts — begin queued after that end leaves the edge glow on
+        // until the 5-minute backstop. Measured on device.
+        acceptBrainOutput = true
+        dispatcher.beginTask()
+        window.setState(FloatingWindowUi.State.THINKING)
+        if (n.untrusted) {
+            brain.wake(text, untrusted = true)
+        } else {
+            // The same preparations [submitUserTurn] makes for any turn the user starts.
+            guestBrain?.cancel()
+            closeTyping()
+            dispatcher.beginTurn(null)
+            brain.submit(text)
+        }
+    }
+
     private fun waitForQuiet(then: () -> Unit) {
         Thread {
             val until = android.os.SystemClock.uptimeMillis() + WAKE_PATIENCE_MS
@@ -3043,6 +3202,12 @@ class BodyCoreService : Service() {
         val missed = net.kuafuai.andee.config.Scheduler.catchUp(this)
         val brain = localBrain
         for (todo in missed) {
+            // A planned bubble that came due while nothing ran: shown now if it is still worth it, else the
+            // plan item is marked missed. Never a note to the brain — nobody promised anything.
+            if (todo.nudge.isNotEmpty()) {
+                postPlanBubble(todo)
+                continue
+            }
             if (brain != null) {
                 brain.note(
                     "(missed) you had promised: ${todo.what}" +
@@ -3239,6 +3404,10 @@ class BodyCoreService : Service() {
     }
 
     companion object {
+        /** How often to ask whether the plan wants thinking about; [PlanMind] decides whether it does. */
+        private const val PLAN_TICK_MS = 10 * 60_000L
+        private const val PLAN_FIRST_TICK_MS = 60_000L
+
         private const val WS_PORT = 9008
 
         /**

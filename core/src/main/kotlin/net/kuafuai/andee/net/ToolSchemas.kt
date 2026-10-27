@@ -894,6 +894,43 @@ object ToolSchemas {
             ),
         ),
         tool(
+            localOnly = true,
+            name = "nudge",
+            method = "ui.nudge",
+            description = """
+        Hold up a small SILENT bubble over your ball: the lightest way to speak
+        first. Nothing is read aloud, the mic stays off, and you are not
+        blocked — this returns at once. If the user is busy (a card is up,
+        you are talking, a task is running, the screen is off, quiet hours)
+        the device holds it until they are not, and drops it once `ttl_minutes`
+        has passed. Ignoring it is a perfectly good answer.
+
+        USE FOR things that are fine to miss: "该喝水啦", "12点了，要帮你点外卖吗？",
+        "你下午三点有个会". NOT for anything that needs a decision now (that is
+        ask_user) and NOT as a second copy of something you are saying out
+        loud in this turn — say it or bubble it, never both.
+
+        With buttons, a tap comes back to you later as its own turn
+        ("[You offered in a bubble: … — the user tapped …]"). Mark the "no
+        thanks" button as `dismiss`: tapping it just closes the bubble and
+        you hear nothing. A button only means they want it — anything
+        irreversible (paying, sending) still needs its own yes.
+
+        The device rations these (per hour, per day, and per `kind`) at a
+        level the user chose, and the user can mute a kind. A refusal says
+        why: do not retry it, and do not dress the same thing up as another
+        kind.
+    """.trimIndent(),
+            required = listOf("text"),
+            props = mapOf(
+                "text" to prop("string", "One short sentence (≤ 60 characters), in the language the user speaks. Plain text, no markdown."),
+                "buttons" to prop("array", "0–3 short labels, e.g. [\"好\",\"不用\"]. Omit for a bubble that only says something."),
+                "dismiss" to prop("string", "Which button means \"no thanks\" — exactly one of `buttons`. Tapping it ends the bubble with no turn."),
+                "ttl_minutes" to prop("integer", "How long it stays worth saying, 1–720. Default 30.", default = 30),
+                "kind" to prop("string", "A short stable tag for this sort of bubble, e.g. water, meal, meeting. Used for rationing and for the user muting it."),
+            ),
+        ),
+        tool(
             name = "show_html",
             method = "ui.show_html",
             description = """
@@ -1655,6 +1692,76 @@ object ToolSchemas {
                 "what" to prop("string", "One sentence: what to do / say at that time"),
                 "at" to prop("string", "One-off, local time YYYY-MM-DD HH:mm"),
                 "cron" to prop("string", "Recurring, 5 fields \"minute hour day month weekday\". Densest is once every 15 minutes"),
+            ),
+        ),
+        tool(
+            localOnly = true,
+            name = "plan_directions",
+            method = "note.directions",
+            description = """
+        Your long-term directions with this person: what you are helping them get done these weeks, and how.
+        They are the reason behind every item of every day plan, and the user can see them — and pause or
+        remove them — in Settings.
+
+        - `list`: see them.
+        - `add`: title, why, how_i_help, good_when, source. **Only from what the user said or did** — `source`
+          says when and what ("10-26: 「这周要把 0.6.2 发出去」"). A goal you think would be good for them is
+          not theirs; do not add it.
+        - `update` / `pause` / `resume` / `done` / `drop`: by id.
+
+        At most 5 active; more than that is no focus at all. A direction the user paused or removed is theirs:
+        you cannot resume or re-add it unless they ask for it in so many words.
+    """.trimIndent(),
+            required = listOf("action"),
+            props = mapOf(
+                "action" to propEnum("What to do", listOf("list", "add", "update", "pause", "resume", "done", "drop")),
+                "id" to prop("string", "For everything but list and add; take it from list"),
+                "title" to prop("string", "A few words, in the user's language"),
+                "why" to prop("string", "Why it matters to them, in their terms"),
+                "how_i_help" to prop("string", "What you will do about it, concretely"),
+                "good_when" to prop("string", "How you will know it is done"),
+                "source" to prop("string", "When and what they said or did that makes this theirs. Required for add"),
+            ),
+        ),
+        tool(
+            localOnly = true,
+            name = "day_plan",
+            method = "note.day_plan",
+            description = """
+        Your plan for a day: what you mean to do for this person, and when you will speak to them. The user sees
+        it in Settings and can remove items; a line of it rides on every message.
+
+        - `get`: the plan for `date` (today, tomorrow or YYYY-MM-DD).
+        - `write`: replace the still-planned part of that day.
+          - `intent`: one sentence in your own voice and the user's language — 「今天我想帮他把发布收个尾，别的事少打扰。」
+          - `items`: each `{time, slot, kind, what, because, buttons, dismiss, tag}`
+            - `time` "HH:mm", or "" with a `slot` (a loose time: 午饭前, when they first talk to me).
+            - `kind`: remind (a bubble telling them something), ask (a bubble with buttons), prepare (something
+              you do quietly ahead of time), follow_up (pick up something left half-way).
+            - `what`: for remind/ask, exactly the bubble's words (≤ 60 characters, their language); otherwise
+              what you will do.
+            - `because`: the direction or todo it serves. Required — an item that serves nothing is not part
+              of the plan.
+            - remind/ask with a `time` become bubbles at that minute with no further thought from you; what
+              happened (done / declined / ignored / skipped) is written back onto the item.
+          - `quiet`: what you will NOT bother them about today — as much a part of the plan as the items.
+          At most 5 remind/ask a day. Items already done or ignored stay as the day's history; items the user
+          removed cannot be put back.
+        - `mark`: set an item done / dropped / moved by id, when it was handled some other way.
+
+        A day with nothing to say is a good plan. Never plan anything irreversible (paying, sending, deleting):
+        those need the user, asked at the time.
+    """.trimIndent(),
+            required = listOf("action"),
+            props = mapOf(
+                "action" to propEnum("What to do", listOf("get", "write", "mark")),
+                "date" to prop("string", "today (default), tomorrow, or YYYY-MM-DD"),
+                "intent" to prop("string", "For write: one sentence, your own voice"),
+                "items" to prop("array", "For write: the items, see the description"),
+                "quiet" to prop("array", "For write: what you will leave alone today"),
+                "id" to prop("string", "For mark: the item id from get"),
+                "status" to propEnum("For mark", listOf("done", "dropped", "moved")),
+                "note" to prop("string", "For mark: a few words on why"),
             ),
         ),
         tool(

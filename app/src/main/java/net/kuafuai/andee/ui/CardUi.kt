@@ -162,6 +162,12 @@ object CardUi {
      */
     fun isAsking(): Boolean = current?.let { !it.finished && it.captureSpeech } == true
 
+    /**
+     * A real card (not a bubble) is up. A bubble yields to every card and never replaces one — see
+     * [bubble]. Snapshot, readable from any thread.
+     */
+    fun isCardUp(): Boolean = current?.let { !it.finished && !it.bubble } == true
+
     fun dismissCurrent() {
         main.post { current?.close("superseded") }
     }
@@ -216,6 +222,9 @@ object CardUi {
     private fun decideVoice(said: String): VoiceOutcome {
         val handle = current ?: return VoiceOutcome.NOT_HANDLED
         if (handle.finished) return VoiceOutcome.NOT_HANDLED
+        // A bubble was never spoken, so nothing the user says is an answer to it: a 「好」 meant for
+        // something else must not press a button they may not even have read.
+        if (handle.bubble) return VoiceOutcome.NOT_HANDLED
         val spoken = normalizeForMatch(said)
         val hit = handle.buttons.firstOrNull { label ->
             val l = normalizeForMatch(label)
@@ -246,6 +255,8 @@ object CardUi {
         val buttons: List<String>,
         /** Whether speech that names no button should still answer this card. */
         val captureSpeech: Boolean = false,
+        /** A silent [bubble], not a card: yields to cards and is never answered by voice. */
+        val bubble: Boolean = false,
         @Volatile var finished: Boolean = false,
         var onDone: ((Result) -> Unit)? = null,
         var timeout: Runnable? = null,
@@ -514,6 +525,117 @@ object CardUi {
             }
         }
     }
+
+    /**
+     * A silent bubble over the folded ball — the weakest way the device speaks first. See `NudgeUi`,
+     * which decides *when*; this only draws it.
+     *
+     * Everything a card does to get attention, this does not: no speech, no mic, no holding face, and it
+     * never displaces anything. It is shown only into an empty slot on a folded ball, and [onDone] fires
+     * with `busy` otherwise so the caller can hold it. A card arriving while it is up closes it with
+     * `superseded` (the ordinary one-signboard rule), which the caller also treats as "hold it again".
+     *
+     * Same window as the cards ([FloatingWindowUi.showSignboard]) and never a window of its own: one more
+     * overlay could push the combined opacity past the 0.80 at which Android silently drops the brain's
+     * injected taps.
+     *
+     * [onDone]'s `how`: `button` (with the label), `body` (the bubble itself), `mute` (long press),
+     * `timeout` (faded out unanswered), `superseded`, or `busy` (never shown). Main thread.
+     */
+    fun bubble(text: String, buttons: List<String>, stayMs: Long, onDone: (Result) -> Unit) {
+        main.post {
+            val context = appContext
+            val host = ballWindow()
+            if (current != null || context == null || host == null || !host.isShown() || !host.isFolded()) {
+                onDone(Result(null, "busy"))
+                return@post
+            }
+            val density = android.content.res.Resources.getSystem().displayMetrics.density
+            fun dp(v: Int) = (v * density).toInt()
+            val view = TailLinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                cornerRadius = dp(18)
+                setPadding(dp(16), dp(11), dp(16), dp(11))
+            }
+            val body = TextView(context).apply {
+                this.text = text
+                setTextColor(Color.parseColor(Glass.TITLE))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.BODY)
+                setLineSpacing(dp(2).toFloat(), 1f)
+                maxLines = 3
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                gravity = Gravity.CENTER_HORIZONTAL
+            }
+            view.addView(body, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+            ))
+            val btnViews = mutableListOf<TextView>()
+            if (buttons.isNotEmpty()) {
+                val row = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER
+                    setPadding(0, dp(8), 0, 0)
+                }
+                buttons.forEachIndexed { i, label ->
+                    val btn = TextView(context).apply {
+                        this.text = label
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.BODY)
+                        setPadding(dp(14), dp(5), dp(14), dp(5))
+                        gravity = Gravity.CENTER
+                        isClickable = true
+                        isFocusable = false
+                        background = if (i == 0) Glass.tinted(context, dp(16)) else Glass.thumb(context, dp(16))
+                        setTextColor(Color.parseColor(if (i == 0) Glass.ON_TINT else Glass.LABEL))
+                        Glass.pressable(this)
+                    }
+                    row.addView(btn, LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply { if (i > 0) marginStart = dp(8) })
+                    btnViews.add(btn)
+                }
+                view.addView(row)
+            }
+            // As narrow as the words allow: a card-wide pane for 「该喝水啦」 is a card.
+            view.measure(
+                View.MeasureSpec.makeMeasureSpec(dp(BUBBLE_MAX_WIDTH_DP), View.MeasureSpec.AT_MOST),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            )
+            val width = maxOf(view.measuredWidth, dp(BUBBLE_MIN_WIDTH_DP))
+            view.tailX = width / 2
+
+            val handle = CardHandle(view, host, buttons, bubble = true)
+            handle.onDone = { r -> main.post { onDone(r) } }
+            buttons.forEachIndexed { i, label -> btnViews[i].setOnClickListener { handle.close("button", label) } }
+            view.setOnClickListener { handle.close("body") }
+            body.setOnClickListener { handle.close("body") }
+            val mute = View.OnLongClickListener { handle.close("mute"); true }
+            view.setOnLongClickListener(mute)
+            body.setOnLongClickListener(mute)
+            // Fades rather than blinks out: a bubble leaving on its own should not look like one that broke.
+            // The backstop is for a detached view, which never delivers its end action; close() runs once.
+            val timeoutRunnable = Runnable {
+                view.animate().alpha(0f).setDuration(BUBBLE_FADE_MS).withEndAction { handle.close("timeout") }.start()
+                main.postDelayed({ handle.close("timeout") }, BUBBLE_FADE_MS + 200)
+            }
+            handle.timeout = timeoutRunnable
+            if (host.showSignboard(view, foldedWidth = width)) {
+                current = handle
+                ensureEvictorWired(host)
+                view.pivotX = width / 2f
+                view.pivotY = view.measuredHeight.toFloat()
+                Glass.enter(view)
+                host.greet()
+                main.postDelayed(timeoutRunnable, stayMs)
+            } else {
+                handle.finished = true
+                onDone(Result(null, "busy"))
+            }
+        }
+    }
+
+    private const val BUBBLE_MAX_WIDTH_DP = 300
+    private const val BUBBLE_MIN_WIDTH_DP = 120
+    private const val BUBBLE_FADE_MS = 260L
 
     /** Shared button wiring for both the hosted and the fallback card. */
     private fun wireButtons(

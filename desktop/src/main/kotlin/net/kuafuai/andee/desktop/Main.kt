@@ -93,6 +93,10 @@ fun main() {
         )
         BallCaptionWindow(ballWindow, suppressed = pending != null || ask != null)
         PromptWindow(ballWindow, pending, ask)
+        // Bubbles stand beside the ball; with the chat window in front they are a scrollback row instead.
+        Nudges.ballUp = { ballWindow != null }
+        Nudges.chatInFront = { chat && chatWindow?.isActive == true }
+        BubbleWindow(ballWindow)
 
         Window(
             onCloseRequest = { chat = false },

@@ -100,6 +100,11 @@ class EmotionBallTextureView @JvmOverloads constructor(
         renderer.signalOutcome(ok)
     }
 
+    /** A bubble the ball raised by itself just went up. */
+    fun greet() {
+        renderer.greet()
+    }
+
     /** One-shot body gesture, e.g. a nod when the mic opens. */
     fun trigger(action: Action) {
         renderer.request(action)

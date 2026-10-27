@@ -21,6 +21,9 @@ object DesktopNotebook {
     val book: NotebookBook by lazy {
         NotebookBook(storeOverride ?: EncryptedFileStore(AppDirs.file("notebook.enc"), "notebook-key"))
     }
+
+    /** Directions and day plans, in the same book. One instance: its lock serialises the tool and the settings page. */
+    val plans: net.kuafuai.andee.config.Plans by lazy { net.kuafuai.andee.config.Plans(book) }
 }
 
 /** Local-time formats the model writes todos in — the same list the phone accepts. */
@@ -74,6 +77,17 @@ object DesktopScheduler {
         synchronized(armed) { armed.remove(id)?.cancel(false) }
     }
 
+    /**
+     * Bring the plan's bubble timers in line with the plan ([net.kuafuai.andee.config.Plans.reconcile]). After
+     * every plan write — the model's or the user's in settings — and at launch.
+     */
+    fun syncPlan() {
+        val s = DesktopNotebook.plans.reconcile()
+        s.cancel.forEach(::cancel)
+        s.arm.forEach(::arm)
+        if (s.arm.isNotEmpty() || s.cancel.isNotEmpty()) Log.i(TAG, "plan: armed ${s.arm.size}, cancelled ${s.cancel.size}")
+    }
+
     /** At launch: re-arm the future, fire what was missed while the app was closed. */
     fun catchUp() {
         val now = System.currentTimeMillis()
@@ -107,6 +121,12 @@ class NotebookTools(private val onSceneChanged: (String?) -> Unit) {
     fun handles(method: String) = method.startsWith("note.") || method.startsWith("scene.")
 
     fun dispatch(method: String, p: JSONObject, silent: Boolean, untrusted: Boolean): Any = when (method) {
+        // The plan (`Plans`): shared logic in core; here only the timers it asks for.
+        "note.directions", "note.day_plan" -> {
+            val r = DesktopNotebook.plans.handle(method, p, Nudges.level().perDay)
+            if (method == "note.day_plan") DesktopScheduler.syncPlan()
+            r
+        }
         "note.remember" -> {
             val (saved, overwrote) = book.remember(
                 name = req(p, "name", method),

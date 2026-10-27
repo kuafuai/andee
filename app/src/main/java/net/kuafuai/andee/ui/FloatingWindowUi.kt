@@ -673,8 +673,12 @@ class FloatingWindowUi(
      *
      * Main thread only. One signboard at a time; false when there is no
      * window to host it (caller falls back to its own overlay).
+     *
+     * [foldedWidth] narrows the window while folded, for a bubble that would
+     * look lost in a card-wide pane. Never narrower than the ball itself, or
+     * the ball area would be clipped by its own window.
      */
-    fun showSignboard(content: View): Boolean {
+    fun showSignboard(content: View, foldedWidth: Int? = null): Boolean {
         val v = root ?: return false
         val p = params ?: return false
         if (signboard != null) return false
@@ -691,7 +695,8 @@ class FloatingWindowUi(
         val side = dp(COMPACT_DP)
         // The width the card will get; measured here so the window can grow
         // by exactly the card's height in the same updateViewLayout.
-        val w = minOf(dm.widthPixels - dp(32), dp(560))
+        val w = foldedWidth?.coerceIn(side, dm.widthPixels - dp(32))
+            ?: minOf(dm.widthPixels - dp(32), dp(560))
         content.measure(
             View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
@@ -1027,6 +1032,11 @@ class FloatingWindowUi(
     /** A task ended. A brief pleased or flinching face, then back to normal. */
     fun signalOutcome(ok: Boolean) {
         ui.post { ball?.signalOutcome(ok) }
+    }
+
+    /** A bubble went up that nobody asked for: wave once so the eye finds it. See `NudgeUi`. */
+    fun greet() {
+        ui.post { ball?.greet() }
     }
 
     /**

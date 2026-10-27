@@ -688,6 +688,9 @@ class LocalBrain(
             // Empty notebook, empty string, zero cost: the feature only starts
             // paying for itself once there is something to remember.
             val index = host.notebookIndex()
+            // The plan (`Plans`): what it is helping them with and what it meant to do today. Right after
+            // the notebook and for the same cache reason; it is the thread every turn should be able to see.
+            val plan = host.planIndex()
             val scenes = host.scenesIndex()
             // The pages it has made, the same way and for the same reason: a
             // tool answers a question the brain thought to ask, and 「上次那个表格」
@@ -739,6 +742,12 @@ class LocalBrain(
                             ""
                         } else {
                             "\n\n(what your notebook holds, for reference; use recall for detail)\n$index"
+                        } +
+                        if (plan.isEmpty()) {
+                            ""
+                        } else {
+                            "\n\n(your plan — what you are helping them with and what you meant to do today; " +
+                                "the user can see it in Settings; change it with day_plan / plan_directions)\n$plan"
                         } +
                         // Same position and same reason as the notebook index:
                         // a newly saved scene must not cost the prefix cache.
@@ -1744,6 +1753,8 @@ class LocalBrain(
    When it has, remember under the same name to overwrite that entry. This one is a judgement left for future you, not a log.
 6. A kind of session that has now come up more than once and will come again (practising a language, minding his messages, comparing prices) and is not a scene yet → remember(type=feedback) "propose saving <kind> as a scene next time we do it". Do NOT call save_scene here: scenes are saved only after he says yes (§11), and he is not here.
 7. You used an installed app this time and learned what it is for, what it can do on his behalf, or a limit you hit → note_gear (only what you actually saw; a login only if you saw it signed in). If a note on the shelf turned out wrong this time, correct it. Never touch gear_visibility here: what is kept out of view is his call, made when he is present.
+8. The plan (your plan line; day_plan get for detail). Keep today's plan true: if there is none, write one (day_plan write, date=today); if what happened in this conversation changed it, rewrite it; after 20:00, also draft tomorrow's — and before you do, read today's outcomes (day_plan get): keep what landed, do less of or move what he ignored or declined, carry over what was moved. If your plan line says the weekly look at the directions is due, do it now: plan_directions list, then mark done what is done, pause what has stalled, and add what he newly said he is working toward. Every item points at a long-term direction or a todo in `because`; at most 5 that interrupt (remind/ask), at the times you would really choose; a quiet day is a fine plan, and `quiet` says what you will leave alone today.
+   Long-term directions (plan_directions add) come only from what he said or did — quote it in `source`; a goal you think would be good for him is not his. With no directions yet, one `ask` item a day may be getting to know him (what he is busy with lately, what he would like you to keep an eye on — in his language), until he has answered or ignored it twice. Never put back what he removed.
 
 If this conversation genuinely produced nothing new, record nothing — ending empty-handed is allowed. Forcing one in just dirties the notebook."""
 

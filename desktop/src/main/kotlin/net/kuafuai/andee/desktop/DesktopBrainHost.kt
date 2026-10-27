@@ -80,6 +80,8 @@ class DesktopBrainHost(
     override fun gearIndex(): String = providers.filterIsInstance<net.kuafuai.andee.desktop.mac.MacGear>().firstOrNull()?.indexForPrompt().orEmpty()
     override fun topicsIndex(): String = Scrollback.topicsIndex()
 
+    override fun planIndex(): String = DesktopNotebook.plans.indexForPrompt()
+
     override fun friendsIndex(): String = Peers.tasks.indexForPrompt()
 
     override fun foldTopic(title: String, summary: String, rows: List<ScrollRow>, text: String): FoldedTopic? {

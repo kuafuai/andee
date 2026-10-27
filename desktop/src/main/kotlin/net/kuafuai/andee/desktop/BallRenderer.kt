@@ -171,6 +171,7 @@ class BallRenderer(val width: Int, val height: Int) {
     fun setWorking(w: Boolean) = post { renderer.working = w }
     fun pulseTool() = post { renderer.pulseTool() }
     fun signalOutcome(ok: Boolean) = post { renderer.signalOutcome(ok) }
+    fun greet() = post { renderer.greet() }
     fun trigger(action: Action) = post { renderer.request(action) }
 
     private fun post(f: () -> Unit) { commands.offer(f); java.util.concurrent.locks.LockSupport.unpark(thread) }

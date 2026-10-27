@@ -588,6 +588,26 @@ The trap this introduced, caught before it compiled: `notified()` defers behind 
 
 `notified` is also not `submit`: it does not stamp `Notebook.touchActivity`, because the quiet-hour timer measures silence from the *user* and a chatty group would otherwise push the nightly review out all evening on their behalf.
 
+### Bubbles: the weakest way to speak first (`ui/NudgeUi.kt`, `brain/NudgeBook.kt`)
+
+`nudge` (local-only) holds a **silent** bubble over the folded ball — 「该喝水啦」, 「要帮你点外卖吗？」 [好][不用]. It is the opposite of a card on every axis: no TTS, no mic, no holding face, returns at once, never displaces a card, fades out if ignored. Design and what is still undone: `docs/design/proactive-nudge.zh-CN.md`. Four things are load-bearing:
+
+- **It shares the cards' one slot on the ball** (`CardUi.bubble` → `showSignboard(foldedWidth)`) and never gets a window of its own — one more overlay can push the combined opacity past the 0.80 that makes Android drop injected taps. A card arriving closes it as `superseded` and `NudgeUi` holds it again.
+- **A tap runs at the trust of the turn that wrote it** (`Nudge.untrusted` → `answerNudge` → `wake(untrusted = true)`). Same laundering `Todo.untrusted` closes: a stranger's notification must not get a trusted turn back for a 「好」.
+- **Budget, cooldown, quiet hours and mutes are device-side** (`NudgeBook.admit`), and a refusal is a normal result telling the model not to retry. `nudge` setting: unset = `few`, unrecognised = `off`, 关 leftmost.
+- **`nudgeGate` only ever holds, never drops** — the bubble's TTL decides when waiting stops being worth it. The `dismiss` button and a tap on a text-only bubble start no turn; voice never presses a bubble's button.
+- **The Mac has the same tool and the same `NudgeBook`** (`desktop/NudgeBubble.kt`: `Nudges` + `BubbleWindow`). There the bubble is its own non-focusable window beside the ball, like the prompt card and the caption — the Mac has no opacity ceiling and the ball's window is exactly the ball's size. "Unfolded card" becomes "chat window active" (→ a scrollback row), and "screen off" becomes five minutes with no keyboard or mouse input (`ioreg` `HIDIdleTime`). `uishot bubble` draws the card.
+
+### Plans: what it is trying to do, so speaking first has a reason (`config/Plans.kt`)
+
+Bubbles alone felt random — "no overall idea, no soul" was the user's verdict — so speaking first now hangs off a plan: **long-term directions** (what it is helping them get done; only from what they said, each with a `source`, ≤ 5 active) and a **day plan** (an intent in its own voice, items that each name a direction or todo in `because`, and a `quiet` list). Both live in the notebook's `plan` section, shared by both bodies like `Gear`. Design: `docs/design/proactive-nudge.zh-CN.md` §5–§6, §12.
+
+- **Timed `remind`/`ask` items become bubble todos** (`Plans.reconcile` → `Todo.nudge`): at their minute the device raises the bubble with **no model call**, and `recordOutcome` writes done / declined / ignored / skipped / missed back onto the item. Every plan write (tool or settings) and every start re-runs `reconcile` (`Scheduler.syncPlan` / `DesktopScheduler.syncPlan`). A bubble todo that comes due with nothing running is marked missed — never a notification, never a note to the brain.
+- **The review writes the plan** (`REVIEW_RULES` item 8), so a device nobody has talked to has none. After 20:00 it also drafts tomorrow's.
+- **The user sees and trims it in Settings → 它的打算.** Removing an item or pausing/removing a direction is done by the device at once and cannot be undone by the model (`userDropped`, `byUser`); anything else goes in through 告诉它一句 as an ordinary turn.
+- **`PlanMind` thinks about the plan without being asked, in two no-tool calls** (the triage pattern): `morning` once a day when the user first shows up (writes today's plan from directions, yesterday's outcomes, the draft, today's todos and the notebook — this is also what gives an unreviewed device a plan), and `muse` every ≥ 40 min while they are present, only for today's loose-time items, picking at most one. Timing state lives in the plan section's `meta`. Triggers: phone `USER_PRESENT` + a 10-min tick (`BodyCoreService.planTick`), Mac a 5-min tick with recent HID input (`PlanTicks`). Both fail closed — no key or a bad answer changes nothing. There is deliberately **no** "prepare while they are away" turn.
+- **`TurnGuards` refuses `note.directions` / `note.day_plan` on untrusted turns** — a planned bubble's tap is a trusted turn, so a stranger's words in the plan would be laundered.
+
 ### Scenes: ways of working it learned with this person (local brain only)
 
 A scene (「陪我练英语」「帮我接管微信」「比价购物」) is a goal + voice + rules + routine that the model steps into for a while. It is **only a prompt** — no tool scoping, no scheduler of its own — and it is **learned, not shipped**: the model proposes one after the same kind of session has recurred, the user says yes, *then* `save_scene` writes it. `LocalPrompt` §11 is the whole teaching; the nightly review (`REVIEW_RULES` item 6) only leaves itself a `remember(type=feedback)` to propose one next time, because there is nobody to ask while it reviews.

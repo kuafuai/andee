@@ -687,6 +687,7 @@ object VoiceConfig {
                 "llm_reasoning_effort" to bc.reasoningEffort,
                 "grounding" to p.getString("grounding", "off")!!,
                 "notify" to notifyScope(context),
+                "nudge" to nudgeLevel(context),
                 "lang" to uiLanguage(context),
                 "sweep" to p.getString("sweep", "on")!!,
                 "sweep_quiet_minutes" to p.getString(
@@ -844,6 +845,30 @@ object VoiceConfig {
          * reader: the scene-ended event, which must not tell the brain what the
          * brain itself just did (a second turn to say "you left the scene").
          */
+        /**
+         * How many bubbles the device may raise by itself: `off` / `few` / `normal`, read through
+         * [net.kuafuai.andee.brain.NudgeBook.Level.of]. **Unset is `few` and unrecognised is `off`** — the
+         * split [notifyScope] draws, for its reasons, and the picker lists 关 leftmost to match.
+         */
+        fun nudgeLevel(context: Context): String =
+            net.kuafuai.andee.brain.NudgeBook.Level.of(
+                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("nudge", null),
+            ).key
+
+        /** Bubble kinds the user long-pressed away. Written directly, like `scene`: it is a set, not a field. */
+        fun nudgeMuted(context: Context): Set<String> =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getStringSet("nudge_muted", emptySet()).orEmpty().toSet()
+
+        fun muteNudgeKind(context: Context, kind: String) {
+            val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            p.edit().putStringSet("nudge_muted", nudgeMuted(context) + kind).apply()
+        }
+
+        fun clearNudgeMuted(context: Context) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove("nudge_muted").apply()
+        }
+
         fun setActiveScene(context: Context, name: String?, byBrain: Boolean = false) {
             val next = name?.trim().orEmpty()
             val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -916,6 +941,7 @@ object VoiceConfig {
             "llm_thinking", "llm_reasoning_effort",
             "grounding",
             "notify",
+            "nudge",
             "lang",
             "ball",
             "sweep", "sweep_quiet_minutes", "sweep_daily_cap",

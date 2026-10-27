@@ -158,6 +158,9 @@ class CommandDispatcher(
 ) {
     private val ui = Handler(Looper.getMainLooper())
 
+    /** The bubble budget. One per dispatcher, so a service restart starts the count again — see [NudgeBook]. */
+    val nudgeBook = net.kuafuai.andee.brain.NudgeBook()
+
     /**
      * Put the two guards on a freshly built screen controller.
      *
@@ -836,6 +839,29 @@ class CommandDispatcher(
                     .put("how", r.how)
                     .put("read", true)
             }
+            "ui.nudge" -> {
+                // Malformed → throws for the model to fix. Over budget → a normal result that says why: that
+                // is the user's limit, not a mistake, and "do not retry" has to reach the model as an answer.
+                val n = nudgeBook.parse(params, untrusted)
+                val refusal = nudgeBook.admit(
+                    n,
+                    net.kuafuai.andee.brain.NudgeBook.Level.of(VoiceConfig.nudgeLevel(appContext)),
+                    VoiceConfig.nudgeMuted(appContext),
+                )
+                if (refusal != null) {
+                    JSONObject().put("queued", false).put("reason", refusal)
+                } else {
+                    net.kuafuai.andee.ui.NudgeUi.post(n)
+                    JSONObject()
+                        .put("queued", true)
+                        .put(
+                            "note",
+                            "Queued. It goes up when the user is free and is dropped after its ttl. You will hear " +
+                                "back only if they tap a button that is not `dismiss` — do not wait for it, and do " +
+                                "not also say it out loud.",
+                        )
+                }
+            }
             "ui.show_html" -> {
                 val html = requireNotNull(params?.optString("html")?.ifEmpty { null }) { "ui.show_html requires html" }
                 // Reuses `html_default_title`, the same resource
@@ -1478,6 +1504,16 @@ class CommandDispatcher(
                     )
             }
 
+            // The plan (`Plans`): shared logic in core; here only the alarms it asks for.
+            "note.directions", "note.day_plan" -> {
+                val r = Notebook.plans(appContext).handle(
+                    method,
+                    params,
+                    net.kuafuai.andee.brain.NudgeBook.Level.of(VoiceConfig.nudgeLevel(appContext)).perDay,
+                )
+                if (method == "note.day_plan") Scheduler.syncPlan(appContext)
+                r
+            }
             "note.todos" -> {
                 val action = params?.optString("action")?.trim()?.lowercase().orEmpty()
                 require(action in listOf("list", "done", "drop", "pause", "resume")) {

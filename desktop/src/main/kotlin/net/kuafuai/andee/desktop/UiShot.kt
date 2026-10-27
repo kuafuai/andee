@@ -21,7 +21,7 @@ import kotlin.system.exitProcess
  * directory seeded with a short conversation and two topics, so nothing of the user's
  * is read or shown.
  *
- * screen: chat | settings | notebook | scenes | vault | selfcheck | expressions | artifacts | topic:1
+ * screen: chat | settings | notebook | scenes | vault | selfcheck | expressions | artifacts | topic:1 | ask | bubble
  */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
@@ -51,6 +51,16 @@ fun main(args: Array<String>) {
         val png = java.io.ByteArrayOutputStream().also { javax.imageio.ImageIO.write(img, "png", it) }.toByteArray()
         val doc = File(System.getProperty("andee.home"), "季度复盘-final.pdf").also { it.writeText("%PDF") }
         ChatPreview.attachments = listOfNotNull(Attachments.fromBytes("a.png", png), Attachments.fromBytes("b.png", png), Attachments.fromFile(doc))
+    }
+    // `settings … plan`: the settings page with an invented plan, in a throwaway notebook. Nothing real.
+    if (args.getOrElse(4) { "" } == "plan") {
+        DesktopNotebook.storeOverride = object : net.kuafuai.andee.config.NotebookStore {
+            var s: String? = null
+            override fun read() = s
+            override fun write(plain: String): Boolean { s = plain; return true }
+            override fun wipe() { s = null }
+        }
+        seedPlan()
     }
     if (screen == "gear") {
         DesktopNotebook.storeOverride = object : net.kuafuai.andee.config.NotebookStore {
@@ -83,7 +93,11 @@ fun main(args: Array<String>) {
         System.currentTimeMillis() + 20_000,
     ) else null
     val scene = ImageComposeScene(width = w * 2, height = h * 2, density = density) {
-        if (askCard != null) AskShot(askCard) else AppRoot(nav)
+        when {
+            askCard != null -> AskShot(askCard)
+            screen == "bubble" -> BubbleShot()
+            else -> AppRoot(nav)
+        }
     }
     // Let the backdrop (decoded off the main thread) and the layout settle.
     repeat(12) { scene.render(it * 50_000_000L); Thread.sleep(60) }
@@ -92,6 +106,19 @@ fun main(args: Array<String>) {
     println("wrote $out (${w}x$h @2x, screen=$screen)")
     scene.close()
     exitProcess(0)
+}
+
+/** The two shapes of bubble — words only, and words with buttons — on a plain ground. */
+@Composable
+private fun BubbleShot() {
+    val far = Long.MAX_VALUE
+    androidx.compose.foundation.layout.Column(
+        Modifier.background(Color(0xFFB9C0C8)).padding(24.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+    ) {
+        BubbleCard(net.kuafuai.andee.brain.Nudge("该喝水啦 💧", emptyList(), null, "water", far, false))
+        BubbleCard(net.kuafuai.andee.brain.Nudge("12点了，要帮你点外卖吗？", listOf("好", "不用"), "不用", "meal", far, false))
+    }
 }
 
 /** One question card on a plain ground, so the card's edges and its corner button are unambiguous. */
@@ -116,6 +143,23 @@ private fun seed() {
     Scrollback.fold("周会提醒", "明天 10:00 开周会", b, "User: 明天上午十点提醒我开周会\n\nAndee: 好……")
     Scrollback.add(Scrollback.Role.USER, "看看今天有什么新闻")
     Scrollback.add(Scrollback.Role.ASSISTANT, "我先打开浏览器搜一下，稍等。")
+}
+
+/** An invented plan, so 它的打算 has rows to show. */
+private fun seedPlan() {
+    val p = DesktopNotebook.plans
+    p.handle("note.directions", org.json.JSONObject().put("action", "add").put("title", "Andee 发布")
+        .put("how_i_help", "每天下午问一次进度").put("source", "10-26: 这周要把 0.6.2 发出去"), 8)
+    p.handle("note.directions", org.json.JSONObject().put("action", "add").put("title", "规律喝水")
+        .put("how_i_help", "上午下午各提醒一次").put("source", "10-25: 我老忘了喝水"), 8)
+    p.handle("note.day_plan", org.json.JSONObject().put("action", "write").put("date", "today")
+        .put("intent", "今天我想帮他把发布收个尾，别的事少打扰。")
+        .put("items", org.json.JSONArray()
+            .put(org.json.JSONObject().put("time", "23:58").put("kind", "remind").put("what", "该喝水啦 💧").put("because", "规律喝水"))
+            .put(org.json.JSONObject().put("time", "23:59").put("kind", "ask").put("what", "发布的视频剪完了吗？")
+                .put("buttons", org.json.JSONArray().put("剪完了").put("还没")).put("dismiss", "还没").put("because", "Andee 发布"))
+            .put(org.json.JSONObject().put("slot", "他第一次找我时").put("kind", "prepare").put("what", "整理一份发布前检查清单").put("because", "Andee 发布")))
+        .put("quiet", org.json.JSONArray().put("上午他在开会，12 点前不出气泡")), 8)
 }
 
 /** A few invented apps, in the throwaway home, so the gear card has something to show. Nothing real. */

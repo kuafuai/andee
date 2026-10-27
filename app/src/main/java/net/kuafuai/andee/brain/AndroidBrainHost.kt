@@ -79,6 +79,8 @@ class AndroidBrainHost(
 
     override fun gearIndex(): String = dispatcher.gearShelf.indexForPrompt()
 
+    override fun planIndex(): String = net.kuafuai.andee.config.Notebook.plans(ctx).indexForPrompt()
+
     override fun friendsIndex(): String = peers.tasks.indexForPrompt()
 
     override fun topicsIndex(): String = ChatHistory.topicsForPrompt()

@@ -44,6 +44,8 @@ class UiTools : DesktopBrainHost.ToolProvider {
 
     override fun handles(method: String) = method.startsWith("ui.")
 
+
+
     override fun turnStarted(kind: String) = Pages.beginTurn()
 
     override fun dispatch(method: String, p: JSONObject, silent: Boolean, untrusted: Boolean): Any? = when (method) {
@@ -71,6 +73,21 @@ class UiTools : DesktopBrainHost.ToolProvider {
                 .put("how", r.how)
                 .put("answered", r.button != null || r.heard != null)
                 .apply { r.heard?.let { put("heard", it) } }
+        }
+        "ui.nudge" -> {
+            // Malformed → throws for the model to fix; over budget → a normal result that says why.
+            val n = Nudges.book.parse(p, untrusted)
+            val refusal = Nudges.book.admit(n, Nudges.level(), Nudges.muted())
+            if (refusal != null) {
+                JSONObject().put("queued", false).put("reason", refusal)
+            } else {
+                Nudges.post(n)
+                JSONObject().put("queued", true).put(
+                    "note",
+                    "Queued. It goes up when the user is free and is dropped after its ttl. You will hear back only " +
+                        "if they tap a button that is not `dismiss` — do not wait for it, and do not also say it out loud.",
+                )
+            }
         }
         "ui.alert" -> {
             val text = p.optString("text").trim().ifEmpty { throw IllegalArgumentException("ui.alert requires text") }

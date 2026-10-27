@@ -149,7 +149,7 @@ class EmotionBallRenderer {
     /** A `screen.*` command just ran — see [pulseTool]. */
     private var toolLeft = 0f
 
-    /** Transient SUCCESS / FAILED face, outranking everything while it lasts. */
+    /** Transient SUCCESS / FAILED / WAVE face, outranking everything while it lasts. */
     private var overlayMood: Mood? = null
     private var overlayLeft = 0f
 
@@ -195,6 +195,15 @@ class EmotionBallRenderer {
     /** A task finished. Two seconds of face, and a pop or a flinch. */
     fun signalOutcome(ok: Boolean) {
         outcomeRequest = if (ok) Mood.SUCCESS else Mood.FAILED
+    }
+
+    /**
+     * The ball is holding up a bubble it raised by itself: a wave and a hop, then back to whatever it was.
+     * Rides the outcome flash because it is the same kind of thing — a moment of face that outranks the
+     * rest and lets go on its own. A look without gestures shows WAVE as its plain face row.
+     */
+    fun greet() {
+        outcomeRequest = Mood.WAVE
     }
 
     /** Play a one-shot gesture on the next frame. Safe from any thread. */
@@ -603,7 +612,13 @@ class EmotionBallRenderer {
             overlayMood = it
             overlayLeft = OVERLAY_SECONDS
             toolLeft = 0f
-            state.trigger(if (it == Mood.SUCCESS) Action.POP else Action.RECOIL)
+            state.trigger(
+                when (it) {
+                    Mood.SUCCESS -> Action.POP
+                    Mood.FAILED -> Action.RECOIL
+                    else -> Action.HOP
+                },
+            )
         }
         if (overlayLeft > 0f) {
             overlayLeft -= dt

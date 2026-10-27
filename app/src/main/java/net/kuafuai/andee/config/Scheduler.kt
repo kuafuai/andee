@@ -121,6 +121,17 @@ object Scheduler {
         }
     }
 
+    /**
+     * Bring the plan's bubble alarms in line with the plan ([net.kuafuai.andee.config.Plans.reconcile]). After
+     * every plan write — by the model or by the user in settings — and once at start.
+     */
+    fun syncPlan(context: Context) {
+        val s = Notebook.plans(context).reconcile()
+        s.cancel.forEach { cancelTodo(context, it) }
+        s.arm.forEach { armTodo(context, it) }
+        if (s.arm.isNotEmpty() || s.cancel.isNotEmpty()) Log.i(TAG, "plan: armed ${s.arm.size}, cancelled ${s.cancel.size}")
+    }
+
     fun cancelTodo(context: Context, id: String) {
         runCatching {
             am(context).cancel(todoIntent(context, id))
