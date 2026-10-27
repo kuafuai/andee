@@ -34,4 +34,11 @@ class HistoryTrimTest {
         val d = HistoryTrim.dropIndexes(b, 60)
         assertEquals(30, d.size)
     }
+
+    @Test fun aStoppedTaskIsKeptEvenWhenAnotherTurnIsNewer() {
+        // system + a 70-message task stopped at the step limit + a todo's 2-message turn after it.
+        val b = listOf(false) + turn(70) + turn(2)
+        assertTrue("without the guard the task goes", 1 in HistoryTrim.dropIndexes(b, 60))
+        assertEquals(emptyList<Int>(), HistoryTrim.dropIndexes(b, 60, keepFrom = 1))
+    }
 }

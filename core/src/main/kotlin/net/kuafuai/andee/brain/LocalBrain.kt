@@ -584,6 +584,81 @@ class LocalBrain(
      */
     private var turnAnswer: String? = null
 
+    /**
+     * Loop thread only. A task that stopped before it was done — at the step limit, or cut by the repeat
+     * guard — and the user may yet say 继续 to.
+     *
+     * Without this the stop was invisible to the model and the task fragile. The sentence the user heard was
+     * never in the history, so the model did not know it had been cut off; and the trim protects only the
+     * newest turn, so the moment anything else became newest (a todo firing between the stop and 继续 —
+     * measured, 10-22 11:30, 104 messages trimmed to 52) the whole task was dropped and 继续 meant nothing.
+     * While this is set the task's messages are kept by the trim, the harvest and topic folds alike, and every
+     * user message says what was stopped. Cleared by a later turn that acts and finishes, or by [UNFINISHED_TTL_MS].
+     */
+    private class Unfinished(val start: JSONObject, val request: String, val at: Long, val steps: Int)
+
+    private var unfinished: Unfinished? = null
+
+    /** Index of the unfinished task's first message, or [Int.MAX_VALUE] when there is none to keep. */
+    private fun keepFrom(): Int {
+        val u = unfinished ?: return Int.MAX_VALUE
+        val i = history.indexOfFirst { it === u.start }
+        if (i < 1) {
+            unfinished = null
+            return Int.MAX_VALUE
+        }
+        return i
+    }
+
+    /**
+     * End a turn that is not done: the sentence goes into the history as well as to the user, every tool call
+     * the model already made is answered (an unanswered `tool_call_id` is a 400 on the next request, which is
+     * how 继续 used to fail outright after the repeat guard), and the task is marked [unfinished].
+     */
+    private fun stopUnfinished(start: JSONObject, request: String, steps: Int, said: String, pending: List<LlmClient.ToolCall>) {
+        for (tc in pending) {
+            history += JSONObject().put("role", "tool").put("tool_call_id", tc.id)
+                .put("content", "Not run: the turn was stopped before this call (see your next message).")
+        }
+        history += JSONObject().put("role", "assistant").put("content", said)
+        unfinished = Unfinished(start, request.lineSequence().firstOrNull().orEmpty().trim().take(160), System.currentTimeMillis(), steps)
+        finish(said)
+    }
+
+    /**
+     * Answer the tool calls a cut-off turn left hanging. A turn the user stopped (or talked over) returns
+     * between one tool call and the next, so its last assistant message can name calls that never got a
+     * `tool` reply — and the API refuses the whole next request for it, which is 继续 failing outright.
+     * Each missing reply is placed right after that message's own replies, where the API expects it.
+     */
+    private fun answerDangling() {
+        val a = history.indexOfLast { it.optString("role") == "assistant" && it.has("tool_calls") }
+        if (a < 0) return
+        val calls = history[a].optJSONArray("tool_calls") ?: return
+        var end = a + 1
+        val answered = HashSet<String>()
+        while (end < history.size && history[end].optString("role") == "tool") {
+            answered += history[end].optString("tool_call_id"); end++
+        }
+        var at = end
+        for (i in 0 until calls.length()) {
+            val id = calls.optJSONObject(i)?.optString("id").orEmpty()
+            if (id.isEmpty() || id in answered) continue
+            history.add(at++, JSONObject().put("role", "tool").put("tool_call_id", id).put("content", "Not run: the turn was stopped before this call."))
+        }
+        if (at > end) host.logInfo(TAG, "answered ${at - end} tool call(s) a stopped turn left hanging")
+    }
+
+    /** The line every user message carries while a task is unfinished. Empty otherwise. */
+    private fun unfinishedNote(): String {
+        val u = unfinished ?: return ""
+        val at = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date(u.at))
+        return "\n\n(unfinished: at $at you stopped a task after ${u.steps} steps before it was done — it began with " +
+            "\"${u.request}\". Its steps are still above, and so is what you told the user when you stopped. If they want " +
+            "you to go on (继续 / go on / keep going), carry on from where you stopped — do not start over, and do not " +
+            "ask what they mean.)"
+    }
+
     /** A turn's final answer: the one place it is both said and remembered. Loop thread only. */
     private fun finish(text: String) {
         turnAnswer = text
@@ -669,7 +744,9 @@ class LocalBrain(
         if (!internal) trimHistory()
         // Where this turn's own messages begin. The harvest uses it afterwards
         // to throw away its own scaffolding and keep only the summary.
+        answerDangling()
         if (internal) internalFromIndex = history.size
+        if (!internal) unfinished?.let { if (System.currentTimeMillis() - it.at > UNFINISHED_TTL_MS) unfinished = null }
         history += if (internal) {
             // A silent turn speaks as itself, never as the user. Hanging the
             // review prompt on a `user` message would forge an utterance the
@@ -798,9 +875,13 @@ class LocalBrain(
                             ""
                         } else {
                             "\n\n(other Andees you can ask with ask_friend; list_friends has detail)\n$friends"
-                        },
+                        } +
+                        // A task cut off at the step limit, so 继续 has something to continue. See [Unfinished].
+                        unfinishedNote(),
                 )
         }
+        val turnStart = history.last()
+        var acted = false
 
         if (!internal && images.isNotEmpty()) attachUserPhotos(images)
 
@@ -849,6 +930,9 @@ class LocalBrain(
                     // are about to drop.
                     applyHarvest(answer)
                 } else if (!internal) {
+                    // A turn that did something and finished means the user has moved on — or that 继续 just
+                    // finished the job. Either way the stopped task no longer needs keeping.
+                    if (acted) unfinished = null
                     // A silent turn has nobody to answer; whatever it wrote
                     // stays in the history as its own note and that is all.
                     finish(
@@ -866,7 +950,7 @@ class LocalBrain(
             if (reply.content.isNotBlank() && !internal) onProgress(reply.content.trim())
 
             val images = mutableListOf<String>()
-            for (tc in reply.toolCalls) {
+            for ((ti, tc) in reply.toolCalls.withIndex()) {
                 if (gen != generation.get()) return
 
                 // The repeated-call guard, which is *not* the one in
@@ -879,17 +963,18 @@ class LocalBrain(
                 if (repeats >= MAX_REPEATS) {
                     host.logWarn(TAG, "same call $MAX_REPEATS× in a row: $sig")
                     BrainTrace.end(gen, "same call $MAX_REPEATS× in a row: ${tc.name}")
+                    val rest = reply.toolCalls.drop(ti)
                     if (!internal) {
-                        finish(
-                            host.text(BrainText.REPEAT_STOP,
-                                tc.name,)
-                        )
+                        stopUnfinished(turnStart, userText, step, host.text(BrainText.REPEAT_STOP, tc.name), rest)
+                    } else {
+                        rest.forEach { history += JSONObject().put("role", "tool").put("tool_call_id", it.id).put("content", "Not run: stopped.") }
                     }
                     return
                 }
 
                 if (reply.content.isBlank() && !internal) onProgress(narrate(tc.name))
                 val t0 = System.nanoTime() / 1_000_000L
+                acted = true
                 val msg = runTool(tc, images, internal, kind.untrusted)
                 BrainTrace.tool(
                     gen, tc.name, host.methodOf(tc.name), tc.argumentsRaw,
@@ -903,12 +988,7 @@ class LocalBrain(
 
         host.logWarn(TAG, "hit max steps ($maxSteps)")
         BrainTrace.end(gen, "hit max steps ($maxSteps)")
-        if (!internal) {
-            finish(
-                host.text(BrainText.MAX_STEPS,
-                    maxSteps,)
-            )
-        }
+        if (!internal) stopUnfinished(turnStart, userText, maxSteps, host.text(BrainText.MAX_STEPS, maxSteps), emptyList())
     }
 
     /**
@@ -1216,6 +1296,11 @@ class LocalBrain(
             host.logWarn(TAG, "fold of 「${fold.title}」 finished with no live range; dropped")
             return
         }
+        if (keepFrom() < until) {
+            // The stretch reaches into a task stopped before it was done; putting it away would take 继续's context.
+            host.logInfo(TAG, "fold of 「${fold.title}」 skipped: it reaches into an unfinished task")
+            return
+        }
         val firstSaid = TopicSplitter.anchorText(fold.first)
         val nextSaid = TopicSplitter.anchorText(fold.next)
         val all = host.scrollback()
@@ -1434,7 +1519,7 @@ class LocalBrain(
     private fun trimHistory() {
         val before = history.size
         if (before <= MAX_HISTORY) return
-        for (gone in HistoryTrim.dropIndexes(history.map { isBoundary(it) }, MAX_HISTORY).sortedDescending()) drop(gone)
+        for (gone in HistoryTrim.dropIndexes(history.map { isBoundary(it) }, MAX_HISTORY, keepFrom()).sortedDescending()) drop(gone)
         host.logInfo(TAG, "history trimmed to ${history.size} msgs")
     }
 
@@ -1495,7 +1580,8 @@ class LocalBrain(
             host.logInfo(TAG, "harvest skipped: nothing changed since the last one")
             return
         }
-        val cut = boundaryAtOrBefore(history.size - KEEP_TAIL_MESSAGES)
+        // Never into a task the user may still say 继续 to — see [Unfinished].
+        val cut = minOf(boundaryAtOrBefore(history.size - KEEP_TAIL_MESSAGES), keepFrom())
         if (cut < MIN_HARVEST_MESSAGES) {
             host.logInfo(TAG, "harvest skipped: only ${cut - 1} messages old enough to fold in")
             return
@@ -1559,7 +1645,7 @@ class LocalBrain(
             host.logWarn(TAG, "harvest produced no summary; nothing dropped")
             return
         }
-        val keepStart = boundaryAtOrBefore(from - KEEP_TAIL_MESSAGES)
+        val keepStart = minOf(boundaryAtOrBefore(from - KEEP_TAIL_MESSAGES), keepFrom())
         if (keepStart < 2) {
             host.logInfo(TAG, "harvest has nothing old enough to replace; kept as is")
             return
@@ -1698,6 +1784,9 @@ class LocalBrain(
         private const val MAX_REPEATS = 3
 
         private const val MAX_HISTORY = 60
+
+        /** How long a task stopped at the step limit is kept ready for 继续. See [Unfinished]. */
+        private const val UNFINISHED_TTL_MS = 60 * 60_000L
 
         /**
          * The other half of the context budget. See [historyChars] — 60
