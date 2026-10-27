@@ -802,6 +802,39 @@
     }
   },
   {
+    "localOnly": true,
+    "method": "ui.nudge",
+    "name": "nudge",
+    "description": "Hold up a small SILENT bubble over your ball: the lightest way to speak\nfirst. Nothing is read aloud, the mic stays off, and you are not\nblocked \u2014 this returns at once. If the user is busy (a card is up,\nyou are talking, a task is running, the screen is off, quiet hours)\nthe device holds it until they are not, and drops it once `ttl_minutes`\nhas passed. Ignoring it is a perfectly good answer.\n\nUSE FOR things that are fine to miss: \"该喝水啦\", \"12点了，要帮你点外卖吗？\",\n\"你下午三点有个会\". NOT for anything that needs a decision now (that is\nask_user) and NOT as a second copy of something you are saying out\nloud in this turn \u2014 say it or bubble it, never both.\n\nWith buttons, a tap comes back to you later as its own turn\n(\"[You offered in a bubble: \u2026 \u2014 the user tapped \u2026]\"). Mark the \"no\nthanks\" button as `dismiss`: tapping it just closes the bubble and\nyou hear nothing. A button only means they want it \u2014 anything\nirreversible (paying, sending) still needs its own yes.\n\nThe device rations these (per hour, per day, and per `kind`) at a\nlevel the user chose, and the user can mute a kind. A refusal says\nwhy: do not retry it, and do not dress the same thing up as another\nkind.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "buttons": {
+          "description": "0\u20133 short labels, e.g. [\"好\",\"不用\"]. Omit for a bubble that only says something.",
+          "type": "array"
+        },
+        "ttl_minutes": {
+          "default": 30,
+          "description": "How long it stays worth saying, 1\u2013720. Default 30.",
+          "type": "integer"
+        },
+        "kind": {
+          "description": "A short stable tag for this sort of bubble, e.g. water, meal, meeting. Used for rationing and for the user muting it.",
+          "type": "string"
+        },
+        "dismiss": {
+          "description": "Which button means \"no thanks\" \u2014 exactly one of `buttons`. Tapping it ends the bubble with no turn.",
+          "type": "string"
+        },
+        "text": {
+          "description": "One short sentence (≤ 60 characters), in the language the user speaks. Plain text, no markdown.",
+          "type": "string"
+        }
+      },
+      "required": ["text"]
+    }
+  },
+  {
     "method": "ui.show_html",
     "name": "show_html",
     "description": "Render a full-screen UI YOU compose, ON THIS TABLET, right now, in\nfront of the user. It is not a file you are handing them and not a\nlink \u2014 the page opens on the device in their hands the moment you\ncall this. Never tell the user to open it on a computer, in a\nbrowser, or anywhere else; there is nowhere else to open it.\n\nThis is your canvas for rich output \u2014 dashboards, comparison\ntables, image grids, small games, interactive widgets the chat\nbubble can't hold. It comes back as soon as the page is up \u2014 the\npage stays until the user taps 完成, and you are told when they do.\nDo not wait for it and do not describe the page out loud.\n\nA wall of prose is NOT rich output, however long it is. The chat\nbubble holds text: a message past six lines is folded, and the user\ndouble-taps it to read the whole thing fullscreen. So an\nexplanation, an introduction or a story belongs in your reply, not\non a page. Reach for this when the answer has STRUCTURE (rows and\ncolumns, cards, steps) or is interactive; length alone is not a\nreason.\n\nONE PAGE AT A TIME: while a page is up, calling this again REPLACES\nit in place \u2014 that is how you revise a page the user asked you to\nchange. Send the whole new page, not a diff. Never ask the user to\nclose the page first.\n\nThe page is KEPT after it closes, on this device \u2014 the user has a 产物\npanel listing everything you have made. So a page is not gone when it\nleaves the screen: list_pages shows what exists and get_page reads one\nback for revision. Check before building something the user may already\nhave.\n\nREVISING KEEPS THE HISTORY. A page you revise becomes the next VERSION\nof that same artifact; it does not become a second entry on the shelf.\nThe user's panel shows one row per artifact with its version number, and\nthey can look back through the older revisions and return to one. So\nwhen the user asks you to change an existing page, read the current one\nback (`get_page`) and send the full revised page \u2014 that pairing is what\nfiles it as a revision. Use `revise` to name the page explicitly if you\nhave its id; the device also infers it from the `get_page` you just\nmade, and from the panel the user tapped. Building the page from scratch\ninstead, without reading it back, is how a \"change\" turns into a\nnear-duplicate the user has to sort out themselves.\n\nInline CSS and JS ONLY. The device may have no usable internet, so a\npage that fetches a font, a framework or a script over the network\nrenders broken. Media is the exception: an image, video or audio\nfile at an absolute https:// address embeds directly \u2014 `<img\nsrc=\"\u2026\">`, `<video src=\"\u2026\" controls>`, `<audio src=\"\u2026\" controls>` \u2014\nand is how you show the user a picture or a clip instead of naming\na URL they would have to go and open themselves. Keep `controls` on\na player. A plain http:// address will not load.\n\nTwo things about the page itself, and neither is a matter of taste.\nThe WebView lays the page out at the width its own viewport tag asks\nfor, so send one:\n\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1,viewport-fit=cover\">\n\nAnd a ✕完成 pill floats over the top-right corner so the user can\nalways leave \u2014 keep roughly 110×44px clear there.\n\nEverything else \u2014 colour, type size, layout \u2014 is yours to pick.",
@@ -1239,6 +1272,109 @@
         }
       },
       "required": ["what"]
+    }
+  },
+  {
+    "localOnly": true,
+    "method": "note.directions",
+    "name": "plan_directions",
+    "description": "Your long-term directions with this person: what you are helping them get done these weeks, and how.\nThey are the reason behind every item of every day plan, and the user can see them \u2014 and pause or\nremove them \u2014 in Settings.\n\n- `list`: see them.\n- `add`: title, why, how_i_help, good_when, source. **Only from what the user said or did** \u2014 `source`\n  says when and what (\"10-26: 「这周要把 0.6.2 发出去」\"). A goal you think would be good for them is\n  not theirs; do not add it.\n- `update` / `pause` / `resume` / `done` / `drop`: by id.\n\nAt most 5 active; more than that is no focus at all. A direction the user paused or removed is theirs:\nyou cannot resume or re-add it unless they ask for it in so many words.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "how_i_help": {
+          "description": "What you will do about it, concretely",
+          "type": "string"
+        },
+        "action": {
+          "description": "What to do",
+          "type": "string",
+          "enum": [
+            "list",
+            "add",
+            "update",
+            "pause",
+            "resume",
+            "done",
+            "drop"
+          ]
+        },
+        "why": {
+          "description": "Why it matters to them, in their terms",
+          "type": "string"
+        },
+        "good_when": {
+          "description": "How you will know it is done",
+          "type": "string"
+        },
+        "id": {
+          "description": "For everything but list and add; take it from list",
+          "type": "string"
+        },
+        "source": {
+          "description": "When and what they said or did that makes this theirs. Required for add",
+          "type": "string"
+        },
+        "title": {
+          "description": "A few words, in the user's language",
+          "type": "string"
+        }
+      },
+      "required": ["action"]
+    }
+  },
+  {
+    "localOnly": true,
+    "method": "note.day_plan",
+    "name": "day_plan",
+    "description": "Your plan for a day: what you mean to do for this person, and when you will speak to them. The user sees\nit in Settings and can remove items; a line of it rides on every message.\n\n- `get`: the plan for `date` (today, tomorrow or YYYY-MM-DD).\n- `write`: replace the still-planned part of that day.\n  - `intent`: one sentence in your own voice and the user's language \u2014 「今天我想帮他把发布收个尾，别的事少打扰。」\n  - `items`: each `{time, slot, kind, what, because, buttons, dismiss, tag}`\n    - `time` \"HH:mm\", or \"\" with a `slot` (a loose time: 午饭前, when they first talk to me).\n    - `kind`: remind (a bubble telling them something), ask (a bubble with buttons), prepare (something\n      you do quietly ahead of time), follow_up (pick up something left half-way).\n    - `what`: for remind/ask, exactly the bubble's words (≤ 60 characters, their language); otherwise\n      what you will do.\n    - `because`: the direction or todo it serves. Required \u2014 an item that serves nothing is not part\n      of the plan.\n    - remind/ask with a `time` become bubbles at that minute with no further thought from you; what\n      happened (done / declined / ignored / skipped) is written back onto the item.\n  - `quiet`: what you will NOT bother them about today \u2014 as much a part of the plan as the items.\n  At most 5 remind/ask a day. Items already done or ignored stay as the day's history; items the user\n  removed cannot be put back.\n- `mark`: set an item done / dropped / moved by id, when it was handled some other way.\n\nA day with nothing to say is a good plan. Never plan anything irreversible (paying, sending, deleting):\nthose need the user, asked at the time.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "description": "today (default), tomorrow, or YYYY-MM-DD",
+          "type": "string"
+        },
+        "note": {
+          "description": "For mark: a few words on why",
+          "type": "string"
+        },
+        "action": {
+          "description": "What to do",
+          "type": "string",
+          "enum": [
+            "get",
+            "write",
+            "mark"
+          ]
+        },
+        "quiet": {
+          "description": "For write: what you will leave alone today",
+          "type": "array"
+        },
+        "id": {
+          "description": "For mark: the item id from get",
+          "type": "string"
+        },
+        "intent": {
+          "description": "For write: one sentence, your own voice",
+          "type": "string"
+        },
+        "items": {
+          "description": "For write: the items, see the description",
+          "type": "array"
+        },
+        "status": {
+          "description": "For mark",
+          "type": "string",
+          "enum": [
+            "done",
+            "dropped",
+            "moved"
+          ]
+        }
+      },
+      "required": ["action"]
     }
   },
   {

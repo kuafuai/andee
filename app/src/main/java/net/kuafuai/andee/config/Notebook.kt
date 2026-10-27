@@ -100,6 +100,16 @@ object Notebook {
         }
     }
 
+    @Volatile
+    private var plans: net.kuafuai.andee.config.Plans? = null
+
+    /**
+     * Directions and day plans, kept inside the notebook's own file. One instance per process: its lock is
+     * what keeps a tool write and a settings tap from interleaving their read-modify-write of the section.
+     */
+    fun plans(context: Context): net.kuafuai.andee.config.Plans =
+        plans ?: synchronized(this) { plans ?: net.kuafuai.andee.config.Plans(book(context)).also { plans = it } }
+
     /** The gear shelf (what is installed, what it is for), kept inside the notebook's own file. */
     fun gear(context: Context): net.kuafuai.andee.config.Gear = net.kuafuai.andee.config.Gear(book(context))
 

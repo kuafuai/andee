@@ -42,4 +42,9 @@ data class Todo(
      * Rows written before this field existed read as false.
      */
     val untrusted: Boolean = false,
+    /**
+     * A bubble spec (JSON) when this todo raises a bubble at its time instead of waking the model — the
+     * plan's timed items ([Plans.reconcile]). Blank for an ordinary todo.
+     */
+    val nudge: String = "",
 )

@@ -92,6 +92,10 @@ class AlarmReceiver : BroadcastReceiver() {
         if (service != null) {
             Log.i(TAG, "todo due: ${todo.what.take(60)} — handing it to the service")
             service.wakeForTodo(patched)
+        } else if (patched.nudge.isNotEmpty()) {
+            // A planned bubble is fine to miss, and a notification for one would be the loud version of the
+            // quiet thing it was. The plan item records it.
+            Notebook.plans(context).missed(patched)
         } else {
             // Nothing is running, so nothing can act on it. Say so — a silent
             // drop here is the exact failure the whole feature exists to
@@ -116,7 +120,9 @@ class AlarmReceiver : BroadcastReceiver() {
             Log.e(TAG, "catch-up after boot failed", it)
             emptyList()
         }
-        for (todo in missed.take(3)) Scheduler.notifyMissed(context, todo)
+        val (bubbles, promises) = missed.partition { it.nudge.isNotEmpty() }
+        bubbles.forEach { Notebook.plans(context).missed(it) }
+        for (todo in promises.take(3)) Scheduler.notifyMissed(context, todo)
         // The sweep timer is deliberately NOT armed here: it is armed at the
         // end of a turn, and arming it at boot would sweep a conversation the
         // user has not had yet.

@@ -83,6 +83,12 @@ interface BrainHost {
     fun gearIndex(): String = ""
 
     /**
+     * One line of the plan (see `Plans`): today's intent, the next items, the long-term directions. Empty
+     * for a host without plans, so it changes by not a byte.
+     */
+    fun planIndex(): String = ""
+
+    /**
      * One line naming the other Andees this one can ask (see `PeerTasks`), empty when it has none. Without it the
      * model answers "do you have friends" from nothing; a default, so a host without friends changes by not a byte.
      */

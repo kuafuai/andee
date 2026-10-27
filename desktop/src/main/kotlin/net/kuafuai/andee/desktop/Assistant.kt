@@ -437,6 +437,25 @@ object Assistant {
     }
 
     /** A turn is running, or its answer is being read out: what a tap on the ball should cut short. */
+    /**
+     * The user tapped a bubble's button (or the body of one with buttons): that is a turn, at the trust of
+     * the turn that wrote the bubble — a 「好」 under a bubble a notification's turn raised must not come
+     * back as the user's own request (the phone's `answerNudge`, and `Todo.untrusted` for the alarm clock).
+     */
+    fun answerNudge(n: net.kuafuai.andee.brain.Nudge, button: String?) {
+        val text = net.kuafuai.andee.brain.NudgeBook.answerText(n, button)
+        if (n.untrusted) {
+            if (brain?.isBusy() != true) busy(true)
+            ensure().wake(text, untrusted = true)
+        } else {
+            // A tap is the user asking, like [say]: it replaces whatever is running.
+            guest?.cancel()
+            if (brain?.isBusy() == true || net.kuafuai.andee.desktop.voice.MacVoice.isSpeaking()) interruptForNewRequest()
+            busy(true)
+            ensure().submit(text)
+        }
+    }
+
     fun working(): Boolean = brain?.isBusy() == true || net.kuafuai.andee.desktop.voice.MacVoice.isSpeaking()
 
     /**
@@ -488,6 +507,8 @@ object Assistant {
         DesktopScheduler.onDue = { todo -> wakeFor(todo) }
         Peers.tasks.brain = peerBrain
         DesktopScheduler.catchUp()
+        DesktopScheduler.syncPlan()
+        PlanTicks.start()
     }
 
     /**
@@ -502,7 +523,13 @@ object Assistant {
      * The wait is bounded, so a card nobody answers cannot hold an alarm back forever — it fires anyway
      * after [WAKE_PATIENCE_MS], when the card has timed out on its own.
      */
-    private fun wakeFor(todo: net.kuafuai.andee.config.Todo) = whenQuiet("wake-${todo.id}") {
+    private fun wakeFor(todo: net.kuafuai.andee.config.Todo) {
+        // A planned bubble: shown by the device, no model involved, nothing to wait for.
+        if (todo.nudge.isNotEmpty()) return Nudges.postPlanned(todo)
+        wakeBrain(todo)
+    }
+
+    private fun wakeBrain(todo: net.kuafuai.andee.config.Todo) = whenQuiet("wake-${todo.id}") {
         // busy() is the window's "working" light: only turn it on when a turn really starts, not when
         // the wake-up is merely parked behind another one.
         if (brain?.isBusy() != true) busy(true)

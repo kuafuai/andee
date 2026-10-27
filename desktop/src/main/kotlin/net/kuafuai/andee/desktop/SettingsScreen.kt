@@ -208,6 +208,25 @@ fun SettingsScreen(
             }
 
         }
+        // ---- 主动招呼: how often a bubble may go up beside the ball. 关 leftmost, as everywhere ----
+        Section(st("settings_section_nudge")) {
+            SegmentedPicker(
+                listOf("off" to st("common_off"), "few" to st("settings_nudge_few"), "normal" to st("settings_nudge_normal")),
+                Nudges.level().key.let { saved -> v["nudge"].orEmpty().ifEmpty { saved } },
+            ) { v["nudge"] = it }
+            Note(st("settings_nudge_note"))
+            // The way back from a long-press, which mutes with no confirmation. Written at once.
+            var muted by remember { mutableStateOf(Nudges.muted()) }
+            if (muted.isNotEmpty()) {
+                Note(st("settings_nudge_muted", muted.sorted().joinToString(if (zh) "、" else ", ")))
+                Row(Modifier.padding(top = 8.dp)) { Pill(st("settings_nudge_unmute")) {
+                    // `v` holds the list as it was when the card opened, and Save writes all of `v` back.
+                    Nudges.unmuteAll(); v["nudge_muted"] = ""; muted = emptySet()
+                } }
+            }
+        }
+        // ---- 它的打算: the plan, readable and trimmable by the person it is about ----
+        Section(st("settings_section_plan")) { PlanSection(zh) }
         // ---- 保险箱: a summary here, and the door to the card ----
         Section(st("settings_section_vault")) {
             val vaultN = remember { runCatching { net.kuafuai.andee.desktop.mac.MacVault.entries().size }.getOrDefault(0) }
@@ -300,6 +319,72 @@ fun SettingsScreen(
             t("数据保存在 ~/Library/Application Support/Andee，笔记本的密钥在钥匙串里。", "Data lives in ~/Library/Application Support/Andee; the notebook key is in your Keychain."),
             color = Palette.secondary, fontSize = 12.sp,
         )
+    }
+}
+
+/**
+ * 它的打算 (`Plans`, design doc §5.5). Removing and pausing are done by the device at once, not asked of the
+ * model, and the timers follow in the same click. Anything subtler goes through the box at the bottom as an
+ * ordinary message, and the model changes the plan itself.
+ */
+@Composable
+private fun PlanSection(zh: Boolean) {
+    var rev by remember { mutableStateOf(0) }
+    val plans = DesktopNotebook.plans
+    val day = remember(rev) { plans.day(plans.today()) }
+    val dirs = remember(rev) { plans.directions().filter { it.status != "dropped" && it.status != "done" } }
+    fun kind(k: String) = st("settings_plan_kind_" + if (k in setOf("ask", "prepare", "follow_up")) k else "remind")
+    fun status(s: String) = st("settings_plan_st_" + if (s in setOf("done", "declined", "ignored", "missed", "skipped", "moved", "dropped")) s else "planned")
+
+    Text(st("settings_plan_today"), color = Palette.secondary, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+    if (day == null) {
+        Note(st("settings_plan_none_today"))
+    } else {
+        Text(day.intent, color = Palette.text, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+        for (it in day.items.sortedBy { i -> i.time.ifEmpty { "99" } }) {
+            val live = it.status == "planned"
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${it.time.ifEmpty { it.slot }.ifEmpty { "·" }}  ${kind(it.kind)}  ${it.what}",
+                    color = if (live) Palette.label else Palette.secondary, fontSize = 13.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(status(it.status), color = Palette.muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
+                if (live) {
+                    Text("✕", color = Palette.accent, fontSize = 13.sp, modifier = Modifier.clickable {
+                        plans.dropItemByUser(day.date, it.id)
+                        DesktopScheduler.syncPlan()
+                        rev++
+                    }.padding(4.dp))
+                }
+            }
+        }
+        if (day.quiet.isNotEmpty()) Note(st("settings_plan_quiet", day.quiet.joinToString(if (zh) "；" else "; ")))
+    }
+    Text(st("settings_plan_directions"), color = Palette.secondary, fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp))
+    if (dirs.isEmpty()) Note(st("settings_plan_none_directions"))
+    for (d in dirs) {
+        val paused = d.status == "paused"
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                d.title + if (d.howIHelp.isNotEmpty()) " — ${d.howIHelp}" else "",
+                color = if (paused) Palette.secondary else Palette.label, fontSize = 13.sp, modifier = Modifier.weight(1f),
+            )
+            Text(st(if (paused) "settings_plan_resume" else "settings_plan_pause"), color = Palette.accent, fontSize = 12.sp,
+                modifier = Modifier.clickable { plans.setDirectionByUser(d.id, if (paused) "active" else "paused"); rev++ }.padding(6.dp))
+            Text(st("settings_plan_remove"), color = Palette.accent, fontSize = 12.sp,
+                modifier = Modifier.clickable { plans.setDirectionByUser(d.id, "dropped"); rev++ }.padding(6.dp))
+        }
+    }
+    var line by remember { mutableStateOf("") }
+    var sent by remember { mutableStateOf(false) }
+    GlassField(st("settings_plan_tell"), line, { line = it; sent = false }, hint = st("settings_plan_tell_hint"))
+    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Pill(st("settings_plan_send")) {
+            val text = line.trim()
+            if (text.isNotEmpty()) { Assistant.say(text); line = ""; sent = true }
+        }
+        if (sent) Text(st("settings_plan_sent"), color = Palette.secondary, fontSize = 12.sp, modifier = Modifier.padding(start = 10.dp))
     }
 }
 

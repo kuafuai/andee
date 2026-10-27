@@ -648,6 +648,7 @@ class NotebookBook(private val store: NotebookStore) {
             status = o.optString("status", "active"),
             createdAt = o.optLong("created_at"),
             untrusted = o.optBoolean("untrusted", false),
+            nudge = o.optString("nudge"),
         )
 
         fun toJson(t: Todo): JSONObject = JSONObject()
@@ -663,5 +664,6 @@ class NotebookBook(private val store: NotebookStore) {
             .put("status", t.status)
             .put("created_at", t.createdAt)
             .put("untrusted", t.untrusted)
+            .apply { if (t.nudge.isNotEmpty()) put("nudge", t.nudge) }
     }
 }

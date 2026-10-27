@@ -93,6 +93,9 @@ object MacBall {
     /** A tool ran: a nod, then back to the working face on its own. */
     fun onTool() { renderers.forEach { it.pulseTool() } }
 
+    /** A bubble it raised by itself just went up: wave once so the eye finds it. */
+    fun greet() { renderers.forEach { it.greet() } }
+
     /**
      * An answer came back. The opening face it was written with is held for
      * when (if) it is spoken — the phone's fallback when the cue clock is

@@ -127,6 +127,11 @@ class SettingsUi(
      * the page it just opened.
      */
     private val onOpenLink: (String) -> Unit = {},
+    /**
+     * The user typed a line to it from 它的打算 («今天别提喝水了»). Wired to the service's own user-turn path;
+     * null hides the box, because a box that sends nowhere is worse than none.
+     */
+    private val onTellBrain: ((String) -> Unit)? = null,
 ) {
 
     private val wm: WindowManager =
@@ -385,6 +390,8 @@ class SettingsUi(
         notebookSection(form)
         gearSection(form)
         notifySection(form)
+        nudgeSection(form)
+        planSection(form)
         vaultSection(form)
         maxStepsSection(form)
 
@@ -1338,6 +1345,177 @@ class SettingsUi(
             lctx.getString(R.string.settings_notify_note),
         )
     }
+
+    /**
+     * How often the ball may hold up a bubble nobody asked for. Beside the notification setting because it is
+     * the same decision — how much this thing may interrupt — and 关 is leftmost because it is the fallback
+     * for a value nobody recognises (see `VoiceConfig.nudgeLevel`; unset reads as 少).
+     */
+    private fun nudgeSection(form: LinearLayout) {
+        val panel = group(form, lctx.getString(R.string.settings_section_nudge))
+        segmented(
+            panel,
+            "nudge",
+            listOf(
+                "off" to lctx.getString(R.string.common_off),
+                "few" to lctx.getString(R.string.settings_nudge_few),
+                "normal" to lctx.getString(R.string.settings_nudge_normal),
+            ),
+        )
+        note(panel, lctx.getString(R.string.settings_nudge_note))
+        // The way back from a long-press, which mutes with no confirmation — without this the only undo was
+        // a factory reset. Written at once, like the language: there is nothing to cancel about un-muting.
+        val muted = VoiceConfig.nudgeMuted(context)
+        if (muted.isNotEmpty()) {
+            val line = noteView(lctx.getString(R.string.settings_nudge_muted, muted.sorted().joinToString("、")))
+            panel.addView(line, rowParams(dp(10)))
+            lateinit var unmute: TextView
+            unmute = button(lctx.getString(R.string.settings_nudge_unmute), filled = false) {
+                VoiceConfig.clearNudgeMuted(context)
+                line.visibility = View.GONE
+                unmute.visibility = View.GONE
+            }
+            panel.addView(unmute, rowParams(dp(10)))
+        }
+    }
+
+    /**
+     * 它的打算: the plan, readable and trimmable by the person it is about (`Plans`, design doc §5.5).
+     *
+     * Removing and pausing are done by the device at once, not asked of the model — the plan is theirs to
+     * cut — and the alarms follow in the same tap (`Scheduler.syncPlan`). Anything subtler goes through the
+     * box at the bottom as an ordinary message, and the model changes the plan itself.
+     */
+    private fun planSection(form: LinearLayout) {
+        val panel = group(form, lctx.getString(R.string.settings_section_plan))
+        val box = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        panel.addView(box, matchWrap())
+        fun fill() {
+            box.removeAllViews()
+            val plans = net.kuafuai.andee.config.Notebook.plans(context)
+            val day = plans.day(plans.today())
+            rowLabel(box, lctx.getString(R.string.settings_plan_today))
+            if (day == null) {
+                note(box, lctx.getString(R.string.settings_plan_none_today))
+            } else {
+                box.addView(noteView(day.intent).apply {
+                    setTextColor(Color.parseColor(Glass.TITLE))
+                    textSize = Glass.Type.BODY
+                }, rowParams(dp(8)))
+                for (it in day.items.sortedBy { i -> i.time.ifEmpty { "99" } }) {
+                    val live = it.status == "planned"
+                    val line = "${it.time.ifEmpty { it.slot }.ifEmpty { "·" }}  ${kindLabel(it.kind)}  ${it.what}"
+                    planRow(box, line, statusLabel(it.status), live) {
+                        if (live) {
+                            plans.dropItemByUser(day.date, it.id)
+                            net.kuafuai.andee.config.Scheduler.syncPlan(context)
+                            fill()
+                        }
+                    }
+                }
+                if (day.quiet.isNotEmpty()) note(box, lctx.getString(R.string.settings_plan_quiet, day.quiet.joinToString("；")))
+            }
+            rowLabel(box, lctx.getString(R.string.settings_plan_directions))
+            val dirs = plans.directions().filter { d -> d.status != "dropped" && d.status != "done" }
+            if (dirs.isEmpty()) note(box, lctx.getString(R.string.settings_plan_none_directions))
+            for (d in dirs) {
+                val paused = d.status == "paused"
+                val row = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+                row.addView(noteView(d.title + if (d.howIHelp.isNotEmpty()) " — ${d.howIHelp}" else "").apply {
+                    alpha = if (paused) 0.5f else 1f
+                }, LinearLayout.LayoutParams(0, WRAP, 1f))
+                row.addView(smallLink(lctx.getString(if (paused) R.string.settings_plan_resume else R.string.settings_plan_pause)) {
+                    plans.setDirectionByUser(d.id, if (paused) "active" else "paused")
+                    fill()
+                })
+                row.addView(smallLink(lctx.getString(R.string.settings_plan_remove)) {
+                    plans.setDirectionByUser(d.id, "dropped")
+                    fill()
+                })
+                box.addView(row, rowParams(dp(8)))
+            }
+        }
+        fill()
+        val tell = onTellBrain ?: return
+        rowLabel(panel, lctx.getString(R.string.settings_plan_tell))
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val et = EditText(context).apply {
+            background = Glass.well(context, dp(13))
+            setPadding(dp(14), dp(13), dp(14), dp(13))
+            setTextColor(Color.parseColor(Glass.TITLE))
+            setHintTextColor(Color.parseColor(Glass.MUTED))
+            textSize = Glass.Type.BODY
+            isSingleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT
+            hint = lctx.getString(R.string.settings_plan_tell_hint)
+        }
+        row.addView(et, LinearLayout.LayoutParams(0, WRAP, 1f))
+        val sent = noteView("")
+        row.addView(smallLink(lctx.getString(R.string.settings_plan_send)) {
+            val text = et.text?.toString().orEmpty().trim()
+            if (text.isEmpty()) return@smallLink
+            tell(text)
+            et.setText("")
+            sent.text = lctx.getString(R.string.settings_plan_sent)
+        })
+        panel.addView(row, rowParams(dp(5)))
+        panel.addView(sent, rowParams(dp(6)))
+    }
+
+    /** One plan item: what, its state, and ✕ while it is still to come. */
+    private fun planRow(parent: LinearLayout, text: String, status: String, removable: Boolean, onRemove: () -> Unit) {
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        row.addView(noteView(text).apply { alpha = if (removable) 1f else 0.6f }, LinearLayout.LayoutParams(0, WRAP, 1f))
+        row.addView(TextView(context).apply {
+            this.text = status
+            textSize = Glass.Type.CAPTION
+            setTextColor(Color.parseColor(Glass.MUTED))
+            setPadding(dp(10), 0, dp(4), 0)
+        })
+        if (removable) row.addView(smallLink("✕", onRemove))
+        parent.addView(row, rowParams(dp(6)))
+    }
+
+    private fun smallLink(label: String, onClick: () -> Unit): TextView = TextView(context).apply {
+        text = label
+        textSize = Glass.Type.CAPTION
+        setTextColor(Color.parseColor(Glass.ACCENT))
+        setPadding(dp(10), dp(8), dp(4), dp(8))
+        isClickable = true
+        Glass.pressable(this)
+        setOnClickListener { onClick() }
+    }
+
+    private fun kindLabel(kind: String): String = lctx.getString(
+        when (kind) {
+            "ask" -> R.string.settings_plan_kind_ask
+            "prepare" -> R.string.settings_plan_kind_prepare
+            "follow_up" -> R.string.settings_plan_kind_follow_up
+            else -> R.string.settings_plan_kind_remind
+        },
+    )
+
+    private fun statusLabel(status: String): String = lctx.getString(
+        when (status) {
+            "done" -> R.string.settings_plan_st_done
+            "declined" -> R.string.settings_plan_st_declined
+            "ignored" -> R.string.settings_plan_st_ignored
+            "missed" -> R.string.settings_plan_st_missed
+            "skipped" -> R.string.settings_plan_st_skipped
+            "moved" -> R.string.settings_plan_st_moved
+            "dropped" -> R.string.settings_plan_st_dropped
+            else -> R.string.settings_plan_st_planned
+        },
+    )
 
     // ---- Widgets ----
 
