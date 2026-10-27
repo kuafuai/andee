@@ -47,6 +47,10 @@ class AudioFocusGate(
     @Volatile
     private var held = false
 
+    /** Set by the [acquire] overload that wants a say; see there. */
+    @Volatile
+    private var decide: ((change: Int) -> Boolean)? = null
+
     private val listener = AudioManager.OnAudioFocusChangeListener { change ->
         when (change) {
             // All three are "stop": a phone call (LOSS_TRANSIENT), something
@@ -58,6 +62,10 @@ class AudioFocusGate(
             AudioManager.AUDIOFOCUS_LOSS,
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                if (onLost != null && decide?.invoke(change) == false) {
+                    Log.i(TAG, "focus lost ($change) — not the end of this turn")
+                    return@OnAudioFocusChangeListener
+                }
                 val cb = onLost
                 onLost = null
                 held = false
@@ -88,6 +96,30 @@ class AudioFocusGate(
      *   mid-turn. Fires at most once per [acquire].
      */
     fun acquire(onLost: () -> Unit): Boolean {
+        decide = null
+        return take(onLost)
+    }
+
+    /**
+     * [acquire], for a holder for whom not every loss means the end. [decide] sees which loss it was and
+     * returns true to end (then [onLost] fires, once, as usual) or false to carry on — the callback stays
+     * armed for the next one. Listening is that holder: it makes no sound, so a request to duck means nothing
+     * to it, and an app that grabbed the floor can be asked to give it back ([retake]).
+     */
+    fun acquire(onLost: () -> Unit, decide: (change: Int) -> Boolean): Boolean {
+        this.decide = decide
+        return take(onLost)
+    }
+
+    /** Ask for the floor again after declining a loss, so the app that took it pauses once more. */
+    fun retake(): Boolean {
+        val ok = am.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        held = ok
+        Log.i(TAG, "focus retaken: $ok")
+        return ok
+    }
+
+    private fun take(onLost: () -> Unit): Boolean {
         this.onLost = onLost
         val ok = am.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         held = ok
@@ -101,6 +133,7 @@ class AudioFocusGate(
     /** Give the floor back so the media app can resume. Safe to call twice. */
     fun release() {
         onLost = null
+        decide = null
         if (!held) return
         held = false
         runCatching { am.abandonAudioFocusRequest(request) }

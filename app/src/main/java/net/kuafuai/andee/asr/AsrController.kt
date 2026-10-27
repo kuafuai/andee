@@ -159,7 +159,8 @@ class AsrController(
         // stop in — asking and then opening the mic in the same breath would
         // still catch the tail of whatever was playing. A phone call takes the
         // floor back: end the turn rather than transcribe one side of a call.
-        focus.acquire { stop() }
+        regrabs = 0
+        focus.acquire(onLost = { stop() }, decide = ::lossEndsTurn)
 
         val listener = object : AsrEngine.Listener {
             override fun onReady() {
@@ -276,6 +277,36 @@ class AsrController(
      * two-handed exercise — and now that talking happens from the corner ball,
      * with no card in the way, "I'm done" has to be inferable from silence.
      */
+    /** How many times this turn has taken the floor back from another app. See [lossEndsTurn]. */
+    @Volatile
+    private var regrabs = 0
+
+    /**
+     * Whether losing audio focus ends this listening turn. It used to, always — the rule the speaking side
+     * needs (half an answer at a quarter volume is no answer) applied to the side that makes no sound.
+     * The cost showed up as "tap the ball mid-task, it starts listening and stops at once": the app being
+     * driven is in front then, and a video that autoplays, a chat's message tone or a voice clip the last
+     * tap opened is a focus request that took the user's sentence with it.
+     *
+     * Now only a call ends it — the call notification ([CallState]) or the audio mode, which changes the
+     * moment it rings, before any notification. A duck request means nothing to a microphone. Any other
+     * taker is asked to give the floor back, twice a turn at most so two apps cannot fight over it; after
+     * that we keep listening without it rather than drop what the user is saying.
+     */
+    private fun lossEndsTurn(change: Int): Boolean {
+        if (change == android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) return false
+        val mode = (context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager).mode
+        if (net.kuafuai.andee.device.CallState.isActive || mode != android.media.AudioManager.MODE_NORMAL) {
+            Log.i(TAG, "focus lost to a call (mode=$mode) — ending the turn")
+            return true
+        }
+        if (regrabs < MAX_REGRABS) {
+            regrabs++
+            focus.retake()
+        }
+        return false
+    }
+
     private fun armSilenceWatchdog() {
         lastSpeechAt = SystemClock.uptimeMillis()
         lastPartial = ""
@@ -382,6 +413,9 @@ class AsrController(
          * to the user as a device that would not answer.
          */
         private const val MAX_TURN_MS = 60_000L
+
+        /** See [lossEndsTurn]. */
+        private const val MAX_REGRABS = 2
 
         /**
          * How long a turn may run having heard nothing at all before the
