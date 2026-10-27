@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`15` / `"0.6.2"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`16` / `"0.7.0"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,80 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.7.0] - 2026-10-27
+
+**It can speak first now, and it has a reason to.** Until this release every turn began with the user:
+`todo` alarms, notification triage and the nightly review were all reflexes to something that had
+already happened. This adds the two things that turn a reflex into an intention — a **way** to open its
+mouth that costs almost nothing, and a **plan** that gives the opening a why.
+
+The design is written up in **[docs/design/proactive-nudge.zh-CN.md](../design/proactive-nudge.zh-CN.md)**
+(Chinese). Its rule is that the cost of interrupting is asymmetric: missing one chance to speak costs the
+user a question, while one interruption too many gets the ball muted and silences the good ones with it.
+So the default is silence, speaking needs a reason, and the reason is rationed.
+
+### Added
+
+- **Bubbles (`nudge`) — the lightest way to speak first.** A small silent bubble beside the ball, on both
+  bodies. Nothing is read aloud, the microphone stays off, and the turn is not blocked: it returns at
+  once. It fades if ignored, always yields to a card, and is rationed per hour, per day and per `kind` at
+  a level the user picks (*off / few / normal*); a kind can be muted by long-press. The bubbles yield,
+  never displace — the reasoning is that a bubble is an attempt to be useful, not a claim on attention.
+  - With up to 3 short buttons, a tap comes back later as its own turn. The button meaning "no thanks"
+    is marked `dismiss` by whoever sent the bubble rather than guessed from its label, and tapping it
+    closes the bubble **without** a turn — a refusal needs no model to answer it.
+  - Tapping the bubble's text (not a button) opens an ordinary conversation: the equivalent of the user
+    saying "go on, then".
+- **Plans (`plan_directions`, `day_plan`) — what it is trying to get done, and how today goes.**
+  - *Directions* are the long-term layer: what it is helping with over these weeks. They may be created
+    **only from what the user said or did**, and each carries a `source` naming when and what — a goal
+    the model thinks would be good for someone is not theirs to add.
+  - *Day plans* are per-day items, each pointing at a direction or a todo. A timed item becomes a bubble
+    raised by the device with **no model call at all**; outcomes are written back to the plan.
+  - **Visible and editable**: **Settings → 它的打算**. The user can pause or remove an entry; everything
+    else is done by telling it, rather than through a form with a field for every case.
+  - One plan per body. The phone and the Mac each keep their own.
+- **PlanMind — a morning look and a spaced muse.** Once a day it takes a look at the day ahead and drafts
+  a plan; for items with loose timing it thinks again at intervals. Each is a single call with no tools.
+  The nightly review compares the day's outcomes before drafting tomorrow, and looks over the directions
+  weekly.
+- **`kitten` look and voice**, and stronger personas across the existing looks.
+
+### Changed
+
+- **The step limit no longer loses the task.** See *Fixed* below; this is listed because it changes what
+  the user sees after a long task, which is now resumable by `继续` rather than silently truncated.
+
+### Fixed
+
+- **`继续` after the step limit now picks up where the task stopped.** Three things were wrong at once: the
+  sentence the user heard never reached the history, so the model did not know it had been cut off; the
+  trim protected only the newest turn, so a todo firing between the stop and the `继续` made the task
+  "old" and it was dropped (measured 2026-10-22: 104 messages trimmed to 52, task gone); and tool calls
+  left unanswered by the stopped turn made the next request fail with HTTP 400.
+  - A turn stopped by the step limit or the repeat guard is now kept **unfinished**: its sentence goes
+    into the history, its messages survive the trim, the harvest and the topic folds, and every user
+    message says what was stopped until a later turn finishes it or an hour passes.
+  - `ContinueAfterStepLimitTest` replays the failure against a scripted model, and fails on the old code.
+- **Android: tapping the ball mid-task no longer ends listening immediately.** Listening was ended on
+  every loss of audio focus — a rule that speaking needs, applied to the side that makes no sound. Mid
+  task the driven app is in front, and its autoplay, message tone or voice clip took the floor, closing
+  the turn the tap had just opened. Now a duck request is ignored, a call still ends the turn, and any
+  other taker is asked to hand the floor back — at most twice a turn — while listening carries on.
+  *Reasoned from the code, not from a capture: the Huawei test phone keeps no app logs and its voice key
+  is invalid, so this is not yet verified on a device.*
+- **macOS: the notification store is found on every version.** Andee looked for `usernoted`'s database in
+  one place only — the group container macOS 15 uses. Earlier systems keep it under the per-user Darwin
+  directory, where the file does not exist, and that was reported as missing Full Disk Access, so
+  granting it and restarting changed nothing. Now each known location is tried in turn (the old one asked
+  of the system with `confstr(_CS_DARWIN_USER_DIR)`, not derived from `$TMPDIR`, which the JVM
+  replaces); **"no store anywhere" and "the store refuses us" are separate states**, and only the second
+  is a permission problem — the first says so plainly and offers no button to System Settings; and the
+  read happens in-process through `libsqlite3` instead of forking `/usr/bin/sqlite3`, which had swallowed
+  the reason a read failed.
+  *Verified on macOS 15.5 against the live store, including a row still in the WAL, and against a fake
+  home for both failure states. The macOS 14 location is not verified on a device.*
 
 ## [0.6.2] - 2026-10-26
 
