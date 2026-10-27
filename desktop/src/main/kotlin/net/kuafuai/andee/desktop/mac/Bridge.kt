@@ -111,7 +111,7 @@ object Bridge {
     fun brightnessSet(b: Double) = lib?.andee_brightness_set(b) == 1
     fun location(): JSONObject = JSONObject(str(need().andee_location()))
 
-    /** Newest record id in the system notification store; -1 when it cannot be read (Full Disk Access). */
+    /** Newest record id in the system notification store; -1 when it refuses us (Full Disk Access), -2 when there is no store where this macOS keeps it. */
     fun notifLatestId(): Long = lib?.andee_notif_latest_id() ?: -1
     /** Records after [afterId]: id, bundle, app, title, subtitle, body, when. */
     fun notifSince(afterId: Long): JSONObject = JSONObject(str(need().andee_notif_since(afterId)))

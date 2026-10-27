@@ -206,6 +206,13 @@ fun SettingsScreen(
                     color = Palette.warn, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp),
                 )
             }
+            if (net.kuafuai.andee.desktop.mac.MacNotifications.state == net.kuafuai.andee.desktop.mac.MacNotifications.State.NOT_FOUND) {
+                Text(
+                    t("这台 Mac 上找不到通知数据库，暂时读不了通知。这不是权限问题，开完全磁盘访问也没用。",
+                        "No notification store found on this Mac, so notifications cannot be read yet. This is not a permission problem; Full Disk Access will not help."),
+                    color = Palette.warn, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp),
+                )
+            }
 
         }
         // ---- 主动招呼: how often a bubble may go up beside the ball. 关 leftmost, as everywhere ----

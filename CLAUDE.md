@@ -660,6 +660,7 @@ meetings, gear, friends) and lists exactly the tools some provider handles. What
   ball steal the first one's state. Both use `ballTaps(ballActions(…))`, the phone's vocabulary: tap stops and
   listens, double-tap stops and types, long-press opens the window; a sideways drag on the chat ball switches
   character.
+- **Notifications come from `usernoted`'s SQLite store, and where it is depends on the macOS version** (`notifCandidates` in `AndeeMac.swift`): macOS 15 keeps it in `~/Library/Group Containers/group.com.apple.usernoted/db2`, earlier systems under `confstr(_CS_DARWIN_USER_DIR)` + `com.apple.notificationcenter/db2` (never derive that from `$TMPDIR` — the JVM replaces it). Only the first was tried, and a store that was not there was reported as missing Full Disk Access, so the user granted it and was told the same thing forever. `andee_notif_latest_id` now answers -2 for "no store anywhere" (`State.NOT_FOUND`, no permission button) and -1 for "exists but refuses us" (`NO_ACCESS`), and reads in process through `libsqlite3` (read-only, busy timeout, since `usernoted` is writing the WAL) instead of forking `/usr/bin/sqlite3`, which swallowed the reason.
 - **A prompt card appears beside the ball** (`PromptWindow`), which may be on a screen the user is not looking
   at. A friend's request therefore plays a sound and waves the ball first — the first one timed out unseen.
 

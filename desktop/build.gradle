@@ -43,7 +43,7 @@ tasks.register('buildBridge', Exec) {
     inputs.file(src)
     outputs.file(out)
     doFirst { out.parentFile.mkdirs() }
-    commandLine 'swiftc', '-O', '-target', swiftTarget, '-emit-library', '-framework', 'CoreDisplay', '-framework', 'CoreLocation', src.path, '-o', out.path
+    commandLine 'swiftc', '-O', '-target', swiftTarget, '-emit-library', '-framework', 'CoreDisplay', '-framework', 'CoreLocation', '-lsqlite3', src.path, '-o', out.path
 }
 tasks.register('buildNative') { dependsOn('buildTrashTool', 'buildBridge') }
 sourceSets.main.resources.srcDir(nativeOut)

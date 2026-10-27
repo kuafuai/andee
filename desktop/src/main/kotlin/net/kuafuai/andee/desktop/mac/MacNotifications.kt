@@ -54,7 +54,21 @@ object MacNotifications {
         fun act(text: String)
     }
 
-    enum class State { OFF, WATCHING, NO_ACCESS }
+    /**
+     * [NO_ACCESS] and [NOT_FOUND] are two different fixes and must never be reported as each other: the first
+     * is Full Disk Access, the second is a macOS that keeps the store somewhere Andee does not know (see
+     * `notifCandidates` in AndeeMac.swift). A missing store used to read as [NO_ACCESS], so the user granted
+     * the permission, restarted, and was told the same thing again, forever.
+     */
+    enum class State { OFF, WATCHING, NO_ACCESS, NOT_FOUND }
+
+    /** The bridge's answer for the newest record id: -2 no store, -1 refused, else an id. */
+    private fun stateFor(id: Long): State = when {
+        id == -2L -> State.NOT_FOUND
+        id < 0 -> State.NO_ACCESS
+        Bridge.notifWatch(onChange) -> State.WATCHING
+        else -> State.NO_ACCESS
+    }
 
     @Volatile var state = State.OFF
         private set
@@ -74,11 +88,7 @@ object MacNotifications {
     fun start(h: Host) = exec.execute {
         host = h
         lastId = Bridge.notifLatestId()
-        state = when {
-            lastId < 0 -> State.NO_ACCESS
-            Bridge.notifWatch(onChange) -> State.WATCHING
-            else -> State.NO_ACCESS
-        }
+        state = stateFor(lastId)
         Log.i(TAG, "notification store: $state (from record $lastId)")
     }
 
@@ -95,11 +105,7 @@ object MacNotifications {
         val id = Bridge.notifLatestId()
         if (id > lastId) lastId = id
         if (state == State.WATCHING) return
-        state = when {
-            id < 0 -> State.NO_ACCESS
-            Bridge.notifWatch(onChange) -> State.WATCHING
-            else -> State.NO_ACCESS
-        }
+        state = stateFor(id)
         Log.i(TAG, "notification store re-checked: $state (from record $lastId)")
     }
 
@@ -193,6 +199,7 @@ object MacNotifications {
             .put("scope", Settings.get("notify").ifEmpty { "off" })
             .put("items", arr)
         if (state == State.NO_ACCESS) o.put("how_to_enable", NO_ACCESS_NOTE)
+        else if (state == State.NOT_FOUND) o.put("note", NOT_FOUND_NOTE)
         else if (Settings.get("notify").let { it != "chat" && it != "all" }) {
             o.put("note", "Notifications are recorded but Andee does not act on them: the user has the Notifications setting off.")
         }
@@ -219,6 +226,11 @@ object MacNotifications {
         "Andee cannot read the Mac's notification store. In System Settings → Privacy & Security → Full Disk Access, " +
             "click + and add ${PermissionHelp.appPath() ?: "Andee.app"}, switch it on, then quit and reopen Andee (⌘Q). " +
             "If Andee is already listed and on, remove it with − and add it again (it belongs to an earlier build)."
+
+    val NOT_FOUND_NOTE: String get() =
+        "Andee cannot find the Mac's notification store at any place this version of macOS is known to keep it. " +
+            "This is not a permission problem — Full Disk Access will not change it. Tell the user plainly that reading " +
+            "notifications does not work on this Mac yet, and do not send them to System Settings for it."
 
     /** Apps a person writes to you from, by bundle id (lowercased). */
     private val CHAT_APPS = setOf(

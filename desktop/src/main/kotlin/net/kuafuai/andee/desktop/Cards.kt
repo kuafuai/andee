@@ -63,10 +63,19 @@ fun SelfCheckCard(onDone: () -> Unit, onOpenSettings: () -> Unit) {
         add(CheckRow("rec", if (zh) "录屏" else "Screen Recording", rec,
             if (rec) if (zh) "能看见屏幕" else "Can see the screen" else if (zh) "截图拿不到" else "Screenshots are blocked",
             { openPane("Privacy_ScreenCapture") }))
-        val fda = net.kuafuai.andee.desktop.mac.MacNotifications.state != net.kuafuai.andee.desktop.mac.MacNotifications.State.NO_ACCESS
-        add(CheckRow("fda", if (zh) "完全磁盘访问" else "Full Disk Access", fda,
-            if (fda) if (zh) "能读通知" else "Can read notifications" else if (zh) "读不到通知数据库" else "Cannot read the notification store",
-            { openPane("Privacy_AllFiles") }))
+        val notif = net.kuafuai.andee.desktop.mac.MacNotifications.state
+        if (notif == net.kuafuai.andee.desktop.mac.MacNotifications.State.NOT_FOUND) {
+            // Not a permission row in disguise: no store at any known place. No button — Full Disk Access is
+            // exactly the fix that does not work here, and a button to it is how this used to go wrong.
+            add(CheckRow("fda", if (zh) "通知" else "Notifications", false,
+                if (zh) "这台 Mac 上找不到通知数据库，不是权限问题，开完全磁盘访问也没用" else "No notification store found on this Mac — not a permission problem; Full Disk Access will not help",
+                null))
+        } else {
+            val fda = notif != net.kuafuai.andee.desktop.mac.MacNotifications.State.NO_ACCESS
+            add(CheckRow("fda", if (zh) "完全磁盘访问" else "Full Disk Access", fda,
+                if (fda) if (zh) "能读通知" else "Can read notifications" else if (zh) "读不到通知数据库" else "Cannot read the notification store",
+                { openPane("Privacy_AllFiles") }))
+        }
         // Asked of the backend in force, not of one key's name: under CodeFlying the key is codeflying_key,
         // and the same key carries the voice. Reading llm_api_key there said "missing" for a Mac that worked.
         val cf = Assistant.config().mode == net.kuafuai.andee.config.BrainConfig.BRAIN_CODEFLYING

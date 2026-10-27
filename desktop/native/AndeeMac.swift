@@ -6,6 +6,7 @@
 //   swiftc -O -target arm64-apple-macos14 -emit-library AndeeMac.swift -o libandeemac.dylib
 // macOS 14 is the floor: ScreenCaptureKit's one-shot screenshot arrived there.
 
+import SQLite3
 import AppKit
 import ApplicationServices
 import AVFoundation
@@ -436,54 +437,102 @@ public func andee_set_own_alpha(_ alpha: Double) -> Int32 {
 /// Watching that file's directory tells us within moments that something new
 /// arrived, whether or not a banner was shown (Focus and per-app banner
 /// settings do not stop the write). Read-only; never touches the file.
-private let notifDir = (NSHomeDirectory() as NSString)
-    .appendingPathComponent("Library/Group Containers/group.com.apple.usernoted/db2")
-
-private func notifQuery(_ sql: String) -> [[String: Any]]? {
-    let p = Process()
-    p.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
-    p.arguments = ["-readonly", "-json", "file:\(notifDir)/db?mode=ro", sql]
-    let out = Pipe(), err = Pipe()
-    p.standardOutput = out; p.standardError = err
-    do { try p.run() } catch { return nil }
-    let data = out.fileHandleForReading.readDataToEndOfFile()
-    p.waitUntilExit()
-    if p.terminationStatus != 0 { return nil }
-    if data.isEmpty { return [] }
-    return (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]]
+///
+/// **Where that file is depends on the macOS version**, and assuming one place
+/// is how a Mac ended up "without permission" forever: the store was not there,
+/// the failed read was reported as a missing Full Disk Access grant, and granting
+/// it changed nothing. macOS 15 keeps it in the usernoted group container; earlier
+/// systems keep it under the per-user Darwin directory
+/// (`confstr(_CS_DARWIN_USER_DIR)`, i.e. `/var/folders/…/0/`). Asked of the system
+/// rather than derived from `$TMPDIR`, which the JVM replaces with its own.
+private func notifCandidates() -> [String] {
+    var out = [(NSHomeDirectory() as NSString)
+        .appendingPathComponent("Library/Group Containers/group.com.apple.usernoted/db2")]
+    var buf = [CChar](repeating: 0, count: Int(PATH_MAX))
+    if confstr(_CS_DARWIN_USER_DIR, &buf, buf.count) > 0 {
+        out.append((String(cString: buf) as NSString).appendingPathComponent("com.apple.notificationcenter/db2"))
+    }
+    return out
 }
 
-/// Can the store be read at all (Full Disk Access may be required): -1 unreadable, else the newest record id.
+/// Where the store is: a readable directory, nowhere we know of, or somewhere we are not allowed to read.
+private enum NotifStore { case at(String), missing, denied }
+
+/// First candidate whose `db` opens. A path that exists but refuses us (EPERM/EACCES — the TCC answer) is
+/// "denied"; only when no candidate exists at all is it "missing" — two different fixes, so two answers.
+private func notifLocate() -> NotifStore {
+    var denied = false
+    for dir in notifCandidates() {
+        let fd = open(dir + "/db", O_RDONLY)
+        if fd >= 0 { close(fd); return .at(dir) }
+        if errno == EPERM || errno == EACCES { denied = true }
+    }
+    return denied ? .denied : .missing
+}
+
+/// One query, in process, through the system's own SQLite, read-only. `usernoted` is writing to the same
+/// file (its WAL is where new rows land first), so a short busy timeout rather than failing on its lock.
+/// Nil when it cannot be opened or the statement fails.
+private func notifQuery(_ dir: String, _ sql: String) -> [[String: Any]]? {
+    var db: OpaquePointer?
+    guard sqlite3_open_v2(dir + "/db", &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let db = db else {
+        sqlite3_close(db)
+        return nil
+    }
+    defer { sqlite3_close(db) }
+    sqlite3_busy_timeout(db, 1000)
+    var st: OpaquePointer?
+    guard sqlite3_prepare_v2(db, sql, -1, &st, nil) == SQLITE_OK, let st = st else { return nil }
+    defer { sqlite3_finalize(st) }
+    var rows: [[String: Any]] = []
+    while true {
+        let rc = sqlite3_step(st)
+        if rc == SQLITE_DONE { break }
+        if rc != SQLITE_ROW { return nil }
+        var row: [String: Any] = [:]
+        for i in 0..<sqlite3_column_count(st) {
+            let name = String(cString: sqlite3_column_name(st, i))
+            switch sqlite3_column_type(st, i) {
+            case SQLITE_INTEGER: row[name] = NSNumber(value: sqlite3_column_int64(st, i))
+            case SQLITE_FLOAT: row[name] = NSNumber(value: sqlite3_column_double(st, i))
+            case SQLITE_TEXT: row[name] = String(cString: sqlite3_column_text(st, i))
+            case SQLITE_BLOB:
+                let n = Int(sqlite3_column_bytes(st, i))
+                if let p = sqlite3_column_blob(st, i) { row[name] = Data(bytes: p, count: n) }
+            default: break
+            }
+        }
+        rows.append(row)
+    }
+    return rows
+}
+
+/// Can the store be read at all: the newest record id, -1 when it exists and refuses us (Full Disk Access),
+/// -2 when there is no store at any place this Mac's macOS is known to keep it.
 @_cdecl("andee_notif_latest_id")
 public func andee_notif_latest_id() -> Int64 {
-    guard let rows = notifQuery("select coalesce(max(rec_id),0) m from record"),
-          let m = (rows.first?["m"] as? NSNumber)?.int64Value else { return -1 }
-    return m
-}
-
-private func hexData(_ s: String) -> Data? {
-    var d = Data(capacity: s.count / 2)
-    var i = s.startIndex
-    while i < s.endIndex {
-        let j = s.index(i, offsetBy: 2)
-        guard let b = UInt8(s[i..<j], radix: 16) else { return nil }
-        d.append(b); i = j
+    switch notifLocate() {
+    case .missing: return -2
+    case .denied: return -1
+    case .at(let dir):
+        guard let rows = notifQuery(dir, "select coalesce(max(rec_id),0) m from record"),
+              let m = (rows.first?["m"] as? NSNumber)?.int64Value else { return -1 }
+        return m
     }
-    return d
 }
 
 /// Every record newer than [afterId], decoded: id, app bundle id, app name, title, subtitle, body, delivered (epoch ms).
 @_cdecl("andee_notif_since")
 public func andee_notif_since(_ afterId: Int64) -> UnsafeMutablePointer<CChar> {
-    let sql = "select r.rec_id id, a.identifier bundle, r.delivered_date d, hex(r.data) data from record r join app a using(app_id) where r.rec_id > \(afterId) order by r.rec_id limit 50"
-    guard let rows = notifQuery(sql) else { return json(["error": "unreadable"]) }
+    let sql = "select r.rec_id id, a.identifier bundle, r.delivered_date d, r.data data from record r join app a using(app_id) where r.rec_id > \(afterId) order by r.rec_id limit 50"
+    guard case .at(let dir) = notifLocate(), let rows = notifQuery(dir, sql) else { return json(["error": "unreadable"]) }
     var out: [[String: Any]] = []
     for r in rows {
         let id = (r["id"] as? NSNumber)?.int64Value ?? 0
         let bundle = (r["bundle"] as? String) ?? ""
         var o: [String: Any] = ["id": id, "bundle": bundle]
         if let d = (r["d"] as? NSNumber)?.doubleValue { o["when"] = Int64((d + 978_307_200) * 1000) }
-        if let h = r["data"] as? String, let blob = hexData(h),
+        if let blob = r["data"] as? Data,
            let pl = try? PropertyListSerialization.propertyList(from: blob, format: nil) as? [String: Any],
            let req = pl["req"] as? [String: Any] {
             o["title"] = req["titl"] as? String ?? ""
@@ -508,6 +557,7 @@ public func andee_notif_watch(_ cb: NotifCallback) -> Int32 {
     notifKeep.forEach { $0.cancel() }
     let q = DispatchQueue(label: "andee.notif")
     var sources: [DispatchSourceFileSystemObject] = []
+    guard case .at(let notifDir) = notifLocate() else { notifKeep = []; return 0 }
     for path in [notifDir, notifDir + "/db-wal", notifDir + "/db"] {
         let fd = open(path, O_EVTONLY)
         if fd < 0 { continue }
