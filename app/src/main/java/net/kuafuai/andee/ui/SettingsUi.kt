@@ -391,6 +391,7 @@ class SettingsUi(
         gearSection(form)
         notifySection(form)
         nudgeSection(form)
+        driveSection(form)
         planSection(form)
         vaultSection(form)
         maxStepsSection(form)
@@ -1351,6 +1352,16 @@ class SettingsUi(
      * the same decision — how much this thing may interrupt — and 关 is leftmost because it is the fallback
      * for a value nobody recognises (see `VoiceConfig.nudgeLevel`; unset reads as 少).
      */
+    /**
+     * 自己动起来: whether it may look at what is on its mind and get up for it without being asked
+     * ([net.kuafuai.andee.brain.Heartbeat]). 关 leftmost, the fallback for a value nobody recognises; unset reads as 开.
+     */
+    private fun driveSection(form: LinearLayout) {
+        val panel = group(form, lctx.getString(R.string.settings_section_drive))
+        segmented(panel, "drive", listOf("off" to lctx.getString(R.string.common_off), "on" to lctx.getString(R.string.common_on)))
+        note(panel, lctx.getString(R.string.settings_drive_note))
+    }
+
     private fun nudgeSection(form: LinearLayout) {
         val panel = group(form, lctx.getString(R.string.settings_section_nudge))
         segmented(

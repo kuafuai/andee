@@ -3079,6 +3079,8 @@ class BodyCoreService : Service() {
         val keyguard = getSystemService(android.app.KeyguardManager::class.java)
         if (power?.isInteractive != true || keyguard?.isKeyguardLocked == true) return
         val free = !dispatcher.isTaskActive() && !audio.isStreamPlaying() && !asr.isActive() && !meeting.isActive()
+        val brain = localBrain
+        val drive = net.kuafuai.andee.config.VoiceConfig.driveEnabled(this)
         planExec.execute {
             val plans = net.kuafuai.andee.config.Notebook.plans(this)
             val mind = net.kuafuai.andee.brain.PlanMind(cfg, plans) { warn, msg ->
@@ -3092,6 +3094,36 @@ class BodyCoreService : Service() {
                     plans.bubbleForItem(id, dispatcher.nudgeBook, level, net.kuafuai.andee.config.VoiceConfig.nudgeMuted(this))
                         ?.let(net.kuafuai.andee.ui.NudgeUi::post)
                 }
+            }
+            if (free && drive && brain != null && !brain.isBusy()) heartbeat(cfg, brain, plans, lang)
+        }
+    }
+
+    /**
+     * Is anything on its mind worth getting up for ([net.kuafuai.andee.brain.Heartbeat])? Rides the plan tick:
+     * same presence check, same worker, and the beat keeps its own pace (about every 20 minutes) and budget. A
+     * `work` verdict starts a quiet turn of its own ([net.kuafuai.andee.brain.SelfWork]): no voice, no screen,
+     * and one scrollback row when it is done, so what it did is never invisible. [planExec] only.
+     */
+    private fun heartbeat(
+        cfg: net.kuafuai.andee.config.BrainConfig,
+        brain: net.kuafuai.andee.brain.LocalBrain,
+        plans: net.kuafuai.andee.config.Plans,
+        lang: String,
+    ) {
+        val self = net.kuafuai.andee.config.Notebook.selfhood(this)
+        val drive = net.kuafuai.andee.config.Notebook.drive(this)
+        val log: (Boolean, String) -> Unit = { warn, msg -> if (warn) android.util.Log.w("Drive", msg) else android.util.Log.i("Drive", msg) }
+        val v = net.kuafuai.andee.brain.Heartbeat(cfg, self, drive, { plans.indexForPrompt() }, log).beat(lang)
+        if (v !is net.kuafuai.andee.brain.Heartbeat.Verdict.Work) return
+        log(false, "work on ${v.care.id} (${v.care.what}): ${v.why}")
+        net.kuafuai.andee.brain.SelfWork.start(brain, self, drive, v.care, v.ratio, v.why) { effect, summary ->
+            log(false, "work on ${v.care.id} booked as $effect")
+            if (effect != net.kuafuai.andee.config.Selfhood.Effect.NOTHING && summary != null) {
+                val text = net.kuafuai.andee.text.stripMarkdown(net.kuafuai.andee.brain.SpeechMood.parse(summary).text)
+                net.kuafuai.andee.ui.ChatHistory.addAssistant(
+                    net.kuafuai.andee.i18n.AppLocale.str(this, R.string.drive_row, v.care.what, text.take(160)),
+                )
             }
         }
     }

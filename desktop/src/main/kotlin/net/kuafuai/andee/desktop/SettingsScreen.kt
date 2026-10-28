@@ -232,6 +232,14 @@ fun SettingsScreen(
                 } }
             }
         }
+        // ---- 自己动起来: the heartbeat and the work turns it starts. 关 leftmost; unset reads as 开 ----
+        Section(st("settings_section_drive")) {
+            SegmentedPicker(
+                listOf("off" to st("common_off"), "on" to st("common_on")),
+                v["drive"].orEmpty().ifEmpty { if (DesktopNotebook.driveEnabled()) "on" else "off" },
+            ) { v["drive"] = it }
+            Note(st("settings_drive_note"))
+        }
         // ---- 它的打算: the plan, readable and trimmable by the person it is about ----
         Section(st("settings_section_plan")) { PlanSection(zh) }
         // ---- 保险箱: a summary here, and the door to the card ----

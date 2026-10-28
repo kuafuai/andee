@@ -153,7 +153,24 @@ class LocalBrain(
      * kind does: a task another device handed us must still send its answer back
      * when it happened to arrive while something else was running.
      */
-    private data class Queued(val text: String, val kind: TurnKind, val onAnswer: ((String?) -> Unit)? = null)
+    private data class Queued(
+        val text: String,
+        val kind: TurnKind,
+        val onAnswer: ((String?) -> Unit)? = null,
+        /** [TurnKind.WORK] only: the territory it was given, applied when it actually runs. */
+        val territory: String? = null,
+    )
+
+    /**
+     * One tool call a [TurnKind.WORK] turn made, as the device saw it. [effective] is false when the call was
+     * refused or its write did not land (`{"written": false, …}`), so a refusal cannot count as having done
+     * something. [action] is the call's `action` argument, which is what tells a read from a write on the
+     * tools that do both.
+     */
+    data class WorkCall(val method: String, val action: String, val callId: String, val effective: Boolean)
+
+    /** What a work turn left behind: its closing words (never spoken) and every tool call it made. */
+    data class WorkResult(val summary: String?, val calls: List<WorkCall>)
 
     /**
      * Why a turn is running — which decides two things: whether the user hears
@@ -484,11 +501,18 @@ class LocalBrain(
         kind: TurnKind,
         images: List<String> = emptyList(),
         onAnswer: ((String?) -> Unit)? = null,
+        territory: String? = null,
     ) {
         val gen = generation.incrementAndGet()
         loop.execute {
             busy.set(true)
             currentKind = kind
+            if (kind == TurnKind.WORK) {
+                // Per turn, here, so a queued work turn cannot inherit the one before it.
+                workTerritory = territory
+                workSummary = null
+                workCalls.clear()
+            }
             turnAnswer = null
             host.turnStarted(kind.name)
             turnTokens = 0
@@ -589,7 +613,7 @@ class LocalBrain(
     private fun drainWakes() {
         val next = pendingWakes.removeFirstOrNull() ?: return
         host.logInfo(TAG, "running a queued ${next.kind} turn: ${next.text.take(60)}")
-        launch(next.text, next.kind, onAnswer = next.onAnswer)
+        launch(next.text, next.kind, onAnswer = next.onAnswer, territory = next.territory)
     }
 
     /**
@@ -601,6 +625,11 @@ class LocalBrain(
     /** Loop thread only. The closing words of a [TurnKind.WORK] turn; read by [work]'s callback. Never spoken. */
     private var workSummary: String? = null
 
+    /** Loop thread only. The tool calls of the [TurnKind.WORK] turn running now; see [WorkCall]. */
+    private val workCalls = mutableListOf<WorkCall>()
+
+    private fun workResult() = WorkResult(workSummary, workCalls.toList())
+
     /**
      * Wake up on a care of its own: a [TurnKind.WORK] turn. Queued behind whatever is running (never cuts a
      * user off), and answered to [onDone] with the model's closing words and whether any tool with an effect
@@ -608,18 +637,17 @@ class LocalBrain(
      *
      * [territory] names the tool set it may use (see [BrainHost.workTools]); null = the default set.
      */
-    fun work(text: String, territory: String?, onDone: (summary: String?) -> Unit) {
+    fun work(text: String, territory: String?, onDone: (WorkResult) -> Unit) {
         val t = text.trim()
         if (t.isEmpty()) return
         loop.execute {
-            val job = Queued(t, TurnKind.WORK) { onDone(workSummary) }
+            val job = Queued(t, TurnKind.WORK, { onDone(workResult()) }, territory)
             if (busy.get()) {
                 host.logInfo(TAG, "work queued behind a running turn: ${t.take(60)}")
                 pendingWakes.addLast(job)
                 return@execute
             }
-            workTerritory = territory
-            launch(t, TurnKind.WORK, onAnswer = { onDone(workSummary) })
+            launch(t, TurnKind.WORK, onAnswer = job.onAnswer, territory = territory)
         }
     }
 
@@ -1118,6 +1146,15 @@ class LocalBrain(
                         "bubble (nudge) or write it in your diary, and say it next time they talk to you.",
                 )
             }
+            // The list a work turn is given is a request; this is the wall. A model that names a tool it was not
+            // handed (a tap, a shell command) would otherwise reach it through [BrainHost.methodOf] all the same.
+            if (currentKind == TurnKind.WORK && !SelfWork.allowed(method)) {
+                return toolMessage(
+                    tc.id,
+                    "$method is not open to a turn you started yourself: it has no screen, device or shell. Write down what you " +
+                        "would do and why (wiki, diary, the care's note), or leave a bubble, and do it when the user is with you.",
+                )
+            }
             // A task another device handed over is done here, never handed on: see [TurnKind.PEER].
             if (method == "peer.ask" && currentKind == TurnKind.PEER) {
                 return toolMessage(
@@ -1139,6 +1176,7 @@ class LocalBrain(
             }
 
             val result = dispatchWithTimeout(method, args, tc.id, silent, untrusted)
+            if (currentKind == TurnKind.WORK) workCalls += WorkCall(method, args.optString("action"), tc.id, landed(result))
             when (result) {
                 is JSONObject -> {
                     extractImages(result, images)
@@ -1156,6 +1194,13 @@ class LocalBrain(
             "Failed: ${t.message ?: t.javaClass.simpleName}"
         }
         return toolMessage(tc.id, body.take(MAX_TOOL_CHARS))
+    }
+
+    /** False when a handler answered that its write did not happen — `{"written": false}` and its siblings. */
+    private fun landed(result: Any?): Boolean {
+        val o = result as? JSONObject ?: return true
+        if (o.optBoolean("timed_out")) return false
+        return NOT_DONE_KEYS.none { o.has(it) && o.opt(it) == false }
     }
 
     private fun dispatchWithTimeout(method: String, params: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? {
@@ -1838,6 +1883,9 @@ class LocalBrain(
 
         private const val MAX_HISTORY = 60
 
+        /** The keys a handler uses to say its write did or did not happen (`LifeTools`, the notebook). */
+        private val NOT_DONE_KEYS = listOf("written", "added", "changed", "saved", "noted", "linked", "shared", "logged", "settled", "ok", "performed")
+
         /** What a self-started turn may not call: anything that speaks to or stops the person. */
         private val SELF_TURN_MAY_NOT = setOf("ui.ask", "ui.alert", "tts.speak")
 
@@ -1900,6 +1948,7 @@ class LocalBrain(
 7. You used an installed app this time and learned what it is for, what it can do on his behalf, or a limit you hit → note_gear (only what you actually saw; a login only if you saw it signed in). If a note on the shelf turned out wrong this time, correct it. Never touch gear_visibility here: what is kept out of view is his call, made when he is present.
 8. The plan (your plan line; day_plan get for detail). Keep today's plan true: if there is none, write one (day_plan write, date=today); if what happened in this conversation changed it, rewrite it; after 20:00, also draft tomorrow's — and before you do, read today's outcomes (day_plan get): keep what landed, do less of or move what he ignored or declined, carry over what was moved. If your plan line says the weekly look at the directions is due, do it now: plan_directions list, then mark done what is done, pause what has stalled, and add what he newly said he is working toward. Every item points at a long-term direction or a todo in `because`; at most 5 that interrupt (remind/ask), at the times you would really choose; a quiet day is a fine plan, and `quiet` says what you will leave alone today.
    Long-term directions (plan_directions add) come only from what he said or did — quote it in `source`; a goal you think would be good for him is not his. With no directions yet, one `ask` item a day may be getting to know him (what he is busy with lately, what he would like you to keep an eye on — in his language), until he has answered or ignored it twice. Never put back what he removed.
+9. Your own record ("Your own life" in the prompt). Something he handed you to look after this time that is not among your cares → cares add, his words in `source` (do not ask the three intake questions here — he is not present; leave them for next time in the care's note). A care this conversation moved → cares update with a one-line note. Someone you dealt with other than him → person find, then upsert or log. Something long you worked out for him that should be findable later → wiki_write (wiki_search first; revise rather than duplicate). After 20:00, if tonight's diary page is not written yet → diary write, in your own voice and only about what really happened. If who you are or what you are busy with has changed → self_note write.
 
 If this conversation genuinely produced nothing new, record nothing — ending empty-handed is allowed. Forcing one in just dirties the notebook."""
 

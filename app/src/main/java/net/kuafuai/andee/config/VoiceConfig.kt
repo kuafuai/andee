@@ -688,6 +688,7 @@ object VoiceConfig {
                 "grounding" to p.getString("grounding", "off")!!,
                 "notify" to notifyScope(context),
                 "nudge" to nudgeLevel(context),
+                "drive" to if (driveEnabled(context)) "on" else "off",
                 "lang" to uiLanguage(context),
                 "sweep" to p.getString("sweep", "on")!!,
                 "sweep_quiet_minutes" to p.getString(
@@ -855,6 +856,18 @@ object VoiceConfig {
                 context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("nudge", null),
             ).key
 
+        /**
+         * Whether it may get up of its own accord — the heartbeat and the work turns it starts
+         * ([net.kuafuai.andee.brain.Heartbeat]). The design's 「让它歇着」 switch. **Unset is on and unrecognised is
+         * off**, the split [nudgeLevel] draws: a device nobody configured gets the behaviour the product is, and a
+         * value nobody can read permits nothing. Cheap when on: a beat calls the model only when a care is overdue.
+         */
+        fun driveEnabled(context: Context): Boolean =
+            when (context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("drive", null)) {
+                null, "on" -> true
+                else -> false
+            }
+
         /** Bubble kinds the user long-pressed away. Written directly, like `scene`: it is a set, not a field. */
         /** The pointing model for `tap_target`, if the user named one; blank = [net.kuafuai.andee.brain.Locator.modelFor] picks. */
         fun locatorModel(context: Context): String =
@@ -946,6 +959,7 @@ object VoiceConfig {
             "grounding",
             "notify",
             "nudge",
+            "drive",
             "locator_model",
             "lang",
             "ball",

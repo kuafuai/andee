@@ -258,9 +258,9 @@ fun VaultCard(onDone: () -> Unit) {
 
 /** 小本本: what Andee remembers, browsable and deletable — plus the todos it owes. */
 @Composable
-fun NotebookCard(onDone: () -> Unit) {
+fun NotebookCard(onDone: () -> Unit, startTab: Int = 0) {
     val zh = Strings.lang() == "zh"
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableStateOf(startTab) }
     var refresh by remember { mutableStateOf(0) }
 
     val tabs = if (zh) listOf("自己", "在意", "日记", "打算", "人", "维基", "记忆", "待办")
@@ -346,7 +346,8 @@ private fun CaresTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
 @Composable
 private fun DiaryTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
     val pages = DesktopNotebook.book.selfhood.diary(7)
-    
+    OnItsOwn(zh)
+
     if (pages.isEmpty()) {
         EmptyState(if (zh) "还没有日记" else "No diary yet",
             if (zh) "Andee 会在一天结束时自动记录" else "Andee will write at the end of the day")
@@ -361,6 +362,30 @@ private fun DiaryTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
         }
         Spacer(Modifier.height(12.dp))
     }
+}
+
+/** Today's thoughts and the last thing it did by itself — the device's record, so nothing it did unasked is invisible. */
+@Composable
+private fun OnItsOwn(zh: Boolean) {
+    val drive = DesktopNotebook.drive
+    val thoughts = drive.thoughtsToday()
+    val last = drive.lastWork()
+    if (thoughts.isEmpty() && last == null) return
+    Column(Modifier.fillMaxWidth().glassPanel(16).padding(16.dp)) {
+        Text(if (zh) "它自己" else "On its own", color = Palette.secondary, fontSize = 12.sp)
+        if (last != null) {
+            Spacer(Modifier.height(8.dp))
+            val did = when (last.effect) { "acted" -> if (zh) "动手做了" else "worked on"; "looked" -> if (zh) "看了看" else "looked at"; else -> if (zh) "想了想" else "thought about" }
+            Text("${LocalTime.format(last.at)} · $did「${last.what}」", color = Palette.label, fontSize = 13.sp)
+            if (last.summary.isNotBlank()) Markdown(last.summary, color = Palette.photoInk, size = 13.sp, modifier = Modifier.padding(top = 4.dp))
+        }
+        if (thoughts.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Text(if (zh) "今天的念头" else "Thoughts today", color = Palette.secondary, fontSize = 12.sp)
+            for (t in thoughts.reversed()) Text("· " + t.text, color = Palette.photoInk, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+    Spacer(Modifier.height(12.dp))
 }
 
 @Composable
@@ -553,7 +578,8 @@ private fun WikiCard(entry: net.kuafuai.andee.wiki.Meta, zh: Boolean, onOpen: ()
         Text(wikiLine(entry, zh), color = Palette.secondary, fontSize = 11.sp)
         if (entry.summary.isNotBlank()) {
             Spacer(Modifier.height(6.dp))
-            Text(entry.summary, color = Palette.photoInk, fontSize = 13.sp, lineHeight = 19.sp, maxLines = 2)
+            // The summary is the start of the body, markup and all; a two-line preview reads only its prose.
+            Text(net.kuafuai.andee.text.Md.preview(entry.summary), color = Palette.photoInk, fontSize = 13.sp, lineHeight = 19.sp, maxLines = 2)
         }
     }
 }

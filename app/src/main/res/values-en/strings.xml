@@ -222,6 +222,9 @@
     <string name="settings_notify_all">Everything</string>
     <string name="settings_notify_note">When a message arrives it decides for itself whether it is worth your attention: lets the noise go, says the useful part out loud, handles what needs handling. \"Chat apps\" means the ones with a person on the other end — WeChat, QQ, DingTalk, Lark, SMS. \"Everything\" watches the rest too, minus progress bars and permanent notifications. It only puts a card up when it cannot decide. Off means nothing interrupts you — the messages are all still there, and you can ask about them whenever.</string>
     <string name="nudge_muted_row">OK, nothing like \"%1$s\" again. To bring it back: Settings → Speaking first.</string>
+    <string name="settings_section_drive">On its own</string>
+    <string name="settings_drive_note">It keeps a few things it cares about, each with how often it means to look. While you are using the device it checks about every 20 minutes whether one has waited too long and is worth doing now. If so, it works on it for a while — writing a plan, tidying the people it knows, noting a thought, at most one bubble — without touching the screen, speaking, or sending anything for you. Not at night (22:30–8:00); at most 40 checks and 6 work turns a day. Nothing overdue costs nothing. Off means it only moves when you call it.</string>
+    <string name="drive_row">(Thought about “%1$s” on my own: %2$s)</string>
     <string name="settings_section_nudge">Speaking first</string>
     <string name="settings_nudge_few">Rarely</string>
     <string name="settings_nudge_normal">Normal</string>
@@ -477,6 +480,11 @@
     <string name="notebook_copied">Copied</string>
     <string name="notebook_tab_memories">Memories</string>
     <string name="notebook_tab_todos">Todos</string>
+    <string name="notebook_own_heading">On its own</string>
+    <string name="notebook_own_acted">worked on</string>
+    <string name="notebook_own_looked">looked at</string>
+    <string name="notebook_own_thought">thought about</string>
+    <string name="notebook_own_thoughts">Thoughts today</string>
     <string name="notebook_tab_self">Self</string>
     <string name="notebook_tab_cares">Cares</string>
     <string name="notebook_tab_diary">Diary</string>

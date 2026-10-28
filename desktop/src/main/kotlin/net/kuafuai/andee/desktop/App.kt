@@ -34,6 +34,8 @@ fun AppRoot(nav: Nav) {
                         )
                         screen == "selfcheck" -> SelfCheckCard(onDone = { nav.back() }, onOpenSettings = { nav.push("settings") })
                         screen == "notebook" -> NotebookCard(onDone = { nav.back() })
+                        // `notebook:<tab>` opens on that tab; only the screenshot harness names one.
+                        screen.startsWith("notebook:") -> NotebookCard(onDone = { nav.back() }, startTab = screen.substringAfter(':').toIntOrNull() ?: 0)
                         screen == "vault" -> VaultCard(onDone = { nav.back() })
                         screen == "scenes" -> ScenesCard(onDone = { nav.back() })
                         screen == "expressions" -> ExpressionsCard(onDone = { nav.back() })

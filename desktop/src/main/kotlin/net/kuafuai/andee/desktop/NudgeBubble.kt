@@ -249,6 +249,29 @@ object PlanTicks {
         if (free && level != NudgeBook.Level.OFF) {
             mind.muse(Strings.lang())?.let { id -> plans.bubbleForItem(id, Nudges.book, level, Nudges.muted())?.let(Nudges::post) }
         }
+        val brain = Assistant.built()
+        if (free && DesktopNotebook.driveEnabled() && brain != null && !brain.isBusy()) heartbeat(cfg, brain)
+    }
+
+    /**
+     * Is anything on its mind worth getting up for ([net.kuafuai.andee.brain.Heartbeat])? The phone's twin, on the
+     * same tick and presence check; the beat keeps its own pace and budget. A `work` verdict starts a quiet turn
+     * ([net.kuafuai.andee.brain.SelfWork]) and leaves one scrollback row when it is done.
+     */
+    private fun heartbeat(cfg: net.kuafuai.andee.config.BrainConfig, brain: net.kuafuai.andee.brain.LocalBrain) {
+        val self = DesktopNotebook.book.selfhood
+        val drive = DesktopNotebook.drive
+        val log: (Boolean, String) -> Unit = { warn, msg -> if (warn) Log.w("Drive", msg) else Log.i("Drive", msg) }
+        val v = net.kuafuai.andee.brain.Heartbeat(cfg, self, drive, { DesktopNotebook.plans.indexForPrompt() }, log).beat(Strings.lang())
+        if (v !is net.kuafuai.andee.brain.Heartbeat.Verdict.Work) return
+        log(false, "work on ${v.care.id} (${v.care.what}): ${v.why}")
+        net.kuafuai.andee.brain.SelfWork.start(brain, self, drive, v.care, v.ratio, v.why) { effect, summary ->
+            log(false, "work on ${v.care.id} booked as $effect")
+            if (effect != net.kuafuai.andee.config.Selfhood.Effect.NOTHING && summary != null) {
+                val text = net.kuafuai.andee.text.stripMarkdown(net.kuafuai.andee.brain.SpeechMood.parse(summary).text)
+                Scrollback.add(Scrollback.Role.ASSISTANT, String.format(Strings.locale(), Strings.get("s_drive_row"), v.care.what, text.take(160)))
+            }
+        }
     }
 }
 

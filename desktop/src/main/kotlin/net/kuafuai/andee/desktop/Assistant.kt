@@ -477,6 +477,9 @@ object Assistant {
         }
     }
 
+    /** The brain as built, if it is; never builds one. For the heartbeat, which must not wake a brain nobody is using. */
+    fun built(): LocalBrain? = brain
+
     fun working(): Boolean = brain?.isBusy() == true || net.kuafuai.andee.desktop.voice.MacVoice.isSpeaking()
 
     /**

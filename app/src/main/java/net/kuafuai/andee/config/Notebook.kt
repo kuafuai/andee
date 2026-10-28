@@ -122,6 +122,13 @@ object Notebook {
     fun people(context: Context): net.kuafuai.andee.config.People = book(context).people
     fun wiki(context: Context): net.kuafuai.andee.wiki.WikiBook = book(context).wiki
 
+    @Volatile
+    private var drive: net.kuafuai.andee.config.Drive? = null
+
+    /** What it did of its own accord today, counted by the device ([Drive]). One instance: its lock serialises writes. */
+    fun drive(context: Context): net.kuafuai.andee.config.Drive =
+        drive ?: synchronized(this) { drive ?: net.kuafuai.andee.config.Drive(book(context)).also { drive = it } }
+
     /** The tool-call id of the [LifeTools] call being answered; set by the brain host just before it dispatches. */
     @Volatile var callBeingRun: String = ""
 
@@ -131,6 +138,7 @@ object Notebook {
     /** `self_note`, `cares`, `diary`, `person`, `people`, `wiki_*` — the same handler the Mac uses. */
     fun life(context: Context): net.kuafuai.andee.config.LifeTools = life ?: synchronized(this) {
         life ?: net.kuafuai.andee.config.LifeTools(selfhood(context), people(context), wiki(context), callId = { callBeingRun })
+            .apply { todaysCalls = { drive(context).todaysCalls() } }
             .also { life = it }
     }
 

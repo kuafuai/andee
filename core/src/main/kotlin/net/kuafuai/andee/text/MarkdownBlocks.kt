@@ -115,19 +115,12 @@ object Md {
     private fun cells(row: String): List<String> =
         row.trim().removePrefix("|").removeSuffix("|").split(Regex("""(?<!\\)\|""")).map { it.trim().replace("\\|", "|") }
 
-    /** Soft line breaks: a space between Latin words, nothing between Chinese characters; two trailing spaces break. */
-    private fun joinLines(lines: List<String>): String = buildString {
-        for ((k, l) in lines.withIndex()) {
-            if (k > 0) {
-                val prev = lines[k - 1]
-                if (prev.endsWith("\\")) { setLength(length - 1); append('\n') }
-                else if (!(isCjk(last()) && isCjk(l.first()))) append(' ')
-            }
-            append(l)
-        }
-    }
-
-    private fun isCjk(c: Char): Boolean = c.code in 0x2E80..0x9FFF || c.code in 0xFF00..0xFFEF || c.code in 0x3000..0x303F
+    /**
+     * A single newline inside a paragraph stays a line break — GitHub-comment style, not strict Markdown. What the
+     * model writes is mostly one point per line (「我是 Andee。\n最近在忙：…」), and joining those lines, as strict
+     * Markdown does, ran its self-description together into one sentence.
+     */
+    private fun joinLines(lines: List<String>): String = lines.joinToString("\n") { it.removeSuffix("\\") }
 
     private val INLINE = Regex(
         """`([^`]+)`""" +                                   // 1 code
@@ -158,6 +151,21 @@ object Md {
             at = m.range.last + 1
         }
         out += style.copy(text = text.substring(at))
+    }
+
+    /**
+     * The prose of [text] as one plain line, for a two-line preview: paragraphs, quotes and list items, without
+     * their markup; tables, code, rules and headings are skipped — flattened, a table is a row of pipes and dashes.
+     */
+    fun preview(text: String, max: Int = 240): String {
+        fun prose(b: Block): List<String> = when (b) {
+            is Block.Para -> listOf(b.text)
+            is Block.Item -> listOf(b.text)
+            is Block.Quote -> b.inner.flatMap(::prose)
+            else -> emptyList()
+        }
+        return blocks(text).flatMap(::prose).joinToString(" ") { p -> runs(p).joinToString("") { it.text }.replace('\n', ' ') }
+            .trim().take(max)
     }
 
     /** A relative path from the model is shown, never followed. */

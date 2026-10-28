@@ -27,13 +27,18 @@ object DesktopNotebook {
     /** Directions and day plans, in the same book. One instance: its lock serialises the tool and the settings page. */
     val plans: net.kuafuai.andee.config.Plans by lazy { net.kuafuai.andee.config.Plans(book) }
 
-    /** For [LifeTools.callId]: the tool call id (set at call time), and what today's work turns wrote (call ids as well). */
+    /** What it did of its own accord today, counted by the device. One instance: its lock serialises writes. */
+    val drive: net.kuafuai.andee.config.Drive by lazy { net.kuafuai.andee.config.Drive(book) }
+
+    /** For [LifeTools.callId]: the tool call id (set at call time); a diary page may point at today's work turns' calls. */
     @Volatile var callBeingRun: String = ""
-    private var todaysCalls: MutableList<String> = mutableListOf()
-    val life = net.kuafuai.andee.config.LifeTools(
-        book.selfhood, book.people, book.wiki,
-        callId = { callBeingRun },
-    ).apply { todaysCalls = { this@DesktopNotebook.todaysCalls } }
+    val life by lazy {
+        net.kuafuai.andee.config.LifeTools(book.selfhood, book.people, book.wiki, callId = { callBeingRun })
+            .apply { todaysCalls = { drive.todaysCalls() } }
+    }
+
+    /** 「让它歇着」: unset is on, anything unreadable is off — the phone's `VoiceConfig.driveEnabled`. */
+    fun driveEnabled(): Boolean = when (Settings.get("drive").trim()) { "", "on" -> true; else -> false }
 }
 
 /** Local-time formats the model writes todos in — the same list the phone accepts. */

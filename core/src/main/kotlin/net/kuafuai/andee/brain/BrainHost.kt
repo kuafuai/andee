@@ -96,9 +96,10 @@ interface BrainHost {
 
     /**
      * The tools a [LocalBrain.TurnKind.WORK] turn may use in [territory] — a smaller set than [toolLists]. The
-     * default is the full list: a host that has not defined territories behaves as before.
+     * default is [SelfWork]'s: no screen, no device, nothing outward; the loop enforces the same line, so a host
+     * that widens this list still cannot hand a work turn the screen.
      */
-    fun workTools(territory: String?): List<JSONArray> = toolLists()
+    fun workTools(territory: String?): List<JSONArray> = SelfWork.tools(toolLists())
 
     /**
      * One line naming the other Andees this one can ask (see `PeerTasks`), empty when it has none. Without it the

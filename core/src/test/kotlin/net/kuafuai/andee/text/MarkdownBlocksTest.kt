@@ -44,7 +44,8 @@ class MarkdownBlocksTest {
         assertEquals(2, t.rows.size)
         assertEquals(Block.Item("•", 0, "留言区打开后， 拟了两条"), b[5])
         assertEquals(Block.Item("1.", 0, "第一"), b[6])
-        assertEquals(Block.Para("中文换行接着写"), b[7])
+        // One line per point is how the model writes; a single newline stays a break.
+        assertEquals(Block.Para("中文换行\n接着写"), b[7])
     }
 
     @Test fun inlineStylesNestAndTheMarkersAreGone() {
@@ -59,6 +60,10 @@ class MarkdownBlocksTest {
 
     @Test fun snakeCaseKeepsItsUnderscores() {
         assertEquals(listOf(Run("call tap_screen_element then get_screen_element")), Md.runs("call tap_screen_element then get_screen_element"))
+    }
+
+    @Test fun aPreviewIsTheProseWithoutTablesOrMarkup() {
+        assertEquals("本页是基于公开数据搭的初版。 留言区打开后， 拟了两条 第一 中文换行 接着写", Md.preview(page))
     }
 
     @Test fun noFrontMatterIsLeftAlone() {

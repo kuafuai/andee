@@ -243,10 +243,12 @@ class WikiBook(
         const val MAX_BODY = 40_000
         const val MAX_SUMMARY = 240
 
-        /** A short digest for the index: the first prose lines, headings dropped. */
-        fun summarize(body: String): String =
-            body.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("---") && !it.startsWith("#") && !it.startsWith("title:") }
-                .joinToString(" ").take(MAX_SUMMARY)
+        /**
+         * A short digest for the index and the notebook's preview: the article's prose, without its markup —
+         * headings, tables and code dropped (a flattened table is a row of pipes and dashes). Same parser that
+         * draws the article ([net.kuafuai.andee.text.Md]).
+         */
+        fun summarize(body: String): String = net.kuafuai.andee.text.Md.preview(body, MAX_SUMMARY)
 
         /** Two titles name the same subject if one contains the other or they share most of their characters. */
         fun sameSubject(a: String, b: String): Boolean {

@@ -335,6 +335,7 @@ class NotebookUi(
     }
 
     private fun buildDiary(body: LinearLayout) {
+        onItsOwn(body)
         val pages = Notebook.selfhood(context).diary(7)
         if (pages.isEmpty()) {
             body.addView(emptyState(lctx.getString(R.string.notebook_empty_diary), lctx.getString(R.string.notebook_empty_diary_hint)))
@@ -346,6 +347,26 @@ class NotebookUi(
             p.addView(md(page.text), matchWrap().apply { topMargin = dp(10) })
             addRow(body, p)
         }
+    }
+
+    /** Today's thoughts and the last thing it did by itself — the device's record, so nothing done unasked is invisible. */
+    private fun onItsOwn(body: LinearLayout) {
+        val drive = Notebook.drive(context)
+        val thoughts = drive.thoughtsToday()
+        val last = drive.lastWork()
+        if (thoughts.isEmpty() && last == null) return
+        val p = panel()
+        p.addView(label(lctx.getString(R.string.notebook_own_heading), Glass.Type.CAPTION, Glass.SECONDARY), matchWrap())
+        if (last != null) {
+            val did = lctx.getString(when (last.effect) { "acted" -> R.string.notebook_own_acted; "looked" -> R.string.notebook_own_looked; else -> R.string.notebook_own_thought })
+            p.addView(label("${stamp(last.at)} · $did「${last.what}」", Glass.Type.BODY, Glass.LABEL, top = 8), matchWrap())
+            if (last.summary.isNotBlank()) p.addView(md(last.summary, Glass.PHOTO_INK, Glass.Type.CAPTION), matchWrap().apply { topMargin = dp(4) })
+        }
+        if (thoughts.isNotEmpty()) {
+            p.addView(label(lctx.getString(R.string.notebook_own_thoughts), Glass.Type.CAPTION, Glass.SECONDARY, top = 10), matchWrap())
+            for (t in thoughts.reversed()) p.addView(label("· " + t.text, Glass.Type.CAPTION, Glass.PHOTO_INK, top = 4), matchWrap())
+        }
+        addRow(body, p)
     }
 
     private fun buildPlan(body: LinearLayout) {
@@ -406,7 +427,8 @@ class NotebookUi(
             p.addView(top, matchWrap())
             p.addView(label(wikiLine(m), Glass.Type.MICRO, Glass.MUTED, top = 4), matchWrap())
             if (m.summary.isNotBlank()) {
-                p.addView(label(m.summary, Glass.Type.CAPTION, Glass.PHOTO_INK, top = 6).apply {
+                // The summary is the start of the body, markup and all; a two-line preview reads only its prose.
+                p.addView(label(net.kuafuai.andee.text.Md.preview(m.summary), Glass.Type.CAPTION, Glass.PHOTO_INK, top = 6).apply {
                     maxLines = 2
                     ellipsize = android.text.TextUtils.TruncateAt.END
                 }, matchWrap())
