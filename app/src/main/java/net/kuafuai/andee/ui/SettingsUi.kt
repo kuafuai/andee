@@ -763,7 +763,8 @@ class SettingsUi(
 
         // 说（朗读）：谁把答案读出来。可以选系统自带的引擎——免费、离线。
         rowLabel(voiceBlock, lctx.getString(R.string.settings_voice_speak_provider))
-        segmented(
+        var speakPicked = ""
+        val speak = segmented(
             voiceBlock,
             "speak_provider",
             listOf(
@@ -771,7 +772,11 @@ class SettingsUi(
                 VoiceConfig.VOICE_GOOGLE to lctx.getString(R.string.settings_voice_provider_google),
                 VoiceConfig.VOICE_SYSTEM to lctx.getString(R.string.settings_voice_provider_system),
             ),
-        )
+        ) {
+            speakPicked = it
+            applyProvider?.invoke(provider, true)
+        }
+        speakPicked = speak
 
         // 火山: previously in 高级 → 火山. Rows copy that section's labels,
         // which still describe exactly these keys.
@@ -871,8 +876,14 @@ class SettingsUi(
         note(googleBlock, lctx.getString(R.string.settings_voice_google_note))
 
         applyProvider = { p, animate ->
-            Glass.setVisible(huoshanBlock, p == VoiceConfig.VOICE_HUOSHAN, animate)
-            Glass.setVisible(googleBlock, p == VoiceConfig.VOICE_GOOGLE, animate)
+            // A provider's block is shown if it is picked on *either* side. The
+            // blocks hold both the hearing and speaking rows, so hiding one
+            // because the *hearing* picker does not name it would bury the key
+            // field for the provider the *speaking* picker just chose.
+            val useHuoshan = p == VoiceConfig.VOICE_HUOSHAN || speakPicked == VoiceConfig.VOICE_HUOSHAN
+            val useGoogle = p == VoiceConfig.VOICE_GOOGLE || speakPicked == VoiceConfig.VOICE_GOOGLE
+            Glass.setVisible(huoshanBlock, useHuoshan, animate)
+            Glass.setVisible(googleBlock, useGoogle, animate)
         }
         applyProvider(provider, false)
 

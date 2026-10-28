@@ -314,14 +314,10 @@ class GoogleTts(
      * makes — a client that pushes text sentence by sentence gets a Gemini
      * call per sentence there too.
      *
-     * `. ` rather than `.` in the pattern: a bare period would cut `3.5` in
-     * half, and a half-sentence is spoken with a falling contour that sounds
-     * like the end of a thought.
+     * Delegates to [splitSentences], shared with `SystemTts` so both backends
+     * read the same terminators.
      */
-    private fun split(pending: String): List<String> =
-        pending.split(Regex("(?<=[。！？!?\\n])|(?<=\\. )"))
-            .map { it.trim() }
-            .filter { it.isNotEmpty() && it.any { ch -> ch.isLetterOrDigit() } }
+    private fun split(pending: String): List<String> = splitSentences(pending)
 
     /** The API's own words for what it disliked, else a truncated body. */
     private fun detail(raw: String): String = runCatching {

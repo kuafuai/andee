@@ -413,9 +413,13 @@ class AudioIO {
      * Tell a deferred playback session ([startStreamPlayback] with 0) what its
      * sample rate is. The track is built here; a session that already knows its
      * rate ignores the call.
+     *
+     * Gated on [playing] because a barge-in can stop the session on another
+     * thread between the caller's `cancelled` check and this call, and a track
+     * built after that has no one left to stop it.
      */
     fun setStreamSampleRate(sampleRate: Int) {
-        if (sampleRate <= 0 || streamTrack != null) return
+        if (!playing || sampleRate <= 0 || streamTrack != null) return
         createStreamTrack(sampleRate)
     }
 

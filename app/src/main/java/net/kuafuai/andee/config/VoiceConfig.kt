@@ -62,11 +62,13 @@ object VoiceConfig {
         private const val PREFS = "voice_prefs"
 
         /**
-         * Which service hears and speaks. See [voiceProvider].
+         * The two cloud providers, valid on both the hearing and speaking
+         * sides. See [voiceProvider] and [speakProvider].
          *
-         * Two values and not a boolean because the list will not stay at two:
-         * the picker, the self-check rows and the engines all branch on the
-         * string, so a third provider is a value rather than a second flag.
+         * A string and not a boolean because the list is not closed: the
+         * speaking side already adds [VOICE_SYSTEM], and the picker, the
+         * self-check rows and the engines all branch on the string, so a new
+         * provider is a value rather than a second flag.
          */
         const val VOICE_HUOSHAN = VoiceSettings.VOICE_HUOSHAN
         const val VOICE_GOOGLE = VoiceSettings.VOICE_GOOGLE

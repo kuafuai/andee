@@ -22,20 +22,26 @@ import java.util.concurrent.atomic.AtomicBoolean
  * engine-agnostic — the code never names a specific package, it binds
  * whatever the system reports as the default.
  *
- * **The one real difference from the other two backends is the sample rate.**
- * [TtsEngine]'s contract says [TtsEngine.Listener.onOpen] declares the rate
- * before the driver can push text, because 火山 learns it from an open socket
- * and Google declares a constant. A system engine only reveals its rate after
- * the WAV has been written, so this backend opens at an *unknown* rate
- * ([onOpen] with `0`) and reports the real number through [TtsEngine.Listener.onRate]
- * once the first file is read — the "build the AudioTrack late" path the
- * issue discussion settled on, instead of resampling.
+ * **Two things differ from the other backends.**
  *
- * Each utterance is synthesised to a real file in one pass
- * (`synthesizeToFile`), the PCM is read back out of the WAV, and the file is
- * deleted immediately after. The utterance is not streamed: it is spoken only
- * after the whole file exists, which is the honest trade the system API
- * forces.
+ * The sample rate. [TtsEngine]'s contract says [TtsEngine.Listener.onOpen]
+ * declares the rate before the driver can push text, because 火山 learns it
+ * from an open socket and Google declares a constant. A system engine only
+ * reveals its rate after the WAV has been written, so this backend opens at an
+ * *unknown* rate ([onOpen] with `0`) and reports the real number through
+ * [TtsEngine.Listener.onRate] once the first file is read — the "build the
+ * AudioTrack late" path the issue discussion settled on, instead of
+ * resampling.
+ *
+ * The split. Synthesis is per sentence ([splitSentences]), not per utterance:
+ * the engine caps its input at a few thousand characters and an
+ * unpronounceable stretch kills the whole take, so the same trade GoogleTts
+ * makes — one file per sentence — is made here too.
+ *
+ * A device with no bindable engine (or none that will speak the reply's
+ * language) is reported through [TtsEngine.Listener.onUnavailable], not
+ * [TtsEngine.Listener.onError], so the driver can fall back to a keyed backend
+ * rather than go quiet.
  */
 class SystemTts(
     private val context: Context,
@@ -72,7 +78,7 @@ class SystemTts(
                 Log.w(TAG, "init timeout")
                 engine.shutdown()
                 tts = null
-                listener.onError("system tts init timeout")
+                listener.onUnavailable("system tts init timeout")
                 return@execute
             }
             if (cancelled) {
@@ -84,7 +90,7 @@ class SystemTts(
                 Log.w(TAG, "no system TTS engine on this device")
                 engine.shutdown()
                 tts = null
-                listener.onError("no system tts engine")
+                listener.onUnavailable("no system tts engine")
                 return@execute
             }
 
@@ -106,7 +112,7 @@ class SystemTts(
                 Log.w(TAG, "engine has no data for $lang")
                 engine.shutdown()
                 tts = null
-                listener.onError("system tts: no language data for $lang")
+                listener.onUnavailable("system tts: no language data for $lang")
                 return@execute
             }
 
@@ -138,6 +144,7 @@ class SystemTts(
         runCatching { engine?.stop() }
         runCatching { engine?.shutdown() }
         tts = null
+        io.shutdown()
     }
 
     private fun synth(pending: String) {
@@ -147,26 +154,38 @@ class SystemTts(
         }
         if (cancelled) return
 
-        val trimmed = pending.trim()
-        // Nothing pronounceable — punctuation or whitespace. Saying nothing is
-        // the correct reading of it, same as GoogleTts.
-        if (trimmed.isEmpty() || trimmed.none { it.isLetterOrDigit() }) {
-            release(engine)
+        try {
+            val sentences = splitSentences(pending)
+            // Nothing pronounceable — punctuation or whitespace. Saying nothing
+            // is the correct reading of it, same as GoogleTts.
+            if (sentences.isEmpty()) {
+                listener.onDone()
+                return
+            }
+
+            var sawAny = false
+            for ((i, sentence) in sentences.withIndex()) {
+                if (cancelled) return
+                listener.onSentenceStart(sentence)
+                val got = synthOne(engine, sentence, i)
+                listener.onSentenceEnd(sentence)
+                if (cancelled) return
+                sawAny = sawAny || got
+                // The first sentence is the test of whether this works at all.
+                // A silent *later* sentence is a long pause and not our
+                // business; a silent *first* one means the whole utterance is
+                // about to vanish, and reporting it is what gets the words put
+                // up on screen to be read instead.
+                if (i == 0 && !got) {
+                    listener.onError("system tts returned no audio")
+                    return
+                }
+            }
+            if (cancelled) return
             listener.onDone()
-            return
+        } finally {
+            release(engine)
         }
-
-        listener.onSentenceStart(trimmed)
-        val got = synthOne(engine, trimmed)
-        listener.onSentenceEnd(trimmed)
-        release(engine)
-        if (cancelled) return
-
-        if (!got) {
-            listener.onError("system tts returned no audio")
-            return
-        }
-        listener.onDone()
     }
 
     /**
@@ -179,12 +198,13 @@ class SystemTts(
         runCatching { engine.stop() }
         runCatching { engine.shutdown() }
         if (tts === engine) tts = null
+        io.shutdown()
     }
 
-    /** One whole utterance to a file, read back, file deleted. */
-    private fun synthOne(engine: TextToSpeech, sentence: String): Boolean {
+    /** One sentence to a file, read back, file deleted whatever happens. */
+    private fun synthOne(engine: TextToSpeech, sentence: String, index: Int): Boolean {
         val file = File(context.cacheDir, "andee_tts_${System.nanoTime()}.wav")
-        val uid = "andee_${System.nanoTime()}"
+        val uid = "andee_${index}_${System.nanoTime()}"
         val done = CountDownLatch(1)
         val ok = AtomicBoolean(false)
 
@@ -212,39 +232,46 @@ class SystemTts(
                     done.countDown()
                 }
             }
+
+            // Barge-in reports through onStop, not onDone/onError. Without this
+            // the done latch is never released after a cancel, and the io thread
+            // sits out the full 30-second await with the temp file still on
+            // disk.
+            override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                if (utteranceId == uid) {
+                    ok.set(false)
+                    done.countDown()
+                }
+            }
         })
 
-        val result = engine.synthesizeToFile(sentence, null, file, uid)
-        if (result != TextToSpeech.SUCCESS) {
-            file.delete()
-            return false
-        }
-        if (!done.await(30, TimeUnit.SECONDS)) {
-            file.delete()
-            return false
-        }
-        if (cancelled || !ok.get() || !file.exists() || file.length() == 0L) {
-            file.delete()
-            return false
-        }
+        try {
+            val result = engine.synthesizeToFile(sentence, null, file, uid)
+            if (result != TextToSpeech.SUCCESS) return false
+            if (!done.await(30, TimeUnit.SECONDS)) return false
+            if (cancelled || !ok.get() || !file.exists() || file.length() == 0L) return false
 
-        val (rate, pcm) = readWav(file)
-        // The temporary file must not survive the sentence; a pile of *.wav is
-        // a bug, not a backlog.
-        file.delete()
-
-        if (rate <= 0 || pcm.isEmpty()) return false
-        // Report the real rate once the first file tells us what it is.
-        listener.onRate(rate)
-        listener.onAudio(pcm)
-        return true
+            val (rate, pcm) = readWav(file)
+            if (rate <= 0 || pcm.isEmpty()) return false
+            // Report the real rate; the player ignores a rate it already has,
+            // so one per sentence is harmless and the first is the one that
+            // builds the track.
+            listener.onRate(rate)
+            listener.onAudio(pcm)
+            return true
+        } finally {
+            // The temporary file must not survive the sentence; a pile of
+            // *.wav is a bug, not a backlog — and a throw on this path must
+            // not leave one behind.
+            file.delete()
+        }
     }
 
     /**
      * Pull the sample rate and the raw 16-bit mono PCM out of a WAV. Only the
      * common system-engine shape (PCM, 16-bit, mono) is returned; anything
-     * else hands back an empty result so the caller falls back rather than
-     * plays garbage at the wrong rate.
+     * else hands back an empty result — with a log line naming the format — so
+     * the caller falls back rather than plays garbage at the wrong rate.
      */
     private fun readWav(file: File): Pair<Int, ByteArray> {
         val bytes = file.readBytes()
@@ -265,9 +292,13 @@ class SystemTts(
                 ((bytes[offset + 7].toInt() and 0xff) shl 24)
 
             if (id == "fmt ") {
+                if (offset + 24 > bytes.size) return 0 to ByteArray(0)
                 val audioFormat =
                     (bytes[offset + 8].toInt() and 0xff) or ((bytes[offset + 9].toInt() and 0xff) shl 8)
-                if (audioFormat != 1) return 0 to ByteArray(0)
+                if (audioFormat != 1) {
+                    Log.w(TAG, "not PCM: audioFormat=$audioFormat")
+                    return 0 to ByteArray(0)
+                }
                 channels =
                     (bytes[offset + 10].toInt() and 0xff) or ((bytes[offset + 11].toInt() and 0xff) shl 8)
                 sampleRate = (bytes[offset + 12].toInt() and 0xff) or
@@ -284,10 +315,21 @@ class SystemTts(
             offset += 8 + size + (size and 1)
         }
 
-        if (dataOffset < 0 || dataOffset + dataSize > bytes.size) return 0 to ByteArray(0)
-        if (channels != 1 || bitsPerSample != 16) return 0 to ByteArray(0)
+        if (dataOffset < 0) return 0 to ByteArray(0)
+        // The size is read as a signed 32-bit, so a streaming writer's
+        // 0xFFFFFFFF becomes -1; clamp it to what the file actually holds.
+        val available = bytes.size - dataOffset
+        val pcmSize = dataSize.coerceIn(0, available)
+        if (pcmSize <= 0) {
+            Log.w(TAG, "wav has no data (size=$dataSize)")
+            return 0 to ByteArray(0)
+        }
+        if (channels != 1 || bitsPerSample != 16) {
+            Log.w(TAG, "unsupported wav format: rate=$sampleRate channels=$channels bits=$bitsPerSample")
+            return 0 to ByteArray(0)
+        }
 
-        val pcm = bytes.copyOfRange(dataOffset, dataOffset + dataSize)
+        val pcm = bytes.copyOfRange(dataOffset, dataOffset + pcmSize)
         return sampleRate to pcm
     }
 

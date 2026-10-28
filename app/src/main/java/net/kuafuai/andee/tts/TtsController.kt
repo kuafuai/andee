@@ -69,6 +69,14 @@ class TtsController(
     @Volatile
     private var reported = false
 
+    /**
+     * Reset per utterance. Set when the system backend reports itself
+     * unavailable and the driver falls back to a keyed engine, so a second
+     * [TtsEngine.Listener.onUnavailable] does not retry forever.
+     */
+    @Volatile
+    private var fallbackTried = false
+
     private fun reportUnavailable(why: String) {
         if (reported) return
         reported = true
@@ -239,6 +247,7 @@ class TtsController(
         if (text.isBlank()) return
         cancelled = false
         reported = false
+        fallbackTried = false
         executor.execute {
             try {
                 speakImpl(text, cues)
@@ -351,6 +360,29 @@ class TtsController(
             override fun onRate(sampleRate: Int) {
                 if (cancelled) return
                 audio.setStreamSampleRate(sampleRate)
+            }
+
+            override fun onUnavailable(reason: String) {
+                if (cancelled) return
+                if (fallbackTried) {
+                    // Already fell back once and the fallback is not running
+                    // yet — treat it as a plain failure and close the turn out.
+                    onError(reason)
+                    return
+                }
+                fallbackTried = true
+                // The system engine cannot speak on this device. Fall back to
+                // the keyed engine the listening side already names — the same
+                // "fail to 火山" direction, decided here because the controller
+                // is the only thing that knows what else is available, and the
+                // adapter is the only thing that can find out it cannot speak.
+                client = null
+                val fallback: TtsEngine = when (VoiceConfig.voiceProvider(context)) {
+                    VoiceConfig.VOICE_GOOGLE -> GoogleTts(cfg, this)
+                    else -> HuoshanTts(cfg, this)
+                }
+                client = fallback
+                fallback.open()
             }
 
             override fun onAudio(pcm: ByteArray) {
