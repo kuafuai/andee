@@ -166,7 +166,7 @@ fun SettingsScreen(
             Row(Modifier.padding(top = 8.dp)) { Pill(st("settings_expr_open")) { onOpenExpressions() } }
 
         }
-        // ---- 小本本 ----
+        // ---- 复盘: the review switch (the notebook itself is the sidebar card) ----
         Section(st("settings_section_notebook")) {
             SegmentedPicker(listOf("on" to st("common_on"), "off" to st("common_off")), v["sweep"].orEmpty().ifEmpty { "on" }) { v["sweep"] = it }
             Note(st("settings_notebook_sweep_note"))
