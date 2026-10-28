@@ -159,19 +159,22 @@ dependencies {
     testImplementation libs.junit
 }
 
+def macPackageName = 'Andee'
+def macPackageVersion = '1.0.0'
+
 compose.desktop {
     application {
         mainClass = 'net.kuafuai.andee.desktop.MainKt'
         nativeDistributions {
             targetFormats(TargetFormat.Dmg)
-            packageName = 'Andee'
+            packageName = macPackageName
             // The packaged runtime is trimmed to what jlink sees used; LWJGL (the
             // ball's OpenGL) reaches sun.misc.Unsafe reflectively, so name it, or the
             // ball silently fails only in the .app and never under `gradle run`.
             modules('jdk.unsupported')
             // macOS rejects a 0.x bundle version for a .dmg; 1.0.0 is the bundle's
             // version, not the product's.
-            packageVersion = '1.0.0'
+            packageVersion = macPackageVersion
             macOS {
                 // The phone's launcher character on a white tile, as an .icns (icon/Andee.icns).
                 iconFile.set(project.file('icon/Andee.icns'))
@@ -283,6 +286,38 @@ tasks.matching { it.name == 'createDistributable' }.configureEach { finalizedBy(
 // Signing seals the bundle, so it has to come after the plist is changed.
 tasks.named('signApp') { dependsOn('patchInfoPlist') }
 tasks.matching { it.name == 'createDistributable' }.configureEach { finalizedBy('signApp') }
+
+// Rebuild the dmg around the *signed* app with the Applications symlink and a
+// laid-out window (app on the left, Applications on the right, an arrow
+// background) — jpackage's own dmg has no drag target, so people double-click
+// the app and run it straight from the mounted image. make-dmg.sh runs dmgbuild,
+// which writes the .DS_Store that carries the window size, icon positions and
+// background directly — Finder's AppleScript no longer writes .DS_Store on
+// current macOS, so the osascript route was abandoned. It runs after signApp,
+// so the bundled app is the signed one. This deliberately handles the
+// documented packageDmg workflow; release/notarization tasks have distinct
+// outputs and must not be used to publish a drag-to-install image until wired
+// to the same layout step.
+tasks.register('checkDmgTools', Exec) {
+    commandLine 'bash', file('dmg/make-dmg.sh').path, '--check-tools'
+}
+tasks.register('polishDmg', Exec) {
+    dependsOn('createDistributable', 'signApp', 'checkDmgTools')
+    def app = layout.buildDirectory.dir('compose/binaries/main/app/Andee.app')
+    def out = layout.buildDirectory.file("compose/binaries/main/dmg/${macPackageName}-${macPackageVersion}.dmg")
+    commandLine 'bash',
+        file('dmg/make-dmg.sh').path,
+        app.get().asFile.path,
+        out.get().asFile.path
+}
+// packageDmg still builds jpackage's bare dmg; polishDmg overwrites it in place,
+// so the existing `./gradlew :desktop:packageDmg` yields the finished one.
+// Always re-cut the image because signing may change the bundle even when
+// Gradle considers createDistributable up to date.
+tasks.matching { it.name == 'packageDmg' }.configureEach {
+    dependsOn('checkDmgTools')
+    finalizedBy('polishDmg')
+}
 
 // The real window body, drawn offscreen against seeded throwaway data:
 //   ./gradlew :desktop:uishot --args='chat 1020 820 /tmp/ui.png'
