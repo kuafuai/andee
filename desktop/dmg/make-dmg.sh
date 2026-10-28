@@ -19,7 +19,8 @@ check_tools() {
     if ! command -v "$PYTHON" >/dev/null 2>&1 || \
        ! "$PYTHON" -c "from importlib.metadata import version; import sys; sys.exit(version('dmgbuild') != '1.6.7')" 2>/dev/null; then
         echo "DMG packaging requires Python with dmgbuild==1.6.7." >&2
-        echo "Install it using desktop/dmg/requirements.txt; see README.md (Mac packaging)." >&2
+        echo "Install it with: python3 -m pip install -r desktop/dmg/requirements.txt" >&2
+        echo "For an isolated environment, see README.md (Mac packaging)." >&2
         echo "Set ANDEE_DMG_PYTHON to that environment's Python executable." >&2
         exit 2
     fi
