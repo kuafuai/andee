@@ -6,6 +6,7 @@
 <p align="center">  
   <a href="https://www.codeflying.app/andee">Build online</a> ·  
   <a href="https://www.codeflying.app/andee">Try now</a> ·  
+  <a href="docs/getting-started.md">Getting started</a> ·
   <a href="#key-features">Features</a> ·  
   <a href="#quick-start">Quick start</a> ·  
   <a href="#provisioning">Provisioning</a> ·  
@@ -1156,6 +1157,7 @@ See [CHANGELOG.md](CHANGELOG.md) for what changed and for the versioning policy.
 
 ## Related documents
 
+- [docs/getting-started.md](docs/getting-started.md) ([Chinese](docs/getting-started.zh-CN.md)) — the short first-run path from installation to a basic interaction
 - [docs/permissions.md](docs/permissions.md) ([Chinese](docs/permissions.zh-CN.md)) — why it asks for
   the permissions it asks for, each one against a concrete tool
 - [docs/architecture.svg](docs/architecture.svg) ([Chinese](docs/architecture.zh-CN.svg)) — the whole
