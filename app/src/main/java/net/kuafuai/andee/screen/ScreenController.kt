@@ -461,6 +461,25 @@ class ScreenController(
         )
     }
 
+    /**
+     * Tap the point the locating model found for a described target (`tap_target`, see `Locator`).
+     *
+     * It counts as aimed, which is the point of it: the tree-blind zoom rule ([requireZoomedOnBlind]), the
+     * send-after-typing rule ([requireAimedSend]) and the popup guard all exist because the BRAIN's eye was
+     * the aim, and a model trained to point, asked one question per tap, is not that eye — it was 1–8 px off
+     * on every target measured. So the point is recorded as a fresh zoom on itself, the typing mark is
+     * cleared, and the tap goes straight to [tapNorm]: the repetition guard still applies, and nothing is
+     * snapped, since the point is the model's measured answer and not a guess near a shape.
+     */
+    fun tapLocated(nx: Int, ny: Int, target: String, long: Boolean): JSONObject {
+        requireNorm(nx, "x"); requireNorm(ny, "y")
+        zoomRegion = intArrayOf((nx - 12).coerceAtLeast(0), (ny - 12).coerceAtLeast(0), (nx + 12).coerceAtMost(NORM_MAX), (ny + 12).coerceAtMost(NORM_MAX))
+        zoomAtMs = SystemClock.uptimeMillis()
+        typedBlindAt = 0L
+        val r = if (long) longPressNorm(nx, ny, 600L) else tapNorm(nx, ny)
+        return r.put("located", "$nx,$ny").put("target", target)
+    }
+
     fun tapAim(on: String?, x: Int?, y: Int?, cell: String?, part: String?): JSONObject {
         val a = resolveAim(on, x, y, cell, part)
         val blind = treeBlind()
@@ -701,7 +720,7 @@ class ScreenController(
         else "{\"cell\": \"$cell\", \"part\": \"${part.trim()}\"}"
         return out.put("aimed_at", a.label).put(
             "aim_check",
-            "The RED CROSSHAIR is exactly where tap_by_coordinates $args would land. " +
+            "The MAGENTA CROSSHAIR is exactly where tap_by_coordinates $args would land. " +
                 "If it sits on the target, tap with those same arguments. If it does " +
                 "not, do NOT nudge the screen cell: name the lowercase cell (+ part) " +
                 "of THIS image where the target is, with on=\"zoom\".",

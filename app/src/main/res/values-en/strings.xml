@@ -519,6 +519,7 @@
     <string name="brain_error_auth">The backend refused the request (HTTP %1$d): the key is wrong, expired or disabled. Check the key in Settings → Backend, and generate a new one on the provider\'s website if needed.</string>
     <string name="brain_error_400">The backend rejected the request: %1$s\nThe usual cause is a misspelled model name. Check it in Settings → Backend.</string>
     <string name="brain_error_404">The backend could not find that address (HTTP 404). Check the endpoint URL and the model name in Settings → Backend.</string>
+    <string name="brain_error_moved">The backend did not answer as an API — the address may be wrong, or the service has moved (it pointed to: %1$s). Check the address in Settings → Backend; if you use CodeFlying, the problem is on the service side, and you can switch to On-device for now.</string>
     <string name="brain_error_429">The backend is busy or being asked too often (HTTP 429). Say it again in a moment. If it keeps happening, check on the provider\'s website whether your quota has run out.</string>
     <string name="brain_error_5xx">The backend itself is having trouble (HTTP %1$d). Your settings are not the problem. Try again in a few minutes, or check the provider\'s website for maintenance notices.</string>
     <string name="brain_error_timeout">The backend took too long to answer. Check that the network is working and try again in a moment.</string>

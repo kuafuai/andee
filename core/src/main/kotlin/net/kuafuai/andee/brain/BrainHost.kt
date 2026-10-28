@@ -159,6 +159,7 @@ enum class BrainText {
     ERROR_400,
     ERROR_402,
     ERROR_404,
+    ERROR_MOVED,
     ERROR_429,
     ERROR_5XX,
     ERROR_AUTH,

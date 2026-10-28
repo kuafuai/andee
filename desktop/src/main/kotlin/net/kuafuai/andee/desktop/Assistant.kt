@@ -327,6 +327,27 @@ object Assistant {
         progressClear()
     }
 
+    /**
+     * 清空聊天记录: the conversation is gone — the rows the user reads **and** the one the model is holding.
+     *
+     * The settings button used to wipe only the rows (`Scrollback.wipe()`), and the brain kept its in-memory
+     * history word for word: the window was empty and the next sentence was still answered from the old chat
+     * (reported 2026-10-28; the phone's `clearChatHistory` has always rebuilt the brain for exactly this reason).
+     * Unlike [newConversation], nothing is folded away as a topic — the user asked to forget it, not to file it.
+     * A summary the review wrote into the history ("the user is waiting for…") goes with it, which is the
+     * other half of why this matters.
+     */
+    @Synchronized
+    fun clearConversation() {
+        stop()
+        Scrollback.wipe()
+        Pages.wipe()
+        brain?.stop()
+        brain = null
+        builtFor = null
+        progressClear()
+    }
+
     private fun progressClear() { BallCaption.clear(); onProgress("") }
 
     /** The quiet-hour review (also the sidebar's 整理 button). Silent: no answer, no voice, no task light. */

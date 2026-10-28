@@ -93,7 +93,14 @@ class AndroidBrainHost(
     }
 
     override fun toolLists(): List<JSONArray> = listOfNotNull(
-        ToolSchemas.all(), registry.tools(), market.tools(),
+        // tap_target only where a pointing model can answer it: on a backend without one it would fail every tap.
+        ToolSchemas.subset { m ->
+            // drag is the Mac's: on the phone a swipe already is a finger moving, and there is nothing to implement.
+            m != "screen.drag" && (m != "screen.tap_target" || net.kuafuai.andee.brain.Locator.modelFor(
+                net.kuafuai.andee.config.VoiceConfig.brainConfig(ctx), net.kuafuai.andee.config.VoiceConfig.locatorModel(ctx),
+            ) != null)
+        },
+        registry.tools(), market.tools(),
         // A tool that can only ever answer "nothing is paired" is a promise made to every user who never set this up.
         net.kuafuai.andee.peer.PeerTasks.TOOLS.takeIf { peers.store.all().isNotEmpty() },
     )
@@ -126,6 +133,7 @@ class AndroidBrainHost(
         BrainText.ERROR_400 -> R.string.brain_error_400
         BrainText.ERROR_402 -> R.string.brain_error_402
         BrainText.ERROR_404 -> R.string.brain_error_404
+        BrainText.ERROR_MOVED -> R.string.brain_error_moved
         BrainText.ERROR_429 -> R.string.brain_error_429
         BrainText.ERROR_5XX -> R.string.brain_error_5xx
         BrainText.ERROR_AUTH -> R.string.brain_error_auth

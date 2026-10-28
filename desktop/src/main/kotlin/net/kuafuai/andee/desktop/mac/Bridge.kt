@@ -26,6 +26,9 @@ object Bridge {
         fun andee_running_apps(): Pointer
         fun andee_ax_tree(maxNodes: Int): Pointer
         fun andee_ax_press_at(x: Double, y: Double): Int
+        fun andee_ax_at(x: Double, y: Double): Pointer
+        fun andee_activate_at(x: Double, y: Double): Int
+        fun andee_activate_target(): Int
         fun andee_ax_set_focused_value(text: String): Int
         fun andee_ax_focused_value(): Pointer
         fun andee_click(x: Double, y: Double, button: Int, count: Int, holdMs: Int)
@@ -83,6 +86,13 @@ object Bridge {
     fun runningApps(): JSONArray = JSONArray(str(need().andee_running_apps()))
     fun axTree(maxNodes: Int): JSONObject = JSONObject(str(need().andee_ax_tree(maxNodes)))
     fun axPressAt(x: Double, y: Double) = need().andee_ax_press_at(x, y) == 1
+    /** Bring the app under (x, y) to the front before clicking there; true when it had to be moved. */
+    fun activateAt(x: Double, y: Double) = lib?.andee_activate_at(x, y) == 1
+    /** Before keystrokes: bring the driven app back if Andee itself is in front; true when it had to be moved. */
+    fun activateTarget() = lib?.andee_activate_target() == 1
+
+    /** What a click at (x, y) would reach: `{found, chain: [{role, label}, …]}`, the hit element first. */
+    fun axAt(x: Double, y: Double): JSONObject = JSONObject(str(need().andee_ax_at(x, y)))
     fun setFocusedValue(text: String) = need().andee_ax_set_focused_value(text) == 1
     fun focusedValue(): JSONObject = JSONObject(str(need().andee_ax_focused_value()))
     fun click(x: Double, y: Double, right: Boolean = false, count: Int = 1, holdMs: Int = 40) =

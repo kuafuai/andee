@@ -34,6 +34,68 @@
     }
   },
   {
+    "localOnly": true,
+    "method": "screen.drag",
+    "name": "drag",
+    "description": "Press at one point, move to another while holding, and release \u2014 a real drag, on the Mac. swipe_by_coordinates\nSCROLLS there; use drag when something has to be grabbed: a slider or a progress/volume bar, a splitter, a\nwindow by its title bar, a file onto a folder, a list row to reorder, a text or range selection.\n\nAim each end the way you aim a tap: `from_x`/`from_y` and `to_x`/`to_y` in 0-1000 of the screen, or describe\nit in words with `from_target` / `to_target` (resolved like tap_target \u2014 you never compute a coordinate).\nA slider's end is where its handle should END UP, not where the handle is now.\n\nThe result carries `screen_changed` and an `after_shot` with a magenta ring at the release point. Look at it:\na drag that grabbed nothing leaves the screen unchanged. Do not repeat the same drag blindly \u2014 re-aim from a\nfresh look, or use the control's own keyboard handling.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "duration_ms": {
+          "default": 700,
+          "description": "How long the move takes, 200-5000. Default 700; slower for fussy controls.",
+          "type": "integer"
+        },
+        "to_x": {
+          "description": "End x, 0-1000.",
+          "type": "integer"
+        },
+        "to_y": {
+          "description": "End y, 0-1000.",
+          "type": "integer"
+        },
+        "to_target": {
+          "description": "Where to drop it, in words (instead of to_x/to_y).",
+          "type": "string"
+        },
+        "from_target": {
+          "description": "The thing to grab, in words (instead of from_x/from_y).",
+          "type": "string"
+        },
+        "from_x": {
+          "description": "Start x, 0-1000.",
+          "type": "integer"
+        },
+        "from_y": {
+          "description": "Start y, 0-1000.",
+          "type": "integer"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "localOnly": true,
+    "method": "screen.tap_target",
+    "name": "tap_target",
+    "description": "Tap something you can SEE but that has no e-number \u2014 an icon, a button in an app that hides its\nelement tree (WeChat), anything on a canvas, mini-program or web page \u2014 by describing it in words.\nThe device takes a fresh screenshot, a vision model trained to point finds the element, and the\ndevice taps its centre. You never give a coordinate, so nothing can be off by your arithmetic.\n\nUse it INSTEAD of tap_by_coordinates whenever there is no e-number for the target; tap_by_coordinates\nand zoom are the fallback for when this says it cannot find the target.\n\nDescribe the one element you mean so that nothing else on the screen fits: its visible text or icon,\nand where it is (\"the 发送 button right of the comment box at the bottom\", \"the 「··」 button at the\nright end of 好友3's post\", \"the red 删除 in the menu that just opened\"). Name what it looks like,\nnot what it will do. Relational words alone (\"the second one\") are where it errs most.\n\nThe result has `located` (0-1000), `saw` (what the element it tapped shows), `after_shot` with a\nmagenta ring where it tapped, and `screen_changed` where the device can tell. If `saw` is not what\nyou meant, the tap went to the wrong thing \u2014 look before you go on. `found: false` means the model looked and does not see\nit \u2014 do not repeat the same words; look at the screen and describe it differently, or scroll.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "long": {
+          "default": false,
+          "description": "Long-press (phone) / right-click (Mac) instead of a tap. Default false.",
+          "type": "boolean"
+        },
+        "target": {
+          "description": "The one element to tap, described by its visible text or icon and where it is, in any language.",
+          "type": "string"
+        }
+      },
+      "required": ["target"]
+    }
+  },
+  {
     "method": "screen.tap",
     "name": "tap_by_coordinates",
     "description": "[LAST RESORT] Tap a point on the screen. Aim in ONE of two ways:\n\n1. **By grid cell + part** (preferred whenever you are looking at an\n   image): {\"cell\": \"D7\", \"part\": \"bottom-right\"}. The cell is one of\n   the aim grid drawn on the screenshot you were shown, columns A-H\n   left to right, rows 1-12 top to bottom. The letters are printed\n   along the TOP edge and the numbers down the LEFT edge, like a map's\n   rulers \u2014 nothing is printed inside a cell, so the target is never\n   covered. Follow the target's column up and its row left. Then `part`\n   says which third of that cell the\n   target is in, across and down: top-left, top, top-right, left,\n   center, right, bottom-left, bottom, bottom-right (omit it for the\n   centre). The device converts both to pixels itself; there is no\n   arithmetic for you to do. A cell is too coarse to tap with on its\n   own \u2014 always give the part unless the target fills the cell.\n   If the target straddles two cells, pick the one holding most of it.\n   For anything not clearly bigger than a cell (an icon, a ✕ close\n   button, a small chip), CHECK FIRST: zoom_screen_region with the\n   same cell and part shows a magenta crosshair exactly where this tap\n   would land. On target → send this tap with the same arguments.\n   Off target → aim off that magnified image: its labels are\n   LOWERCASE and you must say so \u2014 {\"cell\": \"d7\", \"part\": \"left\",\n   \"on\": \"zoom\"}. A lowercase label sent as if it were a full-screen\n   cell will be about 120 units off.\n   **On an app that hides its tree (get_screen_element came back empty\n   / withheld \u2014 WeChat often does), zooming first is not optional**:\n   a tap or long-press is refused unless its point lies inside a zoom\n   taken after your last gesture. So the rhythm there is always\n   zoom → tap, one zoom per screen.\n\n2. **By coordinate** {\"x\": \u2026, \"y\": \u2026} \u2014 RELATIVE 0-1000 integers\n   ((0,0) top-left, (1000,1000) bottom-right; the device converts to real\n   pixels for any screen size). With {\"on\": \"zoom\"} these numbers are\n   0-1000 *within the last magnified image* instead of the whole screen,\n   and the device maps them back \u2014 so you never add region.left or divide\n   by scale_x yourself. Values outside 0-1000 are rejected, not clamped.\n\nUse this only when the target has no e-number: self-drawn panes\n(mini-program, WebView, game), images, pure-visual content. If a\nget_screen_element list exists for this screen, use tap_screen_element.\n\nWhen the app hides its element tree and your point lands on blank\nbackground right beside one small isolated shape (an icon, a \"··\"\nbutton), the device taps that shape's centre instead and says so with\n`snapped_from` / `snapped_to`. Check after_shot as usual \u2014 if the shape\nwas not what you meant, aim again further away from it.",
@@ -240,7 +302,7 @@
   {
     "method": "screen.look_region",
     "name": "zoom_screen_region",
-    "description": "[PRECISION AIMING · SCREEN, NOT CAMERA] Despite the method name,\nthis is a magnified capture of a screen REGION and has nothing to\ndo with the physical camera (camera_turn). A magnified look at ONE region of the screen \u2014\n4x the pixel density of a full screenshot around wherever you point.\n\nUse it to CHECK an aim before tapping anything not clearly bigger\nthan a grid cell (an icon, a ✕ close button, a small chip): pass the\ncell and part you were about to tap \u2014 {\"cell\": \"D9\", \"part\":\n\"bottom-right\"} \u2014 and you get a magnified view two cells each way,\ncentred on that point, with a RED CROSSHAIR exactly where the tap\nwould land. Crosshair on the target → tap with the same cell and\npart. Off it → aim off this image instead (below). Targets often sit\nright on a grid line; this view is centred on the aim, so they are\nnever cut in half.\n\nThe other form is x/y marking the region's CENTER plus w/h for its\nsize (try 200x300 for one control, 400x600 for a card) \u2014 a plain\nmagnified look, no crosshair. All four are 0-1000 of the WHOLE SCREEN,\nnever pixels of an image you were shown: a screenshot arrives\ndownscaled (often ~576 wide as you see it), so a position measured in\nits pixels is the wrong number here. Read the position off the grid\ninstead \u2014 cell D is 375-500 across, row 7 is 500-583 down, each column\n125 wide and each row ~83 tall \u2014 or simply use the cell form above,\nwhich needs no numbers at all. Every zoom reports the screen rectangle\nit actually showed (`region`); if that is not where you meant to look,\nyour numbers were in the wrong space.\n\nThis image is a magnified region, and it carries the SAME 8x12 grid in\nLOWERCASE (a1..h12), labels at each cell's centre, so a label read off\nit can never be confused with a cell of the full screen. Aim your tap\nstraight from one of those labels: {\"cell\": \"d7\", \"part\": \"top\",\n\"on\": \"zoom\"} on tap_by_coordinates, and the device\nconverts it \u2014 no arithmetic. (The old route still works and is\nequivalent: the response carries the region's screen bounds and\nscale_x/scale_y, and a point (px,py) read off the image maps to\nscreen-relative (region.left + px/scale_x, region.top + py/scale_y).)\n\nAfter a tap that reported screen_changed=false, its miss_shot field\nis exactly this \u2014 aim your retry from that image.",
+    "description": "[PRECISION AIMING · SCREEN, NOT CAMERA] Despite the method name,\nthis is a magnified capture of a screen REGION and has nothing to\ndo with the physical camera (camera_turn). A magnified look at ONE region of the screen \u2014\n4x the pixel density of a full screenshot around wherever you point.\n\nUse it to CHECK an aim before tapping anything not clearly bigger\nthan a grid cell (an icon, a ✕ close button, a small chip): pass the\ncell and part you were about to tap \u2014 {\"cell\": \"D9\", \"part\":\n\"bottom-right\"} \u2014 and you get a magnified view two cells each way,\ncentred on that point, with a MAGENTA CROSSHAIR exactly where the tap\nwould land. Crosshair on the target → tap with the same cell and\npart. Off it → aim off this image instead (below). Targets often sit\nright on a grid line; this view is centred on the aim, so they are\nnever cut in half.\n\nThe other form is x/y marking the region's CENTER plus w/h for its\nsize (try 200x300 for one control, 400x600 for a card) \u2014 a plain\nmagnified look, no crosshair. All four are 0-1000 of the WHOLE SCREEN,\nnever pixels of an image you were shown: a screenshot arrives\ndownscaled (often ~576 wide as you see it), so a position measured in\nits pixels is the wrong number here. Read the position off the grid\ninstead \u2014 cell D is 375-500 across, row 7 is 500-583 down, each column\n125 wide and each row ~83 tall \u2014 or simply use the cell form above,\nwhich needs no numbers at all. Every zoom reports the screen rectangle\nit actually showed (`region`); if that is not where you meant to look,\nyour numbers were in the wrong space.\n\nThis image is a magnified region, and it carries the SAME 8x12 grid in\nLOWERCASE (a1..h12), letters along the top edge and numbers down the left\nlike a map's rulers, so a label read off\nit can never be confused with a cell of the full screen. Aim your tap\nstraight from one of those labels: {\"cell\": \"d7\", \"part\": \"top\",\n\"on\": \"zoom\"} on tap_by_coordinates, and the device\nconverts it \u2014 no arithmetic. (The old route still works and is\nequivalent: the response carries the region's screen bounds and\nscale_x/scale_y, and a point (px,py) read off the image maps to\nscreen-relative (region.left + px/scale_x, region.top + py/scale_y).)\n\nAfter a tap that reported screen_changed=false, its miss_shot field\nis exactly this \u2014 aim your retry from that image.",
     "parameters": {
       "type": "object",
       "properties": {

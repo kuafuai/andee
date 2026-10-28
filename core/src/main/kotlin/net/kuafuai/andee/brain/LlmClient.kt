@@ -14,6 +14,13 @@ import java.util.concurrent.TimeUnit
  * sentence the user can act on; this class has none and must not grow one.
  * The message stays `LLM HTTP <code>: <body>` so logs read as they always did.
  */
+/**
+ * The backend address answered with something other than the API: a redirect, or a page that is not JSON. The
+ * address is wrong or the service moved; [where] is where it pointed, [sample] what came back instead.
+ */
+class LlmMovedException(val code: Int, val where: String, val sample: String = "") :
+    IllegalStateException("the backend did not answer as an API (HTTP $code${if (where.isNotEmpty()) " → $where" else ""}${if (sample.isNotEmpty()) ": $sample" else ""})")
+
 class LlmHttpException(val code: Int, val body: String) :
     IllegalStateException("LLM HTTP $code: ${body.take(600)}") {
 
@@ -88,6 +95,12 @@ class LlmClient(
      * network should say so quickly.
      */
     private val http = OkHttpClient.Builder()
+        // Never follow a redirect. OkHttp turns a POST that meets a 301 into a GET of the new address, which on a
+        // moved gateway is a web page: the turn then died on "A JSONObject text must begin with '{'", which tells
+        // nobody anything (measured 2026-10-28: codeflying.net → www.codeflying.net, an nginx page). A redirect
+        // here is an address that is wrong or has moved, and it is reported as that — see [LlmMovedException].
+        .followRedirects(false)
+        .followSslRedirects(false)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(180, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -173,6 +186,9 @@ class LlmClient(
                 // and a bare "HTTP 400" sends whoever is debugging to the wrong
                 // place entirely.
                 val raw = resp.body?.string().orEmpty()
+                if (resp.code in 300..399) {
+                    throw LlmMovedException(resp.code, resp.header("Location").orEmpty())
+                }
                 if (!resp.isSuccessful) {
                     throw LlmHttpException(resp.code, raw)
                 }
@@ -182,7 +198,10 @@ class LlmClient(
             current = null
         }
 
-        val root = JSONObject(text)
+        // A 200 that is not JSON is a web server answering where the API should: a proxy page, a login wall.
+        val root = runCatching { JSONObject(text) }.getOrElse {
+            throw LlmMovedException(200, "", text.trim().take(80).replace(Regex("\\s+"), " "))
+        }
         val choice = root.optJSONArray("choices")?.optJSONObject(0)
             ?: throw IllegalStateException("LLM reply has no choices: ${text.take(400)}")
         val msg = choice.optJSONObject("message")

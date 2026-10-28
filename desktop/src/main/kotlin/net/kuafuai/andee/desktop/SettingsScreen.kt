@@ -293,7 +293,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(16.dp))
             when (confirm) {
                 "chat" -> ConfirmBlock(st("settings_clear_chat_confirm_title"), st("settings_clear_chat_confirm_body"), st("settings_clear_chat_confirm"),
-                    onNo = { confirm = "" }) { Assistant.stop(); Scrollback.wipe(); Pages.wipe(); confirm = "" }
+                    onNo = { confirm = "" }) { Assistant.clearConversation(); confirm = "" }
                 "notes" -> ConfirmBlock(st("settings_clear_notes_confirm_title"), st("settings_clear_notes_confirm_body"), st("settings_clear_notes_confirm"),
                     onNo = { confirm = "" }) { DesktopNotebook.book.wipe(); confirm = "" }
                 "factory" -> ConfirmBlock(
@@ -420,22 +420,24 @@ private fun NoKeyHint(onPick: () -> Unit) {
 }
 
 @Composable
-private fun DangerButton(label: String, onClick: () -> Unit) {
+private fun DangerButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Text(
         label, color = Palette.danger, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        modifier = Modifier.fillMaxWidth().glassPanel(14).clickable { onClick() }.padding(vertical = 11.dp),
+        // Like SecondaryButton, the caller owns the width: both fill, so in a Row each needs its own weight or the
+        // second one takes everything and the first is squeezed to a sliver (cancel read vertically, 2026-10-28).
+        modifier = modifier.fillMaxWidth().glassPanel(14).clickable { onClick() }.padding(vertical = 11.dp),
     )
 }
 
 @Composable
-private fun ConfirmBlock(title: String, body: String, confirmLabel: String, onNo: () -> Unit, onYes: () -> Unit) {
+internal fun ConfirmBlock(title: String, body: String, confirmLabel: String, onNo: () -> Unit, onYes: () -> Unit) {
     Column(Modifier.fillMaxWidth().glassPanel(12).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, color = Palette.danger, fontSize = 14.sp)
         Text(body, color = Palette.label, fontSize = 13.sp)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SecondaryButton(st("common_cancel"), Modifier.weight(1f)) { onNo() }
-            DangerButton(confirmLabel, onYes)
+            DangerButton(confirmLabel, Modifier.weight(1f), onYes)
         }
     }
 }
@@ -447,9 +449,7 @@ private fun factoryItems(zh: Boolean): List<String> =
 
 /** Wipes everything the card promised to. Irreversible; the confirmation lists it first. */
 private fun factoryReset() {
-    Assistant.stop()
-    runCatching { Scrollback.wipe() }
-    runCatching { Pages.wipe() }
+    runCatching { Assistant.clearConversation() }
     runCatching { DesktopNotebook.book.wipe() }
     runCatching { net.kuafuai.andee.desktop.mac.MacVault.wipe() }
     runCatching { net.kuafuai.andee.desktop.shell.AndeeAgent.keys().forEach { net.kuafuai.andee.desktop.shell.AndeeAgent.delete(it.name) } }

@@ -1199,6 +1199,33 @@ class CommandDispatcher(
                 }
             }
 
+            // tap_target: the brain describes, a pointing model locates, the device taps. See `Locator`.
+            "screen.tap_target" -> {
+                val target = params?.optString("target")?.trim().orEmpty()
+                require(target.isNotEmpty()) { "tap_target requires target — the element to tap, described in words" }
+                val cfg = VoiceConfig.brainConfig(appContext)
+                val model = net.kuafuai.andee.brain.Locator.modelFor(cfg, VoiceConfig.locatorModel(appContext))
+                    ?: throw IllegalStateException("No locating model is available on this backend. Use tap_screen_element or tap_by_coordinates (zoom first).")
+                // No grid: the lines and rulers are for an eye that counts cells, and only get in a pointing model's way.
+                val shot = blankedForCapture { requireScreen().screenshot("locate", grid = false) }
+                val png = shot.optString("png_base64").ifEmpty { throw IllegalStateException("could not take the screenshot to locate on") }
+                val loc = net.kuafuai.andee.brain.Locator(cfg, model) { warn, msg ->
+                    if (warn) android.util.Log.w("Locator", msg) else android.util.Log.i("Locator", msg)
+                }.locate(png, target)
+                when (loc) {
+                    is net.kuafuai.andee.brain.Locator.Result.Found -> passthroughForGesture {
+                        requireScreen().tapLocated(loc.x, loc.y, target, params?.optBoolean("long", false) == true)
+                    }.put("saw", loc.seen)
+                    net.kuafuai.andee.brain.Locator.Result.Absent -> JSONObject().put("found", false).put("target", target).put(
+                        "note",
+                        "The locating model looked at the current screen and does not see this. Nothing was tapped. Look at the screen " +
+                            "(take_screenshot) and describe it differently, or scroll — do not send the same words again.",
+                    )
+                    is net.kuafuai.andee.brain.Locator.Result.Failed -> JSONObject().put("found", false).put("target", target)
+                        .put("error", loc.why).put("note", "Nothing was tapped. Fall back to tap_by_coordinates with a zoom.")
+                }
+            }
+
             "screen.tap_id" -> {
                 // tap_screen_element: by eid from the latest element list. The old
                 // resource-id form is gone — WeChat nodes mostly have none,

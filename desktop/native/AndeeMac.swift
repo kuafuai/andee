@@ -44,10 +44,22 @@ public func andee_screen_capture_allowed(_ request: Int32) -> Int32 {
 
 // MARK: - display / apps
 
+/// The scale of the display whose origin is (0,0) — the one we capture and aim at. Not `NSScreen.main`, which is
+/// the screen with keyboard focus and on a two-screen desk is often the other one.
+private func mainScale() -> CGFloat {
+    let id = CGMainDisplayID()
+    for s in NSScreen.screens {
+        if let n = s.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber, n.uint32Value == id {
+            return s.backingScaleFactor
+        }
+    }
+    return NSScreen.screens.first?.backingScaleFactor ?? 2
+}
+
 @_cdecl("andee_main_display")
 public func andee_main_display() -> UnsafeMutablePointer<CChar> {
     let b = CGDisplayBounds(CGMainDisplayID())
-    let scale = NSScreen.main?.backingScaleFactor ?? 2
+    let scale = mainScale()
     return json(["x": b.origin.x, "y": b.origin.y, "w": b.width, "h": b.height, "scale": scale])
 }
 
@@ -93,7 +105,12 @@ private func otherAppAt(_ x: Double, _ y: Double) -> pid_t? {
     guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
         as? [[String: Any]] else { return nil }
     for w in list {
-        guard let pid = w[kCGWindowOwnerPID as String] as? pid_t, pid != me,
+        // Ordinary app windows only (layer 0). Above them sit the Dock's full-screen transparent window, the menu
+        // bar and its extras — measured 2026-10-28: the Dock's window covers the whole display at layer 20, so
+        // "the topmost window here" was the Dock for every point, an e-number tap was refused as "now there:
+        // 通知中心", and activating the app under a click would have activated the Dock.
+        guard (w[kCGWindowLayer as String] as? Int) == 0,
+              let pid = w[kCGWindowOwnerPID as String] as? pid_t, pid != me,
               (w[kCGWindowAlpha as String] as? Double ?? 1) > 0,
               let b = w[kCGWindowBounds as String] as? [String: Any],
               let r = CGRect(dictionaryRepresentation: b as CFDictionary),
@@ -151,6 +168,41 @@ private func actions(_ e: AXUIElement) -> [String] {
 
 private var nodeBudget = 0
 
+/// The app being walked, for the hit test below; set by andee_ax_tree for the length of one walk.
+private var walkApp: AXUIElement? = nil
+private var hitBudget = 0
+
+/// Whether [a] is [b] or sits inside it, walking up from [a] at most [levels] parents.
+private func within(_ a: AXUIElement, _ b: AXUIElement, levels: Int = 12) -> Bool {
+    var cur: AXUIElement? = a
+    for _ in 0...levels {
+        guard let c = cur else { return false }
+        if CFEqual(c, b) { return true }
+        cur = attr(c, kAXParentAttribute).map { $0 as! AXUIElement }
+    }
+    return false
+}
+
+/// Is [e] what a click at its own centre would reach? False when something else is there — a menu that has
+/// closed but whose items the page keeps in the tree, a row scrolled out of its panel, a card under a dialog.
+/// Measured on the Mac traces: tapping such items by number hit the card beneath six times. Nil = not asked.
+private func reachable(_ e: AXUIElement, _ f: CGRect) -> Bool? {
+    guard let app = walkApp, hitBudget > 0 else { return nil }
+    hitBudget -= 1
+    var hit: AXUIElement?
+    guard AXUIElementCopyElementAtPosition(app, Float(f.midX), Float(f.midY), &hit) == .success, let h = hit else { return nil }
+    // The hit is the element or something inside it: the click lands on it.
+    if within(h, e) { return true }
+    // Or a container it sits in — web content often answers a hit test with an outer group several levels up
+    // (measured in Chrome: a visible nav link's centre returned its fourth-level group). Not the page or the
+    // window itself, though: that is exactly what a closed menu's item leaves at its centre.
+    if within(e, h, levels: 30) {
+        let role = str(h, kAXRoleAttribute) ?? ""
+        return !["AXWebArea", "AXWindow", "AXScrollArea", "AXApplication"].contains(role)
+    }
+    return false
+}
+
 private func walk(_ e: AXUIElement, depth: Int) -> [String: Any]? {
     nodeBudget -= 1
     if nodeBudget < 0 || depth > 40 { return nil }
@@ -169,6 +221,11 @@ private func walk(_ e: AXUIElement, depth: Int) -> [String: Any]? {
     let acts = actions(e)
     if acts.contains(kAXPressAction as String) { n["press"] = true }
     if let settable = settableValue(e), settable { n["editable"] = true }
+    // Only for what the model may press — a container's centre is often a child, which is fine and not asked.
+    if let f = frame(e), f.width > 1, f.height > 1,
+       n["press"] != nil || n["editable"] != nil || n["title"] != nil || n["desc"] != nil {
+        if reachable(e, f) == false { n["covered"] = true }
+    }
     if let kids = attr(e, kAXChildrenAttribute) as? [AXUIElement], !kids.isEmpty {
         let c = kids.compactMap { walk($0, depth: depth + 1) }
         if !c.isEmpty { n["children"] = c }
@@ -193,6 +250,9 @@ public func andee_ax_tree(_ maxNodes: Int32) -> UnsafeMutablePointer<CChar> {
     if let w = attr(ax, kAXFocusedWindowAttribute) { win = (w as! AXUIElement) }
     else if let ws = attr(ax, kAXWindowsAttribute) as? [AXUIElement], let f = ws.first { win = f }
     nodeBudget = Int(maxNodes)
+    walkApp = ax
+    hitBudget = 600
+    defer { walkApp = nil }
     var out: [String: Any] = ["app": app.localizedName ?? "", "bundle": app.bundleIdentifier ?? "", "pid": Int(app.processIdentifier)]
     if let w = win {
         out["window_title"] = str(w, kAXTitleAttribute) ?? ""
@@ -201,7 +261,8 @@ public func andee_ax_tree(_ maxNodes: Int32) -> UnsafeMutablePointer<CChar> {
         out["tree"] = [:]
         out["no_window"] = true
     }
-    // The menu bar is part of the app a person can reach.
+    // The menu bar is part of the app a person can reach; its items are not hit-tested (they sit in closed menus).
+    walkApp = nil
     if let mb = attr(ax, kAXMenuBarAttribute) {
         nodeBudget = 400
         out["menubar"] = walk(mb as! AXUIElement, depth: 0) ?? [:]
@@ -221,6 +282,23 @@ public func andee_ax_press_at(_ x: Double, _ y: Double) -> Int32 {
     var el: AXUIElement?
     guard AXUIElementCopyElementAtPosition(app, Float(x), Float(y), &el) == .success, let e = el, !isOurs(e) else { return 0 }
     return AXUIElementPerformAction(e, kAXPressAction as CFString) == .success ? 1 : 0
+}
+
+/// What a click at (x, y) would reach, with up to four of its containers: role and label of each. Lets an
+/// e-number tap check that the element it is about to press is still the one at that spot.
+@_cdecl("andee_ax_at")
+public func andee_ax_at(_ x: Double, _ y: Double) -> UnsafeMutablePointer<CChar> {
+    guard let pid = otherAppAt(x, y) else { return json(["found": false]) }
+    let app = AXUIElementCreateApplication(pid)
+    var el: AXUIElement?
+    guard AXUIElementCopyElementAtPosition(app, Float(x), Float(y), &el) == .success, var cur = el, !isOurs(cur) else { return json(["found": false]) }
+    var chain: [[String: String]] = []
+    for _ in 0..<5 {
+        chain.append(["role": str(cur, kAXRoleAttribute) ?? "", "label": [kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute].lazy.compactMap { str(cur, $0) }.first ?? ""])
+        guard let p = attr(cur, kAXParentAttribute) else { break }
+        cur = p as! AXUIElement
+    }
+    return json(["found": true, "chain": chain])
 }
 
 /** Set the focused element's value (a text field), as a person pasting it would. */
@@ -262,7 +340,13 @@ public func andee_click(_ x: Double, _ y: Double, _ button: Int32, _ count: Int3
 @_cdecl("andee_drag")
 public func andee_drag(_ x1: Double, _ y1: Double, _ x2: Double, _ y2: Double, _ ms: Int32) {
     let steps = max(8, Int(ms) / 16)
+    // Move there first and let the pointer settle: pressing without arriving hovers nothing, and controls that
+    // react to hover (sliders, handles, list rows) only start a drag once they have seen the pointer over them.
+    post(CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: CGPoint(x: x1, y: y1), mouseButton: .left))
+    usleep(120_000)
     post(CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: CGPoint(x: x1, y: y1), mouseButton: .left))
+    // A beat with the button down before moving — the press has to register as a grab, not as the start of a click.
+    usleep(100_000)
     for i in 1...steps {
         let t = Double(i) / Double(steps)
         let p = CGPoint(x: x1 + (x2 - x1) * t, y: y1 + (y2 - y1) * t)
@@ -363,7 +447,7 @@ public func andee_screenshot(_ path: UnsafePointer<CChar>, _ maxSide: Int32) -> 
             let mine = content.applications.filter { $0.processID == getpid() }
             let filter = SCContentFilter(display: display, excludingApplications: mine, exceptingWindows: [])
             let cfg = SCStreamConfiguration()
-            let scale = NSScreen.main?.backingScaleFactor ?? 2
+            let scale = mainScale()
             var w = Double(display.width) * scale, h = Double(display.height) * scale
             let longSide = max(w, h)
             if maxSide > 0 && longSide > Double(maxSide) { let k = Double(maxSide) / longSide; w *= k; h *= k }
@@ -571,6 +655,36 @@ public func andee_notif_watch(_ cb: NotifCallback) -> Int32 {
     return sources.isEmpty ? 0 : 1
 }
 private var notifKeep: [DispatchSourceFileSystemObject] = []
+
+/// Bring [pid] to the front and wait until it is there (up to ~0.8 s). True when it had to be moved.
+private func activate(_ pid: pid_t) -> Bool {
+    if NSWorkspace.shared.frontmostApplication?.processIdentifier == pid { return false }
+    guard let app = NSRunningApplication(processIdentifier: pid) else { return false }
+    app.activate(options: [])
+    for _ in 0..<16 {
+        usleep(50_000)
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier == pid { break }
+    }
+    usleep(150_000)  // the app's own key window and first responder, a beat after it is frontmost
+    return true
+}
+
+/// Make the app that owns the window at (x, y) the active one before a click lands there. A click on an
+/// inactive window only activates it: measured in Chrome, the first click on a text box left focus on the page
+/// (AXWebArea) and only the second focused the box — so a paste after one click went nowhere while the tool
+/// reported success. 1 when the app had to be brought forward, 0 when it already was (or none is there).
+@_cdecl("andee_activate_at")
+public func andee_activate_at(_ x: Double, _ y: Double) -> Int32 {
+    guard let pid = otherAppAt(x, y) else { return 0 }
+    return activate(pid) ? 1 : 0
+}
+
+/// Before keystrokes: if Andee itself is in front (the user just typed to it), bring the app being driven back.
+@_cdecl("andee_activate_target")
+public func andee_activate_target() -> Int32 {
+    guard NSWorkspace.shared.frontmostApplication?.processIdentifier == getpid(), let app = targetApp() else { return 0 }
+    return activate(app.processIdentifier) ? 1 : 0
+}
 
 /// Whether a visible window of ours covers this point — only then does a click need us out of the way.
 @_cdecl("andee_own_window_at")

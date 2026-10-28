@@ -43,7 +43,12 @@ class MacScreen(
     @Volatile private var zoomAt = 0L
     private val spots = HashMap<String, MutableList<Long>>()
 
-    override fun handles(method: String) = method in METHODS
+    // tap_target only where a pointing model can answer it; DesktopBrainHost lists exactly what is handled.
+    override fun handles(method: String) = method in METHODS && (method != "screen.tap_target" || locatorModel() != null)
+
+    private fun locatorModel(): String? = net.kuafuai.andee.brain.Locator.modelFor(
+        net.kuafuai.andee.desktop.Assistant.config(), net.kuafuai.andee.desktop.Settings.get("locator_model"),
+    )
 
     override fun dispatch(method: String, p: JSONObject, silent: Boolean, untrusted: Boolean): Any? {
         if (!Bridge.available) throw IllegalStateException("The Mac screen bridge did not load; screen tools cannot run here.")
@@ -53,9 +58,11 @@ class MacScreen(
             "screen.ui_tree" -> uiTree(p.optBoolean("with_shot", false))
             "screen.tap_id" -> tapId(req(p, "eid"), long = false)
             "screen.long_press_id" -> tapId(req(p, "eid"), long = true)
+            "screen.tap_target" -> tapTarget(req(p, "target"), p.optBoolean("long", false))
             "screen.tap" -> tapAim(p, long = false)
             "screen.long_press" -> tapAim(p, long = true)
             "screen.swipe" -> swipe(p)
+            "screen.drag" -> drag(p)
             "screen.type" -> type(p.optString("text"))
             "screen.submit_input" -> submit()
             "screen.wait" -> waitFor(p.optDouble("seconds", 2.0))
@@ -86,6 +93,7 @@ class MacScreen(
         val idx = LinkedHashMap<String, El>()
         var total = 0
         var n = 0
+        var covered = 0
         fun visit(o: JSONObject, depth: Int) {
             total++
             val f = o.optJSONArray("frame")
@@ -96,7 +104,11 @@ class MacScreen(
                 f.getDouble(0) < dw() && f.getDouble(1) < dh() && f.getDouble(0) + f.getDouble(2) > 0 && f.getDouble(1) + f.getDouble(3) > 0
             val press = o.optBoolean("press")
             val editable = o.optBoolean("editable") || role in setOf("TextField", "TextArea", "SearchField", "ComboBox")
-            val useful = visible && !o.optBoolean("disabled") &&
+            // Something else is what a click at its centre would reach (see `reachable` in AndeeMac.swift): a closed
+            // menu's items, a row scrolled out of its panel. Listing it invites a tap that lands on whatever is there.
+            val hidden = o.optBoolean("covered")
+            if (hidden && visible) covered++
+            val useful = visible && !hidden && !o.optBoolean("disabled") &&
                 (press || editable || label.isNotBlank() || role in setOf("Button", "Link", "CheckBox", "RadioButton", "PopUpButton", "MenuButton", "Tab", "Cell", "Row"))
             val kids = o.optJSONArray("children")
             val decorative = role in setOf("Group", "ScrollArea", "SplitGroup", "Unknown", "LayoutArea", "") && label.isBlank() && !press
@@ -120,8 +132,25 @@ class MacScreen(
             .put("window", raw.optString("window_title")).put("nodes_total", total).put("elements_listed", idx.size)
             .put("elements", lines.joinToString("\n"))
         if (idx.size > MAX_LINES) out.put("elements_dropped", idx.size - MAX_LINES)
-        if (idx.isEmpty()) {
-            out.put("empty", true).put(
+        if (covered > 0) out.put("covered_not_listed", covered)
+        val win = raw.optJSONObject("tree")?.optJSONArray("frame")
+        val offMain = win != null && win.getDouble(2) > 1 && run {
+            val l = maxOf(0.0, win.getDouble(0)); val t = maxOf(0.0, win.getDouble(1))
+            val r = minOf(dw(), win.getDouble(0) + win.getDouble(2)); val b = minOf(dh(), win.getDouble(1) + win.getDouble(3))
+            val inside = maxOf(0.0, r - l) * maxOf(0.0, b - t)
+            inside < 0.5 * win.getDouble(2) * win.getDouble(3)
+        }
+        // A window of real size with nothing in it but its own title-bar buttons: the app draws its own UI and
+        // tells accessibility nothing (Mac WeChat lists 4 elements — the window and three traffic lights).
+        val blind = !offMain && idx.size <= 6 && total <= 16 && win != null && win.getDouble(2) * win.getDouble(3) > 200_000
+        if (offMain) {
+            out.put("other_display", true).put(
+                "hint",
+                "${raw.optString("app")}'s window is mostly on another display. Andee can only see and click the main display, " +
+                    "so this list and any screenshot do not show it. Ask the user to move the window to the main screen; do not aim at it.",
+            )
+        } else if (idx.isEmpty() || blind) {
+            out.put("empty", true).put("tree_withheld", blind).put(
                 "hint",
                 "This app gives the accessibility layer almost nothing (common for apps that draw their own UI, like " +
                     "WeChat for Mac). Work from the screenshot attached here: aim with the grid and tap_by_coordinates, " +
@@ -142,26 +171,128 @@ class MacScreen(
             "unknown element $eid — the screen has changed or the number is from an older list. Re-dump with get_screen_element; do not guess.",
         )
         val (nx, ny) = toNorm(e.cx, e.cy)
+        stillThere(e)
         // A Press action is not a pointer event and the hit test already skips our windows: nothing to step aside for.
+        val before = probe()
         val pressed = !long && e.press && Bridge.axPressAt(e.cx, e.cy)
-        if (!pressed) gesture(e.cx, e.cy) { Bridge.click(e.cx, e.cy, right = long, holdMs = 40) }
+        if (!pressed) click(e.cx, e.cy, long)
         return afterTap(JSONObject().put("completed", true).put("eid", eid).put("label", e.label)
-            .put("via", if (pressed) "press_action" else if (long) "right_click" else "click").put("x", nx).put("y", ny))
+            .put("via", if (pressed) "press_action" else if (long) "right_click" else "click").put("x", nx).put("y", ny), nx, ny, before)
     }
 
     private fun tapAim(p: JSONObject, long: Boolean): JSONObject {
         val (nx, ny, label) = resolveAim(p)
         guardSpot(nx, ny)
         val (x, y) = toPx(nx, ny)
-        gesture(x, y) { Bridge.click(x, y, right = long, holdMs = 40) }
+        val before = probe()
+        click(x, y, long)
         return afterTap(JSONObject().put("completed", true).put("x", nx).put("y", ny).put("aimed_at", label)
-            .put("via", if (long) "right_click" else "click"))
+            .put("via", if (long) "right_click" else "click"), nx, ny, before)
     }
 
-    /** Taps are followed by a fresh picture, as on the phone, so the next step reads the result. */
-    private fun afterTap(o: JSONObject): JSONObject {
-        Thread.sleep(400)
-        if (Bridge.screenCaptureAllowed()) o.put("after_shot", JSONObject().put("png_base64", shot(grid = true)))
+    /**
+     * The brain describes, a model trained to point locates, the device clicks — see `Locator`. The picture it
+     * locates on is the plain screenshot (no grid: rulers are for an eye that counts cells), at the size the
+     * brain's own screenshots have, so "0-1000 of the image" is 0-1000 of the main display.
+     */
+    private fun tapTarget(target: String, long: Boolean): JSONObject {
+        val model = locatorModel() ?: throw IllegalStateException("No locating model is available on this backend. Use tap_screen_element or tap_by_coordinates (zoom first).")
+        if (!Bridge.screenCaptureAllowed()) throw IllegalStateException(SCREEN_RECORDING_NOTE)
+        val img = scale(capture(SHOT_MAX_SIDE), SHOT_MAX_SIDE)
+        val loc = net.kuafuai.andee.brain.Locator(net.kuafuai.andee.desktop.Assistant.config(), model) { warn, msg ->
+            if (warn) Log.w("Locator", msg) else Log.i("Locator", msg)
+        }.locate(png(img), target)
+        return when (loc) {
+            is net.kuafuai.andee.brain.Locator.Result.Found -> {
+                guardSpot(loc.x, loc.y)
+                val (x, y) = toPx(loc.x, loc.y)
+                val before = probe()
+                click(x, y, long)
+                afterTap(
+                    JSONObject().put("completed", true).put("located", "${loc.x},${loc.y}").put("target", target).put("saw", loc.seen)
+                        .put("via", if (long) "right_click" else "click"),
+                    loc.x, loc.y, before,
+                )
+            }
+            net.kuafuai.andee.brain.Locator.Result.Absent -> JSONObject().put("found", false).put("target", target).put(
+                "note",
+                "The locating model looked at the current screen and does not see this. Nothing was clicked. Look at the screen " +
+                    "and describe it differently, or scroll — do not send the same words again.",
+            )
+            is net.kuafuai.andee.brain.Locator.Result.Failed -> JSONObject().put("found", false).put("target", target)
+                .put("error", loc.why).put("note", "Nothing was clicked. Fall back to tap_by_coordinates with a zoom.")
+        }
+    }
+
+    /**
+     * The listed element is no longer what a click at its centre reaches — the list is older than the screen.
+     * The phone re-finds the node live before every e-number tap; this is the Mac's version of that check: the
+     * hit element or one of its containers must still carry the label the list showed.
+     */
+    private fun stillThere(e: El) {
+        if (e.label.isBlank()) return
+        val at = runCatching { Bridge.axAt(e.cx, e.cy) }.getOrNull() ?: return
+        if (!at.optBoolean("found")) return
+        val chain = at.optJSONArray("chain") ?: return
+        val labels = (0 until chain.length()).map { chain.getJSONObject(it).optString("label") }
+        val want = e.label.take(40)
+        if (labels.none { it.isNotBlank() && (it.contains(want) || want.contains(it.take(40))) }) {
+            throw IllegalStateException(
+                "${e.eid} (\"${e.label.take(30)}\") is not what is at that spot any more — the screen changed since the list " +
+                    "(now there: \"${labels.firstOrNull { it.isNotBlank() }?.take(30) ?: "unlabelled"}\"). Re-dump with get_screen_element and pick again.",
+            )
+        }
+    }
+
+    /** A tiny capture to tell, after a tap, whether anything on the screen moved. Null without the grant. */
+    private fun probe(): BufferedImage? =
+        if (Bridge.screenCaptureAllowed()) runCatching { capture(PROBE_SIDE) }.getOrNull() else null
+
+    /** Share of probe pixels that differ noticeably — a tap that opened, closed or highlighted something. */
+    private fun changed(a: BufferedImage, b: BufferedImage): Double {
+        if (a.width != b.width || a.height != b.height) return 1.0
+        var diff = 0
+        var n = 0
+        for (y in 0 until a.height step 2) for (x in 0 until a.width step 2) {
+            val p = a.getRGB(x, y); val q = b.getRGB(x, y)
+            val d = Math.abs((p shr 16 and 255) - (q shr 16 and 255)) + Math.abs((p shr 8 and 255) - (q shr 8 and 255)) + Math.abs((p and 255) - (q and 255))
+            if (d > 48) diff++
+            n++
+        }
+        return diff.toDouble() / n
+    }
+
+    /**
+     * Taps are followed by a fresh picture, as on the phone, so the next step reads the result — and, as on the
+     * phone, a fact about it: whether the screen changed at all, and a ring where the click landed. Without
+     * those the model judged every click by eye, and in the traces it repeatedly took a menu for open that was
+     * not. The wait is a poll (the page may take a moment to answer), not a fixed sleep.
+     */
+    private fun afterTap(o: JSONObject, nx: Int = -1, ny: Int = -1, before: BufferedImage? = null): JSONObject {
+        var moved: Double? = null
+        if (before != null) {
+            val until = System.currentTimeMillis() + SETTLE_MAX_MS
+            Thread.sleep(150)
+            while (true) {
+                val now = runCatching { capture(PROBE_SIDE) }.getOrNull() ?: break
+                moved = changed(before, now)
+                if (moved > CHANGED_SHARE || System.currentTimeMillis() >= until) break
+                Thread.sleep(150)
+            }
+            // Something is moving: give it a beat to settle before the picture the model will read.
+            if ((moved ?: 0.0) > CHANGED_SHARE) Thread.sleep(250)
+        } else {
+            Thread.sleep(400)
+        }
+        if (moved != null) {
+            o.put("screen_changed", moved > CHANGED_SHARE)
+            if (moved <= CHANGED_SHARE) o.put(
+                "change_note",
+                "Nothing on the screen changed after this click. It most likely missed (or hit something inert). Do not assume a menu " +
+                    "or page opened — look at after_shot, and zoom in before aiming again.",
+            )
+        }
+        if (Bridge.screenCaptureAllowed()) o.put("after_shot", JSONObject().put("png_base64", shot(grid = true, ringAt = if (nx >= 0) nx to ny else null)))
         o.put("front_app", Bridge.frontmost().optString("name"))
         return o
     }
@@ -203,13 +334,17 @@ class MacScreen(
         return (r[0] + lx * (r[2] - r[0]) / 1000) to (r[1] + ly * (r[3] - r[1]) / 1000)
     }
 
-    /** The phone's stuck-loop guard: a fourth tap within 120 px of a spot inside five minutes is refused. */
+    /**
+     * The phone's stuck-loop guard: a fourth tap within [SPOT_RADIUS_PT] of a spot inside five minutes is refused.
+     * The radius was 120 pt — about 240 Retina pixels — which refused aim corrections converging on a small target
+     * (9 of 56 coordinate taps in the traces, 4 in one turn). The phone made the same cut for the same reason.
+     */
     private fun guardSpot(nx: Int, ny: Int) {
         val (x, y) = toPx(nx, ny)
         val now = System.currentTimeMillis()
         synchronized(spots) {
             spots.values.forEach { it.removeAll { t -> now - t > 300_000 } }
-            val key = spots.keys.firstOrNull { k -> k.split(',').let { Math.hypot(it[0].toDouble() - x, it[1].toDouble() - y) < 120 } }
+            val key = spots.keys.firstOrNull { k -> k.split(',').let { Math.hypot(it[0].toDouble() - x, it[1].toDouble() - y) < SPOT_RADIUS_PT } }
                 ?: "${x.toInt()},${y.toInt()}"
             val list = spots.getOrPut(key) { mutableListOf() }
             if (list.size >= 3) throw IllegalStateException(
@@ -221,6 +356,52 @@ class MacScreen(
     }
 
     // ---- swipes, typing, keys ---------------------------------------------
+
+    /**
+     * Press at the start, move to the end holding, release: a real drag. [swipe] on a Mac is a scroll — it moves
+     * the content under the pointer — so anything that has to be *grabbed* (a slider, a splitter, a window by its
+     * title bar, a file onto a folder, a list row, a range selection) had no tool, and the model reached for
+     * shell scripts that synthesise the mouse.
+     *
+     * Both ends are aimed like a tap: 0-1000 numbers, or `from_target`/`to_target` words resolved by the locating
+     * model when there is one. The app under the start point is brought forward first, as for a click.
+     */
+    private fun drag(p: JSONObject): JSONObject {
+        val (fx, fy) = dragEnd(p, "from")
+        val (tx, ty) = dragEnd(p, "to")
+        val ms = p.optInt("duration_ms", 700).coerceIn(200, 5_000)
+        val (ax, ay) = toPx(fx, fy); val (bx, by) = toPx(tx, ty)
+        require(Math.hypot(bx - ax, by - ay) >= 4) { "the start and the end are the same place — a drag needs somewhere to go" }
+        val before = probe()
+        gesture(ax, ay) {
+            Bridge.activateAt(ax, ay)
+            Bridge.drag(ax, ay, bx, by, ms)
+        }
+        return afterTap(
+            JSONObject().put("completed", true).put("from", "$fx,$fy").put("to", "$tx,$ty").put("via", "drag"),
+            tx, ty, before,
+        )
+    }
+
+    private fun dragEnd(p: JSONObject, side: String): Pair<Int, Int> {
+        val target = p.optString("${side}_target").trim()
+        if (target.isNotEmpty()) {
+            val model = locatorModel() ?: throw IllegalStateException("${side}_target needs a locating model, and none is available here. Give ${side}_x and ${side}_y instead.")
+            if (!Bridge.screenCaptureAllowed()) throw IllegalStateException(SCREEN_RECORDING_NOTE)
+            val loc = net.kuafuai.andee.brain.Locator(net.kuafuai.andee.desktop.Assistant.config(), model) { warn, msg ->
+                if (warn) Log.w("Locator", msg) else Log.i("Locator", msg)
+            }.locate(png(scale(capture(SHOT_MAX_SIDE), SHOT_MAX_SIDE)), target)
+            return when (loc) {
+                is net.kuafuai.andee.brain.Locator.Result.Found -> loc.x to loc.y
+                net.kuafuai.andee.brain.Locator.Result.Absent -> throw IllegalStateException("the locating model does not see \"$target\" on the screen. Nothing was dragged.")
+                is net.kuafuai.andee.brain.Locator.Result.Failed -> throw IllegalStateException("could not locate \"$target\" (${loc.why}). Nothing was dragged; give ${side}_x and ${side}_y instead.")
+            }
+        }
+        val x = p.optInt("${side}_x", Int.MIN_VALUE); val y = p.optInt("${side}_y", Int.MIN_VALUE)
+        require(x != Int.MIN_VALUE && y != Int.MIN_VALUE) { "give ${side}_x and ${side}_y (0-1000), or ${side}_target in words" }
+        requireNorm(x, "${side}_x"); requireNorm(y, "${side}_y")
+        return x to y
+    }
 
     private fun swipe(p: JSONObject): JSONObject {
         val x1 = p.getInt("x1"); val y1 = p.getInt("y1"); val x2 = p.getInt("x2"); val y2 = p.getInt("y2")
@@ -251,6 +432,8 @@ class MacScreen(
      * even then it is keystrokes into a cleared field, never AXValue on top of a web editor.
      */
     private fun type(text: String): JSONObject {
+        // Keys go to the frontmost app; if that is Andee (the user just typed to it), they would land in Andee.
+        Bridge.activateTarget()
         val before = Bridge.focusedValue()
         if (!before.optBoolean("focused")) return typeBlind(text)
         // Keys go to the focused app, not to a point on screen: fading our windows changes nothing for them.
@@ -309,11 +492,13 @@ class MacScreen(
     }
 
     private fun submit(): JSONObject {
+        Bridge.activateTarget()
         Bridge.key(Bridge.Keys.RETURN)
         return JSONObject().put("performed", true).put("via", "return_key")
     }
 
     private fun global(action: String): JSONObject {
+        Bridge.activateTarget()
         when (action.lowercase()) {
             "back" -> Bridge.key(Bridge.Keys.LEFT_BRACKET, Bridge.Keys.CMD)
             "home" -> Bridge.key(Bridge.Keys.F3, Bridge.Keys.CMD)
@@ -353,11 +538,24 @@ class MacScreen(
         } finally { f.delete() }
     }
 
-    private fun shot(grid: Boolean): String {
+    private fun shot(grid: Boolean, ringAt: Pair<Int, Int>? = null): String {
         var img = capture(SHOT_MAX_SIDE)
         img = scale(img, SHOT_MAX_SIDE)
         if (grid) drawGrid(img, zoom = false)
+        ringAt?.let { (nx, ny) -> ring(img, nx * img.width / 1000.0, ny * img.height / 1000.0) }
         return png(img)
+    }
+
+    /** The magenta ring where a click landed — the one piece of evidence about aim, as on the phone. */
+    private fun ring(img: BufferedImage, mx: Double, my: Double) {
+        img.createGraphics().apply {
+            setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            val r = minOf(img.width, img.height) * 0.018
+            color = Color(224, 0, 255); stroke = BasicStroke((r * 0.22).toFloat().coerceAtLeast(2f))
+            drawOval((mx - r).toInt(), (my - r).toInt(), (2 * r).toInt(), (2 * r).toInt())
+            fillOval((mx - 2).toInt(), (my - 2).toInt(), 4, 4)
+            dispose()
+        }
     }
 
     private fun lookRegion(p: JSONObject): JSONObject {
@@ -465,6 +663,19 @@ class MacScreen(
     private fun <T> gesture(x: Double, y: Double, block: () -> T): T =
         if (Bridge.ownWindowAt(x, y)) stepAside(block) else block()
 
+    /**
+     * A click, made to land: the app under the point is brought to the front first. On a Mac a click on an
+     * inactive window only activates it — measured in Chrome, the first click on a text box left focus on the
+     * page, so the paste that followed went nowhere while type_text reported success, and the first click on a
+     * sidebar link did nothing at all. Both were in the traces of one task.
+     */
+    private fun click(x: Double, y: Double, right: Boolean) {
+        gesture(x, y) {
+            Bridge.activateAt(x, y)
+            Bridge.click(x, y, right = right, holdMs = 40)
+        }
+    }
+
     private fun <T> stepAside(block: () -> T): T {
         // The hide is inside the try: if it fails half-way, the windows must still come back.
         try {
@@ -486,10 +697,16 @@ class MacScreen(
         private const val GRID_ROWS = 12
         private const val SHOT_MAX_SIDE = 1600
         private const val MAX_LINES = 300
+        private const val SPOT_RADIUS_PT = 30.0
+        /** Long side of the before/after probes; enough to see a menu open, cheap to capture. */
+        private const val PROBE_SIDE = 480
+        private const val SETTLE_MAX_MS = 1_200L
+        /** Share of probe pixels that must change for a click to count as having done something. */
+        private const val CHANGED_SHARE = 0.002
 
         val METHODS = setOf(
-            "screen.ui_tree", "screen.tap_id", "screen.tap", "screen.long_press_id", "screen.long_press",
-            "screen.swipe", "screen.type", "screen.submit_input", "screen.wait", "screen.look_region",
+            "screen.ui_tree", "screen.tap_id", "screen.tap", "screen.tap_target", "screen.long_press_id", "screen.long_press",
+            "screen.swipe", "screen.drag", "screen.type", "screen.submit_input", "screen.wait", "screen.look_region",
             "screen.screenshot", "screen.global",
         )
 
@@ -499,7 +716,7 @@ class MacScreen(
             "This image carries an 8x12 aim grid, A1 (top-left) to H12 (bottom-right): letters run along the TOP edge and numbers " +
                 "down the LEFT edge like a map's rulers, and nothing is printed inside a cell. " +
                 "To click something, name its cell and which part of the cell — {\"cell\": \"D7\", \"part\": \"bottom-right\"} on " +
-                "tap_by_coordinates. Andee's own windows are never in this picture."
+                "tap_by_coordinates. Andee's own windows are never in this picture. A magenta ring marks where the last click landed."
 
         init { Log.i("MacScreen", "screen tools registered") }
     }

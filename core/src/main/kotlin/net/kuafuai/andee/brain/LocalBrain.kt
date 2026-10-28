@@ -545,6 +545,7 @@ class LocalBrain(
 
     private fun explainFailure(t: Throwable): String {
         fun s(id: BrainText, vararg args: Any) = host.text(id, *args)
+        if (t is LlmMovedException) return s(BrainText.ERROR_MOVED, t.where.ifEmpty { "HTTP ${t.code}" })
         if (t is LlmHttpException) {
             return when (t.code) {
                 402 -> s(BrainText.ERROR_402)

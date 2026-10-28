@@ -193,6 +193,61 @@ object ToolSchemas {
             ),
         ),
         tool(
+            localOnly = true,
+            name = "drag",
+            method = "screen.drag",
+            description = """
+        Press at one point, move to another while holding, and release — a real drag, on the Mac. swipe_by_coordinates
+        SCROLLS there; use drag when something has to be grabbed: a slider or a progress/volume bar, a splitter, a
+        window by its title bar, a file onto a folder, a list row to reorder, a text or range selection.
+
+        Aim each end the way you aim a tap: `from_x`/`from_y` and `to_x`/`to_y` in 0-1000 of the screen, or describe
+        it in words with `from_target` / `to_target` (resolved like tap_target — you never compute a coordinate).
+        A slider's end is where its handle should END UP, not where the handle is now.
+
+        The result carries `screen_changed` and an `after_shot` with a magenta ring at the release point. Look at it:
+        a drag that grabbed nothing leaves the screen unchanged. Do not repeat the same drag blindly — re-aim from a
+        fresh look, or use the control's own keyboard handling.
+    """.trimIndent(),
+            required = emptyList(),
+            props = mapOf(
+                "from_x" to prop("integer", "Start x, 0-1000."), "from_y" to prop("integer", "Start y, 0-1000."),
+                "to_x" to prop("integer", "End x, 0-1000."), "to_y" to prop("integer", "End y, 0-1000."),
+                "from_target" to prop("string", "The thing to grab, in words (instead of from_x/from_y)."),
+                "to_target" to prop("string", "Where to drop it, in words (instead of to_x/to_y)."),
+                "duration_ms" to prop("integer", "How long the move takes, 200-5000. Default 700; slower for fussy controls.", default = 700),
+            ),
+        ),
+        tool(
+            localOnly = true,
+            name = "tap_target",
+            method = "screen.tap_target",
+            description = """
+        Tap something you can SEE but that has no e-number — an icon, a button in an app that hides its
+        element tree (WeChat), anything on a canvas, mini-program or web page — by describing it in words.
+        The device takes a fresh screenshot, a vision model trained to point finds the element, and the
+        device taps its centre. You never give a coordinate, so nothing can be off by your arithmetic.
+
+        Use it INSTEAD of tap_by_coordinates whenever there is no e-number for the target; tap_by_coordinates
+        and zoom are the fallback for when this says it cannot find the target.
+
+        Describe the one element you mean so that nothing else on the screen fits: its visible text or icon,
+        and where it is ("the 发送 button right of the comment box at the bottom", "the 「··」 button at the
+        right end of 好友3's post", "the red 删除 in the menu that just opened"). Name what it looks like,
+        not what it will do. Relational words alone ("the second one") are where it errs most.
+
+        The result has `located` (0-1000), `saw` (what the element it tapped shows), `after_shot` with a
+        magenta ring where it tapped, and `screen_changed` where the device can tell. If `saw` is not what
+        you meant, the tap went to the wrong thing — look before you go on. `found: false` means the model looked and does not see
+        it — do not repeat the same words; look at the screen and describe it differently, or scroll.
+    """.trimIndent(),
+            required = listOf("target"),
+            props = mapOf(
+                "target" to prop("string", "The one element to tap, described by its visible text or icon and where it is, in any language."),
+                "long" to prop("boolean", "Long-press (phone) / right-click (Mac) instead of a tap. Default false.", default = false),
+            ),
+        ),
+        tool(
             name = "tap_by_coordinates",
             method = "screen.tap",
             description = """
@@ -328,7 +383,7 @@ object ToolSchemas {
         than a grid cell (an icon, a ✕ close button, a small chip): pass the
         cell and part you were about to tap — {"cell": "D9", "part":
         "bottom-right"} — and you get a magnified view two cells each way,
-        centred on that point, with a RED CROSSHAIR exactly where the tap
+        centred on that point, with a MAGENTA CROSSHAIR exactly where the tap
         would land. Crosshair on the target → tap with the same cell and
         part. Off it → aim off this image instead (below). Targets often sit
         right on a grid line; this view is centred on the aim, so they are
@@ -347,7 +402,8 @@ object ToolSchemas {
         your numbers were in the wrong space.
 
         This image is a magnified region, and it carries the SAME 8x12 grid in
-        LOWERCASE (a1..h12), labels at each cell's centre, so a label read off
+        LOWERCASE (a1..h12), letters along the top edge and numbers down the left
+        like a map's rulers, so a label read off
         it can never be confused with a cell of the full screen. Aim your tap
         straight from one of those labels: {"cell": "d7", "part": "top",
         "on": "zoom"} on tap_by_coordinates, and the device

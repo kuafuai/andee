@@ -856,6 +856,10 @@ object VoiceConfig {
             ).key
 
         /** Bubble kinds the user long-pressed away. Written directly, like `scene`: it is a set, not a field. */
+        /** The pointing model for `tap_target`, if the user named one; blank = [net.kuafuai.andee.brain.Locator.modelFor] picks. */
+        fun locatorModel(context: Context): String =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("locator_model", "").orEmpty()
+
         fun nudgeMuted(context: Context): Set<String> =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .getStringSet("nudge_muted", emptySet()).orEmpty().toSet()
@@ -942,6 +946,7 @@ object VoiceConfig {
             "grounding",
             "notify",
             "nudge",
+            "locator_model",
             "lang",
             "ball",
             "sweep", "sweep_quiet_minutes", "sweep_daily_cap",

@@ -21,7 +21,7 @@ import kotlin.system.exitProcess
  * directory seeded with a short conversation and two topics, so nothing of the user's
  * is read or shown.
  *
- * screen: chat | settings | notebook | scenes | vault | selfcheck | expressions | artifacts | topic:1 | ask | bubble
+ * screen: chat | settings | notebook | scenes | vault | selfcheck | expressions | artifacts | topic:1 | ask | bubble | confirm
  */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
@@ -96,6 +96,9 @@ fun main(args: Array<String>) {
         when {
             askCard != null -> AskShot(askCard)
             screen == "bubble" -> BubbleShot()
+            screen == "confirm" -> Box(Modifier.background(Color(0xFF1C1C1E)).padding(24.dp)) {
+                ConfirmBlock("清空聊天记录？", "对话记录和它生成过的页面会删掉，这场对话聊过的内容它也会忘掉。小本本不受影响。", "确认清空", {}, {})
+            }
             else -> AppRoot(nav)
         }
     }

@@ -595,6 +595,7 @@
     <string name="brain_error_auth">后端拒绝了请求（HTTP %1$d）：Key 填错、过期或被停用了。到「设置」→「后端」检查 Key，必要时去服务商官网重新生成一个。</string>
     <string name="brain_error_400">后端说请求有问题：%1$s\n最常见的原因是模型名写错了，到「设置」→「后端」核对一下模型名。</string>
     <string name="brain_error_404">后端找不到这个地址（HTTP 404）。到「设置」→「后端」检查接口地址和模型名有没有填错。</string>
+    <string name="brain_error_moved">后端没有按接口回答，地址可能填错了，或者服务换了地址（它指向：%1$s）。到「设置」→「后端」检查地址；如果用的是 CodeFlying，这是服务那边的问题，可以先切到「本机」。</string>
     <string name="brain_error_429">后端现在太忙或者请求太频繁了（HTTP 429），过一会儿再说一遍就行。如果一直这样，去服务商官网看看额度有没有用完。</string>
     <string name="brain_error_5xx">后端服务自己出了问题（HTTP %1$d），不是你这边的设置有误。过几分钟再试；一直不行就去服务商官网看看是否在维护。</string>
     <string name="brain_error_timeout">后端半天没有回应。先看看网络通不通，稍后再试一次。</string>
