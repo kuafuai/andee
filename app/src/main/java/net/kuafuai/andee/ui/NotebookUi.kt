@@ -233,13 +233,17 @@ class NotebookUi(
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(8), dp(8), dp(8), dp(8))
         }
+        var selected: View? = null
         TABS.forEachIndexed { i, t ->
             if (i > 0) bar.addView(View(context), LinearLayout.LayoutParams(dp(4), 1))
-            bar.addView(tabButton(i, lctx.getString(t.label)))
+            bar.addView(tabButton(i, lctx.getString(t.label)).also { if (i == tab) selected = it })
         }
         return android.widget.HorizontalScrollView(context).apply {
             isHorizontalScrollBarEnabled = false
             addView(bar)
+            // Picking a tab rebuilds the card, and a new scroll view starts at 0 — which left 记忆 and 待办 cut off at
+            // the edge right after they were tapped. Bring the selected one fully into view once it is laid out.
+            post { selected?.let { v -> if (v.right > scrollX + width || v.left < scrollX) scrollTo((v.right - width + dp(8)).coerceAtLeast(0), 0) } }
         }
     }
 
