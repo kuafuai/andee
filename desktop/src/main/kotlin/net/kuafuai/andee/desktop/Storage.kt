@@ -42,11 +42,34 @@ object Keychain {
             .redirectErrorStream(true).start().waitFor()
     }
 
-    /** A 256-bit AES key under [account], created on first use. */
-    fun aesKey(account: String): ByteArray? {
+    /** A 256-bit AES key under [account], created on first use. Falls back to file storage if Keychain is unavailable. */
+    fun aesKey(account: String, fallbackFile: File? = null): ByteArray? {
+        // Try Keychain first
         get(account)?.let { return runCatching { Base64.getDecoder().decode(it) }.getOrNull() }
         val k = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        return if (put(account, Base64.getEncoder().encodeToString(k))) k else null
+        val encoded = Base64.getEncoder().encodeToString(k)
+
+        // Try to save to Keychain
+        if (put(account, encoded)) return k
+
+        // Keychain failed, fall back to file
+        if (fallbackFile != null) {
+            Log.w(TAG, "Keychain unavailable for $account, using file fallback")
+            return runCatching {
+                if (fallbackFile.exists()) {
+                    Base64.getDecoder().decode(fallbackFile.readText().trim())
+                } else {
+                    fallbackFile.parentFile?.mkdirs()
+                    fallbackFile.writeText(encoded)
+                    k
+                }
+            }.getOrElse {
+                Log.e(TAG, "file fallback failed for $account", it)
+                null
+            }
+        }
+
+        return null
     }
 }
 
@@ -59,7 +82,8 @@ object Keychain {
  */
 class EncryptedFileStore(private val file: File, private val keyAccount: String) : NotebookStore {
 
-    private val key: ByteArray? by lazy { Keychain.aesKey(keyAccount) }
+    private val keyFile = File(file.parentFile, ".${keyAccount}.key")
+    private val key: ByteArray? by lazy { Keychain.aesKey(keyAccount, keyFile) }
 
     override fun read(): String? {
         if (!file.exists()) return null

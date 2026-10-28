@@ -48,7 +48,7 @@ class UiTools : DesktopBrainHost.ToolProvider {
 
     override fun turnStarted(kind: String) = Pages.beginTurn()
 
-    override fun dispatch(method: String, p: JSONObject, silent: Boolean, untrusted: Boolean): Any? = when (method) {
+    override fun dispatch(method: String, p: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? = when (method) {
         "ui.show_html" -> showHtml(p)
         "ui.list_pages" -> listPages()
         "ui.get_page" -> getPage(p)

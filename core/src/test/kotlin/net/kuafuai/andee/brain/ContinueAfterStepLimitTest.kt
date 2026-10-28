@@ -57,7 +57,7 @@ class ContinueAfterStepLimitTest {
             "locale" -> Locale.ENGLISH
             "maxSteps" -> steps
             "persona", "platformPrompt", "notebookIndex", "scenesIndex", "pagesIndex", "topicsIndex",
-            "gearIndex", "planIndex", "friendsIndex" -> ""
+            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "wikiIndex" -> ""
             "scrollback" -> emptyList<ScrollRow>()
             "toolLists" -> listOf(
                 JSONArray().put(

@@ -22,7 +22,7 @@ class GuestHostTest {
             "toolLists" -> listOf(JSONArray(listOf("screen.tap", "device.vault.fill", "note.recall", "shell.run", "ui.ask", "device.sms.read", "peer.ask")
                 .map { JSONObject().put("name", it.replace('.', '_')).put("method", it) }))
             "methodOf" -> (args[0] as String).replaceFirst('_', '.')
-            "dispatch" -> { calls += (args[0] as String) to (args[3] as Boolean); "ok" }
+            "dispatch" -> { calls += (args[0] as String) to (args[4] as Boolean); "ok" }
             "scrollback" -> listOf(ScrollRow(true, false, "my secret", 0, null, null))
             else -> null
         }
@@ -47,10 +47,10 @@ class GuestHostTest {
     }
 
     @Test fun everythingElseIsRefusedAndWhatRunsRunsUntrusted() {
-        guest.dispatch("screen.tap", JSONObject(), silent = false, untrusted = false)
+        guest.dispatch("screen.tap", JSONObject(), callId = "t1", silent = false, untrusted = false)
         assertEquals("screen.tap" to true, calls.single())
         for (m in listOf("device.vault.fill", "note.recall", "shell.run", "device.sms.read", "peer.ask", "device.contacts")) {
-            try { guest.dispatch(m, JSONObject(), false, false); fail("$m reached the owner's device") } catch (e: IllegalStateException) { }
+            try { guest.dispatch(m, JSONObject(), "t2", false, false); fail("$m reached the owner's device") } catch (e: IllegalStateException) { }
         }
         assertFalse(calls.any { it.first != "screen.tap" })
     }

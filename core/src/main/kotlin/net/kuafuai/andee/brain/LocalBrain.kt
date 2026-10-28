@@ -196,9 +196,21 @@ class LocalBrain(
 
         /** The pre-trim review: same as [SWEEP], plus a summary that replaces messages. */
         HARVEST,
+
+        /**
+         * Andee woke itself: a care of its own came due (design: `docs/design/inner-drive.zh-CN.md` §8). It is
+         * the user's own Andee acting on something it was given, so it is **not** [untrusted]; but nobody asked,
+         * so it does not speak — no subtitle, no voice, no card of its own accord. Its words go to the diary, a
+         *待批 item or a bubble, never aloud. What it may call is a *set the territory names* (see
+         * [BrainHost.workTools]), not the whole list.
+         */
+        WORK,
         ;
 
         val silent: Boolean get() = this == SWEEP || this == HARVEST
+
+        /** Runs with tools but says nothing aloud. Distinct from [silent], which also forbids touching the device. */
+        val quiet: Boolean get() = this == WORK
 
         /** The turn's subject matter came from outside. See [NOTIFY]. */
         val untrusted: Boolean get() = this == NOTIFY
@@ -488,8 +500,9 @@ class LocalBrain(
                 BrainTrace.end(gen, "threw: ${t.message ?: t.javaClass.simpleName}")
                 if (gen == generation.get()) {
                     host.logError(TAG, "turn $gen ($kind) failed", t)
-                    // A silent turn has nobody to apologise to; it just ends.
-                    if (!kind.silent) finish(explainFailure(t))
+                    // A silent turn has nobody to apologise to; it just ends. So does one Andee started itself:
+                    // nobody asked, and a spoken "backend error" at 3 pm out of nowhere is the worst way to hear it.
+                    if (!kind.silent && !kind.quiet) finish(explainFailure(t))
                 } else {
                     // Almost always the cancelled call's own IOException.
                     host.logInfo(TAG, "turn $gen abandoned: ${t.message}")
@@ -584,6 +597,34 @@ class LocalBrain(
      * waiting on it (see [peerTask]). Set by [finish] and by nothing else.
      */
     private var turnAnswer: String? = null
+
+    /** Loop thread only. The closing words of a [TurnKind.WORK] turn; read by [work]'s callback. Never spoken. */
+    private var workSummary: String? = null
+
+    /**
+     * Wake up on a care of its own: a [TurnKind.WORK] turn. Queued behind whatever is running (never cuts a
+     * user off), and answered to [onDone] with the model's closing words and whether any tool with an effect
+     * ran — the device's own record, not the model's account.
+     *
+     * [territory] names the tool set it may use (see [BrainHost.workTools]); null = the default set.
+     */
+    fun work(text: String, territory: String?, onDone: (summary: String?) -> Unit) {
+        val t = text.trim()
+        if (t.isEmpty()) return
+        loop.execute {
+            val job = Queued(t, TurnKind.WORK) { onDone(workSummary) }
+            if (busy.get()) {
+                host.logInfo(TAG, "work queued behind a running turn: ${t.take(60)}")
+                pendingWakes.addLast(job)
+                return@execute
+            }
+            workTerritory = territory
+            launch(t, TurnKind.WORK, onAnswer = { onDone(workSummary) })
+        }
+    }
+
+    /** Loop thread only. The territory the current work turn was given. */
+    private var workTerritory: String? = null
 
     /**
      * Loop thread only. A task that stopped before it was done — at the step limit, or cut by the repeat
@@ -732,6 +773,8 @@ class LocalBrain(
 
     private fun runTurn(userText: String, gen: Int, kind: TurnKind, images: List<String> = emptyList()) {
         val internal = kind.silent
+        // Says nothing aloud, but is a real turn: it has a user-shaped opening message, tools, and a trusted caller.
+        val quiet = kind.quiet
         val harvest = kind == TurnKind.HARVEST
         if (history.isEmpty()) {
             history += JSONObject().put("role", "system").put("content", systemPrompt())
@@ -769,6 +812,10 @@ class LocalBrain(
             // The plan (`Plans`): what it is helping them with and what it meant to do today. Right after
             // the notebook and for the same cache reason; it is the thread every turn should be able to see.
             val plan = host.planIndex()
+            // Who I am in a breath, and what is pulling at me; and what is on my wiki shelf. Same place, same reason
+            // as the plan line: one line each, bodies never. (`Selfhood`, `WikiBook`.)
+            val self = host.selfIndex()
+            val wiki = host.wikiIndex()
             val scenes = host.scenesIndex()
             // The pages it has made, the same way and for the same reason: a
             // tool answers a question the brain thought to ask, and 「上次那个表格」
@@ -820,6 +867,11 @@ class LocalBrain(
                             ""
                         } else {
                             "\n\n(what your notebook holds, for reference; use recall for detail)\n$index"
+                        } +
+                        if (self.isEmpty() && wiki.isEmpty()) {
+                            ""
+                        } else {
+                            "\n\n(you, and your shelf — the Settings page shows them to the user)\n" + listOf(self, wiki).filter { it.isNotEmpty() }.joinToString("\n")
                         } +
                         if (plan.isEmpty()) {
                             ""
@@ -886,7 +938,10 @@ class LocalBrain(
 
         if (!internal && images.isNotEmpty()) attachUserPhotos(images)
 
-        val tools = LlmClient.toolSpecs(*host.toolLists().toTypedArray())
+        // A work turn gets the territory's set, not all ~80: it is cheaper and, more to the point, a stranger-facing
+        // errand has no business holding the vault or the shell. Everyone else is unchanged.
+        val tools = if (quiet) LlmClient.toolSpecs(*host.workTools(workTerritory).toTypedArray())
+        else LlmClient.toolSpecs(*host.toolLists().toTypedArray())
         var lastSignature = ""
         var repeats = 0
 
@@ -930,6 +985,9 @@ class LocalBrain(
                     // the summary that replaces the part of the conversation we
                     // are about to drop.
                     applyHarvest(answer)
+                } else if (quiet) {
+                    // The turn's closing words are for the log and the care's note, not for the user's ears.
+                    workSummary = answer
                 } else if (!internal) {
                     // A turn that did something and finished means the user has moved on — or that 继续 just
                     // finished the job. Either way the stopped task no longer needs keeping.
@@ -948,7 +1006,7 @@ class LocalBrain(
                 return
             }
 
-            if (reply.content.isNotBlank() && !internal) onProgress(reply.content.trim())
+            if (reply.content.isNotBlank() && !internal && !quiet) onProgress(reply.content.trim())
 
             val images = mutableListOf<String>()
             for ((ti, tc) in reply.toolCalls.withIndex()) {
@@ -965,7 +1023,9 @@ class LocalBrain(
                     host.logWarn(TAG, "same call $MAX_REPEATS× in a row: $sig")
                     BrainTrace.end(gen, "same call $MAX_REPEATS× in a row: ${tc.name}")
                     val rest = reply.toolCalls.drop(ti)
-                    if (!internal) {
+                    if (quiet) {
+                        rest.forEach { history += JSONObject().put("role", "tool").put("tool_call_id", it.id).put("content", "Not run: stopped.") }
+                    } else if (!internal) {
                         stopUnfinished(turnStart, userText, step, host.text(BrainText.REPEAT_STOP, tc.name), rest)
                     } else {
                         rest.forEach { history += JSONObject().put("role", "tool").put("tool_call_id", it.id).put("content", "Not run: stopped.") }
@@ -973,7 +1033,7 @@ class LocalBrain(
                     return
                 }
 
-                if (reply.content.isBlank() && !internal) onProgress(narrate(tc.name))
+                if (reply.content.isBlank() && !internal && !quiet) onProgress(narrate(tc.name))
                 val t0 = System.nanoTime() / 1_000_000L
                 acted = true
                 val msg = runTool(tc, images, internal, kind.untrusted)
@@ -989,7 +1049,10 @@ class LocalBrain(
 
         host.logWarn(TAG, "hit max steps ($maxSteps)")
         BrainTrace.end(gen, "hit max steps ($maxSteps)")
-        if (!internal) stopUnfinished(turnStart, userText, maxSteps, host.text(BrainText.MAX_STEPS, maxSteps), emptyList())
+        if (quiet) {
+            workSummary = ""
+            host.logWarn(TAG, "work turn ran out of steps ($maxSteps)")
+        } else if (!internal) stopUnfinished(turnStart, userText, maxSteps, host.text(BrainText.MAX_STEPS, maxSteps), emptyList())
     }
 
     /**
@@ -1046,6 +1109,15 @@ class LocalBrain(
             val method = host.methodOf(tc.name)
                 ?: return toolMessage(tc.id, "No such tool: ${tc.name}")
 
+            // A turn Andee started itself does not interrupt the person: no question card, no alert, no voice.
+            // Whatever it wants them to see goes through a bubble (rationed, silent, fades) or the diary.
+            if (currentKind == TurnKind.WORK && method in SELF_TURN_MAY_NOT) {
+                return toolMessage(
+                    tc.id,
+                    "You woke yourself for this; nobody asked, so you do not ask or speak. If it is worth their attention, leave a " +
+                        "bubble (nudge) or write it in your diary, and say it next time they talk to you.",
+                )
+            }
             // A task another device handed over is done here, never handed on: see [TurnKind.PEER].
             if (method == "peer.ask" && currentKind == TurnKind.PEER) {
                 return toolMessage(
@@ -1066,7 +1138,7 @@ class LocalBrain(
                 turnWaitSeconds += ask
             }
 
-            val result = dispatchWithTimeout(method, args, silent, untrusted)
+            val result = dispatchWithTimeout(method, args, tc.id, silent, untrusted)
             when (result) {
                 is JSONObject -> {
                     extractImages(result, images)
@@ -1086,37 +1158,17 @@ class LocalBrain(
         return toolMessage(tc.id, body.take(MAX_TOOL_CHARS))
     }
 
-    /**
-     * [CommandDispatcher.dispatch] with a deadline.
-     *
-     * The deadline is derived from the tool's own `timeout_ms` where it has one
-     * (`ui.ask` and `ui.alert` both take it) plus slack, so a tool the model
-     * deliberately asked to wait a long time is allowed to. The future is
-     * **not** cancelled on timeout: interrupting a card mid-flight would leave
-     * a hold on screen that nobody is waiting for, and the honest thing to tell
-     * the model is that the call may still be running.
-     */
-    private fun dispatchWithTimeout(
-        method: String,
-        params: JSONObject,
-        silent: Boolean,
-        untrusted: Boolean,
-    ): Any? {
+    private fun dispatchWithTimeout(method: String, params: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? {
         val declared = params.optLong("timeout_ms", 0L)
         val budget = if (declared > 0) declared + TIMEOUT_SLACK_MS else DEFAULT_TOOL_TIMEOUT_MS
-        val f = toolExec.submit<Any?> {
-            host.dispatch(method, params, silent = silent, untrusted = untrusted)
-        }
+        val f = toolExec.submit<Any?> { host.dispatch(method, params, callId, silent, untrusted) }
         return try {
             f.get(budget, TimeUnit.MILLISECONDS)
         } catch (e: TimeoutException) {
             host.logWarn(TAG, "tool $method exceeded ${budget}ms — abandoning the wait")
-            JSONObject()
-                .put("timed_out", true)
+            JSONObject().put("timed_out", true)
                 .put("note", "This step had not returned after ${budget / 1000}s, so I stopped waiting. It may still be running in the background — read the screen before deciding the next step.")
         } catch (e: ExecutionException) {
-            // Unwrap so the model sees the dispatcher's own message, which is
-            // written for it ("re-dump, don't guess").
             throw e.cause ?: e
         }
     }
@@ -1785,6 +1837,9 @@ class LocalBrain(
         private const val MAX_REPEATS = 3
 
         private const val MAX_HISTORY = 60
+
+        /** What a self-started turn may not call: anything that speaks to or stops the person. */
+        private val SELF_TURN_MAY_NOT = setOf("ui.ask", "ui.alert", "tts.speak")
 
         /** How long a task stopped at the step limit is kept ready for 继续. See [Unfinished]. */
         private const val UNFINISHED_TTL_MS = 60 * 60_000L

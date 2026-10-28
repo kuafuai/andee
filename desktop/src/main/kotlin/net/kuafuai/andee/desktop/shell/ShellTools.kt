@@ -94,7 +94,7 @@ class ShellTools(
         else -> null
     }
 
-    override fun dispatch(method: String, p: JSONObject, silent: Boolean, untrusted: Boolean): Any {
+    override fun dispatch(method: String, p: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any {
         // The turn decides first, whatever the tool thinks the turn is.
         val t = when {
             silent -> Turn.SILENT

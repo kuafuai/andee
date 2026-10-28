@@ -38,7 +38,7 @@ class MacDevice : DesktopBrainHost.ToolProvider {
         "full_disk_access" to ("read notifications" to "读通知（完全磁盘访问）"),
     )
 
-    override fun dispatch(method: String, p: JSONObject, silent: Boolean, untrusted: Boolean): Any? = when (method) {
+    override fun dispatch(method: String, p: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? = when (method) {
         "device.launch" -> launch(p)
         "device.open_url" -> openUrl(p.optString("url"))
         "device.apps" -> apps()

@@ -42,12 +42,12 @@ class GuestHost(private val inner: BrainHost) : BrainHost by inner {
 
     override fun methodOf(toolName: String): String? = inner.methodOf(toolName)?.takeIf(::allowed)
 
-    override fun dispatch(method: String, params: JSONObject, silent: Boolean, untrusted: Boolean): Any? {
+    override fun dispatch(method: String, params: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? {
         check(allowed(method)) {
             "This is a request from a friend's Andee, so only the screen, asking the owner and showing a page are open: " +
                 "$method is not. Say in your report what you could not do."
         }
-        return inner.dispatch(method, params, silent, untrusted = true)
+        return inner.dispatch(method, params, callId, silent, untrusted = true)
     }
 
     override fun traceDir(): File = inner.traceDir()

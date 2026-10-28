@@ -256,7 +256,7 @@ object Meeting {
 /** meeting.start / meeting.status / meeting.stop, so the brain sees them. */
 class MeetingTools : DesktopBrainHost.ToolProvider {
     override fun handles(method: String) = method.startsWith("meeting.")
-    override fun dispatch(method: String, p: JSONObject, silent: Boolean, untrusted: Boolean): Any? = when (method) {
+    override fun dispatch(method: String, p: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? = when (method) {
         "meeting.start" -> Meeting.start(p.optString("title").ifEmpty { null })
         "meeting.status" -> Meeting.status()
         "meeting.stop" -> Meeting.stop()

@@ -138,8 +138,8 @@ object Assistant {
             MeetingTools(),
             object : DesktopBrainHost.ToolProvider {
                 override fun handles(method: String) = notes.handles(method)
-                override fun dispatch(method: String, p: JSONObject, silent: Boolean, untrusted: Boolean) =
-                    notes.dispatch(method, p, silent, untrusted)
+                override fun dispatch(method: String, p: JSONObject, callId: String, silent: Boolean, untrusted: Boolean) =
+                    notes.dispatchCall(method, p, callId, silent, untrusted)
             },
             shell,
             screen,
@@ -155,7 +155,7 @@ object Assistant {
      */
     private val peerTools = object : DesktopBrainHost.ToolProvider {
         override fun handles(method: String) = method.startsWith("peer.")
-        override fun dispatch(method: String, p: JSONObject, silent: Boolean, untrusted: Boolean): Any =
+        override fun dispatch(method: String, p: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any =
             Peers.tasks.dispatch(method, p)
         override fun extraTools() =
             if (Peers.store.all().isNotEmpty()) net.kuafuai.andee.peer.PeerTasks.TOOLS else org.json.JSONArray()

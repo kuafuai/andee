@@ -50,7 +50,7 @@ class MacScreen(
         net.kuafuai.andee.desktop.Assistant.config(), net.kuafuai.andee.desktop.Settings.get("locator_model"),
     )
 
-    override fun dispatch(method: String, p: JSONObject, silent: Boolean, untrusted: Boolean): Any? {
+    override fun dispatch(method: String, p: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? {
         if (!Bridge.available) throw IllegalStateException("The Mac screen bridge did not load; screen tools cannot run here.")
         if (!Bridge.axTrusted()) throw IllegalStateException(PermissionHelp.ACCESSIBILITY)
         yieldScreen()

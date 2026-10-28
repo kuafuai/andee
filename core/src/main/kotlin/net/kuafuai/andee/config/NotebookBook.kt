@@ -61,6 +61,20 @@ class NotebookBook(private val store: NotebookStore) {
 
     private val TAG = "Body"
 
+    /** Where wiki articles in the notebook are kept (the local folder). Filled by each body. */
+    @Volatile var localWikiStore: net.kuafuai.andee.wiki.WikiStore? = null
+
+    /** Andee's self-image, cares, diary — everything that forms who it is. One instance. */
+    val selfhood: Selfhood by lazy { Selfhood(this) }
+
+    /** The people it has met. One instance. */
+    val people: People by lazy { People(this) }
+
+    /** The articles it has written and the documents it knows of. One instance. */
+    val wiki: net.kuafuai.andee.wiki.WikiBook by lazy {
+        net.kuafuai.andee.wiki.WikiBook(this, mapOf("local" to (localWikiStore ?: throw IllegalStateException("localWikiStore not set"))))
+    }
+
     /** Old versions kept per memory when the same `name` is written again. */
     private val MAX_HISTORY = 5
 

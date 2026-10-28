@@ -23,7 +23,7 @@ class MacGear : DesktopBrainHost.ToolProvider {
 
     override fun handles(method: String) = method.startsWith("gear.")
 
-    override fun dispatch(method: String, p: JSONObject, silent: Boolean, untrusted: Boolean): Any? = when (method) {
+    override fun dispatch(method: String, p: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? = when (method) {
         "gear.list" -> {
             ensureScanned()
             gear.list(p.optString("query"), p.optInt("limit", 25))

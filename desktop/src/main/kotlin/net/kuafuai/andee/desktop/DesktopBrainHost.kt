@@ -28,7 +28,7 @@ class DesktopBrainHost(
     /** One family of tools the Mac can run. */
     interface ToolProvider {
         fun handles(method: String): Boolean
-        fun dispatch(method: String, p: JSONObject, silent: Boolean, untrusted: Boolean): Any?
+        fun dispatch(method: String, p: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any?
         /** Tools that exist only here and are not in the shared [ToolSchemas]. */
         fun extraTools(): JSONArray = JSONArray()
         fun methodOfExtra(toolName: String): String? = null
@@ -98,7 +98,7 @@ class DesktopBrainHost(
         ToolSchemas.methodOf(toolName)?.takeIf { m -> providers.any { it.handles(m) } }
             ?: providers.firstNotNullOfOrNull { it.methodOfExtra(toolName) }
 
-    override fun dispatch(method: String, params: JSONObject, silent: Boolean, untrusted: Boolean): Any? {
+    override fun dispatch(method: String, params: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? {
         TurnGuards.check(method, silent, untrusted)
         val p = providers.firstOrNull { it.handles(method) }
             ?: throw IllegalArgumentException("unknown method $method")
@@ -107,7 +107,7 @@ class DesktopBrainHost(
         if (!silent && (method.startsWith("screen.") || method.startsWith("shell.") || method.startsWith("device."))) {
             MacBall.onTool()
         }
-        return p.dispatch(method, params, silent, untrusted)
+        return p.dispatch(method, params, callId, silent, untrusted)
     }
 
     override fun turnStarted(kind: String) = providers.forEach { it.turnStarted(kind) }

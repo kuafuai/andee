@@ -88,6 +88,18 @@ interface BrainHost {
      */
     fun planIndex(): String = ""
 
+    /** One line of who I am and what is pulling at me (`Selfhood`). Empty for a host without it. */
+    fun selfIndex(): String = ""
+
+    /** One line of what is in the wiki (`WikiBook`). Empty for a host without one. */
+    fun wikiIndex(): String = ""
+
+    /**
+     * The tools a [LocalBrain.TurnKind.WORK] turn may use in [territory] — a smaller set than [toolLists]. The
+     * default is the full list: a host that has not defined territories behaves as before.
+     */
+    fun workTools(territory: String?): List<JSONArray> = toolLists()
+
     /**
      * One line naming the other Andees this one can ask (see `PeerTasks`), empty when it has none. Without it the
      * model answers "do you have friends" from nothing; a default, so a host without friends changes by not a byte.
@@ -117,7 +129,11 @@ interface BrainHost {
      * the turn, and the implementation must refuse what they forbid — see
      * [net.kuafuai.andee.net.TurnGuards].
      */
-    fun dispatch(method: String, params: org.json.JSONObject, silent: Boolean, untrusted: Boolean): Any?
+    /**
+     * Dispatch a tool call to the host's handler. [callId] is the tool_call_id from the LLM; it must be
+     * recorded on any write operation so diary entries and care logs can point at what did it.
+     */
+    fun dispatch(method: String, params: org.json.JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any?
 
     /**
      * Why the current turn is running, set by the brain before its tools run.
