@@ -82,6 +82,10 @@ class DesktopBrainHost(
 
     override fun planIndex(): String = DesktopNotebook.plans.indexForPrompt()
 
+    override fun selfIndex(): String = DesktopNotebook.book.selfhood.indexForPrompt()
+
+    override fun wikiIndex(): String = DesktopNotebook.book.wiki.indexForPrompt()
+
     override fun friendsIndex(): String = Peers.tasks.indexForPrompt()
 
     override fun foldTopic(title: String, summary: String, rows: List<ScrollRow>, text: String): FoldedTopic? {

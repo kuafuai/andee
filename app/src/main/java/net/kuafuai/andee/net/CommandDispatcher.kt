@@ -1531,6 +1531,10 @@ class CommandDispatcher(
                     )
             }
 
+            // Andee's inner life (`LifeTools`): shared logic in core, the same handler as the Mac's, and nothing
+            // for the phone to arm. The tool-call id it records is set by the brain host before the call.
+            in net.kuafuai.andee.config.LifeTools.METHODS -> Notebook.life(appContext).handle(method, params)
+
             // The plan (`Plans`): shared logic in core; here only the alarms it asks for.
             "note.directions", "note.day_plan" -> {
                 val r = Notebook.plans(appContext).handle(

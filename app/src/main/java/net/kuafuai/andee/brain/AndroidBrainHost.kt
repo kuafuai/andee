@@ -85,6 +85,10 @@ class AndroidBrainHost(
 
     override fun topicsIndex(): String = ChatHistory.topicsForPrompt()
 
+    override fun selfIndex(): String = Notebook.selfhood(ctx).indexForPrompt()
+
+    override fun wikiIndex(): String = Notebook.wiki(ctx).indexForPrompt()
+
     override fun foldTopic(title: String, summary: String, rows: List<ScrollRow>, text: String): FoldedTopic? {
         val entries = rows.map { it.handle as ChatHistory.Entry }
         val t = ChatHistory.foldTopic(title = title, summary = summary, rows = entries, text = text, parentId = null)
@@ -111,7 +115,8 @@ class AndroidBrainHost(
             ?: toolName.takeIf { market.hasMethod(it) }
             ?: net.kuafuai.andee.peer.PeerTasks.methodOf(toolName)
 
-    override fun dispatch(method: String, params: JSONObject, silent: Boolean, untrusted: Boolean): Any? {
+    override fun dispatch(method: String, params: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? {
+        Notebook.callBeingRun = callId
         // Not the dispatcher's: the link to the other devices is not part of this body, and the hub must never
         // see it. The turn guard still runs first — it is what keeps a stranger's notification from handing work on.
         if (method.startsWith("peer.")) {

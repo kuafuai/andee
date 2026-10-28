@@ -96,7 +96,9 @@ object Notebook {
                 override fun wipe() {
                     prefs(app).edit().clear().commit()
                 }
-            }).also { book = it }
+            }).apply {
+                localWikiStore = net.kuafuai.andee.wiki.LocalWikiStore(wikiDir(app))
+            }.also { book = it }
         }
     }
 
@@ -109,6 +111,28 @@ object Notebook {
      */
     fun plans(context: Context): net.kuafuai.andee.config.Plans =
         plans ?: synchronized(this) { plans ?: net.kuafuai.andee.config.Plans(book(context)).also { plans = it } }
+
+    /**
+     * Where wiki articles live: app-private storage, not shared. Unlike the notebook blob these are plain files, and
+     * an article can be marked secret, so they stay where no other app can read them.
+     */
+    private fun wikiDir(context: Context): java.io.File = java.io.File(context.applicationContext.filesDir, "wiki")
+
+    fun selfhood(context: Context): net.kuafuai.andee.config.Selfhood = book(context).selfhood
+    fun people(context: Context): net.kuafuai.andee.config.People = book(context).people
+    fun wiki(context: Context): net.kuafuai.andee.wiki.WikiBook = book(context).wiki
+
+    /** The tool-call id of the [LifeTools] call being answered; set by the brain host just before it dispatches. */
+    @Volatile var callBeingRun: String = ""
+
+    @Volatile
+    private var life: net.kuafuai.andee.config.LifeTools? = null
+
+    /** `self_note`, `cares`, `diary`, `person`, `people`, `wiki_*` — the same handler the Mac uses. */
+    fun life(context: Context): net.kuafuai.andee.config.LifeTools = life ?: synchronized(this) {
+        life ?: net.kuafuai.andee.config.LifeTools(selfhood(context), people(context), wiki(context), callId = { callBeingRun })
+            .also { life = it }
+    }
 
     /** The gear shelf (what is installed, what it is for), kept inside the notebook's own file. */
     fun gear(context: Context): net.kuafuai.andee.config.Gear = net.kuafuai.andee.config.Gear(book(context))
@@ -135,6 +159,10 @@ object Notebook {
     fun wipe(context: Context) {
         book(context).wipe()
         metaPrefs(context).edit().clear().commit()
+        // The wiki's index lived in the blob just wiped; its articles would be files nothing points at any more.
+        wikiDir(context).listFiles()?.forEach { it.deleteRecursively() }
+        // The live store writes into .history/ and archive/ without creating them; its constructor is what does.
+        net.kuafuai.andee.wiki.LocalWikiStore(wikiDir(context))
     }
 
     fun indexForPrompt(context: Context, max: Int = 10): String = book(context).indexForPrompt(max)
