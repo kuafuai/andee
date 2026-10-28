@@ -187,11 +187,13 @@
     <string name="settings_voice_tts_endpoint">TTS endpoint</string>
     <string name="settings_voice_tts_resource_id">TTS resource ID</string>
     <string name="settings_voice_tts_sample_rate">TTS sample rate</string>
-    <string name="settings_voice_provider">Voice provider</string>
     <string name="settings_voice_provider_huoshan">Volcengine</string>
     <string name="settings_voice_provider_google">Google</string>
+    <string name="settings_voice_hear_provider">Hearing</string>
+    <string name="settings_voice_speak_provider">Speaking</string>
+    <string name="settings_voice_provider_system">System</string>
     <string name="settings_google_api_key">Google API key</string>
-    <string name="settings_google_api_key_hint">Vertex Express key — hearing and speaking both use it</string>
+    <string name="settings_google_api_key_hint">Vertex Express key — hearing and Google speaking both use it</string>
     <string name="settings_google_key_builtin">Built in at package time — leave blank to use it</string>
     <string name="settings_google_project">Project number</string>
     <string name="settings_google_project_hint">The GCP project *number* (not its id); recognition needs it</string>
