@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`16` / `"0.7.0"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`17` / `"0.7.1"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,87 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.7.1] - 2026-10-28
+
+**Taps land where it means them to.** Our own numbers said the brain was a poor pointer: on the Mac
+between 21 and 27 October, taps aimed by element number worked about 80% of the time, taps aimed at a
+coordinate after zooming about 43%, and unaimed coordinate taps under 10%. Half of that was the model
+being asked to do arithmetic it is bad at, and half was guards the phone had and the Mac did not.
+
+The answer is to stop asking the brain for coordinates at all. It now describes what it wants in words,
+a vision model that is actually good at pointing answers with a point, and the device taps there.
+
+Reasoning, measurements and the options that were rejected are in
+**[docs/design/click-accuracy.zh-CN.md](../design/click-accuracy.zh-CN.md)** (Chinese).
+
+### Added
+
+- **`tap_target`** — describe the thing to tap, in words; a vision model finds it and the device taps its
+  centre. On both bodies, local brain only. The brain never produces a coordinate, so nothing can be off
+  by its arithmetic.
+  - **It uses the model you already configured for the brain**, on every backend, so there is nothing new
+    to set up. `locator_model` overrides it if you want something faster.
+  - **Measured** on our own screenshots, ten targets with known answers: 6.4 px mean error, 24 px worst,
+    about 2 s and 1400 input tokens each. The alternative — the brain counting cells itself — is what this
+    replaces.
+  - **It degrades instead of gating.** A backend that will not take images withdraws the tool for that
+    run, as do three unreadable answers in a row; one good answer resets the count. After that the brain
+    falls back to aiming by cell, which is what it did before.
+  - Two prompt choices were measured, not guessed: **asking in Chinese** (the same targets in English
+    were off by 25–37 px on three of them) and **naming what it sees before deciding** (without it,
+    "the red 删除 button" was answered confidently with the close button). When the target is not there,
+    it says so.
+- **`drag`** — press, move while holding, release: a real drag on the Mac, for things that have to be
+  grabbed rather than scrolled (a slider, a splitter, a window by its title bar, a row to reorder). Both
+  ends are aimed by coordinate or in words.
+
+### Fixed
+
+- **The Mac gained the guards the phone already had.** Each of these was a measured failure rather than a
+  hypothetical one:
+  - **A tap now reports whether the screen changed**, with a magenta ring marking where it landed. Without
+    it the model could not tell a tap that missed from one that opened a menu.
+  - **Elements a tap cannot reach are no longer offered.** A closed menu item used to be listed, and
+    tapping its number hit the card underneath. Checked against Chrome: 123 visible elements, no
+    misjudgements.
+  - **Tapping by element number checks the element is still there** first, and refuses with a fresh list
+    if it is not.
+  - **The repeat-tap guard radius went from 120 pt to 30 pt** — the old one refused 9 of 56 taps, including
+    corrections that were being aimed at something else.
+  - **Apps that do not expose their UI are recognised.** WeChat's Mac window offers four elements in
+    total; a window that large with so few elements is now treated as tree-blind, and a screenshot is
+    attached automatically with a note to look at it.
+  - **A window on another display is reported** rather than aimed at, and the scale comes from the main
+    display instead of whichever screen has keyboard focus.
+  - **Every click brings its app forward first.** On the Mac a click on an inactive window only activates
+    it, so focus stayed on the page and a following paste went nowhere — which is how "create a new app"
+    appeared to do nothing on the first tap.
+  - **Hit testing only considers ordinary windows**, so the Dock's full-screen window no longer answers for
+    every point.
+- **The Mac can type into apps that hide their focused field** (WeChat is one: it reports no focused
+  element, so `type_text` refused). Pastes with ⌘V only — deliberately no ⌘A, because with focus unknown
+  select-all could take the chat history — refuses if Andee's own window is active, and says the result is
+  unverified rather than claiming success. The model had been working around this with `osascript`, which
+  is closed on notification turns: a message it could read, it could not answer.
+- **A backend that answers with something other than the API now says so.** OkHttp turned a POST meeting a
+  301 into a GET of the new address, and on a moved gateway that is an HTML page, so the turn died on
+  "A JSONObject text must begin with '{'" — a message that tells nobody anything (measured: `codeflying.net`
+  → `www.codeflying.net`, an nginx page). Redirects are no longer followed, and a non-JSON 200 is reported
+  as an address that is wrong or has moved, naming where it pointed and showing what came back.
+- **The cancel button in the Mac's destructive-action confirmations** was squeezed to a sliver because both
+  buttons filled the row; each now takes half. It read vertically.
+- **Clearing the conversation now clears all of it.** The Mac's 清空聊天记录 did three things where the
+  shared routine does seven — it did not stop or drop the running brain, did not clear what the brain was
+  built for, and left the progress caption up. A stop that only half-stops is how a cleared conversation
+  carries on talking.
+
+### Note on verification
+
+- **`tap_target` is not yet verified on a phone.** The design document says so, and it bears repeating: it
+  needs a phone whose voice and brain keys both work, and a WeChat comment or reply tried once. On the Mac
+  it has been used in a real task twice (creating a new app in 码上飞), and landed both times — a sample of
+  two, not proof.
 
 ## [0.7.0] - 2026-10-27
 
