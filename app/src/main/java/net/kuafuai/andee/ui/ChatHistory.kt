@@ -47,7 +47,12 @@ import java.util.Locale
  */
 object ChatHistory {
 
-    enum class Role { USER, ASSISTANT, PAGE, ERROR }
+    /**
+     * [EVENT] is something that happened that is not conversation — a todo woke it, the review ran, it wrote its
+     * diary, it got up by itself ([PhoneTimeline]). Shown in the scrollback, **never** given to the brain:
+     * `AndroidBrainHost.scrollback` leaves these rows out, so a review summary cannot come back as something said.
+     */
+    enum class Role { USER, ASSISTANT, PAGE, ERROR, EVENT }
 
     /**
      * @param page for [Role.PAGE], the archived HTML — null once it has been
@@ -79,6 +84,10 @@ object ChatHistory {
         val groupId: Long = id,
         val version: Int = 1,
         val topicId: Long? = null,
+        /** [Role.EVENT] only: what kind of event, the line shown when opened, and what it opens (a wiki id). */
+        val kind: String = "",
+        val detail: String = "",
+        val ref: String = "",
     )
 
     /**
@@ -154,6 +163,10 @@ object ChatHistory {
     private const val TAG = "Body"
 
     private var appContext: Context? = null
+
+    /** For callers with no Context of their own that need one to word a row (see [PhoneTimeline]). */
+    fun appContextOrNull(): Context? = appContext
+
     private val lock = Any()
     private val entries = ArrayList<Entry>()
     private var nextId = 1L
@@ -649,6 +662,17 @@ object ChatHistory {
     /** Call through [CardUi.error], which de-dups bursts before they get here. */
     fun addError(text: String) = add(Role.ERROR, text, null)
 
+    /** An event row — see [Role.EVENT]. Any thread. */
+    fun addEvent(kind: String, text: String, detail: String = "", ref: String = "") =
+        add(Role.EVENT, text, null, kind = kind, detail = detail.trim().take(MAX_TEXT), ref = ref)
+
+    /** Event rows standing between the first and last of [rows]: they go into the same topic when it is folded. */
+    fun eventsWithin(rows: List<Entry>): List<Entry> = synchronized(lock) {
+        if (rows.isEmpty()) return emptyList()
+        val lo = rows.minOf { it.id }; val hi = rows.maxOf { it.id }
+        entries.filter { it.role == Role.EVENT && it.topicId == null && it.id in lo..hi }
+    }
+
     /**
      * Archive a page the brain just composed and record it as a revision of an
      * artifact.
@@ -715,6 +739,9 @@ object ChatHistory {
         turn: String? = null,
         groupId: Long? = null,
         version: Int = 1,
+        kind: String = "",
+        detail: String = "",
+        ref: String = "",
     ) {
         if (appContext == null) return
         val clean = text.trim().let {
@@ -737,6 +764,9 @@ object ChatHistory {
                     // for the other three.
                     groupId = groupId ?: id,
                     version = version,
+                    kind = kind,
+                    detail = detail,
+                    ref = ref,
                 ),
             )
             trim()
@@ -822,6 +852,7 @@ object ChatHistory {
                         .put("group", e.groupId)
                         .put("version", e.version)
                         .put("topic", e.topicId ?: JSONObject.NULL)
+                        .apply { if (e.kind.isNotEmpty()) put("kind", e.kind); if (e.detail.isNotEmpty()) put("detail", e.detail); if (e.ref.isNotEmpty()) put("ref", e.ref) }
                 )
             }
             val tarr = JSONArray()
@@ -885,6 +916,7 @@ object ChatHistory {
                     Entry(
                         id, o.optLong("ts"), role, o.optString("text"), page, turn,
                         group, version, topic,
+                        kind = o.optString("kind"), detail = o.optString("detail"), ref = o.optString("ref"),
                     ),
                 )
                 if (id >= nextId) nextId = id + 1

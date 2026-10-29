@@ -132,7 +132,11 @@ object Assistant {
     }
 
     private fun providers(): List<DesktopBrainHost.ToolProvider> {
-        val notes = NotebookTools { onSceneChanged(it) }
+        val notes = NotebookTools { name ->
+            onSceneChanged(name)
+            // Entering and leaving a scene is a row in the timeline, as on the phone.
+            TimelineEvents.scene(name?.let { DesktopNotebook.book.scene(it)?.title ?: it })
+        }
         return listOf(
             UiTools(),
             MeetingTools(),
@@ -476,6 +480,9 @@ object Assistant {
             ensure().submit(text)
         }
     }
+
+    /** Bring the window up on a screen (`wiki:<id>`, …). Set by the window once it exists; any thread. */
+    @Volatile var openScreen: (String) -> Unit = {}
 
     /** The brain as built, if it is; never builds one. For the heartbeat, which must not wake a brain nobody is using. */
     fun built(): LocalBrain? = brain

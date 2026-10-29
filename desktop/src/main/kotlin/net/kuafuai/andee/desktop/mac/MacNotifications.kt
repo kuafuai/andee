@@ -169,12 +169,14 @@ object MacNotifications {
         val h = host ?: return
         if (h.busy()) {
             Log.i(TAG, "held: a turn is running (${n.optString("app")})")
+            net.kuafuai.andee.desktop.TimelineEvents.held(n.optString("app").ifEmpty { "?" }, n.optString("latest"))
             return
         }
         val now = System.currentTimeMillis()
         if (now - windowStart >= 3_600_000L) { windowStart = now; used = 0 }
         if (used >= PER_HOUR) {
             Log.w(TAG, "hourly cap reached; kept in the buffer only (${n.optString("app")})")
+            net.kuafuai.andee.desktop.TimelineEvents.capped(n.optString("app").ifEmpty { "?" }, n.optString("latest"))
             return
         }
         used++
@@ -183,7 +185,11 @@ object MacNotifications {
         val verdict = NotificationTriage(cfg) { warn, msg -> if (warn) Log.w(TAG, msg) else Log.i(TAG, msg) }
             .decide(n, h.langTag(), h.scene())
         when (verdict?.action) {
-            null -> Log.w(TAG, "no verdict for ${n.optString("app")}; left in the buffer")
+            null -> {
+                Log.w(TAG, "no verdict for ${n.optString("app")}; left in the buffer")
+                // The phone puts up a card here; the Mac has none, so the row is the only trace.
+                net.kuafuai.andee.desktop.TimelineEvents.undecided(n.optString("app").ifEmpty { "?" }, n.optString("latest"))
+            }
             NotificationTriage.Action.IGNORE -> {
                 Log.i(TAG, "ignored ${n.optString("app")}: ${verdict.why}")
                 // A filter nobody can audit is a filter nobody trusts: what it let pass, and why, is on the timeline.

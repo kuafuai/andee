@@ -386,44 +386,10 @@ private fun OnItsOwn(zh: Boolean) {
     Spacer(Modifier.height(12.dp))
 }
 
+/** Today's plan, the long-term directions and 告诉它一句 — everything Settings used to show, now only here. */
 @Composable
 private fun PlanTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
-    val plans = DesktopNotebook.plans
-    val plan = plans.day(plans.today())
-    
-    if (plan == null) {
-        EmptyState(if (zh) "今天还没有打算" else "No plan for today",
-            if (zh) "Andee 会在早上思考今天的打算" else "Andee will think about today in the morning")
-        return
-    }
-    
-    Column(Modifier.fillMaxWidth().glassPanel(16).padding(16.dp)) {
-        Text(if (zh) "今天的打算" else "Today's plan", color = Palette.label, fontSize = 15.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
-        Spacer(Modifier.height(4.dp))
-        Markdown(plan.intent, color = Palette.secondary, size = 13.sp)
-        
-        if (plan.items.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
-            
-            for (item in plan.items.filter { it.status == "planned" }) {
-                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            androidx.compose.foundation.layout.Box(Modifier.size(6.dp).background(Palette.accent, CircleShape))
-                            Spacer(Modifier.width(8.dp))
-                            Text(item.what, color = Palette.label, fontSize = 14.sp)
-                        }
-                        if (item.time.isNotEmpty()) {
-                            Text("  " + item.time, color = Palette.secondary, fontSize = 12.sp)
-                        }
-                        if (item.slot.isNotEmpty() && item.time.isEmpty()) {
-                            Text("  " + item.slot, color = Palette.secondary, fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-        }
-    }
+    Column(Modifier.fillMaxWidth().glassPanel(16).padding(16.dp)) { PlanSection(zh) }
 }
 
 @Composable

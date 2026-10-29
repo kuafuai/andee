@@ -312,6 +312,7 @@ class NotificationRelayService : NotificationListenerService() {
             // own actions. The message stays in the ring buffer
             // (device.notifications) and gets read when the job is done.
             android.util.Log.i("Body", "notification held: a task is running (${n.optString("app")})")
+            net.kuafuai.andee.ui.PhoneTimeline.held(this, n.optString("app").ifEmpty { "?" }, n.optString("latest"))
             return
         }
         if (!Budget.take()) {
@@ -323,6 +324,7 @@ class NotificationRelayService : NotificationListenerService() {
                 "Body",
                 "notification triage at the hourly cap; ring buffer only (${n.optString("app")})",
             )
+            net.kuafuai.andee.ui.PhoneTimeline.capped(this, n.optString("app").ifEmpty { "?" }, n.optString("latest"))
             return
         }
         // The triage is a network round trip, so it cannot happen here.

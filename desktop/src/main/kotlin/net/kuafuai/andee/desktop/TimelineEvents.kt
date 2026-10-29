@@ -16,7 +16,7 @@ import net.kuafuai.andee.brain.BrainEvent
 object TimelineEvents {
 
     /** Body-side event kinds, alongside [BrainEvent.Kind]'s names. */
-    enum class Body { THOUGHT, WORK, BUBBLE, BUBBLE_MUTED, IGNORED, MEETING, VERSION, LOOK, VAULT, PAGE, MORNING, SHELL }
+    enum class Body { THOUGHT, WORK, BUBBLE, BUBBLE_MUTED, IGNORED, MEETING, VERSION, LOOK, VAULT, PAGE, MORNING, SHELL, SCENE }
 
     private val zh get() = Strings.lang() == "zh"
     private fun t(z: String, e: String) = if (zh) z else e
@@ -34,6 +34,7 @@ object TimelineEvents {
             BrainEvent.Kind.SELF -> t("改写了自我描述", "Rewrote who it is")
             BrainEvent.Kind.WIKI -> t("写进维基：$s", "Wrote to the wiki: $s")
             BrainEvent.Kind.WIKI_READ -> t("翻出了维基：$s", "Opened a wiki article: $s")
+            BrainEvent.Kind.WIKI_SHOWN -> t("给你看了维基：$s", "Showed you a wiki article: $s")
             BrainEvent.Kind.PERSON -> t("记下了一个人：$s", "Noted a person: $s")
             BrainEvent.Kind.CARE -> when (e.detail) {
                 "+" -> t("开始在意：$s", "Now cares about: $s")
@@ -69,6 +70,10 @@ object TimelineEvents {
     )
     fun bubble(text: String) = body(Body.BUBBLE, t("冒了个气泡：$text", "Bubble: $text"))
     fun ignored(app: String, why: String) = body(Body.IGNORED, t("没打扰你：$app 的一条通知", "Let a notification from $app pass"), why)
+    fun held(app: String, text: String) = body(Body.IGNORED, t("收到 $app 的通知，正在忙，先放着", "A notification from $app came in while busy; kept for later"), text)
+    fun capped(app: String, text: String) = body(Body.IGNORED, t("收到 $app 的通知，这个小时看得太多了，先放着", "A notification from $app came in past the hourly limit; kept for later"), text)
+    fun undecided(app: String, text: String) = body(Body.IGNORED, t("收到 $app 的通知，没拿定主意，没处理", "A notification from $app came in; could not decide, left it"), text)
+    fun scene(title: String?) = body(Body.SCENE, if (title != null) t("进入情景：$title", "Entered the scene: $title") else t("退出了情景", "Left the scene"))
     fun morning(intent: String) = body(Body.MORNING, t("早上想好了今天的打算", "Thought out today's plan this morning"), intent)
 
     /** The row's mark, from the app's own icon set (an emoji would take whatever font the Mac has). */
@@ -76,7 +81,7 @@ object TimelineEvents {
         BrainEvent.Kind.WOKE.name, BrainEvent.Kind.NOTIFIED.name, Body.IGNORED.name -> AndeeIcon.ALERT_CIRCLE
         BrainEvent.Kind.FRIEND_TASK.name -> AndeeIcon.FRIENDS
         BrainEvent.Kind.REVIEWED.name, BrainEvent.Kind.FOLDED.name -> AndeeIcon.CHECK_CIRCLE
-        BrainEvent.Kind.WIKI.name, BrainEvent.Kind.WIKI_READ.name, Body.PAGE.name -> AndeeIcon.DOCUMENT
+        BrainEvent.Kind.WIKI.name, BrainEvent.Kind.WIKI_READ.name, BrainEvent.Kind.WIKI_SHOWN.name, Body.PAGE.name -> AndeeIcon.DOCUMENT
         BrainEvent.Kind.PERSON.name -> AndeeIcon.FACE
         BrainEvent.Kind.CARE.name, Body.WORK.name, Body.THOUGHT.name -> AndeeIcon.SPARKLE
         Body.BUBBLE.name, Body.BUBBLE_MUTED.name -> AndeeIcon.CHAT
@@ -85,6 +90,7 @@ object TimelineEvents {
         Body.LOOK.name -> AndeeIcon.IMAGE
         Body.VAULT.name -> AndeeIcon.LOCK
         Body.SHELL.name -> AndeeIcon.GRID
+        Body.SCENE.name -> AndeeIcon.SPARKLE
         else -> AndeeIcon.NOTEBOOK
     }
 }

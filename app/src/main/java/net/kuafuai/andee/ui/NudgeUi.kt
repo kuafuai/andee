@@ -128,7 +128,7 @@ object NudgeUi {
     private fun record(slot: Slot) {
         if (slot.recorded) return
         slot.recorded = true
-        ChatHistory.addAssistant(slot.n.text)
+        ChatHistory.appContextOrNull()?.let { PhoneTimeline.bubble(it, slot.n.text) }
     }
 
     private fun finish(slot: Slot, r: CardUi.Result) {

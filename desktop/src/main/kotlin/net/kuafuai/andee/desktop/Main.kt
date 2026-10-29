@@ -65,6 +65,7 @@ fun main() {
             if (typing) ComposerFocus.pending = true
             frontTick++
         }
+        Assistant.openScreen = { s -> javax.swing.SwingUtilities.invokeLater { openChat(s) } }
         LaunchedEffect(frontTick) {
             if (frontTick == 0) return@LaunchedEffect
             delay(60)

@@ -301,7 +301,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
      * Main thread only.
      */
     fun refresh() {
-        val all = ChatHistory.snapshot()
+        val all = ChatHistory.snapshot().let { rows -> if (showEvents) rows else rows.filter { it.role != ChatHistory.Role.EVENT } }
         // An empty log is the only time the suggestions are shown, so it is
         // also the only time they can be worth building. Built lazily here
         // rather than in `init` so the language is settled first.
@@ -719,7 +719,73 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
         refresh()
     }
 
+    /**
+     * Whether event rows ([ChatHistory.Role.EVENT]) are drawn: 全部 / 只看对话, toggled from the key beside the
+     * ball and remembered in `timeline_events`. Main thread.
+     */
+    var showEvents: Boolean = true
+        set(v) { if (field != v) { field = v; relayoutAll() } }
+
+    /** Opens a wiki article an event row points at (`wiki_show` / 写进维基). */
+    var onWikiOpen: ((String) -> Unit)? = null
+
+    /**
+     * Something that happened, not something said: one quiet centered line with the time and the words. A row with
+     * a detail opens on tap; a wiki row carries 打开 ›. Small, so a day of events does not drown the conversation.
+     */
+    private fun buildEventRow(e: ChatHistory.Entry): View {
+        val col = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6) }
+        }
+        val line = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        fun label(open: Boolean) = clock.format(Date(e.ts)) + "  ·  " + e.text + when {
+            e.detail.isBlank() -> ""
+            open -> "  ▴"
+            else -> "  ▾"
+        }
+        val words = TextView(context).apply {
+            text = label(false)
+            textSize = Glass.Type.MICRO
+            setTextColor(Color.parseColor(Glass.PHOTO_INK))
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            gravity = Gravity.CENTER
+        }
+        line.addView(words, LinearLayout.LayoutParams(0, WRAP, 1f))
+        if (e.ref.isNotBlank() && e.kind.startsWith("WIKI")) {
+            line.addView(TextView(context).apply {
+                text = lctx.getString(R.string.tl_open)
+                textSize = Glass.Type.CAPTION
+                setTextColor(Color.parseColor(Glass.ACCENT))
+                setPadding(dp(10), dp(4), dp(4), dp(4))
+                isClickable = true
+                Glass.pressable(this)
+                setOnClickListener { onWikiOpen?.invoke(e.ref) }
+            })
+        }
+        col.addView(line, LinearLayout.LayoutParams(MATCH, WRAP))
+        if (e.detail.isNotBlank()) {
+            val detail = MarkdownView.build(context, e.detail, Glass.PHOTO_INK, Glass.Type.CAPTION).apply {
+                visibility = View.GONE
+                background = Glass.panel(context, dp(12))
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+            }
+            col.addView(detail, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(4) })
+            line.isClickable = true
+            line.setOnClickListener {
+                val open = detail.visibility != View.VISIBLE
+                detail.visibility = if (open) View.VISIBLE else View.GONE
+                words.maxLines = if (open) 6 else 2
+                words.text = label(open)
+            }
+        }
+        return col
+    }
+
     private fun buildRow(e: ChatHistory.Entry): View {
+        if (e.role == ChatHistory.Role.EVENT) return buildEventRow(e)
         val mine = e.role == ChatHistory.Role.USER
         val bad = e.role == ChatHistory.Role.ERROR
 
@@ -737,6 +803,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
                     lctx.getString(R.string.history_role_assistant, clock.format(Date(e.ts)))
                 ChatHistory.Role.ERROR ->
                     lctx.getString(R.string.history_role_error, clock.format(Date(e.ts)))
+                ChatHistory.Role.EVENT -> ""
                 ChatHistory.Role.PAGE ->
                     if (e.page != null) {
                         lctx.getString(R.string.history_role_page_open, clock.format(Date(e.ts)))
@@ -754,6 +821,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
                     ChatHistory.Role.USER -> Color.parseColor(Glass.SECONDARY)
                     ChatHistory.Role.ASSISTANT -> Color.parseColor(Glass.SECONDARY)
                     ChatHistory.Role.ERROR -> Color.parseColor(Glass.DANGER)
+                    ChatHistory.Role.EVENT -> Color.parseColor(Glass.MUTED)
                     ChatHistory.Role.PAGE ->
                         if (e.page != null) Color.parseColor(Glass.ACCENT)
                         else Color.parseColor(Glass.MUTED)

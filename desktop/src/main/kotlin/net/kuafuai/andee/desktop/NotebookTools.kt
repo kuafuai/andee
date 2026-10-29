@@ -140,7 +140,12 @@ class NotebookTools(private val onSceneChanged: (String?) -> Unit) {
         return when (method) {
             // Andee's inner life (`LifeTools`): also shared logic, no side effects on the desktop. Every
             // call's tool_call_id must be noted on write operations, so they can be pointed at. Filled at launch.
-            in net.kuafuai.andee.config.LifeTools.METHODS -> DesktopNotebook.life.handle(method, p)
+            in net.kuafuai.andee.config.LifeTools.METHODS -> DesktopNotebook.life.handle(method, p).also { r ->
+                // wiki_write show=true: open what was just written — not from a quiet turn, where nobody asked to see it.
+                if (method == "note.wiki_write" && p.optBoolean("show") && !silent && r.optBoolean("written")) {
+                    r.optJSONObject("meta")?.optString("id")?.takeIf { it.isNotEmpty() }?.let { Assistant.openScreen("wiki:$it"); r.put("shown", true) }
+                }
+            }
 
             // The plan (`Plans`): shared logic in core; here only the timers it asks for.
             "note.directions", "note.day_plan" -> {

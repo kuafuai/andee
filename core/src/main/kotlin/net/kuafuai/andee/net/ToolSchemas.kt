@@ -1995,7 +1995,25 @@ object ToolSchemas {
                 "level" to propEnum("Confidentiality label", listOf("public", "internal", "secret", "private")),
                 "links" to prop("array", "care:<id> / person:<id> / wiki:<id>."),
                 "status" to propEnum("Optional", listOf("draft", "active", "stale")),
+                "show" to prop("boolean", "true = open it for the user once written, as wiki_show does. For when they asked to see it."),
             ),
+        ),
+        tool(
+            localOnly = true,
+            name = "wiki_show",
+            method = "ui.show_wiki",
+            description = """
+        Open one article for the user to read, in the device's own reader (headings, tables and links drawn; the
+        article read from its file now, so it is always the latest version). Returns at once — it does not wait for them
+        to finish reading.
+
+        This is how you show an article: do not paste it into your reply, and do not rebuild it as a page with
+        show_html — that makes a copy that will not follow the next revision. Say in a sentence or two what it is and
+        what to look at. show_html is for what is not an article: something interactive, a chart, a game, a finished
+        page meant to be shared.
+    """.trimIndent(),
+            required = listOf("id"),
+            props = mapOf("id" to prop("string", "From wiki_search or wiki_write's result.")),
         ),
         tool(
             localOnly = true,

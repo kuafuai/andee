@@ -158,6 +158,11 @@ class CommandDispatcher(
 ) {
     private val ui = Handler(Looper.getMainLooper())
 
+    /** Returns at once; the card goes up on the main thread. */
+    private fun showWiki(id: String) {
+        ui.post { net.kuafuai.andee.ui.NotebookUi(appContext, startWiki = id).show() }
+    }
+
     /** The bubble budget. One per dispatcher, so a service restart starts the count again — see [NudgeBook]. */
     val nudgeBook = net.kuafuai.andee.brain.NudgeBook()
 
@@ -538,11 +543,10 @@ class CommandDispatcher(
                 // notification appop, which is off for a service with no
                 // launcher icon, and a silently dropped promise is worse than
                 // a quiet one.
-                window.setSubtitle(
-                    AppLocale.str(
-                        appContext, R.string.cmd_vault_filling, e.label, secretLabel(field),
-                    )
-                )
+                val filling = AppLocale.str(appContext, R.string.cmd_vault_filling, e.label, secretLabel(field))
+                window.setSubtitle(filling)
+                // And a row in the timeline, as on the Mac: the subtitle is gone once the card unfolds again.
+                net.kuafuai.andee.ui.PhoneTimeline.body(net.kuafuai.andee.ui.PhoneTimeline.Body.VAULT, filling)
                 requireScreen().typeText(value, id = null, secret = true)
             }
 
@@ -1533,7 +1537,22 @@ class CommandDispatcher(
 
             // Andee's inner life (`LifeTools`): shared logic in core, the same handler as the Mac's, and nothing
             // for the phone to arm. The tool-call id it records is set by the brain host before the call.
-            in net.kuafuai.andee.config.LifeTools.METHODS -> Notebook.life(appContext).handle(method, params)
+            in net.kuafuai.andee.config.LifeTools.METHODS -> Notebook.life(appContext).handle(method, params).also { r ->
+                // wiki_write show=true: open what was just written — not from a quiet turn, where nobody asked to see it.
+                if (method == "note.wiki_write" && params?.optBoolean("show") == true && !silent && r.optBoolean("written")) {
+                    r.optJSONObject("meta")?.optString("id")?.takeIf { it.isNotEmpty() }?.let { showWiki(it); r.put("shown", true) }
+                }
+            }
+
+            // wiki_show: the notebook card, open on that article (read from its file there, so always the latest).
+            "ui.show_wiki" -> {
+                val id = params?.optString("id").orEmpty()
+                require(id.isNotBlank()) { "wiki_show requires id" }
+                val meta = Notebook.wiki(appContext).meta(id) ?: throw IllegalArgumentException("No article with id $id; wiki_search first.")
+                showWiki(id)
+                JSONObject().put("shown", true).put("id", id).put("title", meta.title)
+                    .put("note", "It is open in front of them. Say in a sentence what it is; do not paste it.")
+            }
 
             // The plan (`Plans`): shared logic in core; here only the alarms it asks for.
             "note.directions", "note.day_plan" -> {

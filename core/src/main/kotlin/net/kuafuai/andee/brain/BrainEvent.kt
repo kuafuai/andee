@@ -34,6 +34,8 @@ data class BrainEvent(
         DIARY, SELF, WIKI, PERSON, CARE, MEMORY, TODO, PLAN,
         /** It read a wiki article — usually to show it to the user. [ref] opens it. */
         WIKI_READ,
+        /** It opened a wiki article for the user to read. [ref] opens it again. */
+        WIKI_SHOWN,
     }
 
     companion object {
@@ -65,6 +67,7 @@ data class BrainEvent(
                     "done", "drop" -> if (ok("changed")) BrainEvent(Kind.CARE, args.optString("id"), action) else null
                     else -> null
                 }
+                "ui.show_wiki" -> if (ok("shown")) BrainEvent(Kind.WIKI_SHOWN, r?.optString("title").orEmpty(), ref = args.optString("id")) else null
                 "note.remember" -> BrainEvent(Kind.MEMORY, args.optString("name"), args.optString("description"))
                 "note.todo" -> if (r?.has("error") == true) null else BrainEvent(Kind.TODO, args.optString("what").take(120), args.optString("at"))
                 "note.day_plan" -> if (action == "write") BrainEvent(Kind.PLAN, args.optString("date", "today"), args.optString("intent")) else null

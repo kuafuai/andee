@@ -50,6 +50,7 @@ class UiTools : DesktopBrainHost.ToolProvider {
 
     override fun dispatch(method: String, p: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? = when (method) {
         "ui.show_html" -> showHtml(p)
+        "ui.show_wiki" -> showWiki(p.optString("id"))
         "ui.list_pages" -> listPages()
         "ui.get_page" -> getPage(p)
         "ui.list_topics" -> listTopics()
@@ -354,4 +355,16 @@ fun AskCard(p: AskGate.Pending) {
             ) { Icon(AndeeIcon.CLOSE, Palette.secondary, 14.dp) }
         }
     }
-}
+}    /**
+     * wiki_show: bring the window up on the notebook's reader for that article. The article is read from its file
+     * there, so it is the latest version; nothing is copied. Returns at once.
+     */
+    private fun showWiki(id: String): JSONObject {
+        require(id.isNotBlank()) { "wiki_show requires id" }
+        val meta = DesktopNotebook.book.wiki.meta(id) ?: throw IllegalArgumentException("No article with id $id; wiki_search first.")
+        Assistant.openScreen("wiki:$id")
+        return JSONObject().put("shown", true).put("id", id).put("title", meta.title)
+            .put("note", "It is open in front of them. Say in a sentence what it is; do not paste it.")
+    }
+
+

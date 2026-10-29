@@ -47,6 +47,13 @@ import java.util.Locale
 class NotebookUi(
     private val context: Context,
     private val onDismiss: () -> Unit = {},
+    /**
+     * The user typed a line to it from 打算 → 告诉它一句 («今天别提喝水了»). Wired to the service's own user-turn path;
+     * null hides the box, because a box that sends nowhere is worse than none.
+     */
+    private val onTellBrain: ((String) -> Unit)? = null,
+    /** Open straight on this wiki article (`wiki_show`) rather than on 自己. */
+    private val startWiki: String? = null,
 ) {
 
     private val wm: WindowManager =
@@ -100,6 +107,7 @@ class NotebookUi(
             OwnCard.shown()
             Glass.enter(v)
         }
+        startWiki?.let { tab = TABS.indexOf(Tab.WIKI); openArticle(it) }
     }
 
     fun hide() {
@@ -373,25 +381,115 @@ class NotebookUi(
         addRow(body, p)
     }
 
+    /**
+     * 打算: today's plan with each item's state and ✕ while it is still to come, what it leaves alone today, the
+     * long-term directions (pause / remove), and 告诉它一句. This is the only place the plan is shown — Settings
+     * used to carry the same thing, differently. Removing and pausing are done by the device at once
+     * (`Plans.dropItemByUser`, `setDirectionByUser`), and the model may not undo them.
+     */
     private fun buildPlan(body: LinearLayout) {
         val plans = Notebook.plans(context)
-        val plan = plans.day(plans.today())
-        if (plan == null) {
-            body.addView(emptyState(lctx.getString(R.string.notebook_empty_plan), lctx.getString(R.string.notebook_empty_plan_hint)))
-            return
-        }
+        val day = plans.day(plans.today())
         val p = panel()
-        p.addView(label(lctx.getString(R.string.notebook_plan_today), Glass.Type.TITLE, Glass.TITLE, bold = true), matchWrap())
-        if (plan.intent.isNotBlank()) p.addView(md(plan.intent, Glass.SECONDARY, Glass.Type.CAPTION), matchWrap().apply { topMargin = dp(4) })
-        val items = plan.items.filter { it.status == "planned" }
-        if (items.isNotEmpty()) p.addView(View(context), LinearLayout.LayoutParams(1, dp(10)))
-        for (item in items) {
-            p.addView(label("•  " + item.what, Glass.Type.BODY, Glass.LABEL, top = 6), matchWrap())
-            val whenTxt = item.time.ifEmpty { item.slot }
-            if (whenTxt.isNotEmpty()) p.addView(label("    $whenTxt", Glass.Type.CAPTION, Glass.SECONDARY), matchWrap())
+        p.addView(label(lctx.getString(R.string.settings_plan_today), Glass.Type.CAPTION, Glass.SECONDARY), matchWrap())
+        if (day == null) {
+            p.addView(label(lctx.getString(R.string.settings_plan_none_today), Glass.Type.CAPTION, Glass.MUTED, top = 6), matchWrap())
+        } else {
+            if (day.intent.isNotBlank()) p.addView(md(day.intent, Glass.TITLE, Glass.Type.BODY), matchWrap().apply { topMargin = dp(6) })
+            for (it in day.items.sortedBy { i -> i.time.ifEmpty { "99" } }) {
+                val live = it.status == "planned"
+                val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                row.addView(label("${it.time.ifEmpty { it.slot }.ifEmpty { "·" }}  ${planKind(it.kind)}  ${it.what}", Glass.Type.CAPTION, Glass.LABEL).apply {
+                    alpha = if (live) 1f else 0.6f
+                }, LinearLayout.LayoutParams(0, WRAP, 1f))
+                row.addView(label(planStatus(it.status), Glass.Type.MICRO, Glass.MUTED).apply { setPadding(dp(10), 0, dp(4), 0) })
+                if (live) row.addView(link("✕") {
+                    plans.dropItemByUser(day.date, it.id)
+                    Scheduler.syncPlan(context)
+                    rebuild()
+                })
+                p.addView(row, matchWrap().apply { topMargin = dp(6) })
+            }
+            if (day.quiet.isNotEmpty()) {
+                p.addView(label(lctx.getString(R.string.settings_plan_quiet, day.quiet.joinToString("；") { it.trim().trimEnd('。', '.', '；', ';') }), Glass.Type.CAPTION, Glass.MUTED, top = 8), matchWrap())
+            }
+        }
+        p.addView(label(lctx.getString(R.string.settings_plan_directions), Glass.Type.CAPTION, Glass.SECONDARY, top = 14), matchWrap())
+        val dirs = plans.directions().filter { d -> d.status != "dropped" && d.status != "done" }
+        if (dirs.isEmpty()) p.addView(label(lctx.getString(R.string.settings_plan_none_directions), Glass.Type.CAPTION, Glass.MUTED, top = 6), matchWrap())
+        for (d in dirs) {
+            val paused = d.status == "paused"
+            val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            row.addView(label(d.title + if (d.howIHelp.isNotEmpty()) " — ${d.howIHelp}" else "", Glass.Type.CAPTION, Glass.LABEL).apply {
+                alpha = if (paused) 0.5f else 1f
+            }, LinearLayout.LayoutParams(0, WRAP, 1f))
+            row.addView(link(lctx.getString(if (paused) R.string.settings_plan_resume else R.string.settings_plan_pause)) {
+                plans.setDirectionByUser(d.id, if (paused) "active" else "paused"); rebuild()
+            })
+            row.addView(link(lctx.getString(R.string.settings_plan_remove)) {
+                plans.setDirectionByUser(d.id, "dropped"); rebuild()
+            })
+            p.addView(row, matchWrap().apply { topMargin = dp(6) })
+        }
+        onTellBrain?.let { tell ->
+            p.addView(label(lctx.getString(R.string.settings_plan_tell), Glass.Type.CAPTION, Glass.SECONDARY, top = 14), matchWrap())
+            val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            val et = android.widget.EditText(context).apply {
+                background = Glass.well(context, dp(13))
+                setPadding(dp(14), dp(11), dp(14), dp(11))
+                setTextColor(Color.parseColor(Glass.TITLE))
+                setHintTextColor(Color.parseColor(Glass.MUTED))
+                textSize = Glass.Type.BODY
+                isSingleLine = true
+                inputType = android.text.InputType.TYPE_CLASS_TEXT
+                hint = lctx.getString(R.string.settings_plan_tell_hint)
+            }
+            row.addView(et, LinearLayout.LayoutParams(0, WRAP, 1f))
+            val sent = label("", Glass.Type.CAPTION, Glass.MUTED, top = 6)
+            row.addView(link(lctx.getString(R.string.settings_plan_send)) {
+                val text = et.text?.toString().orEmpty().trim()
+                if (text.isEmpty()) return@link
+                tell(text)
+                et.setText("")
+                sent.text = lctx.getString(R.string.settings_plan_sent)
+            })
+            p.addView(row, matchWrap().apply { topMargin = dp(6) })
+            p.addView(sent, matchWrap())
         }
         addRow(body, p)
     }
+
+    private fun link(text: String, onClick: () -> Unit): TextView = TextView(context).apply {
+        this.text = text
+        textSize = Glass.Type.CAPTION
+        setTextColor(Color.parseColor(Glass.ACCENT))
+        setPadding(dp(10), dp(8), dp(4), dp(8))
+        isClickable = true
+        Glass.pressable(this)
+        setOnClickListener { onClick() }
+    }
+
+    private fun planKind(kind: String): String = lctx.getString(
+        when (kind) {
+            "ask" -> R.string.settings_plan_kind_ask
+            "prepare" -> R.string.settings_plan_kind_prepare
+            "follow_up" -> R.string.settings_plan_kind_follow_up
+            else -> R.string.settings_plan_kind_remind
+        },
+    )
+
+    private fun planStatus(status: String): String = lctx.getString(
+        when (status) {
+            "done" -> R.string.settings_plan_st_done
+            "declined" -> R.string.settings_plan_st_declined
+            "ignored" -> R.string.settings_plan_st_ignored
+            "missed" -> R.string.settings_plan_st_missed
+            "skipped" -> R.string.settings_plan_st_skipped
+            "moved" -> R.string.settings_plan_st_moved
+            "dropped" -> R.string.settings_plan_st_dropped
+            else -> R.string.settings_plan_st_planned
+        },
+    )
 
     private fun buildPeople(body: LinearLayout) {
         val people = Notebook.people(context).all().filter { it.status == "active" }

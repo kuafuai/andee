@@ -1749,6 +1749,10 @@
             "playbook"
           ]
         },
+        "show": {
+          "description": "true = open it for the user once written, as wiki_show does. For when they asked to see it.",
+          "type": "boolean"
+        },
         "links": {
           "description": "care:<id> / person:<id> / wiki:<id>.",
           "type": "array"
@@ -1786,6 +1790,20 @@
         "source",
         "change_note"
       ]
+    }
+  },
+  {
+    "localOnly": true,
+    "method": "ui.show_wiki",
+    "name": "wiki_show",
+    "description": "Open one article for the user to read, in the device's own reader (headings, tables and links drawn; the\narticle read from its file now, so it is always the latest version). Returns at once \u2014 it does not wait for them\nto finish reading.\n\nThis is how you show an article: do not paste it into your reply, and do not rebuild it as a page with\nshow_html \u2014 that makes a copy that will not follow the next revision. Say in a sentence or two what it is and\nwhat to look at. show_html is for what is not an article: something interactive, a chart, a game, a finished\npage meant to be shared.",
+    "parameters": {
+      "type": "object",
+      "properties": {"id": {
+        "description": "From wiki_search or wiki_write's result.",
+        "type": "string"
+      }},
+      "required": ["id"]
     }
   },
   {

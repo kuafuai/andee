@@ -899,6 +899,14 @@ object VoiceConfig {
          * off**, the split [nudgeLevel] draws: a device nobody configured gets the behaviour the product is, and a
          * value nobody can read permits nothing. Cheap when on: a beat calls the model only when a care is overdue.
          */
+        /** 全部 / 只看对话 on the scrollback: whether event rows are shown. Unset is shown. */
+        fun timelineEvents(context: Context): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("timeline_events", null) != "off"
+
+        fun setTimelineEvents(context: Context, on: Boolean) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("timeline_events", if (on) "on" else "off").apply()
+        }
+
         fun driveEnabled(context: Context): Boolean =
             when (context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("drive", null)) {
                 null, "on" -> true
@@ -997,6 +1005,7 @@ object VoiceConfig {
             "notify",
             "nudge",
             "drive",
+            "timeline_events",
             "locator_model",
             "lang",
             "ball",

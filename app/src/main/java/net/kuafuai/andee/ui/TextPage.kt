@@ -65,6 +65,7 @@ object TextPage {
             ChatHistory.Role.ASSISTANT -> lctx.getString(R.string.textpage_role_assistant)
             ChatHistory.Role.ERROR -> lctx.getString(R.string.textpage_role_error)
             ChatHistory.Role.PAGE -> lctx.getString(R.string.textpage_role_page)
+            ChatHistory.Role.EVENT -> "·"
         }
         val when_ = SimpleDateFormat("MM-dd HH:mm", AppLocale.localeOf(context)).format(Date(e.ts))
         return "$who · $when_"
@@ -89,6 +90,7 @@ object TextPage {
                     ChatHistory.Role.ASSISTANT -> lctx.getString(R.string.textpage_role_assistant)
                     ChatHistory.Role.ERROR -> lctx.getString(R.string.textpage_role_error)
                     ChatHistory.Role.PAGE -> lctx.getString(R.string.textpage_role_page)
+                    ChatHistory.Role.EVENT -> "·"
                 }
                 val cls = if (e.role == ChatHistory.Role.USER) "card mine" else "card"
                 "    <p class=\"who\">${esc(who)} · ${esc(fmt.format(Date(e.ts)))}</p>\n" +

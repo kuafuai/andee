@@ -54,7 +54,7 @@ fun main(args: Array<String>) {
         val doc = File(System.getProperty("andee.home"), "季度复盘-final.pdf").also { it.writeText("%PDF") }
         ChatPreview.attachments = listOfNotNull(Attachments.fromBytes("a.png", png), Attachments.fromBytes("b.png", png), Attachments.fromFile(doc))
     }
-    // `settings … plan`: the settings page with an invented plan, in a throwaway notebook. Nothing real.
+    // `… plan`: an invented plan, in a throwaway notebook. Nothing real.
     if (args.getOrElse(4) { "" } == "plan") {
         DesktopNotebook.storeOverride = object : net.kuafuai.andee.config.NotebookStore {
             var s: String? = null

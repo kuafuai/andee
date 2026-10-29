@@ -342,12 +342,20 @@ class BodyCoreService : Service() {
                 dispatcher.compactForUser()
             }
 
+            override fun onWikiOpen(id: String) {
+                net.kuafuai.andee.ui.NotebookUi(this@BodyCoreService, startWiki = id).show()
+            }
+
             override fun onWeChatClick() {
                 net.kuafuai.andee.ui.WeChatQrUi(this@BodyCoreService).show()
             }
 
             override fun onNotebookClick() {
-                net.kuafuai.andee.ui.NotebookUi(this@BodyCoreService) {}.show()
+                net.kuafuai.andee.ui.NotebookUi(
+                    this@BodyCoreService,
+                    // 打算 → 告诉它一句: an ordinary typed turn, so the model adjusts its own plan.
+                    onTellBrain = { text -> ui.post { submitUserTurn(text, "typed") } },
+                ).show()
             }
 
             override fun onFriendsClick() {
@@ -536,7 +544,7 @@ class BodyCoreService : Service() {
             onMute = { n ->
                 net.kuafuai.andee.config.VoiceConfig.muteNudgeKind(this, n.kind)
                 // The user's setting just changed, by a gesture with no confirmation; they are owed the news.
-                net.kuafuai.andee.ui.ChatHistory.addAssistant(AppLocale.str(this, R.string.nudge_muted_row, n.text))
+                net.kuafuai.andee.ui.PhoneTimeline.body(net.kuafuai.andee.ui.PhoneTimeline.Body.BUBBLE_MUTED, AppLocale.str(this, R.string.nudge_muted_row, n.text))
             },
         )
         // The signboard's only source of work. Its listener is a separate
@@ -2031,8 +2039,6 @@ class BodyCoreService : Service() {
             // and the pinned tips live in this service and have to be told.
             // See FloatingWindowUi.onLocaleChanged.
             onLocaleChanged = { window.onLocaleChanged() },
-            // 它的打算 → 告诉它一句: an ordinary typed turn, so the model adjusts its own plan.
-            onTellBrain = { text -> ui.post { submitUserTurn(text, "typed") } },
         )
         settings = s
         s.show()
@@ -2190,7 +2196,8 @@ class BodyCoreService : Service() {
         ui.post {
             val nb = net.kuafuai.andee.config.Notebook
             if (left != null) {
-                net.kuafuai.andee.ui.ChatHistory.addAssistant(
+                net.kuafuai.andee.ui.PhoneTimeline.body(
+                    net.kuafuai.andee.ui.PhoneTimeline.Body.SCENE,
                     AppLocale.str(this, R.string.scenes_exited_row, nb.scene(this, left)?.title ?: left),
                 )
                 // Leaving inside a trigger app must stick until the user goes
@@ -2199,7 +2206,8 @@ class BodyCoreService : Service() {
                 if (entered == null) sceneSuppressedPkg = sceneLastPkg
             }
             if (entered != null) {
-                net.kuafuai.andee.ui.ChatHistory.addAssistant(
+                net.kuafuai.andee.ui.PhoneTimeline.body(
+                    net.kuafuai.andee.ui.PhoneTimeline.Body.SCENE,
                     AppLocale.str(this, R.string.scenes_entered_row, nb.scene(this, entered)?.title ?: entered),
                 )
             }
@@ -3092,7 +3100,10 @@ class BodyCoreService : Service() {
             }
             val lang = net.kuafuai.andee.config.VoiceConfig.uiLanguage(this)
             val level = net.kuafuai.andee.brain.NudgeBook.Level.of(net.kuafuai.andee.config.VoiceConfig.nudgeLevel(this))
-            if (mind.morning(lang, level.perDay)) net.kuafuai.andee.config.Scheduler.syncPlan(this)
+            if (mind.morning(lang, level.perDay)) {
+                net.kuafuai.andee.config.Scheduler.syncPlan(this)
+                net.kuafuai.andee.ui.PhoneTimeline.morning(this, plans.day(plans.today())?.intent.orEmpty())
+            }
             if (free && level != net.kuafuai.andee.brain.NudgeBook.Level.OFF) {
                 mind.muse(lang)?.let { id ->
                     plans.bubbleForItem(id, dispatcher.nudgeBook, level, net.kuafuai.andee.config.VoiceConfig.nudgeMuted(this))
@@ -3119,16 +3130,14 @@ class BodyCoreService : Service() {
         val drive = net.kuafuai.andee.config.Notebook.drive(this)
         val log: (Boolean, String) -> Unit = { warn, msg -> if (warn) android.util.Log.w("Drive", msg) else android.util.Log.i("Drive", msg) }
         val v = net.kuafuai.andee.brain.Heartbeat(cfg, self, drive, { plans.indexForPrompt() }, log).beat(lang)
+        if (v is net.kuafuai.andee.brain.Heartbeat.Verdict.Note) net.kuafuai.andee.ui.PhoneTimeline.thought(this, v.text)
         if (v !is net.kuafuai.andee.brain.Heartbeat.Verdict.Work) return
         log(false, "work on ${v.care.id} (${v.care.what}): ${v.why}")
+        net.kuafuai.andee.ui.PhoneTimeline.workStarted(this, v.care.what, v.why)
         net.kuafuai.andee.brain.SelfWork.start(brain, self, drive, v.care, v.ratio, v.why) { effect, summary ->
             log(false, "work on ${v.care.id} booked as $effect")
-            if (effect != net.kuafuai.andee.config.Selfhood.Effect.NOTHING && summary != null) {
-                val text = net.kuafuai.andee.text.stripMarkdown(net.kuafuai.andee.brain.SpeechMood.parse(summary).text)
-                net.kuafuai.andee.ui.ChatHistory.addAssistant(
-                    net.kuafuai.andee.i18n.AppLocale.str(this, R.string.drive_row, v.care.what, text.take(160)),
-                )
-            }
+            val text = summary?.let { net.kuafuai.andee.brain.SpeechMood.parse(it).text.trim() }
+            net.kuafuai.andee.ui.PhoneTimeline.workDone(this, v.care.what, effect.name, text)
         }
     }
 
@@ -3597,6 +3606,7 @@ class BodyCoreService : Service() {
                     "Body",
                     "notification ignored: ${n.optString("app")} — ${verdict.why}",
                 )
+                net.kuafuai.andee.ui.PhoneTimeline.ignored(this, n.optString("app").ifEmpty { "?" }, verdict.why)
             }
 
             net.kuafuai.andee.brain.NotificationTriage.Action.TELL -> {
