@@ -908,11 +908,22 @@ object SelfCheck {
      */
     private fun voiceKey(context: Context): Finding {
         val cfg = VoiceConfig.load(context)
-        val has = if (cfg.voiceProvider == VoiceConfig.VOICE_GOOGLE) {
+        // The checklist grades "can this device hear and speak". A system
+        // engine needs no key to speak, but both cloud providers do — and the
+        // two sides are now chosen independently, so each has to be checked
+        // against its own picker, or one green tick covers a service with no
+        // key (hear = 火山, speak = Google, no Google key → silent reply).
+        val speakHas = when (VoiceConfig.speakProvider(context)) {
+            VoiceConfig.VOICE_SYSTEM -> true
+            VoiceConfig.VOICE_GOOGLE -> cfg.googleApiKey.isNotBlank()
+            else -> cfg.apiKey.isNotBlank()
+        }
+        val hearHas = if (cfg.voiceProvider == VoiceConfig.VOICE_GOOGLE) {
             cfg.googleApiKey.isNotBlank()
         } else {
             cfg.apiKey.isNotBlank()
         }
+        val has = speakHas && hearHas
         return Finding(
             id = "voice_key",
             title = R.string.check_title_voice_key,

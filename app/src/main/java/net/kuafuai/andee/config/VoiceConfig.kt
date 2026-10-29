@@ -62,14 +62,23 @@ object VoiceConfig {
         private const val PREFS = "voice_prefs"
 
         /**
-         * Which service hears and speaks. See [voiceProvider].
+         * The two cloud providers, valid on both the hearing and speaking
+         * sides. See [voiceProvider] and [speakProvider].
          *
-         * Two values and not a boolean because the list will not stay at two:
-         * the picker, the self-check rows and the engines all branch on the
-         * string, so a third provider is a value rather than a second flag.
+         * A string and not a boolean because the list is not closed: the
+         * speaking side already adds [VOICE_SYSTEM], and the picker, the
+         * self-check rows and the engines all branch on the string, so a new
+         * provider is a value rather than a second flag.
          */
         const val VOICE_HUOSHAN = VoiceSettings.VOICE_HUOSHAN
         const val VOICE_GOOGLE = VoiceSettings.VOICE_GOOGLE
+
+        /**
+         * The device's own text-to-speech engine. A speak-side only option: a
+         * system engine can read aloud but has no recogniser, so it never
+         * appears on the listening side.
+         */
+        const val VOICE_SYSTEM = "system"
 
         /**
          * The Vertex endpoint, its Express-keyed surface.
@@ -480,7 +489,9 @@ object VoiceConfig {
         }
 
         /**
-         * Which service hears and speaks: [VOICE_HUOSHAN] or [VOICE_GOOGLE].
+         * Which service hears: [VOICE_HUOSHAN] or [VOICE_GOOGLE]. The speaking
+         * side is a separate choice — see [speakProvider] — because a system
+         * engine can read aloud but has no recogniser.
          *
          * **Anything that is not exactly `google` reads as 火山**, which is the
          * same fail-closed direction [groundingEnabled] and [notifyScope] take,
@@ -516,6 +527,31 @@ object VoiceConfig {
                 // before this setting existed. Either way the picker is one tap
                 // away, and a user's own choice always outranks this.
                 "" -> if (googleApiKeyDefault().isNotEmpty()) VOICE_GOOGLE else VOICE_HUOSHAN
+                else -> VOICE_HUOSHAN
+            }
+        }
+
+        /**
+         * Which service speaks: [VOICE_HUOSHAN], [VOICE_GOOGLE] or
+         * [VOICE_SYSTEM]. The speaking and hearing sides are now two separate
+         * choices, because a system engine reads aloud but cannot hear — so
+         * [voiceProvider] (the hearing side) keeps only 火山 / Google, while
+         * this one may add the device's own engine.
+         *
+         * An unset value falls back to [voiceProvider], so a device that
+         * predates this row speaks exactly as it did before; a saved choice
+         * always wins. CodeFlying is pinned to 火山 for the same reason as
+         * [voiceProvider] — the hosted gateway owns the upstream choice.
+         */
+        fun speakProvider(context: Context): String {
+            if (brainMode(context) == BRAIN_CODEFLYING) return VOICE_HUOSHAN
+            val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("speak_provider", "").orEmpty().trim().lowercase()
+            return when (saved) {
+                VOICE_GOOGLE -> VOICE_GOOGLE
+                VOICE_SYSTEM -> VOICE_SYSTEM
+                VOICE_HUOSHAN -> VOICE_HUOSHAN
+                "" -> voiceProvider(context)
                 else -> VOICE_HUOSHAN
             }
         }
@@ -646,6 +682,7 @@ object VoiceConfig {
                 // the hint — which is the value a blank resolves to — can be
                 // seen at all.
                 "voice_provider" to voiceProvider(context),
+                "speak_provider" to speakProvider(context),
                 "google_api_key" to p.getString("google_api_key", "").orEmpty(),
                 "google_base_url" to p.getString("google_base_url", "").orEmpty(),
                 "google_project" to p.getString("google_project", "").orEmpty(),
@@ -947,7 +984,7 @@ object VoiceConfig {
             "codeflying_key",
             "asr_endpoint", "asr_resource_id",
             "tts_endpoint", "tts_resource_id", "tts_sample_rate",
-            "voice_provider",
+            "voice_provider", "speak_provider",
             "google_api_key", "google_base_url",
             "google_project", "google_location",
             "google_asr_model", "google_tts_model", "google_language",

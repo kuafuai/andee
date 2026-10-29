@@ -6,6 +6,7 @@
 <p align="center">  
   <a href="https://www.codeflying.app/andee">Build online</a> ·  
   <a href="https://www.codeflying.app/andee">Try now</a> ·  
+  <a href="docs/getting-started.md">Getting started</a> ·
   <a href="#key-features">Features</a> ·  
   <a href="#quick-start">Quick start</a> ·  
   <a href="#provisioning">Provisioning</a> ·  
@@ -379,6 +380,25 @@ every other Mac app does:
 An Apple silicon Mac can build **both**: the architecture is decided by whichever JVM runs Gradle, and
 Rosetta runs an x86_64 one. Take Temurin's macOS x64 tarball rather than Homebrew — the `openjdk@17`
 formula compiles from source and demands a full Xcode, which this project otherwise does not need:
+
+`packageDmg` uses dmgbuild 1.6.7 to add the Applications drag target and Finder layout.
+Set up its pinned Python dependency once before either build. The Gradle task checks for
+this dependency before jpackage writes a dmg:
+
+```bash
+python3 -m venv desktop/build/dmg-venv
+desktop/build/dmg-venv/bin/python -m pip install -r desktop/dmg/requirements.txt
+export ANDEE_DMG_PYTHON="$PWD/desktop/build/dmg-venv/bin/python"
+```
+
+The committed `desktop/dmg/background.png` is used as-is during packaging. To
+regenerate it after editing the artwork or caption, install the optional Pillow
+dependency with
+`desktop/build/dmg-venv/bin/python -m pip install -r desktop/dmg/requirements-background.txt`
+and run
+`ANDEE_REGENERATE_BACKGROUND=1 bash desktop/dmg/make-dmg.sh ...`.
+`packageReleaseDmg` and `notarizeDmg` are not part of this drag-to-install
+packaging path; verify their image layout separately before distributing one.
 
 ```bash
 curl -L -o /tmp/jdk17-x64.tar.gz \
@@ -1137,6 +1157,7 @@ See [CHANGELOG.md](CHANGELOG.md) for what changed and for the versioning policy.
 
 ## Related documents
 
+- [docs/getting-started.md](docs/getting-started.md) ([Chinese](docs/getting-started.zh-CN.md)) — the short first-run path from installation to a basic interaction
 - [docs/permissions.md](docs/permissions.md) ([Chinese](docs/permissions.zh-CN.md)) — why it asks for
   the permissions it asks for, each one against a concrete tool
 - [docs/architecture.svg](docs/architecture.svg) ([Chinese](docs/architecture.zh-CN.svg)) — the whole

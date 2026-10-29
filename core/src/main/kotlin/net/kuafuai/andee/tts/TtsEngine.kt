@@ -8,12 +8,13 @@ package net.kuafuai.andee.tts
  * synthesises on demand, however many times — then [finish]. Audio comes back
  * through [Listener.onAudio] as raw 16-bit little-endian PCM.
  *
- * **What a backend cannot promise is when the text arrives relative to the
- * network call.** 火山 accepts text into an open socket, so it can report its
- * sample rate before it has seen a word; a backend that sends one HTTP request
- * per utterance only learns the rate from the response. [Listener.onOpen] is
- * therefore called *before* [push] by construction — see `GoogleTts` for what
- * that forces it to declare up front.
+ * **What a backend cannot promise is when the text — or the sample rate —
+ * arrives relative to the network call.** 火山 accepts text into an open
+ * socket, so it can report its sample rate before it has seen a word; Google
+ * declares a constant. A system engine only learns its rate after writing the
+ * WAV, so it opens at `0` and reports the real number through
+ * [Listener.onRate]. [Listener.onOpen] is called *before* [push] by
+ * construction either way.
  */
 interface TtsEngine {
 
@@ -29,6 +30,26 @@ interface TtsEngine {
          * callback.
          */
         fun onOpen(sampleRate: Int)
+
+        /**
+         * The sample rate the PCM is actually in, for a backend that could not
+         * name it in [onOpen] because it only learns it after synthesising.
+         * Called at most once, after [onOpen] and before the first [onAudio].
+         *
+         * Streaming backends (火山, Google) already declared their rate in
+         * [onOpen], so this is a no-op for them and they do not override it.
+         */
+        fun onRate(sampleRate: Int) {}
+
+        /**
+         * This backend cannot run on this device at all — no bindable engine,
+         * or no data for the language. The driver may retry once with another
+         * backend; if it does not (or cannot), it treats this as [onError].
+         *
+         * Distinct from [onError] on purpose: a missing engine is a known,
+         * expected state (a bare ROM), not a failure of a running utterance.
+         */
+        fun onUnavailable(reason: String) {}
 
         fun onAudio(pcm: ByteArray)
 
@@ -52,3 +73,14 @@ interface TtsEngine {
 
     fun cancel()
 }
+
+/**
+ * Split an utterance into sentences, keeping the terminator attached to the
+ * sentence it ends. `. ` rather than `.` in the pattern, so `3.5` is not cut
+ * in half. Shared by the backends that synthesise one sentence at a time, so
+ * they read the same terminators rather than drift apart.
+ */
+fun splitSentences(text: String): List<String> =
+    text.split(Regex("(?<=[。！？!?\\n])|(?<=\\. )"))
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && it.any { ch -> ch.isLetterOrDigit() } }
