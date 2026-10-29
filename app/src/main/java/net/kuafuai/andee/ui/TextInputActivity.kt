@@ -115,6 +115,15 @@ class TextInputActivity : Activity() {
 
     /** The keyboard is sliding; [onProgress] owns the strip's position and the card's edge until it stops. */
     private var sliding = false
+    private var keyboardRequested = false
+    private val keyboardRetry = Runnable {
+        val visible = ViewCompat.getRootWindowInsets(field)
+            ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+        if (resumed && !isFinishing && !picking && hasWindowFocus() && field.hasFocus() && !visible) {
+            (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                .showSoftInput(field, InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
 
     /**
      * The user is in the camera, the photo picker or the permission dialog.
@@ -292,10 +301,9 @@ class TextInputActivity : Activity() {
             // On the column, not the root: the backdrop is full bleed and must
             // slide under the status bar and the keys, while the strip itself
             // steps around them.
-            // While the keyboard slides, the animation callback below moves the strip frame by frame; this
-            // listener sees the *end* state first and would jump it there in one step — the stutter.
-            if (!sliding) column.setPadding(dp(12), dp(4) + bars.top, dp(12), dp(12) + ime)
-            else column.setPadding(dp(12), dp(4) + bars.top, dp(12), column.paddingBottom)
+            // Lay out at the final inset once. During animation translationY
+            // offsets the strip back to the keyboard's current position.
+            column.setPadding(dp(12), dp(4) + bars.top, dp(12), dp(12) + ime)
             if (ime > 0) {
                 imeShown = true
                 cancelCloseWhenGone()
@@ -330,7 +338,7 @@ class TextInputActivity : Activity() {
                 // edge once, now — resizing an overlay every frame is a relayout of the whole card per frame,
                 // which is what made the slide stutter (measured: 66 slow UI-thread frames in three opens).
                 // The gap it leaves above the rising strip is this window's own backdrop: the same picture.
-                trackTop = true
+                trackTop = false
                 if (ime > 0 && strip.height > 0) {
                     val at = IntArray(2)
                     root.getLocationOnScreen(at)
@@ -347,28 +355,45 @@ class TextInputActivity : Activity() {
             root.post { reportTop() }
             insets
         }
-        // Follow the keyboard frame by frame: the strip rides on top of it. The card's edge moves once per
-        // slide (see the listener above); moving it every frame stuttered.
+        // Follow the IME on the render path, without requesting layout each frame.
         ViewCompat.setWindowInsetsAnimationCallback(root, object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_STOP) {
+            private var startBottom = 0
+
             override fun onPrepare(a: WindowInsetsAnimationCompat) {
-                if (a.typeMask and WindowInsetsCompat.Type.ime() != 0) sliding = true
+                if (a.typeMask and WindowInsetsCompat.Type.ime() == 0) return
+                startBottom = column.paddingBottom
+                sliding = true
+                trackTop = false
+            }
+
+            override fun onStart(
+                a: WindowInsetsAnimationCompat,
+                bounds: WindowInsetsAnimationCompat.BoundsCompat,
+            ): WindowInsetsAnimationCompat.BoundsCompat {
+                if (a.typeMask and WindowInsetsCompat.Type.ime() != 0 && !picking) {
+                    strip.translationY = (column.paddingBottom - startBottom).toFloat()
+                }
+                return bounds
             }
 
             override fun onProgress(insets: WindowInsetsCompat, running: MutableList<WindowInsetsAnimationCompat>): WindowInsetsCompat {
                 if (!sliding || picking) return insets
                 val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-                val bottom = dp(12) + ime
-                if (column.paddingBottom != bottom) column.setPadding(column.paddingLeft, column.paddingTop, column.paddingRight, bottom)
-                // Only the strip moves per frame; the card's edge was set once when the slide began.
+                strip.translationY = (column.paddingBottom - dp(12) - ime).toFloat()
                 return insets
             }
 
             override fun onEnd(a: WindowInsetsAnimationCompat) {
                 if (a.typeMask and WindowInsetsCompat.Type.ime() == 0) return
                 sliding = false
+                strip.translationY = 0f
                 val now = ViewCompat.getRootWindowInsets(root)
                 val ime = now?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0
-                if (ime > 0) { trackTop = true; return }
+                if (ime > 0) {
+                    trackTop = true
+                    reportTop()
+                    return
+                }
                 if (imeShown && photos.isEmpty() && !picking) {
                     // The keys are down: hand the card its full height back now — its own pill is the same
                     // picture as this strip, so the hand-over is invisible — and close.
@@ -389,11 +414,14 @@ class TextInputActivity : Activity() {
     override fun onResume() {
         super.onResume()
         resumed = true
-        // Here rather than in onCreate: the window has focus by now, and an IME
-        // request from a window that does not is dropped without a word.
+        keyboardRequested = false
         field.requestFocus()
-        showKeyboard()
-        field.postDelayed({ if (!isFinishing) showKeyboard() }, IME_RETRY_MS)
+        field.post { showKeyboard() }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && ::field.isInitialized) showKeyboard()
     }
 
     override fun onPause() {
@@ -404,6 +432,7 @@ class TextInputActivity : Activity() {
         // field was still showing made the next ⌨ tap a *close*: the user taps
         // the button, and nothing at all happens.
         resumed = false
+        field.removeCallbacks(keyboardRetry)
         super.onPause()
     }
 
@@ -414,6 +443,7 @@ class TextInputActivity : Activity() {
     }
 
     override fun onDestroy() {
+        if (::field.isInitialized) field.removeCallbacks(keyboardRetry)
         cancelCloseWhenGone()
         worker.shutdownNow()
         shotFile?.delete()
@@ -675,11 +705,11 @@ class TextInputActivity : Activity() {
     }
 
     private fun showKeyboard() {
-        runCatching { field.windowInsetsController?.show(android.view.WindowInsets.Type.ime()) }
-        runCatching {
-            (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
-                .showSoftInput(field, 0)
-        }
+        if (!resumed || isFinishing || picking || !hasWindowFocus() || keyboardRequested) return
+        keyboardRequested = true
+        (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+            .showSoftInput(field, InputMethodManager.SHOW_IMPLICIT)
+        field.postDelayed(keyboardRetry, IME_RETRY_MS)
     }
 
     private fun hideKeyboard() {
