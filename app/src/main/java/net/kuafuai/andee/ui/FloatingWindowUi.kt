@@ -18,6 +18,7 @@ import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -960,6 +961,7 @@ class FloatingWindowUi(
         return try {
             ui.removeCallbacks(strollRunnable)
             slide?.cancel()
+            cancelFoldAnimation()
             parkedFrom = null
             wm.removeView(v)
             root = null
@@ -2147,7 +2149,7 @@ class FloatingWindowUi(
     private fun enterCompact() {
         val p = params ?: return
         slide?.cancel()
-        foldAnim?.cancel()
+        cancelFoldAnimation()
         // A signboard cannot survive the fold — the window shrinks to a corner
         // square smaller than the pane. Evict through [signboardEvictor] so
         // CardUi's own callbacks fire (timeout semantics, holding state).
@@ -2182,47 +2184,15 @@ class FloatingWindowUi(
             ui.post { reseatCompact() }
             return
         }
-        // The card is a floating overlay, so it cannot ride the launcher's own
-        // home animation — the system zooms the launcher behind it, which is
-        // already at home. Draw the same zoom ourselves: shrink the whole card
-        // toward the screen centre and fade the *window* out, then land the
-        // window on the corner square once the content is gone. The fade is
-        // window alpha — the ball is a TextureView, which does not reliably
-        // honour a view-level alpha, but the compositor always honours `p.alpha`.
-        // The fade is also what makes the shape change invisible — a tall card
-        // cannot scale into a square corner without it.
-        v.pivotX = dm.widthPixels / 2f
-        v.pivotY = dm.heightPixels / 2f
-        v.scaleX = 1f
-        v.scaleY = 1f
-        foldAnim = ValueAnimator.ofFloat(1f, 0f).apply {
-            duration = FOLD_ANIM_MS
-            interpolator = DecelerateInterpolator()
-            addUpdateListener { a ->
-                val t = a.animatedValue as Float
-                val s = FOLD_SCALE_MIN + (1f - FOLD_SCALE_MIN) * t
-                v.scaleX = s
-                v.scaleY = s
-                p.alpha = t
-                runCatching { wm.updateViewLayout(v, p) }
-            }
-            addListener(object : android.animation.AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: android.animation.Animator) {
-                    foldAnim = null
-                    v.scaleX = 1f
-                    v.scaleY = 1f
-                    p.alpha = 1f
-                    p.x = cx; p.y = cy; p.width = side; p.height = side
-                    runCatching { wm.updateViewLayout(v, p) }
-                    applyCompactAppearance()
-                    syncWorking()
-                    retimeStroll()
-                    // Placed from whatever [winYOrigin] the last fold measured —
-                    // re-measure now that the square's own frame exists.
-                    ui.post { reseatCompact() }
-                }
-            })
-            start()
+        // A short retreat replaces the old half-size zoom. Keep the current
+        // transform when reversing an opening animation, rather than snapping.
+        animateCard(v, p, opening = false) {
+            p.x = cx; p.y = cy; p.width = side; p.height = side
+            resetCardTransform(v)
+            applyCompactAppearance()
+            syncWorking()
+            retimeStroll()
+            ui.post { reseatCompact() }
         }
     }
 
@@ -2253,8 +2223,9 @@ class FloatingWindowUi(
     /** Main thread only. */
     private fun exitCompact() {
         val p = params ?: return
+        val reversing = foldAnim != null
         slide?.cancel()
-        foldAnim?.cancel()
+        cancelFoldAnimation()
         // Same eviction as the fold, in the other direction: the card grows
         // and the signboard's compact geometry (ball at the window's bottom)
         // is meaningless inside it.
@@ -2293,39 +2264,78 @@ class FloatingWindowUi(
         showCardChrome()
         ball?.scaleX = BALL_SCALE
         ball?.scaleY = BALL_SCALE
-        // Land the window fullscreen first, then zoom the content up out of the
-        // centre — the mirror of the fold's shrink-and-fade.
+        // Set the initial opacity and transform BEFORE resizing the window:
+        // resizing an opaque compact window first flashes a fullscreen frame.
         p.x = fx; p.y = fy; p.width = fw; p.height = fh
-        runCatching { wm.updateViewLayout(v, p) }
+        if (!reversing) {
+            v.scaleX = CARD_OPEN_SCALE
+            v.scaleY = CARD_OPEN_SCALE
+            v.translationY = dp(CARD_TRAVEL_DP).toFloat()
+            p.alpha = 0f
+        }
+        animateCard(v, p, opening = true) {
+            resetCardTransform(v)
+            syncWorking()
+            retimeStroll()
+        }
+    }
+
+    /** Cancel without running the old animation's geometry-changing end callback. */
+    private fun cancelFoldAnimation() {
+        foldAnim?.let {
+            it.removeAllListeners()
+            it.removeAllUpdateListeners()
+            it.cancel()
+        }
+        foldAnim = null
+    }
+
+    private fun resetCardTransform(v: View) {
+        v.scaleX = 1f
+        v.scaleY = 1f
+        v.translationY = 0f
+    }
+
+    /** Window alpha includes the TextureView ball, which view alpha cannot reliably fade. */
+    private fun animateCard(
+        v: View,
+        p: WindowManager.LayoutParams,
+        opening: Boolean,
+        finished: () -> Unit,
+    ) {
+        val dm = context.resources.displayMetrics
         v.pivotX = dm.widthPixels / 2f
         v.pivotY = dm.heightPixels / 2f
-        v.scaleX = FOLD_SCALE_MIN
-        v.scaleY = FOLD_SCALE_MIN
-        p.alpha = 0f
-        runCatching { wm.updateViewLayout(v, p) }
+        val fromScale = v.scaleX
+        val fromY = v.translationY
+        val fromAlpha = p.alpha
+        val toScale = if (opening) 1f else CARD_CLOSE_SCALE
+        val toY = if (opening) 0f else dp(CARD_TRAVEL_DP).toFloat()
+        val toAlpha = if (opening) 1f else 0f
         foldAnim = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = FOLD_ANIM_MS
-            interpolator = DecelerateInterpolator()
+            duration = if (opening) CARD_OPEN_MS else CARD_CLOSE_MS
+            interpolator = if (opening) PathInterpolator(0.16f, 1f, 0.3f, 1f)
+                else PathInterpolator(0.4f, 0f, 1f, 1f)
             addUpdateListener { a ->
                 val t = a.animatedValue as Float
-                val s = FOLD_SCALE_MIN + (1f - FOLD_SCALE_MIN) * t
-                v.scaleX = s
-                v.scaleY = s
-                p.alpha = t
+                val scale = fromScale + (toScale - fromScale) * t
+                v.scaleX = scale
+                v.scaleY = scale
+                v.translationY = fromY + (toY - fromY) * t
+                p.alpha = if (captureHidden || away) 0f
+                    else fromAlpha + (toAlpha - fromAlpha) * t
                 runCatching { wm.updateViewLayout(v, p) }
             }
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: android.animation.Animator) {
                     foldAnim = null
-                    v.scaleX = 1f
-                    v.scaleY = 1f
-                    p.alpha = 1f
-                    syncWorking()
-                    retimeStroll()
+                    finished()
+                    p.alpha = if (captureHidden || away) 0f else 1f
+                    runCatching { wm.updateViewLayout(v, p) }
                 }
             })
-            start()
         }
+        foldAnim?.start()
     }
 
     /**
@@ -2364,8 +2374,8 @@ class FloatingWindowUi(
         // `p.alpha` on every frame, so this must not stamp 1f back over the
         // start value (which for an unfold is 0f). Outside that, capture and
         // away are the only reasons the whole window goes transparent.
-        p.alpha = if (foldAnim?.isRunning == true) p.alpha
-            else if (captureHidden || away) 0f else 1f
+        p.alpha = if (captureHidden || away) 0f
+            else if (foldAnim?.isRunning == true) p.alpha else 1f
         // FLAG_LAYOUT_IN_SCREEN is what makes the unfolded card actually
         // fullscreen. Without it the window's frame is the *content* area —
         // the display minus the status and navigation bars — so a MATCH_PARENT
@@ -2453,6 +2463,8 @@ class FloatingWindowUi(
     private fun paintCard() {
         val v = root ?: return
         val bg = backdrop
+        // Keep the card's existing scrim until its closing fade has finished.
+        if (compact && foldAnim?.isRunning == true) return
         if (compact) {
             v.background = null
             clearScrim(bg)
@@ -3388,19 +3400,11 @@ class FloatingWindowUi(
 
         private const val PERCH_SLIDE_MS = 240L
 
-        /**
-         * How long the card takes to zoom between full and folded. Kept near the
-         * perch slide so the two motions read as one family, and short enough
-         * that a fold never delays a task starting — see [enterCompact].
-         */
-        private const val FOLD_ANIM_MS = 220L
-
-        /**
-         * How far the card shrinks during a fold before it fades out. Not the
-         * corner square's own scale — the card is tall and the corner is square,
-         * so the two can never match; the fade covers the hand-off.
-         */
-        private const val FOLD_SCALE_MIN = 0.5f
+        private const val CARD_OPEN_MS = 280L
+        private const val CARD_CLOSE_MS = 190L
+        private const val CARD_OPEN_SCALE = 0.94f
+        private const val CARD_CLOSE_SCALE = 0.90f
+        private const val CARD_TRAVEL_DP = 18
 
         /** The last-few-pixels pull onto the ledge when a drag lets go. */
         private const val SNAP_MS = 150L
