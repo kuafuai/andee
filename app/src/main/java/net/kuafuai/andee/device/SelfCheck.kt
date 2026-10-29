@@ -509,14 +509,15 @@ object SelfCheck {
      * nagware, so the mapping is deliberate:
      *
      *  * Answered, and this build is current → [Level.OK].
-     *  * **A newer version exists → [Level.NOTE], not WARN.** An outdated app
-     *    is not a broken one, and this list's contract is that only FAIL and
-     *    WARN may interrupt. Putting up a card every time we ship a patch would
-     *    be exactly the failure the [Level] doc is written against.
-     *  * The one exception is a *forced* update — `force_update` set in
-     *    `version.json`, or this build sitting below `min_supported_version` —
-     *    which is [Level.WARN], because the service is saying this build is no
-     *    longer supported.
+     *  * **Answered, and a release strictly newer than this build exists →
+     *    [Level.FAIL]**, forced or not, so the startup card says so once (the
+     *    card's own dedup keeps it from repeating). The user asked for it to be
+     *    impossible to miss. The button goes to CodeFlying's site in the
+     *    interface language ([Upgrade.url]), and the text names GitHub as the
+     *    other place to get it.
+     *  * **A build ahead of the release is current**, whatever the service says:
+     *    `has_update` is believed only when [Upgrade.newer] agrees, so a
+     *    development build is never told to "upgrade" to an older one.
      *  * **Anything undetermined is [Level.NOTE]**: no network, today's quota
      *    spent, connection refused, a 500, a domain that does not resolve. A
      *    statistics endpoint being down is never the user's problem, and
@@ -583,8 +584,8 @@ object SelfCheck {
                 // one word apart and swapping the order in one of them would be
                 // a silent lie about which version is which.
                 detailArgs = listOf(v.latest, BuildConfig.VERSION_NAME),
-                // The release page is always a place to go, so the row never ends in a button that does nothing.
-                fix = Fix.Link(v.url ?: RELEASES_URL),
+                // CodeFlying's site in the interface language; the text names GitHub as the other way.
+                fix = Fix.Link(net.kuafuai.andee.config.Upgrade.url(VoiceConfig.uiLanguage(context))),
             )
 
             is Verdict.QuotaSpent -> Finding(
@@ -1321,7 +1322,7 @@ object SelfCheck {
         object Current : Verdict
 
         /** Reached and answered: there is a newer release than this build. */
-        data class Update(val latest: String, val forced: Boolean, val url: String?) : Verdict
+        data class Update(val latest: String, val forced: Boolean) : Verdict
 
         /** Reached, but today's allowance is spent. A normal state, not a fault. */
         object QuotaSpent : Verdict
@@ -1387,17 +1388,12 @@ object SelfCheck {
                 val data = json.optJSONObject("data")
                     ?: return Verdict.Unreachable("HTTP ${resp.code}: no data")
                 if (!data.optBoolean("has_update", false)) return Verdict.Current
+                // Ahead of (or level with) the release is not behind, whatever the service says.
+                if (!net.kuafuai.andee.config.Upgrade.newer(data.optString("latest_version"), current)) return Verdict.Current
 
-                // `org.json.optString` hands back the four-letter *string*
-                // "null" for a JSON null, and the service sends exactly that
-                // when no download URL is published. So the scheme is what gets
-                // checked, not emptiness: a Fix.Link holding "null" opens a
-                // browser at a broken address.
-                val raw = data.optString("download_url").orEmpty()
                 Verdict.Update(
                     latest = data.optString("latest_version").ifEmpty { "?" },
                     forced = data.optBoolean("force_update", false),
-                    url = raw.takeIf { it.startsWith("http://") || it.startsWith("https://") },
                 )
             }
         } catch (e: Exception) {
@@ -1497,9 +1493,6 @@ object SelfCheck {
      * as that lasts. That is the intended failure, not a bug in the check.
      */
     private const val VERSION_API_BASE = "https://api.heyandee.com"
-
-    /** Where a newer build is published. */
-    const val RELEASES_URL = "https://github.com/kuafuai/andee/releases"
 
     /**
      * The whole-call ceiling on the version probe, in milliseconds.

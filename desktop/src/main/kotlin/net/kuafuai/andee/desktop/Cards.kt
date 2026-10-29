@@ -95,10 +95,8 @@ fun SelfCheckCard(onDone: () -> Unit, onOpenSettings: () -> Unit) {
         add(when (val r = version) {
             null -> CheckRow("version", if (zh) "版本" else "Version", true, if (zh) "检查中…（当前 $v）" else "Checking… (you are on $v)", null, quiet = true)
             is VersionCheck.Result.Current -> CheckRow("version", if (zh) "版本" else "Version", true, if (zh) "$v 已经是最新。" else "$v is the latest.", null)
-            is VersionCheck.Result.Behind -> CheckRow("version", if (zh) "版本" else "Version", false,
-                if (r.forced) { if (zh) "请升级到 ${r.latest} —— 你现在这个（$v）已经不再支持了。到 GitHub 下载。" else "Please upgrade to ${r.latest} — this build ($v) is no longer supported. Get it from GitHub." }
-                else { if (zh) "版本落后了：最新是 ${r.latest}，你现在是 $v。请到 GitHub 下载升级。" else "Out of date: the latest is ${r.latest}, you are on $v. Please upgrade from GitHub." },
-                { runCatching { net.kuafuai.andee.desktop.mac.Bridge.open(r.url) } }, red = true)
+            is VersionCheck.Result.Behind -> CheckRow("version", if (zh) "版本" else "Version", false, VersionCheck.behindText(r),
+                { runCatching { net.kuafuai.andee.desktop.mac.Bridge.open(VersionCheck.upgradeUrl()) } }, red = true)
             // Could not be determined is never the user's fault: a quiet note that still names the build.
             is VersionCheck.Result.Unknown -> CheckRow("version", if (zh) "版本" else "Version", true,
                 if (zh) "没能查到最新版本。当前 $v。" else "Could not check for updates. You are on $v.", null, quiet = true)
@@ -128,7 +126,7 @@ fun SelfCheckCard(onDone: () -> Unit, onOpenSettings: () -> Unit) {
                     Text(r.why, color = if (r.red) Palette.danger else Palette.secondary, fontSize = 11.sp)
                 }
                 if (!r.ok && r.fix != null) {
-                    Text(if (r.id == "version") (if (zh) "去 GitHub" else "GitHub") else if (zh) "去处理" else "Fix", color = Palette.accent, fontSize = 13.sp,
+                    Text(if (r.id == "version") (if (zh) "去升级" else "Upgrade") else if (zh) "去处理" else "Fix", color = Palette.accent, fontSize = 13.sp,
                         modifier = Modifier.clickable { r.fix?.invoke() }.padding(6.dp))
                 }
             }

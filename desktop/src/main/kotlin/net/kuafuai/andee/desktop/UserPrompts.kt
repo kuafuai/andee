@@ -236,13 +236,14 @@ object AskGate {
     private val waiting = androidx.compose.runtime.mutableStateOf(false)
     val isWaiting: Boolean get() = waiting.value
 
-    fun ask(question: String, buttons: List<String>, timeoutMs: Long): Result =
-        run(question, buttons, timeoutMs)
+    /** [speak] = false for a card the device raises itself (the launch-time version reminder): nobody asked. */
+    fun ask(question: String, buttons: List<String>, timeoutMs: Long, speak: Boolean = true): Result =
+        run(question, buttons, timeoutMs, speak)
 
     fun alert(text: String, timeoutMs: Long): Result =
         run(text, emptyList(), timeoutMs)
 
-    private fun run(question: String, buttons: List<String>, timeoutMs: Long): Result {
+    private fun run(question: String, buttons: List<String>, timeoutMs: Long, speak: Boolean = true): Result {
         val p = Pending(question, buttons, CompletableFuture(), System.currentTimeMillis() + timeoutMs)
         synchronized(this) {
             current?.answer?.complete(Result(null, null, "superseded"))
@@ -251,7 +252,7 @@ object AskGate {
         waiting.value = p.buttons.isNotEmpty()
         onChange()
         // Voice-first: the question is read out, exactly as the phone says it.
-        MacVoice.speak(question)
+        if (speak) MacVoice.speak(question)
         val r = runCatching { p.answer.get(timeoutMs, TimeUnit.MILLISECONDS) }
             .getOrDefault(Result(null, null, "timeout"))
         synchronized(this) { if (current === p) current = null }

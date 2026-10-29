@@ -720,8 +720,8 @@
          唯一一次主动往外发东西。%1$s 恒为「该升到的版本」，%2$s 恒为「你手上这个」，
          两条文案的参数顺序不许对调。见 SelfCheck.version。 -->
     <string name="check_detail_version_current">%1$s 已经是最新。</string>
-    <string name="check_detail_version_stale">版本落后了：最新是 %1$s，你现在是 %2$s。请到 GitHub 下载升级。</string>
-    <string name="check_detail_version_forced">请升级到 %1$s —— 你现在这个（%2$s）已经不再支持了。到 GitHub 下载。</string>
+    <string name="check_detail_version_stale">版本落后了：最新是 %1$s，你现在是 %2$s。请到 GitHub 或 CodeFlying 升级。</string>
+    <string name="check_detail_version_forced">请升级到 %1$s —— 你现在这个（%2$s）已经不再支持了。到 GitHub 或 CodeFlying 升级。</string>
     <string name="check_detail_version_offline">没网，先不测。当前 %1$s。</string>
     <string name="check_detail_version_quota">今天的检查次数用完了，明天恢复。当前 %1$s。</string>
     <string name="check_detail_version_unreachable">查不到：%1$s。当前是 %2$s。</string>

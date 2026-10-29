@@ -533,6 +533,7 @@ object Assistant {
         DesktopScheduler.catchUp()
         DesktopScheduler.syncPlan()
         PlanTicks.start()
+        VersionCheck.remindAtLaunch()
     }
 
     /**

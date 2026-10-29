@@ -14,14 +14,13 @@ import java.util.concurrent.TimeUnit
  * never the key or the address). No conversation, no screen content, no file names. It is the one call the app
  * makes to a host the maintainers run, and docs/permissions.md says so.
  *
- * Behind is red and says where to upgrade (GitHub). Anything that could not be determined — no network, the
- * day's allowance spent, a server error — is a quiet note, never a fault: a statistics endpoint being down is
- * not the user's problem.
+ * Behind — a release strictly newer than this build ([net.kuafuai.andee.config.Upgrade.newer]; a build ahead of
+ * the release is current) — is red, says to upgrade from GitHub or CodeFlying, and its button opens CodeFlying's
+ * site in the interface language. Checked once at launch ([remindAtLaunch]) and again whenever the self-check card
+ * opens. Anything that could not be determined — no network, the day's allowance spent, a server error — is a
+ * quiet note, never a fault: a statistics endpoint being down is not the user's problem.
  */
 object VersionCheck {
-
-    /** Where a newer build is published, and the fallback when the service names no download address. */
-    const val RELEASES_URL = "https://github.com/kuafuai/andee/releases"
 
     private const val BASE = "https://api.heyandee.com"
     private const val CALL_MS = 4_000L
@@ -29,8 +28,8 @@ object VersionCheck {
     sealed interface Result {
         /** Reached, and this is the current release. */
         object Current : Result
-        /** Reached, and there is a newer one. [url] is where to get it. */
-        data class Behind(val latest: String, val forced: Boolean, val url: String) : Result
+        /** Reached, and there is a strictly newer release. */
+        data class Behind(val latest: String, val forced: Boolean) : Result
         /** Could not be determined; [why] is for the row's text. */
         data class Unknown(val why: String) : Result
     }
@@ -64,18 +63,54 @@ object VersionCheck {
                 if (json.optInt("code", -1) != 0) return Result.Unknown("HTTP ${resp.code} code=${json.optInt("code")}")
                 val data = json.optJSONObject("data") ?: return Result.Unknown("no data")
                 if (!data.optBoolean("has_update", false)) return Result.Current
-                // org.json hands back the four-letter string "null" for a JSON null: check the scheme, not emptiness.
-                val raw = data.optString("download_url").orEmpty()
+                // Ahead of (or level with) the release is not behind, whatever the service says.
+                if (!net.kuafuai.andee.config.Upgrade.newer(data.optString("latest_version"), current())) return Result.Current
                 Result.Behind(
                     latest = data.optString("latest_version").ifEmpty { "?" },
                     forced = data.optBoolean("force_update", false),
-                    url = raw.takeIf { it.startsWith("http://") || it.startsWith("https://") } ?: RELEASES_URL,
                 )
             }
         } catch (e: Exception) {
             Result.Unknown(e.message ?: e.javaClass.simpleName)
         }
     }
+
+    /** Where the upgrade button goes, in the interface language. */
+    fun upgradeUrl(): String = net.kuafuai.andee.config.Upgrade.url(Strings.lang())
+
+    /** The row's and the reminder's sentence. */
+    fun behindText(r: Result.Behind): String {
+        val zh = Strings.lang() == "zh"
+        val v = current()
+        return if (r.forced) {
+            if (zh) "请升级到 ${r.latest} —— 你现在这个（$v）已经不再支持了。到 GitHub 或 CodeFlying 升级。"
+            else "Please upgrade to ${r.latest} — this build ($v) is no longer supported. Upgrade from GitHub or CodeFlying."
+        } else {
+            if (zh) "版本落后了：最新是 ${r.latest}，你现在是 $v。请到 GitHub 或 CodeFlying 升级。"
+            else "Out of date: the latest is ${r.latest}, you are on $v. Upgrade from GitHub or CodeFlying."
+        }
+    }
+
+    /**
+     * The phone's startup card, on the Mac: check once at launch and, only if behind, put up one card beside the
+     * ball with 去升级 / 以后再说. Silent (not read aloud — nobody asked a question), and only when no other card is
+     * up. Nothing at all when current, ahead, or undeterminable.
+     */
+    fun remindAtLaunch() {
+        Thread({
+            Thread.sleep(LAUNCH_DELAY_MS)
+            val r = probe() as? Result.Behind ?: return@Thread
+            if (AskGate.current != null) return@Thread
+            val zh = Strings.lang() == "zh"
+            val go = if (zh) "去升级" else "Upgrade"
+            val a = AskGate.ask(behindText(r), listOf(go, if (zh) "以后再说" else "Later"), REMIND_MS, speak = false)
+            if (a.button == go) runCatching { net.kuafuai.andee.desktop.mac.Bridge.open(upgradeUrl()) }
+        }, "version-remind").apply { isDaemon = true }.start()
+    }
+
+    /** Long enough for the ball to be up before the card is placed beside it. */
+    private const val LAUNCH_DELAY_MS = 8_000L
+    private const val REMIND_MS = 120_000L
 
     private fun usingCodeFlyingWithKey(): Boolean = Assistant.config().let {
         it.mode == net.kuafuai.andee.config.BrainConfig.BRAIN_CODEFLYING && it.apiKey.isNotBlank()

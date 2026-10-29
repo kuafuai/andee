@@ -636,8 +636,8 @@
          move to and %2$s is always the build in hand; the two rows differ by a
          word, so do not swap the arguments between them. See SelfCheck.version. -->
     <string name="check_detail_version_current">%1$s is the current release.</string>
-    <string name="check_detail_version_stale">Out of date: the latest is %1$s, you are on %2$s. Please upgrade from GitHub.</string>
-    <string name="check_detail_version_forced">Please upgrade to %1$s — this build (%2$s) is no longer supported. Get it from GitHub.</string>
+    <string name="check_detail_version_stale">Out of date: the latest is %1$s, you are on %2$s. Upgrade from GitHub or CodeFlying.</string>
+    <string name="check_detail_version_forced">Please upgrade to %1$s — this build (%2$s) is no longer supported. Upgrade from GitHub or CodeFlying.</string>
     <string name="check_detail_version_offline">Offline, so not tested. You are on %1$s.</string>
     <string name="check_detail_version_quota">Today\'s checks are used up; they reset tomorrow. You are on %1$s.</string>
     <string name="check_detail_version_unreachable">Could not be checked: %1$s. You are on %2$s.</string>
