@@ -35,6 +35,8 @@ object Scrollback {
     data class Row(
         val id: Long, val ts: Long, val role: Role, val text: String, val topicId: Long? = null,
         val kind: String = "", val detail: String = "",
+        /** What an event row opens: a wiki article's id. */
+        val ref: String = "",
     )
 
     data class Topic(val id: Long, val title: String, val summary: String, val startedAt: Long, val endedAt: Long)
@@ -69,11 +71,11 @@ object Scrollback {
     }
 
     /** An event row (see [Role.EVENT]). */
-    fun event(kind: String, text: String, detail: String = "") {
+    fun event(kind: String, text: String, detail: String = "", ref: String = "") {
         val t = text.trim()
         if (t.isEmpty()) return
         synchronized(lock) {
-            rows += Row(nextId++, System.currentTimeMillis(), Role.EVENT, t.take(MAX_TEXT), kind = kind, detail = detail.trim().take(MAX_TEXT))
+            rows += Row(nextId++, System.currentTimeMillis(), Role.EVENT, t.take(MAX_TEXT), kind = kind, detail = detail.trim().take(MAX_TEXT), ref = ref)
             while (rows.size > MAX_ROWS) rows.removeAt(0)
         }
         saveAndNotify()
@@ -140,7 +142,7 @@ object Scrollback {
             for (r in rows) arr.put(
                 JSONObject().put("id", r.id).put("ts", r.ts).put("role", r.role.name).put("text", r.text)
                     .apply { r.topicId?.let { put("topic", it) } }
-                    .apply { if (r.kind.isNotEmpty()) put("kind", r.kind); if (r.detail.isNotEmpty()) put("detail", r.detail) },
+                    .apply { if (r.kind.isNotEmpty()) put("kind", r.kind); if (r.detail.isNotEmpty()) put("detail", r.detail); if (r.ref.isNotEmpty()) put("ref", r.ref) },
             )
             val tarr = JSONArray()
             for (t in topics) tarr.put(
@@ -173,6 +175,7 @@ object Scrollback {
                     topicId = if (r.has("topic")) r.getLong("topic") else null,
                     kind = r.optString("kind"),
                     detail = r.optString("detail"),
+                    ref = r.optString("ref"),
                 )
             }
             val tarr = o.optJSONArray("topics") ?: JSONArray()

@@ -35,6 +35,8 @@ fun AppRoot(nav: Nav) {
                         screen == "selfcheck" -> SelfCheckCard(onDone = { nav.back() }, onOpenSettings = { nav.push("settings") })
                         screen == "notebook" -> NotebookCard(onDone = { nav.back() })
                         // `notebook:<tab>` opens on that tab; only the screenshot harness names one.
+                        // A wiki article opened from the timeline: the notebook's wiki tab, on that article.
+                        screen.startsWith("wiki:") -> NotebookCard(onDone = { nav.back() }, startTab = 5, startWiki = screen.removePrefix("wiki:"))
                         screen.startsWith("notebook:") -> NotebookCard(onDone = { nav.back() }, startTab = screen.substringAfter(':').toIntOrNull() ?: 0)
                         screen == "vault" -> VaultCard(onDone = { nav.back() })
                         screen == "scenes" -> ScenesCard(onDone = { nav.back() })
@@ -47,6 +49,7 @@ fun AppRoot(nav: Nav) {
                         else -> ChatScreen(
                             onOpenArtifacts = { nav.go("artifacts") },
                             onOpenTopic = { nav.push("topic:$it") },
+                            onOpenWiki = { nav.push("wiki:$it") },
                             onOpenSettings = { nav.go("settings") },
                             // 继续话题 from the card itself: the same two steps as on the topic page.
                             onContinueTopic = { Assistant.beginTopic(it); ComposerFocus.pending = true },

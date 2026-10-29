@@ -1196,7 +1196,7 @@ class LocalBrain(
 
             val result = dispatchWithTimeout(method, args, tc.id, silent, untrusted)
             if (currentKind == TurnKind.WORK) workCalls += WorkCall(method, args.optString("action"), tc.id, landed(result))
-            BrainEvent.fromTool(method, args, result)?.let { turnRecords++; emit(it) }
+            BrainEvent.fromTool(method, args, result)?.let { if (it.kind != BrainEvent.Kind.WIKI_READ) turnRecords++; emit(it) }
             if (AimHints.isTap(method) && result is JSONObject) {
                 val missed = result.has("screen_changed") && !result.optBoolean("screen_changed", true)
                 aimMisses = if (method == "screen.tap" || method == "screen.long_press") { if (missed) aimMisses + 1 else 0 } else if (missed) aimMisses else 0

@@ -13,6 +13,12 @@ class BrainEventTest {
         assertNull(BrainEvent.fromTool("note.wiki_search", JSONObject(), JSONObject()))
         assertEquals("老王", BrainEvent.fromTool("note.person", JSONObject().put("action", "upsert").put("name", "老王"), JSONObject().put("saved", true))?.subject)
         assertNull(BrainEvent.fromTool("screen.tap", JSONObject(), JSONObject()))
+        // A wiki write or read carries the article's id, which is what the timeline row opens.
+        val meta = JSONObject().put("id", "w1").put("title", "运营规划")
+        assertEquals("w1", BrainEvent.fromTool("note.wiki_write", JSONObject().put("title", "x"), JSONObject().put("written", true).put("meta", meta))?.ref)
+        val read = BrainEvent.fromTool("note.wiki_read", JSONObject().put("id", "w1"), JSONObject().put("read", true).put("meta", meta))!!
+        assertEquals(BrainEvent.Kind.WIKI_READ to "运营规划", read.kind to read.subject)
+        assertNull(BrainEvent.fromTool("note.wiki_read", JSONObject().put("id", "w9"), JSONObject().put("read", false)))
     }
 
     @Test fun aWakeLineGivesBackTheTodo() {

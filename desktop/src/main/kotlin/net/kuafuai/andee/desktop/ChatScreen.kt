@@ -120,7 +120,7 @@ private fun openLink(url: String) {
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
-fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, onContinueTopic: (Scrollback.Topic) -> Unit = {}, onOpenSettings: () -> Unit = {}) {
+fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, onContinueTopic: (Scrollback.Topic) -> Unit = {}, onOpenSettings: () -> Unit = {}, onOpenWiki: (String) -> Unit = {}) {
     var rows by remember { mutableStateOf(Scrollback.snapshot()) }
     var progress by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -273,7 +273,7 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
                 }
                 items(items, key = { it.key }) { it ->
                     when (it) {
-                        is ChatItem.Message -> if (it.row.role == Scrollback.Role.EVENT) EventRow(it.row) else Bubble(it.row)
+                        is ChatItem.Message -> if (it.row.role == Scrollback.Role.EVENT) EventRow(it.row, onOpenWiki) else Bubble(it.row)
                         is ChatItem.Folded -> TopicCard(it.topic, it.count, onOpen = { onOpenTopic(it.topic.id) }, onContinue = { onContinueTopic(it.topic) })
                     }
                 }
@@ -579,7 +579,7 @@ fun noVoiceKey() = when {
  * detail opens on click. Centered and small, so a day of events does not drown the conversation between them.
  */
 @Composable
-private fun EventRow(r: Scrollback.Row) {
+private fun EventRow(r: Scrollback.Row, onOpenWiki: (String) -> Unit = {}) {
     var open by remember(r.id) { mutableStateOf(false) }
     val time = remember(r.ts) { java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date(r.ts)) }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -598,6 +598,12 @@ private fun EventRow(r: Scrollback.Row) {
             if (r.detail.isNotBlank()) {
                 Spacer(Modifier.width(4.dp))
                 Text(if (open) "▴" else "▾", color = Palette.secondary, fontSize = 10.sp)
+            }
+            // A wiki article it wrote or showed: the row is the way in, the way a page has its card.
+            if (r.ref.isNotBlank() && r.kind.startsWith("WIKI")) {
+                Spacer(Modifier.width(8.dp))
+                Text(if (Strings.lang() == "zh") "打开 ›" else "Open ›", color = Palette.accent, fontSize = 12.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onOpenWiki(r.ref) }.padding(horizontal = 4.dp, vertical = 1.dp))
             }
         }
         if (open && r.detail.isNotBlank()) {

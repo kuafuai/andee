@@ -33,6 +33,7 @@ object TimelineEvents {
             BrainEvent.Kind.DIARY -> t("写了今天的日记", "Wrote today's diary")
             BrainEvent.Kind.SELF -> t("改写了自我描述", "Rewrote who it is")
             BrainEvent.Kind.WIKI -> t("写进维基：$s", "Wrote to the wiki: $s")
+            BrainEvent.Kind.WIKI_READ -> t("翻出了维基：$s", "Opened a wiki article: $s")
             BrainEvent.Kind.PERSON -> t("记下了一个人：$s", "Noted a person: $s")
             BrainEvent.Kind.CARE -> when (e.detail) {
                 "+" -> t("开始在意：$s", "Now cares about: $s")
@@ -48,7 +49,7 @@ object TimelineEvents {
             BrainEvent.Kind.TODO -> e.detail.takeIf { it.isNotBlank() }?.let { t("时间：$it", "At: $it") }.orEmpty()
             else -> e.detail
         }
-        Scrollback.event(e.kind.name, text, detail)
+        Scrollback.event(e.kind.name, text, detail, e.ref)
     }
 
     fun body(kind: Body, text: String, detail: String = "") = Scrollback.event(kind.name, text, detail)
@@ -75,7 +76,7 @@ object TimelineEvents {
         BrainEvent.Kind.WOKE.name, BrainEvent.Kind.NOTIFIED.name, Body.IGNORED.name -> AndeeIcon.ALERT_CIRCLE
         BrainEvent.Kind.FRIEND_TASK.name -> AndeeIcon.FRIENDS
         BrainEvent.Kind.REVIEWED.name, BrainEvent.Kind.FOLDED.name -> AndeeIcon.CHECK_CIRCLE
-        BrainEvent.Kind.WIKI.name, Body.PAGE.name -> AndeeIcon.DOCUMENT
+        BrainEvent.Kind.WIKI.name, BrainEvent.Kind.WIKI_READ.name, Body.PAGE.name -> AndeeIcon.DOCUMENT
         BrainEvent.Kind.PERSON.name -> AndeeIcon.FACE
         BrainEvent.Kind.CARE.name, Body.WORK.name, Body.THOUGHT.name -> AndeeIcon.SPARKLE
         Body.BUBBLE.name, Body.BUBBLE_MUTED.name -> AndeeIcon.CHAT

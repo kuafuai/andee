@@ -17,6 +17,8 @@ data class BrainEvent(
     val subject: String = "",
     /** A longer line shown when the row is opened. May be empty. */
     val detail: String = "",
+    /** What the row opens, when there is something to open: a wiki article's id. */
+    val ref: String = "",
 ) {
     enum class Kind {
         /** A todo came due and woke it. */
@@ -30,6 +32,8 @@ data class BrainEvent(
         /** A finished stretch of conversation was put away as a topic. */
         FOLDED,
         DIARY, SELF, WIKI, PERSON, CARE, MEMORY, TODO, PLAN,
+        /** It read a wiki article — usually to show it to the user. [ref] opens it. */
+        WIKI_READ,
     }
 
     companion object {
@@ -44,7 +48,14 @@ data class BrainEvent(
             return when (method) {
                 "note.diary" -> if (action == "write" && ok("written")) BrainEvent(Kind.DIARY, detail = args.optString("text").take(400)) else null
                 "note.self" -> if (action == "write" && ok("written")) BrainEvent(Kind.SELF, detail = args.optString("text").take(400)) else null
-                "note.wiki_write" -> if (ok("written")) BrainEvent(Kind.WIKI, args.optString("title"), args.optString("change_note")) else null
+                "note.wiki_write" -> if (ok("written")) {
+                    val meta = r?.optJSONObject("meta")
+                    BrainEvent(Kind.WIKI, meta?.optString("title")?.ifEmpty { null } ?: args.optString("title"), args.optString("change_note"), meta?.optString("id").orEmpty())
+                } else null
+                "note.wiki_read" -> if (ok("read")) {
+                    val meta = r?.optJSONObject("meta")
+                    BrainEvent(Kind.WIKI_READ, meta?.optString("title").orEmpty(), ref = meta?.optString("id")?.ifEmpty { null } ?: args.optString("id"))
+                } else null
                 "note.person" -> when (action) {
                     "upsert" -> if (ok("saved")) BrainEvent(Kind.PERSON, args.optString("name"), args.optString("impression")) else null
                     else -> null

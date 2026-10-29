@@ -25,7 +25,7 @@ import kotlin.system.exitProcess
  */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
-    val screen = args.getOrElse(0) { "chat" }
+    var screen = args.getOrElse(0) { "chat" }
     val w = args.getOrElse(1) { "1020" }.toInt()
     val h = args.getOrElse(2) { "820" }.toInt()
     val out = File(args.getOrElse(3) { "/tmp/ui.png" })
@@ -65,7 +65,7 @@ fun main(args: Array<String>) {
         seedPlan()
     }
     // `notebook:<tab>`: the notebook with an invented life in a throwaway notebook. Nothing real.
-    if (screen.startsWith("notebook:")) {
+    if (screen.startsWith("notebook:") || screen == "wiki:first") {
         DesktopNotebook.storeOverride = object : net.kuafuai.andee.config.NotebookStore {
             var s: String? = null
             override fun read() = s
@@ -73,6 +73,8 @@ fun main(args: Array<String>) {
             override fun wipe() { s = null }
         }
         seedLife()
+        // `wiki:first`: the article page the timeline's 打开 › goes to.
+        if (screen == "wiki:first") screen = "wiki:" + DesktopNotebook.book.wiki.all().first().id
     }
     if (screen == "gear") {
         DesktopNotebook.storeOverride = object : net.kuafuai.andee.config.NotebookStore {
@@ -159,6 +161,8 @@ private fun seed() {
     TimelineEvents.brain(net.kuafuai.andee.brain.BrainEvent(net.kuafuai.andee.brain.BrainEvent.Kind.REVIEWED, "3"))
     TimelineEvents.brain(net.kuafuai.andee.brain.BrainEvent(net.kuafuai.andee.brain.BrainEvent.Kind.DIARY, detail = "今天他第一次让我自己去 X 上留言。"))
     TimelineEvents.thought("交流群这两天很安静，我想知道是不是大家都没遇到问题")
+    TimelineEvents.brain(net.kuafuai.andee.brain.BrainEvent(net.kuafuai.andee.brain.BrainEvent.Kind.WIKI, "交流群运营方案", "first draft", ref = "w1"))
+    TimelineEvents.brain(net.kuafuai.andee.brain.BrainEvent(net.kuafuai.andee.brain.BrainEvent.Kind.WIKI_READ, "Andee 运营规划", ref = "w2"))
     TimelineEvents.ignored("Slack", "群里的闲聊，没有提到他")
     TimelineEvents.brain(net.kuafuai.andee.brain.BrainEvent(net.kuafuai.andee.brain.BrainEvent.Kind.WOKE, "开周会"))
     Scrollback.add(Scrollback.Role.USER, "看看今天有什么新闻")

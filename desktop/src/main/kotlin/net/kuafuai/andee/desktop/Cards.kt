@@ -256,7 +256,7 @@ fun VaultCard(onDone: () -> Unit) {
 
 /** 小本本: what Andee remembers, browsable and deletable — plus the todos it owes. */
 @Composable
-fun NotebookCard(onDone: () -> Unit, startTab: Int = 0) {
+fun NotebookCard(onDone: () -> Unit, startTab: Int = 0, startWiki: String? = null) {
     val zh = Strings.lang() == "zh"
     var selectedTab by remember { mutableStateOf(startTab) }
     var refresh by remember { mutableStateOf(0) }
@@ -294,7 +294,7 @@ fun NotebookCard(onDone: () -> Unit, startTab: Int = 0) {
                 2 -> DiaryTab(zh, refresh) { refresh++ }
                 3 -> PlanTab(zh, refresh) { refresh++ }
                 4 -> PeopleTab(zh, refresh) { refresh++ }
-                5 -> WikiTab(zh, refresh) { refresh++ }
+                5 -> WikiTab(zh, refresh, startWiki) { refresh++ }
                 6 -> MemoriesTab(zh, refresh) { refresh++ }
                 7 -> TodosTab(zh, refresh) { refresh++ }
             }
@@ -443,8 +443,8 @@ private fun PeopleTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
 }
 
 @Composable
-private fun WikiTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
-    var openId by remember { mutableStateOf<String?>(null) }
+private fun WikiTab(zh: Boolean, refresh: Int, startWiki: String? = null, onRefresh: () -> Unit) {
+    var openId by remember { mutableStateOf(startWiki) }
     openId?.let { id -> WikiArticle(id, zh, onBack = { openId = null; onRefresh() }); return }
     val wikiEntries = DesktopNotebook.book.wiki.all().sortedByDescending { it.updated }
     
