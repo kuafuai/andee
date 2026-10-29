@@ -10,6 +10,7 @@
 <p align="center">
   <a href="https://www.codeflying.net/andee">在线构建</a> ·
   <a href="https://www.codeflying.net/andee">立即体验</a> ·
+  <a href="docs/getting-started.zh-CN.md">入门指南</a> ·
   <a href="#核心能力">核心能力</a> ·
   <a href="#快速开始">快速开始</a> ·
   <a href="#权限每一项为什么以及你拒绝了会怎样">权限</a> ·
@@ -997,6 +998,7 @@ pre-1.0：线上协议和构建开关都还在动。
 
 ## 相关文档
 
+- [docs/getting-started.zh-CN.md](docs/getting-started.zh-CN.md)（[English](docs/getting-started.md)）—— 从安装到第一次基本互动的最短路径
 - [docs/permissions.zh-CN.md](docs/permissions.zh-CN.md)（[English](docs/permissions.md)）—— 权限为什么这么要
 - [docs/architecture.zh-CN.svg](docs/architecture.zh-CN.svg)（[English](docs/architecture.svg)）—— 一页看全：一轮怎么进来、agent loop、六个出口
 - [DISCLAIMER.zh-CN.md](DISCLAIMER.zh-CN.md) —— 免责声明：数据去哪、能做什么、出事谁担
