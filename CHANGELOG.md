@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`17` / `"0.7.1"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`18` / `"0.8.0"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,94 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.8.0] - 2026-10-29
+
+**It has something of its own now, and it can act on it.** Until this release every turn began with an
+event from outside: the user spoke, an alarm fired, a notification arrived, the review ran. With no
+event, nothing happened. This gives it a self to answer to — what it cares about, who it knows, what it
+has been doing — and a heartbeat that wakes it to look at that.
+
+The design and its reasoning, including the parts chosen against, are in
+**[docs/design/inner-drive.zh-CN.md](../design/inner-drive.zh-CN.md)** (Chinese).
+
+### Added
+
+- **A self it writes itself** (`self_note`) — a first-person account of who it is and what it has been
+  busy with, rewritten as it goes. Not a persona skin: it is what the next wake-up reads to become
+  itself again, since it has no continuous experience. Versioned (up to 20) and readable in **小本本 → 自己**, alongside
+  **在意**, **日记**, **人** and **维基** as tabs of the same book.
+- **Things it cares about** (`cares`) — each with how often it means to look. The device computes
+  *how overdue* each one is (ratio ≥ 1.0 means the time has come) and sorts by that; **the ratio is the
+  device's arithmetic, never the model's**. This is what the heartbeat asks about, and the only thing it
+  may pick up work from. Up to 7 active at once.
+- **The people it knows** (`person`, `people`) — one entry per person, held in the encrypted notebook,
+  because this is other people's information. Deliberately not called 通讯录: that word in this project
+  means the system-contacts permission, which is a different thing.
+- **A diary** (`diary`) — one page a day, written in the evening; 40–1200 characters, up to 60 pages.
+- **A notebook it writes for itself, in plain files** — plans, research and write-ups land here, indexed
+  in the notebook but stored as files, so any editor can open them and they can be shared. **This store
+  is deliberately not encrypted** (its own decision, as working documents), so third-party details belong
+  in the people/notebook side, not here.
+- **A heartbeat** — about one look every 20 minutes, at most 40 a day, deciding whether anything it cares
+  about has waited long enough to be worth doing. Most beats stop at a free gate without any model call at
+  all; when one does go through, it costs roughly 500 tokens.
+- **Work turns** — what a heartbeat may start: a full turn with **every tool a user's turn has**, capped
+  at 6 a day with **at least an hour between them**, so a day's allowance cannot be spent in its first two
+  hours. It touches no screen, speaks nothing, and sends nothing on your behalf.
+- **A tap on the ball stops everything** — the running turn, the queue, and wakes that were waiting to
+  start, plus any bubble on screen. One row says what was cut off and what was dropped, so a stop is not
+  silent.
+- **动态 (Mac) / the timeline (phone)** — every non-conversation event as one quiet line: a todo waking
+  it, the review and what it folded, its writes to its own record, a heartbeat's thought and its work
+  turns, bubbles, notifications it let pass, meetings, the camera, shell commands. A row with detail opens
+  on click; 全部 / 只看对话 filters them. Several things that used to be fake assistant lines are events
+  now, which is more honest and easier to scan.
+- **A WeChat icon beside GitHub and Discord** that opens Andee's QR code, on both bodies.
+- **An out-of-date build is told once at launch** and pointed at CodeFlying, on both bodies. "Behind"
+  means a release strictly newer than this build — a build ahead of the release is current.
+- **Android can use the system TTS** as its speaking provider, as an alternative to a cloud voice key.
+- **13 new tools** — `self_note`, `cares`, `diary`, `person`, `people`, and eight `wiki_*`; `wiki_show`
+  opens a written article from the timeline on the phone as well.
+
+### Changed
+
+- **The default step limit is 40, up from 25**, on both bodies.
+- **Nothing asks whether you are there, or what time it is.** The heartbeat, bubbles, the morning plan and
+  the muse no longer wait for input, an unlocked screen, or 08:00. The brakes are the switches, the
+  budgets, and a tap on the ball. The settings copy that still described the old hours has been corrected
+  in all four language/platform files — it had been left describing behaviour the code no longer had.
+
+### Fixed
+
+- **A quiet afternoon is one review row, not eighteen.** A stretch of conversation could be reviewed four
+  times over (a sweep, the harvest straight after it, and both again after an app restart), and every
+  write in each became its own timeline row. The Mac now records "this silence was already reviewed"
+  across restarts, a harvest straight after a sweep writes only the hand-over summary, and a review is one
+  row: *"复盘了一遍，记下 N 处"*. A rewrite that changed nothing is no event at all.
+- **When its aim keeps missing, the device points the model at `tap_target`.** On 2026-10-29 the Mac
+  missed a thin reply box six times with grid taps, and the model ended up asking the user to click it —
+  while one `tap_target` call would have found it. Now a second coordinate tap that changes nothing, an
+  e-number tap that changes nothing, and the same-spot refusal all carry a hint naming `tap_target`;
+  nothing the device said before had mentioned it.
+- **A todo paused or closed while its turn was waiting no longer runs**, and a paused plan bubble stays
+  paused through a reconcile.
+- **Reviews see every memory and pending todo before writing**, so they update instead of duplicating, and
+  a todo that tries to number several things is refused.
+- **The upgrade link is `codeflying.net/andee` (Chinese) / `codeflying.app/andee` (otherwise)**; the
+  service's `download_url` is no longer used. The Mac logs its launch version check.
+- **Android: 小本本 keeps the picked tab in view** after the card rebuilds, and the Mac settings section
+  named 小本本 is renamed **复盘**, which is what it is.
+
+### Notes
+
+- **One device is one Andee.** The one on your phone and the one on your Mac are two individuals with
+  their own narrative, cares and people; they can find each other over the peer channel but they do not
+  share memory. This is not a limitation to be fixed — an individual does not live in two bodies, and it
+  avoids cross-device sync, conflicts and doubled budgets as a class.
+- **`docs/design/inner-drive.zh-CN.md` still says "草案，未实现" at the top.** That line is out of date —
+  the classes it describes are all present. Recorded here rather than silently edited, because the
+  document's status line is the author's to set.
 
 ## [0.7.1] - 2026-10-28
 

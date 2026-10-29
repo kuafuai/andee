@@ -202,11 +202,11 @@
     <string name="settings_notify_note">来消息的时候，它先自己看一眼值不值当：没事的就放过，要紧的说一声，该办的直接去办。「聊天类」是微信、QQ、钉钉、飞书、短信这些有人在那头的；「全部」连其它 App 也一起看（进度条、常驻通知除外）。拿不准的才弹牌子问你。关掉就谁也不打扰你 —— 消息都还在，想知道的时候问它一声就行。</string>
     <string name="nudge_muted_row">好，像「%1$s」这样的以后不提了。想恢复，到 设置 → 主动招呼。</string>
     <string name="settings_section_drive">自己动起来</string>
-    <string name="settings_drive_note">它心里记着几件在意的事，每件都有「多久该看一次」。你在用设备的时候，它大约每 20 分钟想一想：有没有哪件拖得太久、现在值得去做。值得就自己做一会儿——写方案、整理它认识的人、记下想法，最多留一个气泡——不碰屏幕，不出声，也不替你发任何东西。夜里（22:30–8:00）不动；每天最多想 40 次、动手 6 次。没有拖久的事时不花你的 key。关掉就只在你叫它时才动。</string>
+    <string name="settings_drive_note">它心里记着几件在意的事，每件都有「多久该看一次」。它大约每 20 分钟想一想：有没有哪件拖得太久、现在值得去做。值得就自己做一会儿——写方案、整理它认识的人、记下想法，最多留一个气泡——不碰屏幕，不出声，也不替你发任何东西。不看你在不在，也不分白天夜里：每天最多想 40 次、动手 6 次，两次之间至少隔一小时；点一下球它立刻停下来。没有拖久的事时不花你的 key。关掉就只在你叫它时才动。</string>
     <string name="settings_section_nudge">主动招呼</string>
     <string name="settings_nudge_few">少</string>
     <string name="settings_nudge_normal">正常</string>
-    <string name="settings_nudge_note">它有时会在球的头上冒一个小气泡，比如「该喝水啦」「要帮你点外卖吗？」。不出声，不理它几秒后就自己消失；你在忙、在说话、锁屏或者夜里（22:30–8:00）都不会出。「少」是每小时最多 1 个、每天 4 个，「正常」是每小时 2 个、每天 8 个。长按某个气泡，这一类以后就不再提。</string>
+    <string name="settings_nudge_note">它有时会在球的头上冒一个小气泡，比如「该喝水啦」「要帮你点外卖吗？」。不出声，不理它几秒后就自己消失；你在忙、在说话或者锁屏时都不会出。「少」是每小时最多 1 个、每天 4 个，「正常」是每小时 2 个、每天 8 个。长按某个气泡，这一类以后就不再提。</string>
     <string name="settings_nudge_muted">长按关掉的：%1$s</string>
     <string name="settings_nudge_unmute">全部恢复</string>
     <string name="settings_section_plan">它的打算</string>
