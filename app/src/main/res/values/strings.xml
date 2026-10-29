@@ -508,7 +508,6 @@
     <string name="tl_woke">提醒到点：%1$s</string>
     <string name="tl_notified">一条通知值得处理，开始做</string>
     <string name="tl_friend_task">另一台设备的 Andee 交来一件事</string>
-    <string name="tl_reviewed_none">复盘了一遍，没有要记的</string>
     <string name="tl_reviewed">复盘了一遍，记下 %1$s 处</string>
     <string name="tl_folded">收起了一个话题：%1$s</string>
     <string name="tl_diary">写了今天的日记</string>
@@ -535,6 +534,10 @@
     <string name="tl_morning">早上想好了今天的打算</string>
     <string name="tl_held">收到 %1$s 的通知，正在忙，先放着</string>
     <string name="tl_capped">收到 %1$s 的通知，这个小时看得太多了，先放着</string>
+    <string name="tl_diary_updated">改写了今天的日记</string>
+    <string name="tl_memory_updated">更新了记忆：%1$s</string>
+    <string name="tl_plan_today_updated">改了今天的打算</string>
+    <string name="tl_plan_tomorrow_updated">改了明天的打算</string>
     <string name="tl_open">打开 ›</string>
     <string name="tl_show_all">全部</string>
     <string name="tl_show_talk">只看对话</string>

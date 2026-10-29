@@ -287,7 +287,11 @@ class Plans(
         val d = Day(date, intent, kept + fresh, quiet, clock(), dropped)
         putDay(root, d)
         save(root)
+        // Whether this write changed anything — the timeline shows an unchanged rewrite as nothing.
+        val unchanged = old != null && old.intent == d.intent && old.quiet == d.quiet &&
+            old.items.filter { it.status == "planned" }.map { Triple(it.time, it.slot, it.what) } == fresh.map { Triple(it.time, it.slot, it.what) }
         JSONObject().put("written", true).put("date", date).put("items", fresh.size).put("refused", refused)
+            .put("replaced", old != null).put("unchanged", unchanged)
             .put(
                 "note",
                 (if (interrupting > bubblesPerDay) "The user's setting allows $bubblesPerDay bubbles a day; the rest will be skipped. " else "") +

@@ -508,7 +508,8 @@ class LocalBrain(
             busy.set(true)
             currentKind = kind
             aimMisses = 0
-            turnRecords = 0
+            reviewItems = if (kind.silent) mutableListOf() else null
+            if (!kind.silent) justSwept = false
             when (kind) {
                 TurnKind.WAKE -> emit(BrainEvent(BrainEvent.Kind.WOKE, WakeText.what(text)))
                 TurnKind.NOTIFY -> emit(BrainEvent(BrainEvent.Kind.NOTIFIED, detail = text.take(400)))
@@ -567,7 +568,13 @@ class LocalBrain(
                 // is no longer the current one.
                 if (gen == generation.get()) applyPendingFolds() else pendingFolds.clear()
                 if (kind == TurnKind.SWEEP) onSweepSpent(turnTokens)
-                if (kind.silent && gen == generation.get()) emit(BrainEvent(BrainEvent.Kind.REVIEWED, turnRecords.toString()))
+                // One row per review, listing what it wrote; nothing at all when it wrote nothing.
+                val reviewed = reviewItems
+                reviewItems = null
+                if (reviewed != null && reviewed.isNotEmpty() && gen == generation.get()) {
+                    emit(BrainEvent(BrainEvent.Kind.REVIEWED, reviewed.count { it.kind != BrainEvent.Kind.WIKI_READ }.toString(), items = reviewed))
+                }
+                if (kind == TurnKind.SWEEP) justSwept = true
                 if (gen == generation.get()) {
                     drainWakes()
                     maybeHarvest()
@@ -634,8 +641,19 @@ class LocalBrain(
     /** Loop thread only. The closing words of a [TurnKind.WORK] turn; read by [work]'s callback. Never spoken. */
     private var workSummary: String? = null
 
-    /** Loop thread only. Writes to its own record this turn, for the review's summary event. Reset per turn. */
-    private var turnRecords = 0
+    /**
+     * Loop thread only. While a review runs, its writes are gathered here instead of each becoming a row: a review
+     * is one thing that happened, and ten rows of it drowned everything else in the timeline. Null when not in a
+     * review. Folds land after the turn's body, so this lives until the summary row is emitted.
+     */
+    private var reviewItems: MutableList<BrainEvent>? = null
+
+    /**
+     * Loop thread only. The last turn was a sweep and nothing has been said since. A harvest that follows at once
+     * — the sweep's own rebuilt history is often what puts the context over budget — then only summarises: the
+     * notebook was just brought up to date, and going through the same rules again wrote everything twice.
+     */
+    private var justSwept = false
 
     /** Loop thread only. Coordinate taps in a row whose screen did not change; see [AimHints]. Reset per turn. */
     private var aimMisses = 0
@@ -1196,7 +1214,7 @@ class LocalBrain(
 
             val result = dispatchWithTimeout(method, args, tc.id, silent, untrusted)
             if (currentKind == TurnKind.WORK) workCalls += WorkCall(method, args.optString("action"), tc.id, landed(result))
-            BrainEvent.fromTool(method, args, result)?.let { if (it.kind != BrainEvent.Kind.WIKI_READ && it.kind != BrainEvent.Kind.WIKI_SHOWN) turnRecords++; emit(it) }
+            BrainEvent.fromTool(method, args, result)?.let(::emit)
             if (AimHints.isTap(method) && result is JSONObject) {
                 val missed = result.has("screen_changed") && !result.optBoolean("screen_changed", true)
                 aimMisses = if (method == "screen.tap" || method == "screen.long_press") { if (missed) aimMisses + 1 else 0 } else if (missed) aimMisses else 0
@@ -1229,7 +1247,11 @@ class LocalBrain(
         return NOT_DONE_KEYS.none { o.has(it) && o.opt(it) == false }
     }
 
-    private fun emit(e: BrainEvent) = runCatching { host.event(e) }.onFailure { host.logWarn(TAG, "event ${e.kind} not shown", it) }
+    private fun emit(e: BrainEvent) {
+        // Inside a review: gather it for the review's one row. Reading during a review is not worth a line.
+        reviewItems?.let { if (e.kind != BrainEvent.Kind.WIKI_READ) it += e; return }
+        runCatching { host.event(e) }.onFailure { host.logWarn(TAG, "event ${e.kind} not shown", it) }
+    }
 
     private fun dispatchWithTimeout(method: String, params: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? {
         val declared = params.optLong("timeout_ms", 0L)
@@ -1719,7 +1741,7 @@ class LocalBrain(
                 "reviewing before trimming",
         )
         lastHarvestAtSize = history.size
-        launch(HARVEST_INSTRUCTION, TurnKind.HARVEST)
+        launch(if (justSwept) HARVEST_SUMMARY_ONLY else HARVEST_INSTRUCTION, TurnKind.HARVEST)
     }
 
     /**
@@ -2041,6 +2063,16 @@ Up to three topics per review. If `fold_topic` refuses, the reason names the con
                 "The conversation above is about to be deleted from the context, leaving only your summary, so do not write a log — " +
                 "write \"what future-you must know in order to take over\".\n" +
                 "Finish items 1-6 first, and write that summary last."
+
+        /** [HARVEST_INSTRUCTION] right after a sweep: the notebook is current, so only the summary is asked for. */
+        private const val HARVEST_SUMMARY_ONLY =
+            "(to yourself · the context is nearly full, time to wrap up)\n" +
+                "You are not facing the user now, and nobody is watching you. You reviewed this conversation a moment ago and the " +
+                "notebook is up to date, so write nothing to it now.\n" +
+                "Do not reply to the user, make no sound, do not touch the device.\n\n" +
+                "Write only a summary of no more than 300 words: what has happened so far, how far it got, what the next step is, " +
+                "and whether anything is hanging without an answer. The conversation above is about to be deleted from the " +
+                "context, leaving only your summary, so write \"what future-you must know in order to take over\"."
 
         /** How long a topic summary may be. Long enough to carry "where it got to". */
         private const val MAX_TOPIC_SUMMARY_CHARS = 1200

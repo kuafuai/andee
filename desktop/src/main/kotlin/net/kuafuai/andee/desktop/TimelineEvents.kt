@@ -22,15 +22,27 @@ object TimelineEvents {
     private fun t(z: String, e: String) = if (zh) z else e
 
     fun brain(e: BrainEvent) {
+        val detail = when (e.kind) {
+            // A review is one row; what it wrote is the detail, one line each.
+            BrainEvent.Kind.REVIEWED -> e.items.joinToString("\n") { "- " + line(it) }
+            BrainEvent.Kind.CARE -> ""
+            BrainEvent.Kind.TODO -> e.detail.takeIf { it.isNotBlank() }?.let { t("时间：$it", "At: $it") }.orEmpty()
+            else -> e.detail
+        }
+        Scrollback.event(e.kind.name, line(e), detail, e.ref)
+    }
+
+    /** One event in words. An [BrainEvent.updated] write says so, so a rewrite does not read as something new. */
+    private fun line(e: BrainEvent): String {
         val s = e.subject
-        val text = when (e.kind) {
+        val u = e.updated
+        return when (e.kind) {
             BrainEvent.Kind.WOKE -> t("提醒到点：$s", "Reminder due: $s")
             BrainEvent.Kind.NOTIFIED -> t("一条通知值得处理，开始做", "A notification was worth acting on")
             BrainEvent.Kind.FRIEND_TASK -> t("另一台设备的 Andee 交来一件事", "Another Andee handed over a task")
-            BrainEvent.Kind.REVIEWED -> if (s == "0" || s.isEmpty()) t("复盘了一遍，没有要记的", "Reviewed the conversation; nothing to keep")
-                else t("复盘了一遍，记下 $s 处", "Reviewed the conversation; kept $s things")
+            BrainEvent.Kind.REVIEWED -> t("复盘了一遍，记下 $s 处", "Reviewed the conversation; kept $s things")
             BrainEvent.Kind.FOLDED -> t("收起了一个话题：$s", "Put away a topic: $s")
-            BrainEvent.Kind.DIARY -> t("写了今天的日记", "Wrote today's diary")
+            BrainEvent.Kind.DIARY -> if (u) t("改写了今天的日记", "Rewrote today's diary") else t("写了今天的日记", "Wrote today's diary")
             BrainEvent.Kind.SELF -> t("改写了自我描述", "Rewrote who it is")
             BrainEvent.Kind.WIKI -> t("写进维基：$s", "Wrote to the wiki: $s")
             BrainEvent.Kind.WIKI_READ -> t("翻出了维基：$s", "Opened a wiki article: $s")
@@ -41,16 +53,13 @@ object TimelineEvents {
                 "done" -> t("一件在意的事做完了", "A care is done")
                 else -> t("放下了一件在意的事", "Let a care go")
             }
-            BrainEvent.Kind.MEMORY -> t("记住了：$s", "Remembered: $s")
+            BrainEvent.Kind.MEMORY -> if (u) t("更新了记忆：$s", "Updated a memory: $s") else t("记住了：$s", "Remembered: $s")
             BrainEvent.Kind.TODO -> t("排了一件待办：$s", "Set a todo: $s")
-            BrainEvent.Kind.PLAN -> t("写了${if (s == "tomorrow") "明天" else "今天"}的打算", "Wrote ${if (s == "tomorrow") "tomorrow's" else "today's"} plan")
+            BrainEvent.Kind.PLAN -> {
+                val day = if (s == "tomorrow") t("明天", "tomorrow's") else t("今天", "today's")
+                if (u) t("改了${day}的打算", "Revised $day plan") else t("写了${day}的打算", "Wrote $day plan")
+            }
         }
-        val detail = when (e.kind) {
-            BrainEvent.Kind.CARE -> ""
-            BrainEvent.Kind.TODO -> e.detail.takeIf { it.isNotBlank() }?.let { t("时间：$it", "At: $it") }.orEmpty()
-            else -> e.detail
-        }
-        Scrollback.event(e.kind.name, text, detail, e.ref)
     }
 
     fun body(kind: Body, text: String, detail: String = "") = Scrollback.event(kind.name, text, detail)

@@ -22,14 +22,27 @@ object PhoneTimeline {
     private fun s(c: Context, id: Int, vararg a: Any) = AppLocale.str(c, id, *a)
 
     fun brain(c: Context, e: BrainEvent) {
+        val detail = when (e.kind) {
+            // A review is one row; what it wrote is the detail, one line each.
+            BrainEvent.Kind.REVIEWED -> e.items.joinToString("\n") { "- " + line(c, it) }
+            BrainEvent.Kind.CARE -> ""
+            BrainEvent.Kind.TODO -> e.detail.takeIf { it.isNotBlank() }?.let { s(c, R.string.tl_todo_at, it) }.orEmpty()
+            else -> e.detail
+        }
+        ChatHistory.addEvent(e.kind.name, line(c, e), detail, e.ref)
+    }
+
+    /** One event in words. An [BrainEvent.updated] write says so, so a rewrite does not read as something new. */
+    private fun line(c: Context, e: BrainEvent): String {
         val x = e.subject
-        val text = when (e.kind) {
+        val u = e.updated
+        return when (e.kind) {
             BrainEvent.Kind.WOKE -> s(c, R.string.tl_woke, x)
             BrainEvent.Kind.NOTIFIED -> s(c, R.string.tl_notified)
             BrainEvent.Kind.FRIEND_TASK -> s(c, R.string.tl_friend_task)
-            BrainEvent.Kind.REVIEWED -> if (x == "0" || x.isEmpty()) s(c, R.string.tl_reviewed_none) else s(c, R.string.tl_reviewed, x)
+            BrainEvent.Kind.REVIEWED -> s(c, R.string.tl_reviewed, x)
             BrainEvent.Kind.FOLDED -> s(c, R.string.tl_folded, x)
-            BrainEvent.Kind.DIARY -> s(c, R.string.tl_diary)
+            BrainEvent.Kind.DIARY -> s(c, if (u) R.string.tl_diary_updated else R.string.tl_diary)
             BrainEvent.Kind.SELF -> s(c, R.string.tl_self)
             BrainEvent.Kind.WIKI -> s(c, R.string.tl_wiki, x)
             BrainEvent.Kind.WIKI_READ -> s(c, R.string.tl_wiki_read, x)
@@ -40,16 +53,18 @@ object PhoneTimeline {
                 "done" -> s(c, R.string.tl_care_done)
                 else -> s(c, R.string.tl_care_drop)
             }
-            BrainEvent.Kind.MEMORY -> s(c, R.string.tl_memory, x)
+            BrainEvent.Kind.MEMORY -> s(c, if (u) R.string.tl_memory_updated else R.string.tl_memory, x)
             BrainEvent.Kind.TODO -> s(c, R.string.tl_todo, x)
-            BrainEvent.Kind.PLAN -> s(c, if (x == "tomorrow") R.string.tl_plan_tomorrow else R.string.tl_plan_today)
+            BrainEvent.Kind.PLAN -> s(
+                c,
+                when {
+                    x == "tomorrow" && u -> R.string.tl_plan_tomorrow_updated
+                    x == "tomorrow" -> R.string.tl_plan_tomorrow
+                    u -> R.string.tl_plan_today_updated
+                    else -> R.string.tl_plan_today
+                },
+            )
         }
-        val detail = when (e.kind) {
-            BrainEvent.Kind.CARE -> ""
-            BrainEvent.Kind.TODO -> e.detail.takeIf { it.isNotBlank() }?.let { s(c, R.string.tl_todo_at, it) }.orEmpty()
-            else -> e.detail
-        }
-        ChatHistory.addEvent(e.kind.name, text, detail, e.ref)
     }
 
     fun body(kind: Body, text: String, detail: String = "") = ChatHistory.addEvent(kind.name, text, detail)

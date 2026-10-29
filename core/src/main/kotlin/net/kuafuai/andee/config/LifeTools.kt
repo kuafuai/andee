@@ -48,9 +48,13 @@ class LifeTools(
     private fun selfNote(a: JSONObject): JSONObject = when (a.optString("action", "get")) {
         "get" -> self.narrative()?.let { JSONObject().put("text", it.text).put("version", it.version).put("by_user", it.byUser) }
             ?: JSONObject().put("text", "").put("note", "You have not written yourself down yet. Do it once you know what you are doing here.")
-        "write" -> self.setNarrative(a.optString("text"), byUser = false)
-            ?.let { JSONObject().put("written", false).put("reason", it) }
-            ?: JSONObject().put("written", true).put("version", self.narrative()!!.version)
+        "write" -> {
+            val before = self.narrative()?.text?.trim()
+            self.setNarrative(a.optString("text"), byUser = false)
+                ?.let { JSONObject().put("written", false).put("reason", it) }
+                ?: JSONObject().put("written", true).put("version", self.narrative()!!.version)
+                    .put("replaced", before != null).put("unchanged", before == a.optString("text").trim())
+        }
         else -> throw IllegalArgumentException("action is get or write")
     }
 
@@ -96,9 +100,12 @@ class LifeTools(
         "read" -> JSONObject().put("pages", JSONArray().apply {
             self.diary(a.optInt("limit", 3).coerceIn(1, 14)).forEach { put(JSONObject().put("date", it.date).put("text", it.text)) }
         })
-        "write" -> self.writeDiary(a.optString("text"), callIdsToday())
-            ?.let { JSONObject().put("written", false).put("reason", it) }
-            ?: JSONObject().put("written", true)
+        "write" -> {
+            val before = self.diary(1).firstOrNull()?.takeIf { it.date == self.today() }?.text?.trim()
+            self.writeDiary(a.optString("text"), callIdsToday())
+                ?.let { JSONObject().put("written", false).put("reason", it) }
+                ?: JSONObject().put("written", true).put("replaced", before != null).put("unchanged", before == a.optString("text").trim())
+        }
         else -> throw IllegalArgumentException("action is read or write")
     }
 

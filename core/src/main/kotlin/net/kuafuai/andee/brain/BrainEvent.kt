@@ -19,6 +19,10 @@ data class BrainEvent(
     val detail: String = "",
     /** What the row opens, when there is something to open: a wiki article's id. */
     val ref: String = "",
+    /** It rewrote something that was already there (a memory of the same name, today's diary, a day's plan). */
+    val updated: Boolean = false,
+    /** [Kind.REVIEWED] only: what the review wrote, one event each — the row's detail. */
+    val items: List<BrainEvent> = emptyList(),
 ) {
     enum class Kind {
         /** A todo came due and woke it. */
@@ -45,6 +49,13 @@ data class BrainEvent(
          */
         fun fromTool(method: String, args: JSONObject, result: Any?): BrainEvent? {
             val r = result as? JSONObject
+            // A rewrite that changed nothing is not an event: the timeline is for what happened.
+            if (r?.optBoolean("unchanged") == true) return null
+            val upd = r?.optBoolean("overwrote") == true || r?.optBoolean("replaced") == true
+            return fromToolInner(method, args, r)?.copy(updated = upd)
+        }
+
+        private fun fromToolInner(method: String, args: JSONObject, r: JSONObject?): BrainEvent? {
             fun ok(key: String) = r == null || !r.has(key) || r.optBoolean(key)
             val action = args.optString("action")
             return when (method) {

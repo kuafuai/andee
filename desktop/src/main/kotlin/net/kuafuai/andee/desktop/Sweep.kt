@@ -36,7 +36,14 @@ object Sweep {
     private val metaFile get() = AppDirs.file("sweep.json")
     private val lock = Any()
 
-    @Volatile private var lastAttemptAt = 0L
+    /**
+     * On disk, like the phone's `Notebook.lastSweepAt`: kept in memory only, it was forgotten by every restart, and the
+     * first tick after one reviewed a conversation that had already been reviewed — measured 10-29, the same stretch
+     * gone over twice, every write in it made again.
+     */
+    private var lastAttemptAt: Long
+        get() = runCatching { AppDirs.file("last_sweep_attempt").readText().trim().toLong() }.getOrDefault(0L)
+        set(v) { runCatching { AppDirs.file("last_sweep_attempt").writeText(v.toString()) } }
 
     fun enabled(): Boolean = Settings.get("sweep").lowercase() != "off"
     private fun quietMs(): Long =
