@@ -17,7 +17,7 @@ import net.kuafuai.andee.i18n.AppLocale
 object PhoneTimeline {
 
     /** Body-side event kinds, alongside [BrainEvent.Kind]'s names. */
-    enum class Body { THOUGHT, WORK, BUBBLE, BUBBLE_MUTED, IGNORED, MORNING, SCENE, VAULT }
+    enum class Body { THOUGHT, WORK, BUBBLE, BUBBLE_MUTED, IGNORED, MORNING, SCENE, VAULT, TOLD }
 
     private fun s(c: Context, id: Int, vararg a: Any) = AppLocale.str(c, id, *a)
 
@@ -38,6 +38,7 @@ object PhoneTimeline {
         val u = e.updated
         return when (e.kind) {
             BrainEvent.Kind.WOKE -> s(c, R.string.tl_woke, x)
+            BrainEvent.Kind.STOPPED -> if (x.isNotBlank()) s(c, R.string.tl_stopped, x) else s(c, R.string.tl_stopped_queue)
             BrainEvent.Kind.NOTIFIED -> s(c, R.string.tl_notified)
             BrainEvent.Kind.FRIEND_TASK -> s(c, R.string.tl_friend_task)
             BrainEvent.Kind.REVIEWED -> s(c, R.string.tl_reviewed, x)
@@ -78,6 +79,7 @@ object PhoneTimeline {
     )
     fun bubble(c: Context, text: String) = body(Body.BUBBLE, s(c, R.string.tl_bubble, text))
     fun ignored(c: Context, app: String, why: String) = body(Body.IGNORED, s(c, R.string.tl_ignored, app), why)
+    fun told(c: Context, app: String, line: String, original: String) = body(Body.TOLD, s(c, R.string.tl_told, app, line), original)
     fun held(c: Context, app: String, text: String) = body(Body.IGNORED, s(c, R.string.tl_held, app), text)
     fun capped(c: Context, app: String, text: String) = body(Body.IGNORED, s(c, R.string.tl_capped, app), text)
     fun morning(c: Context, intent: String) = body(Body.MORNING, s(c, R.string.tl_morning), intent)

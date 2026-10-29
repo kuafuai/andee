@@ -61,6 +61,8 @@ class DesktopBrainHost(
     }
 
     override fun notebookIndex(): String = DesktopNotebook.book.indexForPrompt()
+    override fun reviewRecord(): String = DesktopNotebook.book.recordForReview()
+    override fun todoStillActive(id: String): Boolean = DesktopNotebook.book.todoById(id)?.status == "active"
     override fun scenesIndex(): String = DesktopNotebook.book.scenesForPrompt()
     override fun scene(name: String): Scene? = DesktopNotebook.book.scene(name)
 

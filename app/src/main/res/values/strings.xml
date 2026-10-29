@@ -538,6 +538,9 @@
     <string name="tl_memory_updated">更新了记忆：%1$s</string>
     <string name="tl_plan_today_updated">改了今天的打算</string>
     <string name="tl_plan_tomorrow_updated">改了明天的打算</string>
+    <string name="tl_stopped">被你叫停了：%1$s</string>
+    <string name="tl_stopped_queue">被你叫停了，排着的事没做</string>
+    <string name="tl_told">%1$s 来消息：%2$s</string>
     <string name="tl_open">打开 ›</string>
     <string name="tl_show_all">全部</string>
     <string name="tl_show_talk">只看对话</string>

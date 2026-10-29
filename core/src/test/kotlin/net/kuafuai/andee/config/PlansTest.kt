@@ -173,7 +173,7 @@ class PlansTest {
         .put("slot", slot).put("kind", "ask").put("what", what).put("because", "规律喝水")
         .put("buttons", JSONArray(listOf("好", "不用"))).put("dismiss", "不用")
 
-    @Test fun museOnlyWithALooseTimeItemSpacedAndNotAtNight() {
+    @Test fun museOnlyWithALooseTimeItemAndSpaced() {
         write(item("10:00", "该喝水啦"))
         assertFalse(plans.museDue())          // only clock-time items: nothing to decide
         write(slotItem("午饭前", "要帮你点外卖吗？"))
@@ -184,7 +184,7 @@ class PlansTest {
         now += Plans.MUSE_GAP_MS
         assertTrue(plans.museDue())
         now = LocalDateTime.of(2026, 10, 27, 23, 0).atZone(zone).toInstant().toEpochMilli()
-        assertFalse(plans.museDue())          // quiet hours
+        assertTrue(plans.museDue())           // no hours of its own: the device is Andee's, at any time of day
     }
 
     @Test fun museCapPerDay() {

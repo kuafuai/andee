@@ -16,7 +16,7 @@ import net.kuafuai.andee.brain.BrainEvent
 object TimelineEvents {
 
     /** Body-side event kinds, alongside [BrainEvent.Kind]'s names. */
-    enum class Body { THOUGHT, WORK, BUBBLE, BUBBLE_MUTED, IGNORED, MEETING, VERSION, LOOK, VAULT, PAGE, MORNING, SHELL, SCENE }
+    enum class Body { THOUGHT, WORK, BUBBLE, BUBBLE_MUTED, IGNORED, MEETING, VERSION, LOOK, VAULT, PAGE, MORNING, SHELL, SCENE, TOLD }
 
     private val zh get() = Strings.lang() == "zh"
     private fun t(z: String, e: String) = if (zh) z else e
@@ -38,6 +38,7 @@ object TimelineEvents {
         val u = e.updated
         return when (e.kind) {
             BrainEvent.Kind.WOKE -> t("提醒到点：$s", "Reminder due: $s")
+            BrainEvent.Kind.STOPPED -> if (s.isNotBlank()) t("被你叫停了：$s", "You stopped it: $s") else t("被你叫停了，排着的事没做", "You stopped it; what was waiting was dropped")
             BrainEvent.Kind.NOTIFIED -> t("一条通知值得处理，开始做", "A notification was worth acting on")
             BrainEvent.Kind.FRIEND_TASK -> t("另一台设备的 Andee 交来一件事", "Another Andee handed over a task")
             BrainEvent.Kind.REVIEWED -> t("复盘了一遍，记下 $s 处", "Reviewed the conversation; kept $s things")
@@ -79,6 +80,7 @@ object TimelineEvents {
     )
     fun bubble(text: String) = body(Body.BUBBLE, t("冒了个气泡：$text", "Bubble: $text"))
     fun ignored(app: String, why: String) = body(Body.IGNORED, t("没打扰你：$app 的一条通知", "Let a notification from $app pass"), why)
+    fun told(app: String, line: String, original: String) = body(Body.TOLD, t("$app 来消息：$line", "$app: $line"), original)
     fun held(app: String, text: String) = body(Body.IGNORED, t("收到 $app 的通知，正在忙，先放着", "A notification from $app came in while busy; kept for later"), text)
     fun capped(app: String, text: String) = body(Body.IGNORED, t("收到 $app 的通知，这个小时看得太多了，先放着", "A notification from $app came in past the hourly limit; kept for later"), text)
     fun undecided(app: String, text: String) = body(Body.IGNORED, t("收到 $app 的通知，没拿定主意，没处理", "A notification from $app came in; could not decide, left it"), text)
@@ -87,6 +89,8 @@ object TimelineEvents {
 
     /** The row's mark, from the app's own icon set (an emoji would take whatever font the Mac has). */
     fun mark(kind: String): AndeeIcon = when (kind) {
+        BrainEvent.Kind.STOPPED.name -> AndeeIcon.STOP
+        Body.TOLD.name -> AndeeIcon.CHAT
         BrainEvent.Kind.WOKE.name, BrainEvent.Kind.NOTIFIED.name, Body.IGNORED.name -> AndeeIcon.ALERT_CIRCLE
         BrainEvent.Kind.FRIEND_TASK.name -> AndeeIcon.FRIENDS
         BrainEvent.Kind.REVIEWED.name, BrainEvent.Kind.FOLDED.name -> AndeeIcon.CHECK_CIRCLE

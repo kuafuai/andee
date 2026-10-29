@@ -168,6 +168,9 @@ object CardUi {
      */
     fun isCardUp(): Boolean = current?.let { !it.finished && !it.bubble } == true
 
+    /** A bubble (not a card) is up. Snapshot. */
+    fun isBubbleUp(): Boolean = current?.let { !it.finished && it.bubble } == true
+
     fun dismissCurrent() {
         main.post { current?.close("superseded") }
     }

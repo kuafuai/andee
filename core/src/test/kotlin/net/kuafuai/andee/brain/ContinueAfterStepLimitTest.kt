@@ -57,7 +57,7 @@ class ContinueAfterStepLimitTest {
             "locale" -> Locale.ENGLISH
             "maxSteps" -> steps
             "persona", "platformPrompt", "notebookIndex", "scenesIndex", "pagesIndex", "topicsIndex",
-            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "wikiIndex" -> ""
+            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "wikiIndex", "reviewRecord" -> ""
             "scrollback" -> emptyList<ScrollRow>()
             "toolLists" -> listOf(
                 JSONArray().put(
@@ -67,6 +67,7 @@ class ContinueAfterStepLimitTest {
             )
             "methodOf" -> "screen.tap"
             "dispatch" -> JSONObject().put("ok", true)
+            "todoStillActive" -> true
             "traceDir" -> trace
             else -> null
         }

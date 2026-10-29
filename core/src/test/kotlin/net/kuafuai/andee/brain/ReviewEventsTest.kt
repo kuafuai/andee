@@ -56,13 +56,14 @@ class ReviewEventsTest {
             "locale" -> Locale.ENGLISH
             "maxSteps" -> 10
             "persona", "platformPrompt", "notebookIndex", "scenesIndex", "pagesIndex", "topicsIndex",
-            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "wikiIndex" -> ""
+            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "wikiIndex", "reviewRecord" -> ""
             "scrollback" -> rows
             "toolLists" -> listOf(JSONArray().put(JSONObject().put("name", "remember").put("method", "note.remember").put("description", "r")
                 .put("parameters", JSONObject().put("type", "object").put("properties", JSONObject()))))
             "methodOf" -> "note.remember"
             "dispatch" -> JSONObject().put("saved", true).put("overwrote", false)
             "event" -> { synchronized(events) { events += args[0] as BrainEvent }; null }
+            "todoStillActive" -> true
             "traceDir" -> trace
             else -> null
         }

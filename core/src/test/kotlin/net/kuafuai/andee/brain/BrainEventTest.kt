@@ -21,8 +21,6 @@ class BrainEventTest {
         assertNull(BrainEvent.fromTool("note.wiki_read", JSONObject().put("id", "w9"), JSONObject().put("read", false)))
         val shown = BrainEvent.fromTool("ui.show_wiki", JSONObject().put("id", "w1"), JSONObject().put("shown", true).put("title", "运营规划"))!!
         assertEquals(Triple(BrainEvent.Kind.WIKI_SHOWN, "运营规划", "w1"), Triple(shown.kind, shown.subject, shown.ref))
-        // Showing is never something a quiet turn may do.
-        assertEquals(false, SelfWork.allowed("ui.show_wiki"))
     }
 
     @Test fun aWakeLineGivesBackTheTodo() {

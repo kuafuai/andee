@@ -1730,6 +1730,10 @@ object ToolSchemas {
         One sentence, written for future you to read: what to **do** or **say** at that time.
         "Remind him to take his medicine" is too vague; "tell him it's time for his medicine, and ask how he slept last night" is something that can be executed.
 
+        **One todo is one thing.** Two unrelated things are two todos, even at the same time — "1) ask about the comment
+        2) check the app" in one todo cannot be closed half-done, and the half that was not done is lost. A todo whose
+        `what` numbers several items is refused.
+
         ## When it triggers (at and cron — one or the other; not both, not neither)
 
         - `at`: one-off. Local time `YYYY-MM-DD HH:mm`. **Absolute times only** — for "in ten minutes", work the time out yourself and fill in the result.

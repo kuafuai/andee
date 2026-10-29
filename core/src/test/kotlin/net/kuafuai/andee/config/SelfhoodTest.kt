@@ -54,12 +54,14 @@ class SelfhoodTest {
         assertTrue(me.overdue(me.care(id)!!) > 1.4)
     }
 
-    @Test fun actingResetsLookingOnlyHalfwayNothingNotAtAll() {
+    @Test fun actingResetsLookingAndNothingOnlyHalfway() {
         val id = add("place", "社区", 12.0)
         now += 24 * h
+        // Nothing came of it: counted, and pushed back half an interval so it cannot take every work turn in a row.
         me.settle(id, Selfhood.Effect.NOTHING, null)
-        assertEquals(2.0, me.overdue(me.care(id)!!), 0.01)
+        assertEquals(0.5, me.overdue(me.care(id)!!), 0.01)
         assertEquals(1, me.care(id)!!.idleRuns)
+        now += 18 * h
         me.settle(id, Selfhood.Effect.LOOKED, "看了一眼")
         assertEquals(0.5, me.overdue(me.care(id)!!), 0.01)         // moved half an interval back, not to zero
         now += 12 * h

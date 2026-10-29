@@ -23,6 +23,10 @@ object WakeText {
             "give-up time → say what you saw. Do not wait on the screen for it."
     }
 
+    /** The todo id a [due] line carries, or null when it is not a todo's line. */
+    fun todoId(line: String): String? =
+        Regex("""^\(time's up[^)]*id=([^)\s]+)\)""").find(line.trimStart())?.groupValues?.get(1)
+
     /** The todo's own words back out of a [due] line, for the timeline; the line itself when it is not one. */
     fun what(line: String): String {
         val first = line.lineSequence().firstOrNull().orEmpty()

@@ -57,15 +57,20 @@ class HeartbeatTest {
         assertNull(beat.beat("zh"))
     }
 
-    @Test fun theNightAndThePaceStopItBeforeTheCall() {
+    @Test fun thePaceAndTheWorkGapStopItBeforeTheCallButTheNightDoesNot() {
         val id = care()
         now += 24 * h
         answer = """{"verdict":"work","care_id":"$id","why":"x"}"""
         beat.beat("zh")
         now += 5 * 60_000L               // five minutes later: too soon
         assertEquals("pace", beat.gate())
-        now = java.time.LocalDateTime.of(2027, 1, 16, 23, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
-        assertEquals("night", beat.gate())
+        drive.recordWork(id, "社区", "acted", "", emptyList())
+        now += Heartbeat.INTERVAL_MS
+        assertEquals("work gap", beat.gate())   // an hour between work turns
+        now += Heartbeat.WORK_GAP_MS
+        self.settle(id, Selfhood.Effect.LOOKED, null); now += 24 * h
+        now = java.time.LocalDateTime.of(2027, 1, 18, 3, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
+        assertNull(beat.gate())          // three in the morning: no hours of its own
     }
 
     @Test fun theWorkBudgetHoldsWhateverTheModelSays() {
@@ -74,7 +79,8 @@ class HeartbeatTest {
         answer = """{"verdict":"work","care_id":"$id","why":"x"}"""
         repeat(Heartbeat.MAX_WORKS) { drive.markWork() }
         assertNull(beat.beat("zh"))
-        assertEquals(1, calls)
+        assertEquals(0, calls)           // spent: not even the call, which could only answer sleep
+        assertEquals("work budget", beat.gate())
     }
 
     @Test fun aNoteIsKeptAsAThoughtAndAnUnreadableAnswerIsSleep() {

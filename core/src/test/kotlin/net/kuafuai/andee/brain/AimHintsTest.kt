@@ -62,7 +62,7 @@ class AimHintsTest {
             "locale" -> Locale.ENGLISH
             "maxSteps" -> 10
             "persona", "platformPrompt", "notebookIndex", "scenesIndex", "pagesIndex", "topicsIndex",
-            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "wikiIndex" -> ""
+            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "wikiIndex", "reviewRecord" -> ""
             "scrollback" -> emptyList<ScrollRow>()
             "toolLists" -> listOf(JSONArray().put(tool("tap_by_coordinates", "screen.tap")).apply {
                 if (withLocator) put(tool("tap_target", "screen.tap_target"))
@@ -73,6 +73,7 @@ class AimHintsTest {
                 if (taps == 3) throw IllegalStateException(AimHints.REPEAT_REFUSED + " (the fourth tap). Not executed.")
                 JSONObject().put("screen_changed", false)
             }
+            "todoStillActive" -> true
             "traceDir" -> trace
             else -> null
         }

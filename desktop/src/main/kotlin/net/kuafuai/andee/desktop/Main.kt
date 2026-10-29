@@ -232,7 +232,8 @@ fun tapToTalk(onNoVoice: () -> Unit) {
     when {
         Meeting.isActive() -> Meeting.stopFromUser()
         else -> {
-            if (Assistant.working()) Assistant.stop()
+            // Always: "working" misses what is queued or waiting to start, and that is what carried on after a tap.
+            Assistant.stop()
             if (!net.kuafuai.andee.desktop.voice.MacVoice.toggle()) onNoVoice()
         }
     }
@@ -241,7 +242,7 @@ fun tapToTalk(onNoVoice: () -> Unit) {
 fun ballActions(onType: () -> Unit, onNoVoice: () -> Unit) = BallActions(
     onTap = { tapToTalk(onNoVoice) },
     // Typing is a new request too: whatever was running or being read out stops first, as the tap does.
-    onDoubleTap = { if (Assistant.working()) Assistant.stop(); onType() },
+    onDoubleTap = { Assistant.stop(); onType() },
     onTripleTap = { if (Meeting.isActive()) Meeting.stopFromUser() else Assistant.stop() },
     onLongPress = {},
 )

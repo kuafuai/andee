@@ -1454,6 +1454,7 @@ class CommandDispatcher(
                 val what = requireNotNull(params?.optString("what")?.trim()?.ifEmpty { null }) {
                     "note.todo requires what"
                 }
+                net.kuafuai.andee.config.NotebookBook.bundledTodo(what)?.let { throw IllegalArgumentException(it) }
                 val atRaw = params?.optString("at")?.trim().orEmpty()
                 val cronRaw = params?.optString("cron")?.trim().orEmpty()
                 require(atRaw.isNotEmpty() != cronRaw.isNotEmpty()) {

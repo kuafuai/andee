@@ -88,6 +88,16 @@ interface BrainHost {
      */
     fun planIndex(): String = ""
 
+    /**
+     * Is the todo [id] still meant to run? Asked when its turn is about to start — after any wait for the user to be
+     * quiet and any queue behind another turn — so a todo paused, done or dropped in the meantime does not run.
+     * Default true: a host without todos has nothing to say.
+     */
+    fun todoStillActive(id: String): Boolean = true
+
+    /** Every memory and pending todo, for a review to check before it writes ([NotebookBook.recordForReview]). */
+    fun reviewRecord(): String = ""
+
     /** One line of who I am and what is pulling at me (`Selfhood`). Empty for a host without it. */
     fun selfIndex(): String = ""
 
@@ -95,11 +105,10 @@ interface BrainHost {
     fun wikiIndex(): String = ""
 
     /**
-     * The tools a [LocalBrain.TurnKind.WORK] turn may use in [territory] — a smaller set than [toolLists]. The
-     * default is [SelfWork]'s: no screen, no device, nothing outward; the loop enforces the same line, so a host
-     * that widens this list still cannot hand a work turn the screen.
+     * The tools a [LocalBrain.TurnKind.WORK] turn may use in [territory]. The default is everything: a turn Andee
+     * starts itself has what a turn the user asked for has (see [SelfWork]).
      */
-    fun workTools(territory: String?): List<JSONArray> = SelfWork.tools(toolLists())
+    fun workTools(territory: String?): List<JSONArray> = toolLists()
 
     /**
      * One line naming the other Andees this one can ask (see `PeerTasks`), empty when it has none. Without it the

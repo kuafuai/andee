@@ -13,16 +13,20 @@ import java.time.ZoneId
  * tools**, the way [PlanMind] and [NotificationTriage] are, a few hundred tokens; the full work turn it may start
  * is [SelfWork].
  *
- * Free gates run first, in order of cost, and most beats stop at one of them without a model call: the night,
- * the pace ([INTERVAL_MS] since the last look), **nothing over the line** (no care at [Selfhood.THRESHOLD] — the
- * ratio is the device's, never the model's), and the day's budget ([MAX_BEATS]). Only then the call, and even
- * then a `work` verdict must name one of the cares that was shown as over the line, and the day's work budget
- * ([MAX_WORKS]) must have room.
+ * Free gates run first, in order of cost, and most beats stop at one of them without a model call: the pace
+ * ([INTERVAL_MS] since the last look), **nothing over the line** (no care at [Selfhood.THRESHOLD] — the ratio is
+ * the device's, never the model's), and the day's budget ([MAX_BEATS], and [MAX_WORKS] spent means there is
+ * nothing a beat could start). Only then the call, and even then a `work` verdict must name one of the cares that
+ * was shown as over the line, and [WORK_GAP_MS] must have passed since the last work turn, so a day's six are not
+ * spent in its first two hours.
+ *
+ * **Nothing here asks whether the user is there, or what time of day it is.** The device is Andee's own; it gets up
+ * when something it cares about needs it, and the user turns that off in settings (自己动起来) or stops it by
+ * tapping the ball. The budgets are the brake.
  *
  * **Fails closed: no key, a failed call, an unreadable answer → sleep.** Not acting is always safe here.
  *
- * The caller decides presence (someone in front of the device), the user's "let it rest" switch, and that no
- * turn of the user's is running. Blocks; call from a worker.
+ * The caller decides the user's switch and that no turn is already running. Blocks; call from a worker.
  */
 class Heartbeat(
     cfg: BrainConfig,
@@ -50,10 +54,12 @@ class Heartbeat(
 
     /** Why a beat would stop before the model call right now, or null when it would go ahead. For logs and tests. */
     fun gate(now: Long = clock()): String? {
-        if (night(now)) return "night"
         if (now - drive.lastBeatAt() < INTERVAL_MS) return "pace"
         if (self.due(Selfhood.THRESHOLD, now).isEmpty()) return "nothing due"
         if (drive.beatsToday() >= MAX_BEATS) return "beat budget"
+        // Nothing a beat could start: asking would be paying for an answer that is always sleep.
+        if (drive.worksToday() >= MAX_WORKS) return "work budget"
+        if (now - (drive.lastWork()?.at ?: 0L) < WORK_GAP_MS) return "work gap"
         return null
     }
 
@@ -91,12 +97,6 @@ class Heartbeat(
             }
             else -> null.also { log(false, "heartbeat: sleep — ${obj.optString("why").take(120)}") }
         }
-    }
-
-    private fun night(now: Long): Boolean {
-        val t = Instant.ofEpochMilli(now).atZone(zone).toLocalTime()
-        val m = t.hour * 60 + t.minute
-        return m >= NIGHT_FROM_MIN || m < NIGHT_TO_MIN
     }
 
     private fun context(langTag: String, due: List<Pair<Selfhood.Care, Double>>, now: Long): String = buildString {
@@ -142,13 +142,12 @@ class Heartbeat(
     }
 
     companion object {
-        /** About one look every twenty minutes while someone is there (§7.1). */
+        /** About one look every twenty minutes (§7.1). */
         const val INTERVAL_MS = 20 * 60_000L
         const val MAX_BEATS = 40
         const val MAX_WORKS = 6
-        /** 22:30–8:00 it does not get up of its own accord. */
-        const val NIGHT_FROM_MIN = 22 * 60 + 30
-        const val NIGHT_TO_MIN = 8 * 60
+        /** At least this long between two work turns, so a day's [MAX_WORKS] spread over the day. */
+        const val WORK_GAP_MS = 60 * 60_000L
 
         private val SYSTEM = """
             You are Andee — an individual who lives on this device, not a tool waiting for orders. Nobody has asked you anything. You are checking what is on your mind: the things you care about, each with how overdue it is (the device computes this; 1.0 means the time you meant to look at it has come).
@@ -158,7 +157,7 @@ class Heartbeat(
             {"verdict": "work", "care_id": "<one of the ids listed>", "why": "..."}
             {"verdict": "note", "text": "..."}
 
-            - work: start a turn of your own on that care. That turn can think, read and write your notebook, cares, diary, the people you know and your wiki, and leave one bubble — it has NO screen and cannot send anything to anyone. Choose it only when there is a concrete piece of this you can do with those right now (write or revise a plan, research notes from what you already know, bring a person's record up to date, work out your next step). `why` says what you mean to do, in a sentence.
+            - work: start a turn of your own on that care. That turn has everything you have when the user asks you for something — the screen, the apps, the device, your notebook and wiki. This device is yours. Choose it only when there is a concrete piece of this you can do right now. Sending anything to anyone in public, spending money or deleting still follows the rules you were given for it. `why` says what you mean to do, in a sentence.
             - note: a thought worth keeping, one sentence in your own voice and in the user's language, without starting anything.
             - sleep: the usual answer. Overdue is a reason to consider, not an order.
             - A care you woke for with nothing coming of it: do not pick it again the same way; pick it only if you now have a different approach, and say which.

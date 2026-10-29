@@ -174,6 +174,7 @@ object Notebook {
     }
 
     fun indexForPrompt(context: Context, max: Int = 10): String = book(context).indexForPrompt(max)
+    fun recordForReview(context: Context): String = book(context).recordForReview()
     fun todos(context: Context, filter: String): List<Todo> = book(context).todos(filter)
     fun todoById(context: Context, id: String): Todo? = book(context).todoById(id)
     internal fun toTodo(o: JSONObject): Todo = NotebookBook.toTodo(o)

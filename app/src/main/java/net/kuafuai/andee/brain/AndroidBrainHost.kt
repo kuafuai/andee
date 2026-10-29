@@ -59,6 +59,8 @@ class AndroidBrainHost(
     override fun touchActivity() = Notebook.touchActivity(ctx)
 
     override fun notebookIndex(): String = Notebook.indexForPrompt(ctx)
+    override fun reviewRecord(): String = Notebook.recordForReview(ctx)
+    override fun todoStillActive(id: String): Boolean = Notebook.todoById(ctx, id)?.status == "active"
 
     override fun scenesIndex(): String = Notebook.scenesForPrompt(ctx)
 

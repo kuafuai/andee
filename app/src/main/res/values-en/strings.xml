@@ -514,6 +514,9 @@
     <string name="tl_memory_updated">Updated a memory: %1$s</string>
     <string name="tl_plan_today_updated">Revised today\'s plan</string>
     <string name="tl_plan_tomorrow_updated">Revised tomorrow\'s plan</string>
+    <string name="tl_stopped">You stopped it: %1$s</string>
+    <string name="tl_stopped_queue">You stopped it; what was waiting was dropped</string>
+    <string name="tl_told">%1$s: %2$s</string>
     <string name="tl_open">Open ›</string>
     <string name="tl_show_all">Everything</string>
     <string name="tl_show_talk">Talk only</string>

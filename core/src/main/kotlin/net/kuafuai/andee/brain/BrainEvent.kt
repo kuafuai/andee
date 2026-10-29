@@ -40,6 +40,8 @@ data class BrainEvent(
         WIKI_READ,
         /** It opened a wiki article for the user to read. [ref] opens it again. */
         WIKI_SHOWN,
+        /** The user stopped it (a tap on the ball). [subject] is what was cut off; [detail] what was waiting and dropped. */
+        STOPPED,
     }
 
     companion object {

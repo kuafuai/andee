@@ -96,13 +96,6 @@ class NudgeBookTest {
         assertEquals(NudgeBook.Level.OFF, NudgeBook.Level.of("chatty"))
     }
 
-    @Test fun quietHours() {
-        assertTrue(NudgeBook.isQuiet(23 * 60))
-        assertTrue(NudgeBook.isQuiet(7 * 60 + 59))
-        assertFalse(NudgeBook.isQuiet(8 * 60))
-        assertFalse(NudgeBook.isQuiet(22 * 60 + 29))
-    }
-
     @Test fun answerTextNamesTheButton() {
         val n = nudge("meal", "好", "不用", dismiss = "不用")
         assertTrue(NudgeBook.answerText(n, "好").contains("tapped \"好\""))

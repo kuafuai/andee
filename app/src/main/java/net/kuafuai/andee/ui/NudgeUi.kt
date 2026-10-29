@@ -81,6 +81,19 @@ object NudgeUi {
 
     private val retry = Runnable { pump() }
 
+    /**
+     * The user tapped the ball to stop everything: the bubble on screen goes, and the one waiting for its moment is
+     * dropped. Both are recorded as dismissed, as if the user had waved them away.
+     */
+    fun dismissAll() {
+        main.post {
+            main.removeCallbacks(retry)
+            held?.let { onOutcome(it.n, "dismissed", null) }
+            held = null
+            if (showing?.let { CardUi.isBubbleUp() } == true) CardUi.dismissCurrent()
+        }
+    }
+
     private fun pump() {
         main.removeCallbacks(retry)
         val slot = held ?: return
@@ -111,7 +124,7 @@ object NudgeUi {
                     finish(slot, r)
                     // A refused or displaced bubble waits a beat: the gate said SHOW a moment ago, so pumping
                     // straight away would just spin against whatever is in the slot.
-                    if (r.how == "busy" || r.how == "superseded") {
+                    if (r.how == "busy" || (r.how == "superseded" && held != null)) {
                         main.postDelayed(retry, RETRY_MS)
                     } else {
                         pump()

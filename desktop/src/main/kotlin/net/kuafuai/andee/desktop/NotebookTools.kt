@@ -275,6 +275,7 @@ class NotebookTools(private val onSceneChanged: (String?) -> Unit) {
 
     private fun todo(p: JSONObject, untrusted: Boolean): JSONObject {
         val what = req(p, "what", "note.todo")
+        NotebookBook.bundledTodo(what)?.let { throw IllegalArgumentException(it) }
         val atRaw = p.optString("at").trim()
         val cronRaw = p.optString("cron").trim()
         require(atRaw.isNotEmpty() != cronRaw.isNotEmpty()) {

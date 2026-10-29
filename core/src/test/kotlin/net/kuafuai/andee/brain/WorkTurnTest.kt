@@ -17,8 +17,8 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 /**
- * A turn Andee starts itself: it is handed only the work tools, a tool it names anyway is refused by the loop
- * (not by the list), nothing is spoken, and the device gets back every call it made.
+ * A turn Andee starts itself: it is handed the same tools as any turn (the device is its own), nothing is spoken,
+ * and the device gets back every call it made.
  */
 class WorkTurnTest {
     private val requests = mutableListOf<JSONObject>()
@@ -54,13 +54,14 @@ class WorkTurnTest {
             "locale" -> Locale.ENGLISH
             "maxSteps" -> 10
             "persona", "platformPrompt", "notebookIndex", "scenesIndex", "pagesIndex", "topicsIndex",
-            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "wikiIndex" -> ""
+            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "wikiIndex", "reviewRecord" -> ""
             "scrollback" -> emptyList<ScrollRow>()
             "toolLists" -> listOf(JSONArray().put(tool("tap", "screen.tap")).put(tool("remember", "note.remember")))
             // A proxy intercepts default methods too, so answer this one the way the default would.
-            "workTools" -> SelfWork.tools((proxy as BrainHost).toolLists())
+            "workTools" -> (proxy as BrainHost).toolLists()
             "methodOf" -> mapOf("tap" to "screen.tap", "remember" to "note.remember")[args[0] as String]
             "dispatch" -> { synchronized(dispatched) { dispatched += args[0] as String }; JSONObject().put("ok", true) }
+            "todoStillActive" -> true
             "traceDir" -> trace
             else -> null
         }
@@ -76,20 +77,16 @@ class WorkTurnTest {
         server.stop(0)
     }
 
-    @Test fun aWorkTurnHoldsOnlyItsToolsAndSaysNothing() {
+    @Test fun aWorkTurnHasEveryToolAndSaysNothing() {
         val done = LinkedBlockingQueue<LocalBrain.WorkResult>()
         brain.work("[You woke yourself: 社区]", "place") { done += it }
         val r = done.poll(20, TimeUnit.SECONDS) ?: throw AssertionError("no result")
 
         val offered = requests.first().getJSONArray("tools").let { a -> (0 until a.length()).map { a.getJSONObject(it).getJSONObject("function").getString("name") } }
-        assertEquals(listOf("remember"), offered)
-        assertEquals(listOf("note.remember"), dispatched)
-        assertEquals(listOf("note.remember"), r.calls.map { it.method })
-        assertTrue(r.calls.single().effective)
+        assertEquals(listOf("tap", "remember"), offered)
+        assertEquals(listOf("screen.tap", "note.remember"), dispatched)
+        assertEquals(listOf("screen.tap", "note.remember"), r.calls.map { it.method })
         assertEquals("写下了下一步", r.summary)
         assertTrue("a work turn spoke: $spoken", spoken.isEmpty())
-        // The refusal went back to the model as the tool's answer.
-        val toolMsgs = requests[1].getJSONArray("messages").let { a -> (0 until a.length()).map { a.getJSONObject(it) } }.filter { it.optString("role") == "tool" }
-        assertFalse(toolMsgs.first { it.optString("tool_call_id") == "c1" }.optString("content").contains("ok"))
     }
 }

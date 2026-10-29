@@ -370,6 +370,11 @@ class Plans(
         for (t in have) {
             val spec = runCatching { JSONObject(t.nudge) }.getOrNull()
             val ref = spec?.optString("plan_ref").orEmpty()
+            // Paused by the user or the model: left alone, and not recreated as an active one under it.
+            if (t.status == "paused") {
+                haveRefs += ref
+                continue
+            }
             val w = want[ref]
             if (w != null && t.at == at[ref] && spec.toString() == w.toString()) {
                 haveRefs += ref
@@ -461,7 +466,6 @@ class Plans(
      * a day. Everything else in the plan has a clock time and needs no thought to come due.
      */
     fun museDue(): Boolean = synchronized(lock) {
-        if (NudgeBook.isQuiet(minuteOfDay())) return false
         val root = load()
         val m = meta(root)
         if (clock() - m.optLong("muse_at") < MUSE_GAP_MS) return false

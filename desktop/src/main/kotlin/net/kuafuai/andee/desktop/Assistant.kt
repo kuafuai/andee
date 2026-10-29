@@ -496,10 +496,15 @@ object Assistant {
      */
     private fun interruptForNewRequest() = stop()
 
-    /** The user's stop: the turn ends, and every command it started ends with it. */
+    /**
+     * The user's stop: everything ends — the turn, every turn queued behind it and every wake still waiting to
+     * start (`LocalBrain.stopAll`, which also puts what was cut off in the timeline), every command it started,
+     * the voice, and the bubble.
+     */
     fun stop() {
         cancelPending()
-        brain?.cancel()
+        brain?.stopAll()
+        Nudges.dismiss()
         guest?.cancel()
         shell.stopAll()
         net.kuafuai.andee.desktop.voice.MacVoice.stopSpeaking()
@@ -515,7 +520,9 @@ object Assistant {
         override fun tell(n: JSONObject, line: String) {
             // No turn and no task light: the sentence is already written, nothing is being driven.
             val clean = net.kuafuai.andee.brain.SpeechMood.parse(line).text.trim()
-            Scrollback.add(Scrollback.Role.ASSISTANT, clean)
+            // An event, not a line of conversation: a lone Andee bubble among the timeline's event rows read as it
+            // talking to nobody. The row names the app; the original message is the detail.
+            TimelineEvents.told(n.optString("app").ifEmpty { "?" }, clean, n.optString("latest").ifEmpty { n.optString("text") })
             onFinal(clean)
             if (!muted) net.kuafuai.andee.desktop.voice.MacVoice.speak(line)
         }
@@ -561,11 +568,15 @@ object Assistant {
         wakeBrain(todo)
     }
 
-    private fun wakeBrain(todo: net.kuafuai.andee.config.Todo) = whenQuiet("wake-${todo.id}") {
-        // busy() is the window's "working" light: only turn it on when a turn really starts, not when
-        // the wake-up is merely parked behind another one.
-        if (brain?.isBusy() != true) busy(true)
-        ensure().wake(dueText(todo), untrusted = todo.untrusted)
+    private fun wakeBrain(todo: net.kuafuai.andee.config.Todo) {
+        // Taken before the wait: a tap on the ball while it waits means this one must not start (LocalBrain.wake).
+        val epoch = ensure().stopEpochNow()
+        whenQuiet("wake-${todo.id}") {
+            // busy() is the window's "working" light: only turn it on when a turn really starts, not when
+            // the wake-up is merely parked behind another one.
+            if (epoch == ensure().stopEpochNow() && brain?.isBusy() != true) busy(true)
+            ensure().wake(dueText(todo), untrusted = todo.untrusted, epoch = epoch)
+        }
     }
 
     /**

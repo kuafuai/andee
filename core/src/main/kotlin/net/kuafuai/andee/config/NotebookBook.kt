@@ -453,6 +453,30 @@ class NotebookBook(private val store: NotebookStore) {
         return top.joinToString("\n") { "- ${it.name}：${it.description}" }
     }
 
+    /**
+     * Everything already written down, for a review to compare against: every memory (name and description) and
+     * every pending todo (id, when, what). A review that could not see these wrote near-duplicates of both — an
+     * ordinary turn's index carries only the top ten memories and no todos at all.
+     */
+    fun recordForReview(now: Long = System.currentTimeMillis()): String = buildString {
+        val mem = memories().filter { !it.expired(now) }.sortedBy { it.type }
+        if (mem.isNotEmpty()) {
+            append("Memories (").append(mem.size).append("):\n")
+            mem.forEach { append("- [").append(it.type).append("] ").append(it.name).append("：").append(it.description.take(100)).append('\n') }
+        }
+        val td = todos("pending")
+        if (td.isNotEmpty()) {
+            if (isNotEmpty()) append('\n')
+            append("Pending todos (").append(td.size).append("):\n")
+            val fmt = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US)
+            td.forEach { t ->
+                append("- ").append(t.id).append(" · ").append(if (t.mode == "cron") t.cronExpr else fmt.format(java.util.Date(t.nextRunAt.takeIf { it > 0 } ?: t.at)))
+                if (t.status == "paused") append(" · paused")
+                append(" · ").append(t.what.take(120)).append('\n')
+            }
+        }
+    }.trimEnd()
+
     // ------------------------------------------------------------------
     // todos
     // ------------------------------------------------------------------
@@ -631,6 +655,16 @@ class NotebookBook(private val store: NotebookStore) {
         }
 
     companion object {
+        /**
+         * A todo's `what` that numbers several items ("1) … 2) …", "①…②…"): refused with the reason, because one todo
+         * cannot be half done — the part that was not is lost when it is closed. Null when it is one thing.
+         */
+        fun bundledTodo(what: String): String? {
+            val marks = Regex("""(?:^|[\s；;。，,:：])(?:\(?\d{1,2}[).、．.]|[①②③④⑤⑥⑦⑧⑨])""").findAll(what).count()
+            return if (marks >= 2) "This todo lists several separate things. Set one todo per thing — each comes due, " +
+                "is done and closed on its own." else null
+        }
+
         fun importanceFor(type: String): Double = when (type) {
             "failure" -> 0.9
             "user" -> 0.7

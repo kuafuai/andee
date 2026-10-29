@@ -131,12 +131,6 @@ class NudgeBook(private val clock: () -> Long = System::currentTimeMillis) {
         const val DAY_MS = 24 * HOUR_MS
         const val KIND_COOLDOWN_MS = 45 * 60_000L
 
-        /** 22:30–08:00. A bubble arriving inside it waits for morning, or expires first. */
-        const val QUIET_FROM_MIN = 22 * 60 + 30
-        const val QUIET_UNTIL_MIN = 8 * 60
-
-        fun isQuiet(minuteOfDay: Int): Boolean = minuteOfDay >= QUIET_FROM_MIN || minuteOfDay < QUIET_UNTIL_MIN
-
         /**
          * What the brain is told when the user answers a bubble. English and bracketed: it is the device
          * talking, and `LocalPrompt` §9 tells the model not to take a language from it.

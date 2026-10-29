@@ -258,7 +258,9 @@ class Selfhood(
         list[i] = when (effect) {
             Effect.ACTED -> c.copy(lastTouched = now, idleRuns = 0, pinnedAt = 0L, note = note?.trim()?.take(MAX_NOTE) ?: c.note)
             Effect.LOOKED -> c.copy(lastTouched = maxOf(c.lastTouched, now - c.intervalMs / 2), idleRuns = c.idleRuns, note = note?.trim()?.take(MAX_NOTE) ?: c.note)
-            Effect.NOTHING -> c.copy(idleRuns = c.idleRuns + 1)
+            // Nothing came of it: count it, and push it back half an interval as a look would, so the same care
+            // cannot take every work turn of the day in a row.
+            Effect.NOTHING -> c.copy(idleRuns = c.idleRuns + 1, lastTouched = maxOf(c.lastTouched, now - c.intervalMs / 2))
         }
         putCares(root, list); save(root)
         list[i]

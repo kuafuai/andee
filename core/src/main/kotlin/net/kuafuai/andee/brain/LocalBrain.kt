@@ -340,11 +340,15 @@ class LocalBrain(
      * one again, or a stranger's message could get past the vault guard simply
      * by asking for it to be done later.
      */
-    fun wake(text: String, untrusted: Boolean = false) {
+    fun wake(text: String, untrusted: Boolean = false, epoch: Int = stopEpoch.get()) {
         val t = text.trim()
         if (t.isEmpty()) return
         val kind = if (untrusted) TurnKind.NOTIFY else TurnKind.WAKE
         loop.execute {
+            // The user tapped the ball after this was taken and before it got here — while it waited to be quiet,
+            // or behind the turn on this very thread: it was stopped while waiting.
+            if (stoppedSince(epoch, t, kind)) return@execute
+            if (todoWithdrawn(t)) return@execute
             if (busy.get()) {
                 // The same alarm twice (a check that came due while its predecessor was still waiting its
                 // turn) is one check. Two copies would each do the full look, and the second would find
@@ -376,7 +380,9 @@ class LocalBrain(
         val t = text.trim()
         if (t.isEmpty()) return
         if (cfg.apiKey.isEmpty()) return // nothing triaged it either; see NotificationTriage
+        val epoch = stopEpoch.get()
         loop.execute {
+            if (stoppedSince(epoch, t, TurnKind.NOTIFY)) return@execute
             if (busy.get()) {
                 host.logInfo(TAG, "notification queued behind a running turn: ${t.take(60)}")
                 pendingWakes.addLast(Queued(t, TurnKind.NOTIFY))
@@ -396,7 +402,9 @@ class LocalBrain(
         val t = text.trim()
         if (t.isEmpty()) return onAnswer(null)
         if (cfg.apiKey.isEmpty()) return onAnswer(noKeyText())
+        val epoch = stopEpoch.get()
         loop.execute {
+            if (stoppedSince(epoch, t, TurnKind.PEER)) return@execute onAnswer(null)
             if (busy.get()) {
                 host.logInfo(TAG, "peer task queued behind a running turn: ${t.take(60)}")
                 pendingWakes.addLast(Queued(t, TurnKind.PEER, onAnswer))
@@ -482,8 +490,21 @@ class LocalBrain(
      */
     private fun sweepInstruction(): String {
         val candidates = topicCandidatesForPrompt()
-        if (candidates.isEmpty()) return SWEEP_INSTRUCTION
-        return SWEEP_INSTRUCTION + TOPIC_RULES.format(candidates)
+        val base = SWEEP_INSTRUCTION + alreadyRecorded()
+        if (candidates.isEmpty()) return base
+        return base + TOPIC_RULES.format(candidates)
+    }
+
+    /**
+     * What the notebook already holds, appended to a review's instruction. A review that could not see it wrote a
+     * second memory beside an existing one and a second todo for something already set.
+     */
+    private fun alreadyRecorded(): String {
+        val r = runCatching { host.reviewRecord() }.getOrDefault("")
+        return if (r.isBlank()) "\n\nYour notebook holds nothing yet." else
+            "\n\nWhat your notebook already holds — check here before writing anything. Something already here is " +
+                "updated in place (remember with the same name; for a todo, todos done/drop and set the corrected one), " +
+                "never written a second time under another name:\n" + r
     }
 
     /** Read from any thread. The service asks before queueing a wake-up. */
@@ -507,6 +528,7 @@ class LocalBrain(
         loop.execute {
             busy.set(true)
             currentKind = kind
+            runningWhat = describe(text, kind)
             aimMisses = 0
             reviewItems = if (kind.silent) mutableListOf() else null
             if (!kind.silent) justSwept = false
@@ -627,7 +649,9 @@ class LocalBrain(
      * turn instead, which is the right order: the person who just spoke goes first.
      */
     private fun drainWakes() {
-        val next = pendingWakes.removeFirstOrNull() ?: return
+        var next = pendingWakes.removeFirstOrNull() ?: return
+        // A queued todo paused (or closed) by the turn it waited behind is skipped; the next one runs instead.
+        while (todoWithdrawn(next.text)) next = pendingWakes.removeFirstOrNull() ?: return
         host.logInfo(TAG, "running a queued ${next.kind} turn: ${next.text.take(60)}")
         launch(next.text, next.kind, onAnswer = next.onAnswer, territory = next.territory)
     }
@@ -676,7 +700,9 @@ class LocalBrain(
     fun work(text: String, territory: String?, onDone: (WorkResult) -> Unit) {
         val t = text.trim()
         if (t.isEmpty()) return
+        val epoch = stopEpoch.get()
         loop.execute {
+            if (stoppedSince(epoch, t, TurnKind.WORK)) return@execute onDone(WorkResult(null, emptyList()))
             val job = Queued(t, TurnKind.WORK, { onDone(workResult()) }, territory)
             if (busy.get()) {
                 host.logInfo(TAG, "work queued behind a running turn: ${t.take(60)}")
@@ -823,6 +849,77 @@ class LocalBrain(
         generation.incrementAndGet()
         llm.cancel()
     }
+
+    /** Any thread. What the turn running now is about, for the stop row: the user's words, a todo's, a care's. */
+    @Volatile private var runningWhat: String? = null
+
+    /** Any thread. Bumped by [stopAll], so a wake that is still waiting to start (see [wake]) knows it was stopped. */
+    private val stopEpoch = java.util.concurrent.atomic.AtomicInteger()
+
+    /** The epoch now; a caller that waits before starting a turn takes it first and passes it to [wake]. */
+    fun stopEpochNow(): Int = stopEpoch.get()
+
+    /**
+     * The user tapped the ball: stop **everything**, not only the turn on screen. [cancel] alone left the queue
+     * standing, so the next turn's end drained it and a stopped job came back — measured as "I tapped the ball
+     * and it carried on with the last task". Here: the turn is cut, every queued turn is dropped (a todo itself
+     * stays — it comes due again if it repeats), anything that took [stopEpochNow] before waiting will not start,
+     * and one STOPPED event names what was cut off and what was dropped, so the timeline says what the tap did.
+     * Must not block: called from the main thread.
+     */
+    fun stopAll() {
+        stopReportPending.set(true)
+        stopEpoch.incrementAndGet()
+        val running = runningWhat.takeIf { busy.get() }
+        cancel()
+        loop.execute {
+            // Turns that were already waiting on this thread ran their own check before this, and left their names
+            // here: one tap, one row.
+            stopReportPending.set(false)
+            val dropped = droppedByStop.toList() + pendingWakes.map { describe(it.text, it.kind) }
+            droppedByStop.clear()
+            pendingWakes.forEach { q -> q.onAnswer?.let { cb -> runCatching { cb(null) } } }
+            pendingWakes.clear()
+            if (running != null || dropped.isNotEmpty()) {
+                emit(BrainEvent(BrainEvent.Kind.STOPPED, running.orEmpty(), dropped.joinToString("\n") { "- $it" }))
+            }
+        }
+    }
+
+    /**
+     * Loop thread. A todo's turn whose todo was paused, done or dropped while the turn waited (to be quiet, or
+     * behind another turn): it does not run. The alarm already checked when it fired; this is the check at the
+     * moment it actually starts.
+     */
+    private fun todoWithdrawn(text: String): Boolean {
+        val id = WakeText.todoId(text) ?: return false
+        if (runCatching { host.todoStillActive(id) }.getOrDefault(true)) return false
+        host.logInfo(TAG, "todo $id is no longer active; its turn is dropped")
+        return true
+    }
+
+    /** Loop thread. True (and recorded) when [stopAll] ran after [epoch] was taken: this turn was stopped before it began. */
+    private fun stoppedSince(epoch: Int, text: String, kind: TurnKind): Boolean {
+        if (epoch == stopEpoch.get()) return false
+        host.logInfo(TAG, "$kind dropped: stopped before it began: ${text.take(60)}")
+        // Folded into the tap's own row when that row is still to come; a row of its own when it arrives later.
+        if (stopReportPending.get()) droppedByStop += describe(text, kind)
+        else emit(BrainEvent(BrainEvent.Kind.STOPPED, "", "- " + describe(text, kind)))
+        return true
+    }
+
+    /** Set by [stopAll] until its own row is written; while set, turns it stopped add their names to [droppedByStop]. */
+    private val stopReportPending = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** Loop thread only. See [stopReportPending]. */
+    private val droppedByStop = mutableListOf<String>()
+
+    /** A short name for a turn, for the stop row. */
+    private fun describe(text: String, kind: TurnKind): String = when (kind) {
+        TurnKind.WAKE, TurnKind.NOTIFY -> WakeText.what(text)
+        TurnKind.WORK -> text.lineSequence().first().removePrefix("[You woke yourself: ").substringBefore(" — ")
+        else -> text.lineSequence().first()
+    }.take(80)
 
     /** Service teardown. Threads are daemons, so this is tidiness, not safety. */
     fun stop() {
@@ -1174,24 +1271,6 @@ class LocalBrain(
             val method = host.methodOf(tc.name)
                 ?: return toolMessage(tc.id, "No such tool: ${tc.name}")
 
-            // A turn Andee started itself does not interrupt the person: no question card, no alert, no voice.
-            // Whatever it wants them to see goes through a bubble (rationed, silent, fades) or the diary.
-            if (currentKind == TurnKind.WORK && method in SELF_TURN_MAY_NOT) {
-                return toolMessage(
-                    tc.id,
-                    "You woke yourself for this; nobody asked, so you do not ask or speak. If it is worth their attention, leave a " +
-                        "bubble (nudge) or write it in your diary, and say it next time they talk to you.",
-                )
-            }
-            // The list a work turn is given is a request; this is the wall. A model that names a tool it was not
-            // handed (a tap, a shell command) would otherwise reach it through [BrainHost.methodOf] all the same.
-            if (currentKind == TurnKind.WORK && !SelfWork.allowed(method)) {
-                return toolMessage(
-                    tc.id,
-                    "$method is not open to a turn you started yourself: it has no screen, device or shell. Write down what you " +
-                        "would do and why (wiki, diary, the care's note), or leave a bubble, and do it when the user is with you.",
-                )
-            }
             // A task another device handed over is done here, never handed on: see [TurnKind.PEER].
             if (method == "peer.ask" && currentKind == TurnKind.PEER) {
                 return toolMessage(
@@ -1741,7 +1820,7 @@ class LocalBrain(
                 "reviewing before trimming",
         )
         lastHarvestAtSize = history.size
-        launch(if (justSwept) HARVEST_SUMMARY_ONLY else HARVEST_INSTRUCTION, TurnKind.HARVEST)
+        launch(if (justSwept) HARVEST_SUMMARY_ONLY else HARVEST_INSTRUCTION + alreadyRecorded(), TurnKind.HARVEST)
     }
 
     /**
@@ -1937,8 +2016,6 @@ class LocalBrain(
         /** The keys a handler uses to say its write did or did not happen (`LifeTools`, the notebook). */
         private val NOT_DONE_KEYS = listOf("written", "added", "changed", "saved", "noted", "linked", "shared", "logged", "settled", "ok", "performed")
 
-        /** What a self-started turn may not call: anything that speaks to or stops the person. */
-        private val SELF_TURN_MAY_NOT = setOf("ui.ask", "ui.alert", "tts.speak")
 
         /** How long a task stopped at the step limit is kept ready for 继续. See [Unfinished]. */
         private const val UNFINISHED_TTL_MS = 60 * 60_000L
@@ -1987,7 +2064,8 @@ class LocalBrain(
          * the conversation afterwards — the sweep leaves it alone, the harvest
          * replaces the old part with the summary.
          */
-        private const val REVIEW_RULES = """1. A preference / a taboo / a worry / a change in circumstances he said out loud this time → remember(type=user)
+        private const val REVIEW_RULES = """0. Before writing anything, look at what your notebook already holds (listed at the end). If an entry already covers it, update that one — never add a near-duplicate under a new name. A todo already set for the same thing is not set again. And one todo is one thing: never number several unrelated things into one todo.
+1. A preference / a taboo / a worry / a change in circumstances he said out loud this time → remember(type=user)
 2. Something you promised but have not yet recorded → remember(type=feedback) + todo
 3. Something dropped half-way (asked but not booked, said he would think about it and nobody followed up) → todo, to arrange one follow-up
 4. Something you actually got done for him this time, a route you walked through → remember(type=way), with the task name as name.

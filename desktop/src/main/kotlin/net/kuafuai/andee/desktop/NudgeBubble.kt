@@ -67,8 +67,6 @@ object Nudges {
     private const val STAY_TEXT_MS = 12_000L
     private const val STAY_BUTTONS_MS = 30_000L
     private const val FADE_MS = 260L
-    /** Nobody has touched the keyboard or mouse for this long: away, or the screen is locked. */
-    private const val AWAY_SECONDS = 300L
 
     private class Slot(val n: Nudge, var recorded: Boolean = false)
 
@@ -141,9 +139,6 @@ object Nudges {
         if (!ballUp()) return Gate.WAIT
         if (AskGate.current != null || ApprovalGate.current != null) return Gate.WAIT
         if (Assistant.working() || net.kuafuai.andee.desktop.voice.MacVoice.isListening() || Meeting.isActive()) return Gate.WAIT
-        val now = java.time.LocalTime.now()
-        if (NudgeBook.isQuiet(now.hour * 60 + now.minute)) return Gate.WAIT
-        if ((idleSeconds() ?: 0L) >= AWAY_SECONDS) return Gate.WAIT
         return if (chatInFront()) Gate.LOG else Gate.SHOW
     }
 
@@ -155,6 +150,16 @@ object Nudges {
     }
 
     // ---- what the user did (called from the UI thread) -----------------------
+
+    /**
+     * The user tapped the ball to stop everything: the bubble on screen goes, and the one waiting for its moment is
+     * dropped — recorded as dismissed, as if the user had waved it away.
+     */
+    fun dismiss() = exec.execute {
+        held?.let { outcome(it.n, "dismissed", null) }
+        held = null
+        current?.let { end(it, "dismissed", null) }
+    }
 
     fun tapButton(label: String) = exec.execute { current?.let { end(it, "button", label) } }
     fun tapBody() = exec.execute { current?.let { end(it, "body", null) } }
@@ -214,18 +219,11 @@ object Nudges {
         TimelineEvents.body(TimelineEvents.Body.BUBBLE_MUTED, String.format(Strings.locale(), Strings.get("s_nudge_muted_row"), n.text))
     }
 
-    /** Seconds since the last keyboard or mouse input, from the HID system; null when it cannot be read. */
-    internal fun idleSeconds(): Long? = runCatching {
-        val p = ProcessBuilder("ioreg", "-c", "IOHIDSystem", "-d", "4").redirectErrorStream(true).start()
-        val out = p.inputStream.bufferedReader().readText()
-        p.waitFor(2, TimeUnit.SECONDS)
-        Regex("\"HIDIdleTime\" = (\\d+)").find(out)?.groupValues?.get(1)?.toLong()?.div(1_000_000_000L)
-    }.getOrNull()
 }
 
 /**
  * The plan, thought about without being asked ([net.kuafuai.andee.brain.PlanMind]) — the Mac's twin of the
- * phone's `planTick`. Every [TICK_MS], and only with someone at the Mac (input within the last five minutes):
+ * phone's `planTick`. Every [TICK_MS], whether or not anyone is at the Mac — the device is Andee's own:
  * the morning look once a day, then the muse while they are free. On its own thread, because both block on a
  * model call and the bubble timers must not wait behind one.
  */
@@ -240,7 +238,7 @@ object PlanTicks {
     private fun tick() {
         val cfg = Assistant.config()
         if (cfg.apiKey.isEmpty()) return
-        if ((Nudges.idleSeconds() ?: 0L) >= 300L) return
+        // Not whether anyone is at the Mac, or the hour: the device is Andee's own (see the phone's planTick).
         val plans = DesktopNotebook.plans
         val mind = net.kuafuai.andee.brain.PlanMind(cfg, plans) { warn, msg -> if (warn) Log.w("Plan", msg) else Log.i("Plan", msg) }
         val level = Nudges.level()

@@ -5,48 +5,25 @@ import net.kuafuai.andee.config.Selfhood
 import org.json.JSONArray
 
 /**
- * A turn Andee starts itself, on a care that came due (`docs/design/inner-drive.zh-CN.md` §8): what it may use,
- * what it is told when it wakes, and how the device books what it did. The heartbeat ([Heartbeat]) decides
- * *whether*; this is the *what*.
+ * A turn Andee starts itself, on a care that came due (`docs/design/inner-drive.zh-CN.md` §8): what it is told when
+ * it wakes, and how the device books what it did. The heartbeat ([Heartbeat]) decides *whether*; this is the *what*.
  *
- * **What it may use is the first phase's boundary, and it is narrow on purpose.** No screen, no device, no
- * shell, nothing sent outward, nothing that interrupts: it can think, read and write its notebook, its cares,
- * its diary, the people it knows and its wiki, and leave a bubble. A heartbeat runs while the user is in front
- * of the device — so a work turn that drove the screen would take the phone out of their hand to go and look at
- * something nobody asked about. Reading a community, posting a draft and the rest need the errand's permission
- * table (§8.2), which does not exist yet; until then the turn is told plainly what it cannot do.
+ * **It has everything a turn the user asked for has** — the screen, the apps, the device, the shell on the Mac.
+ * The device is Andee's own; whether the user is there is not a question this asks. The brakes are the user's:
+ * 自己动起来 in settings, and a tap on the ball, which stops it at once.
  *
- * **What it did is decided by the device, from its own tool calls (§5.2)**: a write that landed is
- * [Selfhood.Effect.ACTED], only reads is [Selfhood.Effect.LOOKED], nothing is [Selfhood.Effect.NOTHING]. Writing
- * back the care's own note is bookkeeping, not work, and does not count as acting on it.
+ * **What it did is decided by the device, from its own tool calls (§5.2)**: a call that changed something and
+ * landed is [Selfhood.Effect.ACTED], only reads is [Selfhood.Effect.LOOKED], nothing is [Selfhood.Effect.NOTHING].
+ * Writing back the care's own note is bookkeeping, not work, and does not count as acting on it.
  */
 object SelfWork {
-
-    /** Every `note.*` except the review-only fold, the destructive forget and sharing outward. */
-    private val NOTE_EXCLUDED = setOf("note.fold", "note.forget", "note.wiki_share")
-
-    /** Outside `note.*`: the bubble, and the read-only shelves. */
-    private val OTHER_ALLOWED = setOf(
-        "ui.nudge", "ui.list_pages", "ui.get_page", "ui.list_topics", "ui.get_topic", "gear.list", "scene.list", "scene.get",
-    )
-
-    fun allowed(method: String): Boolean =
-        (method.startsWith("note.") && method !in NOTE_EXCLUDED) || method in OTHER_ALLOWED
-
-    /** [lists] cut down to what a work turn may hold. The hosts' default for [BrainHost.workTools]. */
-    fun tools(lists: List<JSONArray>): List<JSONArray> = lists.map { a ->
-        JSONArray().apply {
-            for (i in 0 until a.length()) {
-                val t = a.optJSONObject(i) ?: continue
-                if (allowed(t.optString("method"))) put(t)
-            }
-        }
-    }.filter { it.length() > 0 }
 
     /** Reads, whatever their action. */
     private val READS = setOf(
         "note.recall", "note.people", "note.wiki_search", "note.wiki_read",
         "ui.list_pages", "ui.get_page", "ui.list_topics", "ui.get_topic", "gear.list", "scene.list", "scene.get",
+        "screen.ui_tree", "screen.screenshot", "screen.look_region", "screen.wait",
+        "device.notifications", "device.apps", "device.battery", "device.connectivity", "device.location", "device.facts",
     )
 
     /** For the tools that both read and write, the actions that only read. */
@@ -90,14 +67,12 @@ object SelfWork {
         if (care.links.isNotEmpty()) append("\nLinked: ").append(care.links.joinToString(", ")).append(" (read them before you write).")
         append("]\n\n")
         append(
-            "Nobody asked for this and nobody is waiting: nothing you say is read aloud, and you may not ask or alert. " +
-                "This turn has no screen, device or shell tools — you can think, read and write your notebook, cares, diary, " +
-                "the people you know and your wiki, and leave one bubble (nudge) if something is genuinely worth their attention now. " +
-                "Do the piece of this you can do with those: a plan or a piece of research written into the wiki (search first, revise " +
-                "rather than duplicate, say where each claim comes from), a person's record brought up to date, a thought worth " +
-                "keeping. If the real next step needs the screen or the user, say so in a bubble or leave it for when they talk to you. " +
+            "Nobody asked for this; it is your own business, on your own device, and you have every tool you have when " +
+                "someone asks you for something — the screen, the apps, the device. Do the next real piece of it. The rules " +
+                "you were given still hold: what goes out to people in public or in their name, spending money and deleting " +
+                "follow them. If the user taps the ball you are stopped at once — that is theirs to do, not a failure. " +
                 "Before you finish, write back: cares(action=update, id=${care.id}, note=…) with one sentence on where this stands " +
-                "now, in your own voice. Your closing words are for your own record, not for anyone's ears.",
+                "now, in your own voice. Your closing words go to your own record (the timeline), not to anyone's ears.",
         )
     }
 
