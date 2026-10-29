@@ -151,7 +151,7 @@ object Nudges {
     private fun record(slot: Slot) {
         if (slot.recorded) return
         slot.recorded = true
-        Scrollback.add(Scrollback.Role.ASSISTANT, slot.n.text)
+        TimelineEvents.bubble(slot.n.text)
     }
 
     // ---- what the user did (called from the UI thread) -----------------------
@@ -211,7 +211,7 @@ object Nudges {
     private fun mute(n: Nudge) {
         Settings.save(mapOf("nudge_muted" to (muted() + n.kind).joinToString(",")))
         // A setting changed by a gesture with no confirmation; the user is owed the news and the way back.
-        Scrollback.add(Scrollback.Role.ASSISTANT, String.format(Strings.locale(), Strings.get("s_nudge_muted_row"), n.text))
+        TimelineEvents.body(TimelineEvents.Body.BUBBLE_MUTED, String.format(Strings.locale(), Strings.get("s_nudge_muted_row"), n.text))
     }
 
     /** Seconds since the last keyboard or mouse input, from the HID system; null when it cannot be read. */
@@ -244,7 +244,10 @@ object PlanTicks {
         val plans = DesktopNotebook.plans
         val mind = net.kuafuai.andee.brain.PlanMind(cfg, plans) { warn, msg -> if (warn) Log.w("Plan", msg) else Log.i("Plan", msg) }
         val level = Nudges.level()
-        if (mind.morning(Strings.lang(), level.perDay)) DesktopScheduler.syncPlan()
+        if (mind.morning(Strings.lang(), level.perDay)) {
+            DesktopScheduler.syncPlan()
+            TimelineEvents.morning(plans.day(plans.today())?.intent.orEmpty())
+        }
         val free = !Assistant.working() && !Meeting.isActive() && AskGate.current == null && ApprovalGate.current == null
         if (free && level != NudgeBook.Level.OFF) {
             mind.muse(Strings.lang())?.let { id -> plans.bubbleForItem(id, Nudges.book, level, Nudges.muted())?.let(Nudges::post) }
@@ -263,14 +266,14 @@ object PlanTicks {
         val drive = DesktopNotebook.drive
         val log: (Boolean, String) -> Unit = { warn, msg -> if (warn) Log.w("Drive", msg) else Log.i("Drive", msg) }
         val v = net.kuafuai.andee.brain.Heartbeat(cfg, self, drive, { DesktopNotebook.plans.indexForPrompt() }, log).beat(Strings.lang())
+        if (v is net.kuafuai.andee.brain.Heartbeat.Verdict.Note) TimelineEvents.thought(v.text)
         if (v !is net.kuafuai.andee.brain.Heartbeat.Verdict.Work) return
         log(false, "work on ${v.care.id} (${v.care.what}): ${v.why}")
+        TimelineEvents.workStarted(v.care.what, v.why)
         net.kuafuai.andee.brain.SelfWork.start(brain, self, drive, v.care, v.ratio, v.why) { effect, summary ->
             log(false, "work on ${v.care.id} booked as $effect")
-            if (effect != net.kuafuai.andee.config.Selfhood.Effect.NOTHING && summary != null) {
-                val text = net.kuafuai.andee.text.stripMarkdown(net.kuafuai.andee.brain.SpeechMood.parse(summary).text)
-                Scrollback.add(Scrollback.Role.ASSISTANT, String.format(Strings.locale(), Strings.get("s_drive_row"), v.care.what, text.take(160)))
-            }
+            val text = summary?.let { net.kuafuai.andee.brain.SpeechMood.parse(it).text.trim() }
+            TimelineEvents.workDone(v.care.what, effect.name, text)
         }
     }
 }

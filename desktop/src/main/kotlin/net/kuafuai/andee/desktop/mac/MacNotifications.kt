@@ -184,7 +184,11 @@ object MacNotifications {
             .decide(n, h.langTag(), h.scene())
         when (verdict?.action) {
             null -> Log.w(TAG, "no verdict for ${n.optString("app")}; left in the buffer")
-            NotificationTriage.Action.IGNORE -> Log.i(TAG, "ignored ${n.optString("app")}: ${verdict.why}")
+            NotificationTriage.Action.IGNORE -> {
+                Log.i(TAG, "ignored ${n.optString("app")}: ${verdict.why}")
+                // A filter nobody can audit is a filter nobody trusts: what it let pass, and why, is on the timeline.
+                net.kuafuai.andee.desktop.TimelineEvents.ignored(n.optString("app").ifEmpty { "?" }, verdict.why)
+            }
             NotificationTriage.Action.TELL -> if (verdict.line.isNotBlank()) h.tell(n, verdict.line)
             NotificationTriage.Action.ACT -> h.act(lookQuery(n))
         }

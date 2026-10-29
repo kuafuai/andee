@@ -103,6 +103,7 @@ object VersionCheck {
             val p = probe()
             Log.i("Version", "launch check: ${current()} → $p")
             val r = p as? Result.Behind ?: return@Thread
+            TimelineEvents.body(TimelineEvents.Body.VERSION, behindText(r))
             if (AskGate.current != null) return@Thread.also { Log.i("Version", "a card is up; not reminding this launch") }
             val zh = Strings.lang() == "zh"
             val go = if (zh) "去升级" else "Upgrade"

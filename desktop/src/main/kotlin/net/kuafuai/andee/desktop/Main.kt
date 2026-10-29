@@ -113,7 +113,7 @@ fun main() {
                 Menu("Andee") {
                     Item(if (Strings.lang() == "zh") "新对话" else "New chat", onClick = { Assistant.newConversation(); chat = true; nav.go("chat") },
                         shortcut = androidx.compose.ui.input.key.KeyShortcut(androidx.compose.ui.input.key.Key.N, meta = true))
-                    Item(if (Strings.lang() == "zh") "显示对话" else "Show chat", onClick = { chat = true; nav.go("chat") })
+                    Item(if (Strings.lang() == "zh") "显示动态" else "Show timeline", onClick = { chat = true; nav.go("chat") })
                     Item(if (Strings.lang() == "zh") "设置" else "Settings", onClick = { chat = true; nav.go("settings") },
                         shortcut = androidx.compose.ui.input.key.KeyShortcut(androidx.compose.ui.input.key.Key.Comma, meta = true))
                     Item(if (Strings.lang() == "zh") "退出 Andee" else "Quit Andee", onClick = ::exitApplication,

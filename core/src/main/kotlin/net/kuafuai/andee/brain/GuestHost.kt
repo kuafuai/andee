@@ -36,6 +36,9 @@ class GuestHost(private val inner: BrainHost) : BrainHost by inner {
     /** Not forwarded: the owner's own turn state (the Mac's command policy) must not be moved by a guest. */
     override fun turnStarted(kind: String) {}
 
+    /** A friend's task leaves no trace in the owner's timeline beyond the report itself. */
+    override fun event(e: BrainEvent) {}
+
     override fun toolLists(): List<JSONArray> = inner.toolLists().map { list ->
         JSONArray().also { out -> for (i in 0 until list.length()) list.optJSONObject(i)?.takeIf { allowed(it.optString("method")) }?.let(out::put) }
     }

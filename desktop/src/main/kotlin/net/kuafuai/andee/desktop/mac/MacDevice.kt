@@ -237,7 +237,7 @@ class MacDevice : DesktopBrainHost.ToolProvider {
                 return JSONObject().put("error", "The camera could not be used on this Mac (no camera, or the Camera permission is missing). Say so; do not claim to see.")
             }
             val b64 = java.util.Base64.getEncoder().encodeToString(f.readBytes())
-            Scrollback.add(Scrollback.Role.ASSISTANT, (if (Strings.lang() == "zh") "看了一眼（" else "Looked (") + (if (front) "front" else "back") + ")")
+            net.kuafuai.andee.desktop.TimelineEvents.body(net.kuafuai.andee.desktop.TimelineEvents.Body.LOOK, (if (Strings.lang() == "zh") "用摄像头看了一眼（" else "Looked through the camera (") + (if (front) "front" else "back") + ")")
             return JSONObject().put("png_base64", b64).put("camera", if (front) "front" else "back")
         } finally { f.delete() }
     }
@@ -377,7 +377,7 @@ object MacVault {
         val pw = find(label).optString("password")
         require(pw.isNotEmpty()) { "That entry has no password saved." }
         require(Bridge.focusedValue().optBoolean("focused")) { "Click into the password field first." }
-        Scrollback.add(Scrollback.Role.ASSISTANT, "正在填入「$label」的密码… / filling the password for “$label”…")
+        net.kuafuai.andee.desktop.TimelineEvents.body(net.kuafuai.andee.desktop.TimelineEvents.Body.VAULT, if (Strings.lang() == "zh") "正在填入「$label」的密码" else "Filling the password for “$label”")
         // Keystrokes, not AXValue: a web login form only believes what arrives as input events, and writing
         // the control's value directly fills the box on screen while the page still holds an empty password.
         // And not the pasteboard either — a password left there would sit in the user's clipboard history.

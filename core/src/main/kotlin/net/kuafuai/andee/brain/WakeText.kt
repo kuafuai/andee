@@ -22,4 +22,10 @@ object WakeText {
             "not yet → set the next todo further out and end the turn; needs the user → say so; past its " +
             "give-up time → say what you saw. Do not wait on the screen for it."
     }
+
+    /** The todo's own words back out of a [due] line, for the timeline; the line itself when it is not one. */
+    fun what(line: String): String {
+        val first = line.lineSequence().firstOrNull().orEmpty()
+        return if (first.startsWith("(time's up")) first.substringAfter(") ", first).trim() else first.trim().take(200)
+    }
 }

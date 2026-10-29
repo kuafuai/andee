@@ -50,7 +50,7 @@ object Assistant {
         net.kuafuai.andee.desktop.shell.ShellTools(
             ask = { askApproval(it) },
             secrets = { secrets() },
-            record = { line -> Scrollback.add(Scrollback.Role.ASSISTANT, line) },
+            record = { line -> TimelineEvents.body(TimelineEvents.Body.SHELL, line) },
         )
     }
 

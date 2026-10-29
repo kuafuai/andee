@@ -135,7 +135,9 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
     var recording by remember { mutableStateOf(Meeting.isActive()) }
     // A folded stretch is one card standing where its messages stood — the phone's rule, so the
     // conversation still reads top to bottom. The sidebar's topic list is only another way in.
-    val items = remember(rows) { chatItems(rows) }
+    // 全部 shows what happened as well as what was said; 只看对话 hides the event rows. Remembered across launches.
+    var showEvents by remember { mutableStateOf(Settings.get("timeline_events") != "off") }
+    val items = remember(rows, showEvents) { chatItems(if (showEvents) rows else rows.filter { it.role != Scrollback.Role.EVENT }) }
     // The list is created already standing on the newest message. Opening the page used to start at the top
     // and then animate down through the whole conversation, which read as the chat scrolling itself on every
     // visit. (An item that is taller than the viewport is shown from its start, so a long last reply is read
@@ -241,6 +243,8 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
     Column(Modifier.fillMaxSize()) {
         Header(
             muted = muted, onToggleMute = { Assistant.setMuted(!muted) },
+            showEvents = showEvents,
+            onToggleEvents = { showEvents = !showEvents; Settings.save(mapOf("timeline_events" to if (showEvents) "on" else "off")) },
             live = recording || voice == net.kuafuai.andee.desktop.voice.MacVoice.State.LISTENING,
             status = when {
                 recording -> if (Strings.lang() == "zh") "正在录音" else "Recording"
@@ -269,7 +273,7 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
                 }
                 items(items, key = { it.key }) { it ->
                     when (it) {
-                        is ChatItem.Message -> Bubble(it.row)
+                        is ChatItem.Message -> if (it.row.role == Scrollback.Role.EVENT) EventRow(it.row) else Bubble(it.row)
                         is ChatItem.Folded -> TopicCard(it.topic, it.count, onOpen = { onOpenTopic(it.topic.id) }, onContinue = { onContinueTopic(it.topic) })
                     }
                 }
@@ -351,7 +355,7 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
 
 /** Title, or a one-line status when something is live. Stop is with the input box, where the hand already is. */
 @Composable
-private fun Header(status: String?, live: Boolean, muted: Boolean, onToggleMute: () -> Unit) {
+private fun Header(status: String?, live: Boolean, muted: Boolean, onToggleMute: () -> Unit, showEvents: Boolean = true, onToggleEvents: () -> Unit = {}) {
     Row(
         Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -361,12 +365,17 @@ private fun Header(status: String?, live: Boolean, muted: Boolean, onToggleMute:
             Spacer(Modifier.width(8.dp))
         }
         Text(
-            status ?: (if (Strings.lang() == "zh") "对话" else "Chat"),
+            status ?: (if (Strings.lang() == "zh") "动态" else "Timeline"),
             color = if (live) Palette.accent else Palette.title,
             fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.weight(1f))
         val zh = Strings.lang() == "zh"
+        Text(
+            if (showEvents) (if (zh) "全部" else "Everything") else (if (zh) "只看对话" else "Talk only"),
+            color = Palette.label, fontSize = 12.sp,
+            modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable { onToggleEvents() }.padding(horizontal = 10.dp, vertical = 6.dp),
+        )
         Row(
             Modifier.clip(RoundedCornerShape(16.dp)).clickable { onToggleMute() }.padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -563,6 +572,40 @@ fun noVoiceKey() = when {
         if (Strings.lang() == "zh") "还没有 CodeFlying 密钥：在设置的「后端」里填上。" else "No CodeFlying key yet: add it under Backend in Settings."
     Strings.lang() == "zh" -> "还没配语音 Key：在设置的「语音」里填上。"
     else -> "No voice key yet: add it under Voice in Settings."
+}
+
+/**
+ * Something that happened, not something said: one quiet line with the time, a mark and the words. A row with a
+ * detail opens on click. Centered and small, so a day of events does not drown the conversation between them.
+ */
+@Composable
+private fun EventRow(r: Scrollback.Row) {
+    var open by remember(r.id) { mutableStateOf(false) }
+    val time = remember(r.ts) { java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date(r.ts)) }
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(
+            Modifier.clip(RoundedCornerShape(12.dp))
+                .then(if (r.detail.isNotBlank()) Modifier.clickable { open = !open } else Modifier)
+                .padding(horizontal = 10.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(time, color = Palette.secondary, fontSize = 11.sp)
+            Spacer(Modifier.width(8.dp))
+            Icon(TimelineEvents.mark(r.kind), Palette.secondary, 12.dp)
+            Spacer(Modifier.width(6.dp))
+            Text(r.text, color = Palette.photoInk, fontSize = 12.sp, maxLines = if (open) 4 else 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 520.dp))
+            if (r.detail.isNotBlank()) {
+                Spacer(Modifier.width(4.dp))
+                Text(if (open) "▴" else "▾", color = Palette.secondary, fontSize = 10.sp)
+            }
+        }
+        if (open && r.detail.isNotBlank()) {
+            Markdown(r.detail, color = Palette.photoInk, size = 12.sp,
+                modifier = Modifier.widthIn(max = 560.dp).padding(top = 2.dp, bottom = 4.dp)
+                    .background(Palette.glass, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 8.dp))
+        }
+    }
 }
 
 @Composable

@@ -508,6 +508,13 @@ class LocalBrain(
             busy.set(true)
             currentKind = kind
             aimMisses = 0
+            turnRecords = 0
+            when (kind) {
+                TurnKind.WAKE -> emit(BrainEvent(BrainEvent.Kind.WOKE, WakeText.what(text)))
+                TurnKind.NOTIFY -> emit(BrainEvent(BrainEvent.Kind.NOTIFIED, detail = text.take(400)))
+                TurnKind.PEER -> emit(BrainEvent(BrainEvent.Kind.FRIEND_TASK, detail = text.take(400)))
+                else -> {}
+            }
             if (kind == TurnKind.WORK) {
                 // Per turn, here, so a queued work turn cannot inherit the one before it.
                 workTerritory = territory
@@ -560,6 +567,7 @@ class LocalBrain(
                 // is no longer the current one.
                 if (gen == generation.get()) applyPendingFolds() else pendingFolds.clear()
                 if (kind == TurnKind.SWEEP) onSweepSpent(turnTokens)
+                if (kind.silent && gen == generation.get()) emit(BrainEvent(BrainEvent.Kind.REVIEWED, turnRecords.toString()))
                 if (gen == generation.get()) {
                     drainWakes()
                     maybeHarvest()
@@ -625,6 +633,9 @@ class LocalBrain(
 
     /** Loop thread only. The closing words of a [TurnKind.WORK] turn; read by [work]'s callback. Never spoken. */
     private var workSummary: String? = null
+
+    /** Loop thread only. Writes to its own record this turn, for the review's summary event. Reset per turn. */
+    private var turnRecords = 0
 
     /** Loop thread only. Coordinate taps in a row whose screen did not change; see [AimHints]. Reset per turn. */
     private var aimMisses = 0
@@ -1185,6 +1196,7 @@ class LocalBrain(
 
             val result = dispatchWithTimeout(method, args, tc.id, silent, untrusted)
             if (currentKind == TurnKind.WORK) workCalls += WorkCall(method, args.optString("action"), tc.id, landed(result))
+            BrainEvent.fromTool(method, args, result)?.let { turnRecords++; emit(it) }
             if (AimHints.isTap(method) && result is JSONObject) {
                 val missed = result.has("screen_changed") && !result.optBoolean("screen_changed", true)
                 aimMisses = if (method == "screen.tap" || method == "screen.long_press") { if (missed) aimMisses + 1 else 0 } else if (missed) aimMisses else 0
@@ -1216,6 +1228,8 @@ class LocalBrain(
         if (o.optBoolean("timed_out")) return false
         return NOT_DONE_KEYS.none { o.has(it) && o.opt(it) == false }
     }
+
+    private fun emit(e: BrainEvent) = runCatching { host.event(e) }.onFailure { host.logWarn(TAG, "event ${e.kind} not shown", it) }
 
     private fun dispatchWithTimeout(method: String, params: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? {
         val declared = params.optLong("timeout_ms", 0L)
@@ -1448,6 +1462,7 @@ class LocalBrain(
                 text = fold.text,
             )
         }.getOrNull()
+        if (topic != null) emit(BrainEvent(BrainEvent.Kind.FOLDED, topic.title, topic.summary.lineSequence().firstOrNull().orEmpty()))
         if (topic == null) {
             host.logWarn(TAG, "fold produced no topic; the conversation is kept as it was")
             return

@@ -64,7 +64,8 @@ class DesktopBrainHost(
     override fun scenesIndex(): String = DesktopNotebook.book.scenesForPrompt()
     override fun scene(name: String): Scene? = DesktopNotebook.book.scene(name)
 
-    override fun scrollback(): List<ScrollRow> = Scrollback.snapshot().map {
+    // Event rows are the device's record of what the brain did, not conversation: never handed back to it.
+    override fun scrollback(): List<ScrollRow> = Scrollback.snapshot().filter { it.role != Scrollback.Role.EVENT }.map {
         ScrollRow(
             isUser = it.role == Scrollback.Role.USER,
             isAssistant = it.role == Scrollback.Role.ASSISTANT,
@@ -89,7 +90,8 @@ class DesktopBrainHost(
     override fun friendsIndex(): String = Peers.tasks.indexForPrompt()
 
     override fun foldTopic(title: String, summary: String, rows: List<ScrollRow>, text: String): FoldedTopic? {
-        val t = Scrollback.fold(title, summary, rows.mapNotNull { it.handle as? Long }, text) ?: return null
+        val ids = rows.mapNotNull { it.handle as? Long }
+        val t = Scrollback.fold(title, summary, ids + Scrollback.eventsWithin(ids), text) ?: return null
         return FoldedTopic(t.id, t.title, t.summary)
     }
 
@@ -115,6 +117,8 @@ class DesktopBrainHost(
     }
 
     override fun turnStarted(kind: String) = providers.forEach { it.turnStarted(kind) }
+
+    override fun event(e: net.kuafuai.andee.brain.BrainEvent) = TimelineEvents.brain(e)
 
     override fun traceDir(): File = AppDirs.root
 }

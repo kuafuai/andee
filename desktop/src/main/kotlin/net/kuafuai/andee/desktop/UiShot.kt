@@ -156,6 +156,11 @@ private fun seed() {
     Scrollback.add(Scrollback.Role.ASSISTANT, "好，已经设好了明天 10:00 的提醒。")
     val b = Scrollback.snapshot().filter { it.topicId == null }.map { it.id }
     Scrollback.fold("周会提醒", "明天 10:00 开周会", b, "User: 明天上午十点提醒我开周会\n\nAndee: 好……")
+    TimelineEvents.brain(net.kuafuai.andee.brain.BrainEvent(net.kuafuai.andee.brain.BrainEvent.Kind.REVIEWED, "3"))
+    TimelineEvents.brain(net.kuafuai.andee.brain.BrainEvent(net.kuafuai.andee.brain.BrainEvent.Kind.DIARY, detail = "今天他第一次让我自己去 X 上留言。"))
+    TimelineEvents.thought("交流群这两天很安静，我想知道是不是大家都没遇到问题")
+    TimelineEvents.ignored("Slack", "群里的闲聊，没有提到他")
+    TimelineEvents.brain(net.kuafuai.andee.brain.BrainEvent(net.kuafuai.andee.brain.BrainEvent.Kind.WOKE, "开周会"))
     Scrollback.add(Scrollback.Role.USER, "看看今天有什么新闻")
     Scrollback.add(Scrollback.Role.ASSISTANT, "我先打开浏览器搜一下，稍等。")
 }

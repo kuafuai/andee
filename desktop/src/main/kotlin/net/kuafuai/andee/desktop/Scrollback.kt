@@ -24,9 +24,18 @@ object Scrollback {
     private const val MAX_TOPICS = 60
     private const val MAX_TEXT = 4000
 
-    enum class Role { USER, ASSISTANT, ERROR }
+    /**
+     * [EVENT] is something that happened that is not conversation — a todo woke it, the review ran, it wrote its
+     * diary, it got up by itself ([TimelineEvents]). Shown in the timeline, **never** given to the brain:
+     * [DesktopBrainHost.scrollback] leaves these rows out, so a review summary cannot come back as something said.
+     */
+    enum class Role { USER, ASSISTANT, ERROR, EVENT }
 
-    data class Row(val id: Long, val ts: Long, val role: Role, val text: String, val topicId: Long? = null)
+    /** [kind] and [detail] are set on [Role.EVENT] rows only: what kind of event, and the line shown when opened. */
+    data class Row(
+        val id: Long, val ts: Long, val role: Role, val text: String, val topicId: Long? = null,
+        val kind: String = "", val detail: String = "",
+    )
 
     data class Topic(val id: Long, val title: String, val summary: String, val startedAt: Long, val endedAt: Long)
 
@@ -57,6 +66,24 @@ object Scrollback {
             while (rows.size > MAX_ROWS) rows.removeAt(0)
         }
         saveAndNotify()
+    }
+
+    /** An event row (see [Role.EVENT]). */
+    fun event(kind: String, text: String, detail: String = "") {
+        val t = text.trim()
+        if (t.isEmpty()) return
+        synchronized(lock) {
+            rows += Row(nextId++, System.currentTimeMillis(), Role.EVENT, t.take(MAX_TEXT), kind = kind, detail = detail.trim().take(MAX_TEXT))
+            while (rows.size > MAX_ROWS) rows.removeAt(0)
+        }
+        saveAndNotify()
+    }
+
+    /** Event rows standing between the first and last of [members] (by id): they go into the same topic. */
+    fun eventsWithin(members: List<Long>): List<Long> = synchronized(lock) {
+        if (members.isEmpty()) return emptyList()
+        val lo = members.min(); val hi = members.max()
+        rows.filter { it.role == Role.EVENT && it.topicId == null && it.id in lo..hi }.map { it.id }
     }
 
     fun topicsIndex(max: Int = 5): String = synchronized(lock) {
@@ -112,7 +139,8 @@ object Scrollback {
             val arr = JSONArray()
             for (r in rows) arr.put(
                 JSONObject().put("id", r.id).put("ts", r.ts).put("role", r.role.name).put("text", r.text)
-                    .apply { r.topicId?.let { put("topic", it) } },
+                    .apply { r.topicId?.let { put("topic", it) } }
+                    .apply { if (r.kind.isNotEmpty()) put("kind", r.kind); if (r.detail.isNotEmpty()) put("detail", r.detail) },
             )
             val tarr = JSONArray()
             for (t in topics) tarr.put(
@@ -143,6 +171,8 @@ object Scrollback {
                     role = runCatching { Role.valueOf(r.getString("role")) }.getOrDefault(Role.ASSISTANT),
                     text = r.getString("text"),
                     topicId = if (r.has("topic")) r.getLong("topic") else null,
+                    kind = r.optString("kind"),
+                    detail = r.optString("detail"),
                 )
             }
             val tarr = o.optJSONArray("topics") ?: JSONArray()

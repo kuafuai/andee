@@ -191,7 +191,7 @@ fun ArtifactsCard(onDone: () -> Unit, onContinue: () -> Unit) {
                                 Text(if (zh) "回退到这版" else "Roll back", color = Palette.accent, fontSize = 12.sp,
                                     modifier = Modifier.clickable {
                                         Pages.restoreVersion(v.id)
-                                        Scrollback.add(Scrollback.Role.ASSISTANT, "已把「${v.title}」回退到 v${v.version}")
+                                        TimelineEvents.body(TimelineEvents.Body.PAGE, if (zh) "把「${v.title}」回退到 v${v.version}" else "Rolled \"${v.title}\" back to v${v.version}")
                                         refresh++
                                     }.padding(vertical = 3.dp))
                             }

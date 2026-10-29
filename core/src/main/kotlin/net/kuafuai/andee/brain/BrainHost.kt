@@ -143,6 +143,9 @@ interface BrainHost {
      */
     fun turnStarted(kind: String) {}
 
+    /** Something happened that is not conversation — see [BrainEvent]. Any thread. Default: nowhere to show it. */
+    fun event(e: BrainEvent) {}
+
     /** Where the trace file lives. */
     fun traceDir(): File
 }

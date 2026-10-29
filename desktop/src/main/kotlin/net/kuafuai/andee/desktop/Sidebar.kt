@@ -73,7 +73,7 @@ fun Sidebar(nav: Nav, width: androidx.compose.ui.unit.Dp = 228.dp) {
         }
         Spacer(Modifier.height(12.dp))
 
-        NavItem(AndeeIcon.CHAT, t("对话", "Chat"), here == "chat") { nav.go("chat") }
+        NavItem(AndeeIcon.CHAT, t("动态", "Timeline"), here == "chat") { nav.go("chat") }
         NavItem(AndeeIcon.DOCUMENT, t("产物", "Artifacts") + if (artifactCount > 0) "  $artifactCount" else "", here == "artifacts") { nav.go("artifacts") }
         // The same doors, in the same order, as the phone's top bar: 产物 · 小本本 · 情景 · 朋友 · 自检 · 设置.
         // 形象与表情, 装备 and 保险箱 are opened from 设置 on both, so neither body has a door the other lacks.
