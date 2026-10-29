@@ -348,8 +348,8 @@ class MacScreen(
                 ?: "${x.toInt()},${y.toInt()}"
             val list = spots.getOrPut(key) { mutableListOf() }
             if (list.size >= 3) throw IllegalStateException(
-                "refused: this is the fourth tap on the same spot in five minutes. Stop, look at the screen again, and " +
-                    "if it is not working, tell the user where you are stuck instead of tapping again.",
+                net.kuafuai.andee.brain.AimHints.REPEAT_REFUSED + " (the fourth tap within five minutes). It was not executed. Do not " +
+                    "tap here again; look at the screen and change how you aim.",
             )
             list += now
         }

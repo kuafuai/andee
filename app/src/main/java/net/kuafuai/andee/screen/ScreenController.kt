@@ -3733,8 +3733,8 @@ class ScreenController(
         private const val SCREEN_SETTLE_MS = 380L
 
         private const val LOOP_HELP =
-            "Stuck-loop guard: this exact spot has been touched more than " +
-                "6 times within 5 minutes. The gesture was NOT executed. " +
+            net.kuafuai.andee.brain.AimHints.REPEAT_REFUSED + " (stuck-loop guard: more than " +
+                "6 times within 5 minutes). The gesture was NOT executed. " +
                 "Do not retry the same tap. Take a fresh screenshot or get_screen_element, " +
                 "pick a genuinely different approach, and if the goal still cannot " +
                 "be reached, stop and ask the user for help instead of continuing."

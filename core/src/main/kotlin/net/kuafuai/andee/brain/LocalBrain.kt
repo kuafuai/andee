@@ -507,6 +507,7 @@ class LocalBrain(
         loop.execute {
             busy.set(true)
             currentKind = kind
+            aimMisses = 0
             if (kind == TurnKind.WORK) {
                 // Per turn, here, so a queued work turn cannot inherit the one before it.
                 workTerritory = territory
@@ -624,6 +625,12 @@ class LocalBrain(
 
     /** Loop thread only. The closing words of a [TurnKind.WORK] turn; read by [work]'s callback. Never spoken. */
     private var workSummary: String? = null
+
+    /** Loop thread only. Coordinate taps in a row whose screen did not change; see [AimHints]. Reset per turn. */
+    private var aimMisses = 0
+
+    /** Loop thread only. Whether this turn's tool list offers `tap_target`; set when the turn's tools are built. */
+    private var locatorOffered = false
 
     /** Loop thread only. The tool calls of the [TurnKind.WORK] turn running now; see [WorkCall]. */
     private val workCalls = mutableListOf<WorkCall>()
@@ -970,6 +977,7 @@ class LocalBrain(
         // errand has no business holding the vault or the shell. Everyone else is unchanged.
         val tools = if (quiet) LlmClient.toolSpecs(*host.workTools(workTerritory).toTypedArray())
         else LlmClient.toolSpecs(*host.toolLists().toTypedArray())
+        locatorOffered = (0 until tools.length()).any { tools.optJSONObject(it)?.optJSONObject("function")?.optString("name") == "tap_target" }
         var lastSignature = ""
         var repeats = 0
 
@@ -1177,6 +1185,11 @@ class LocalBrain(
 
             val result = dispatchWithTimeout(method, args, tc.id, silent, untrusted)
             if (currentKind == TurnKind.WORK) workCalls += WorkCall(method, args.optString("action"), tc.id, landed(result))
+            if (AimHints.isTap(method) && result is JSONObject) {
+                val missed = result.has("screen_changed") && !result.optBoolean("screen_changed", true)
+                aimMisses = if (method == "screen.tap" || method == "screen.long_press") { if (missed) aimMisses + 1 else 0 } else if (missed) aimMisses else 0
+                if (locatorOffered) AimHints.afterTap(method, result, aimMisses)?.let { result.put("aim_hint", it) }
+            }
             when (result) {
                 is JSONObject -> {
                     extractImages(result, images)
@@ -1191,7 +1204,8 @@ class LocalBrain(
             }
         } catch (t: Throwable) {
             host.logWarn(TAG, "tool '${tc.name}' failed: ${t.message}")
-            "Failed: ${t.message ?: t.javaClass.simpleName}"
+            val way = if (locatorOffered && t.message?.startsWith(AimHints.REPEAT_REFUSED) == true) AimHints.REFUSED_WAY_OUT else ""
+            "Failed: ${t.message ?: t.javaClass.simpleName}$way"
         }
         return toolMessage(tc.id, body.take(MAX_TOOL_CHARS))
     }
