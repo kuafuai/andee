@@ -10,7 +10,7 @@
 
 - **不自己构建，先试用：** 使用 [CodeFlying 构建页](https://www.codeflying.net/andee) 获取已经配置好的 APK。这是独立服务，条款和 token 额度以它自己的规则为准。
 - **试用仓库构建包：** 从[最新 Release](https://github.com/kuafuai/andee/releases/latest)下载裸 debug APK。里面没有密钥，之后必须自己配置本机模型和语音密钥。
-- **自己构建：** 先按 [README 的快速开始](../README.zh-CN.md#快速开始)准备环境和执行命令；工具链没有配好时，再看详细的[装机配置](../README.zh-CN.md#构建配置)。
+- **自己构建：** 先按 [README 的从源码构建](../README.zh-CN.md#从源码构建)准备环境和执行命令；工具链没有配好时，再看详细的[装机配置](../README.zh-CN.md#构建配置)。
 
 第一次运行请使用 Android 11（API 30）或更新版本的真机。模拟器可以安装，但大多数设备操作功能在那里没有实际意义。
 

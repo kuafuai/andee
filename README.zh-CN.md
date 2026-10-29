@@ -9,10 +9,10 @@
 
 <p align="center">
   <a href="https://www.codeflying.net/andee">在线构建</a> ·
-  <a href="https://www.codeflying.net/andee">立即体验</a> ·
+  <a href="#安装">安装</a> ·
   <a href="docs/getting-started.zh-CN.md">入门指南</a> ·
   <a href="#核心能力">核心能力</a> ·
-  <a href="#快速开始">快速开始</a> ·
+  <a href="#从源码构建">从源码构建</a> ·
   <a href="#权限每一项为什么以及你拒绝了会怎样">权限</a> ·
   <a href="#为什么你可以去核对而不是选择相信">可核对</a> ·
   <a href="SECURITY.md">安全</a> ·
@@ -25,7 +25,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20conditions-155eef"></a>
   <a href="app/build.gradle"><img alt="Platform" src="https://img.shields.io/badge/platform-Android%2011%2B%20(API%2030)-3ddc84"></a>
   <a href="desktop/build.gradle"><img alt="macOS" src="https://img.shields.io/badge/platform-macOS%2014%2B%20(arm64%20%2F%20x64)-555555"></a>
-  <a href="app/build.gradle"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.22-7f52ff"></a>
+  <a href="app/build.gradle"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-2.1.21-7f52ff"></a>
   <a href="docs/permissions.zh-CN.md"><img alt="遥测不含内容" src="https://img.shields.io/badge/遥测-不含内容-0f6e56"></a>
   <a href="CONTRIBUTING.zh-CN.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-fdb062"></a>
 </p>
@@ -49,6 +49,36 @@
 
 https://github.com/user-attachments/assets/866e8333-e97b-4bf5-9525-540f9fdb01cd
 
+
+## 安装
+
+**推荐：到 [CodeFlying](https://www.codeflying.net/andee) 一键打包。** 打开页面点「立即打包」，拿到的是一个
+**已经配好模型和语音令牌**的安装包，扫码下载、装上就能说话 —— 不用自己打包，也不用去各家申请密钥。
+新用户有免费额度，够你上手；用完之后需要购买。（English: [codeflying.app/andee](https://www.codeflying.app/andee)）
+
+```text
+1. 打开  https://www.codeflying.net/andee  →  立即打包  →  扫码下载
+2. 安装
+3. 开悬浮窗，再开无障碍 → 那颗球就出现了，点它说话
+```
+
+CodeFlying 是一个独立的服务，和本项目没有直接关系；它自己的条款、定价和数据处理方式，都是它自己的。
+
+**也可以直接下载发布包。** 每次 [Release](https://github.com/kuafuai/andee/releases/latest) 都挂着手机和 Mac
+两种包，中英文各一份：
+
+| 设备 | 下载哪个 | 装好之后 |
+| --- | --- | --- |
+| Android 手机 / 平板（Android 11+） | `andee-<版本>-zh-android-arm64-v8a.apk`（绝大多数设备） | 开悬浮窗、开无障碍 |
+| Mac，Apple 芯片（macOS 14+） | `andee-<版本>-zh-mac-arm64.dmg` | 打开 dmg，把 Andee 拖进「应用程序」；它要「辅助功能」和「屏幕录制」时允许 |
+| Mac，Intel | `andee-<版本>-zh-mac-x64.dmg` | 同上 |
+
+发布包里**没有任何令牌**：装好之后要在 ⚙ → **后端**里填 CodeFlying 的密钥（在 CodeFlying 注册就有），
+或者切到「本机」填你自己的模型和语音密钥。有新版本时，它启动时会提醒你一次，点「去升级」就到 CodeFlying。
+
+想自己从源码构建，见[从源码构建](#从源码构建)。权限为什么要、拒绝了会怎样，见[权限](#权限每一项为什么以及你拒绝了会怎样)。
+
+## 他是谁
 
 **他不是来帮你用手机的，他是来住进这台设备的。** 装上去之后，这台设备是多了一个住户，而不是多了
 一堆功能：他**在这台设备上**思考，留一本只有他自己能读的笔记本，而且没人看着的时候还是同一个样子。这里
@@ -163,7 +193,7 @@ Android 13 及以上，它通过无障碍服务自带的输入通道打字 —�
 *"下次跟这个人打交道，不知道这件事会不会让我搞错？"* 这本笔记本是**私人的** —— 对应工具是
 `localOnly`，在发往 hub 的载荷里被过滤掉，习惯和承诺从不离开设备。上面还有一个真的调度器，
 规矩很硬：说出"我会提醒你"的那一刻，任务必须**已经设好并确认过**。而且这本笔记你看得到：
-**「它记得的事」**里列着每一条记忆和每一个定时任务，每一条都可以删。
+**「小本本」**分八页 —— 自己 · 在意 · 日记 · 打算 · 人 · 维基 · 记忆 · 待办，记忆和待办每一条都可以删。
 **聊完的话题会被收起来，而不是删掉。** 一段结束了的对话，是之后每一次请求里最贵、又最不可能再被
 用到的东西。所以每晚的复盘会把它折成一段带标题的摘要，原地只留一行标记 —— 逐字的对话存档在旁边。
 回溯里那些消息变成一张卡片，上面有**继续话题**、**对话记录**和**产出物**。你问到摘要里没写的细节时，
@@ -173,6 +203,15 @@ Android 13 及以上，它通过无障碍服务自带的输入通道打字 —�
 对话安静下来之后，设备会发一个 `(to yourself …)` 的回合 —— Andee 独自复盘刚才的对话：
 *"没人在看你，也没人在等你回答。"* 两条规矩：**不许出声**，**不许碰设备**。他去收尾自己许下的
 承诺，记下哪些习惯下次值得提议成情景，并且**宁可空手结束，也不为了记而编一条**。
+
+**9. 他有自己的事。**（新）
+他会写下**自己是谁**（一段第一人称的自述，会随经历改写）、**在意的事**（你交给他的一个社区、答应别人的
+一件事、一个想弄明白的问题 —— 每件都有「多久该看一次」）、**认识的人**（只记他真正打过交道的人，不从通讯录
+同步），以及一个**维基**（他写的方案、调研、复盘，都是 Markdown 文件，可以打开、可以发给别人）。每晚写一页
+**日记**，用他自己的口气，不许写成工作汇报。
+**没人叫他，他也会自己动起来**：你在用设备时，他大约每 20 分钟想一想有没有哪件事拖得太久；值得就自己做一会儿
+—— 写方案、整理认识的人、记下想法，最多留一个气泡。这时候他**不碰屏幕、不出声、也不替你发任何东西**，这一条是
+设备强制的。多久算拖久、做没做成，都由设备按记录来算，不听他自己说。设置里「自己动起来」可以关掉。
 
 ### 脸 —— 性格，不是主题皮肤
 
@@ -268,33 +307,10 @@ agent loop **就是** `LocalBrain`。它让系统提示词保持不变，把会�
 图上画的每一样都在本仓库里，连护栏也在 ——
 见[为什么你可以去核对，而不是选择相信](#为什么你可以去核对而不是选择相信)。
 
-## 快速开始
+## 从源码构建
 
-**最快的一条路，省掉的是真正卡住人的那两件事：自己打包、自己配令牌。**
-
-**[codeflying.app](https://www.codeflying.app/andee)**（English）· **[codeflying.net](https://www.codeflying.net/andee)**
-（中文）就是一个干这件事的通用平台 —— **你用一句话描述想要的应用，它帮你开发并发布。** 不需要先懂
-Android。跟它要一个 Andee，它会交给你一个**已经配好令牌**的安装包。也可以直接打开
-**[一键体验页](https://www.codeflying.net/andee)**，点「立即打包」即可复制母应用、生成一个已配好令牌的
-安装包二维码，扫码下载。
-
-**它是一个独立的服务，和本项目没有直接关系** —— 不是 Andee 的构建通道，本项目里的东西也管不到它。
-它自己的条款、定价和数据处理方式，都是它自己的。
-
-有两件事它省不掉。**装这一步省不掉** —— 设备那侧仍然是一个 APK，仍然要装到设备上。
-**免费 token 额度也是有限的** —— 够你上手，用完之后需要购买 token。
-
-```text
-1. 打开  https://www.codeflying.net/andee      （English: https://www.codeflying.app/andee）
-2. 描述你想要的 Andee
-3. 构建 → 下载安装包（令牌已配好）→ 安装
-4. 开悬浮窗，再开无障碍 → 那颗球就出现了
-```
-
-还有中间那条路 —— **最新一次 [Release](https://github.com/kuafuai/andee/releases/latest) 上挂了一个裸的
-debug 包**。它省掉的是「自己打包」，**省不掉「配令牌」**：包里没有任何密钥、默认英文、CodeFlying 关闭，
-所以你得自己在 ⚙ → **后端 → 本机** 里填上模型和语音的密钥，它才能干活。它是**拿来试用的过渡包，不是
-分发包** —— 为什么、以及代价是什么，发版说明里写清了。
+只想用、不想自己构建的话，看上面的[安装](#安装)。下面是自己构建的路：Android 的完整步骤在后面的
+[构建配置](#构建配置)、[配 JDK](#配-jdk)、[把自己构建的包装到设备](#把自己构建的包装到设备)几节。
 
 **在 Mac 上**，同一份代码可以构建桌面版（Apple 芯片、macOS 14+，要装 Command Line Tools 来提供
 `swiftc`，JDK 同样是 17–20）：
@@ -335,6 +351,9 @@ JAVA_HOME=~/jdk-x64/jdk-17.0.20.1+1/Contents/Home \
   ./gradlew :desktop:packageDmg --no-daemon         # → Andee-1.0.0.dmg（x86_64）
 ./gradlew --stop && ./gradlew :desktop:packageDmg   # → Andee-1.0.0.dmg（arm64）
 ```
+
+两种架构打出来的文件名**都是** `desktop/build/compose/binaries/main/dmg/Andee-1.0.0.dmg`，后打的会覆盖先打的 ——
+打完一个先按上表改名，再打另一个。打包要先装 `dmgbuild`，步骤见英文 README 的 Mac packaging 一节。
 
 **这里有两处失败是静默的。**
 
@@ -402,7 +421,7 @@ Google），再填该服务商的密钥。这是两个独立的服务，条款�
 其实是那一栏空着。其余功能照常，只是既听不见也说不出。
 不管你选哪家，音频都会发到那家 —— 见 [DISCLAIMER.zh-CN.md](DISCLAIMER.zh-CN.md)。
 
-> **如果你走的是[快速开始](#快速开始)里 CodeFlying 那条路，这两把 Key 都已经在安装包里了。**
+> **如果你走的是[安装](#安装)里 CodeFlying 那条路，这两把 Key 都已经在安装包里了。**
 > ⚙ → **后端**会直接显示 **CodeFlying** 这一 tab 为当前后端；LLM、ASR、TTS 以及海量第三方 API
 > （AI 图片/视频/音乐生成、地理位置、天气、PDF、搜索、新闻、股票……）都走同一把 Key，由 CodeFlying
 > 统一封装并计费，免去你逐一申请密钥和维护账单的麻烦。上面两把 Key 只适用于你自己配置的**本机** tab。
@@ -489,7 +508,7 @@ Google），再填该服务商的密钥。这是两个独立的服务，条款�
   发布"的通用平台，**是独立服务，不属于本项目。** 描述你想要的 Andee，它会给你一个已经配好令牌的
   安装包；本地不用编译，也不用先懂 Android。免费额度够上手，用完之后需要购买 token。
 
-- **自己部署。** 克隆、构建、安装 —— 见[快速开始](#快速开始)，以及本文下面完整的
+- **自己部署。** 克隆、构建、安装 —— 见[从源码构建](#从源码构建)，以及本文下面完整的
   [装机顺序建议](#装机顺序建议)。接任意 OpenAI 兼容端点即可运行，**不依赖任何私有后端**。
 
 - **换一具身体。** 工具契约就是那道缝。任何说得出这套契约的东西 —— 手机、平板、另一块硬件
@@ -521,7 +540,7 @@ Google），再填该服务商的密钥。这是两个独立的服务，条款�
 | 项 | 值 | 说明 |
 |---|---|---|
 | Android Gradle Plugin | 8.3.1 | `gradle/libs.versions.toml` 里的 `agp` |
-| Kotlin | 1.9.22 | `app/build.gradle` 顶部固定 |
+| Kotlin | 2.1.21 | 根目录 `build.gradle` 固定，三个模块一起动 |
 | compileSdk / targetSdk | 34 | Android 14 |
 | minSdk | 30 | Android 11 —— 因为要用 `AccessibilityAction.ACTION_IME_ENTER`（API 30+）和 `takeScreenshot`（API 30+） |
 | Java / Kotlin JVM target | 1.8 | `sourceCompatibility` 1.8、`jvmTarget = '1.8'` |
@@ -649,7 +668,7 @@ Linux 通常是 `/home/<user>/Android/Sdk`，Windows 是
 - 需要麦克风，否则 ASR 用不了
 - 需要联网（WiFi / 4G / 5G 都行）—— ASR / TTS 走公网，大脑 hub 走 LAN；用 `local` 模式则只走公网
 
-## 安装
+## 把自己构建的包装到设备
 
 ```bash
 ./gradlew installDebug         # 设备已插 USB 或已连 wifi adb
@@ -954,6 +973,9 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
 | 好玩的用法 | 你用它做过什么，实用不实用都行 —— 见[好玩的用法](#好玩的用法) |
 | 安全 | 漏洞 —— 走私密渠道，永远不要开公开 issue。见 [SECURITY.md](SECURITY.md) |
 | 产品 / 在线 | 不想自己打包就想试 Andee —— [codeflying.net](https://www.codeflying.net/andee) · [codeflying.app](https://www.codeflying.app/andee) |
+| 微信 | 加 Andee 为好友 —— 扫下面的码，或者点聊天页底部的微信图标 |
+
+<p align="center"><img src="images/wechat-qr.jpg" width="220" alt="用微信扫码，添加 Andee 为好友"></p>
 
 ## 安全披露
 

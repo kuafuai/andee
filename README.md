@@ -5,10 +5,10 @@
 
 <p align="center">  
   <a href="https://www.codeflying.app/andee">Build online</a> ·  
-  <a href="https://www.codeflying.app/andee">Try now</a> ·  
+  <a href="#install">Install</a> ·  
   <a href="docs/getting-started.md">Getting started</a> ·
   <a href="#key-features">Features</a> ·  
-  <a href="#quick-start">Quick start</a> ·  
+  <a href="#build-from-source">Build from source</a> ·  
   <a href="#provisioning">Provisioning</a> ·  
   <a href="#what-it-looks-like">What it looks like</a> ·  
   <a href="#permissions-why-each-one-and-what-happens-if-you-refuse">Permissions</a> ·  
@@ -23,7 +23,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20conditions-155eef"></a>  
   <a href="app/build.gradle"><img alt="Platform" src="https://img.shields.io/badge/platform-Android%2011%2B%20(API%2030)-3ddc84"></a>  
   <a href="desktop/build.gradle"><img alt="macOS" src="https://img.shields.io/badge/platform-macOS%2014%2B%20(arm64%20%2F%20x64)-555555"></a>  
-  <a href="app/build.gradle"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.22-7f52ff"></a>  
+  <a href="app/build.gradle"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-2.1.21-7f52ff"></a>  
   <a href="docs/permissions.md"><img alt="No content telemetry" src="https://img.shields.io/badge/telemetry-no%20content-0f6e56"></a>  
   <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-fdb062"></a>  
 </p>
@@ -52,6 +52,41 @@
 </p>
 
 <https://github.com/user-attachments/assets/bf560279-d86c-4301-9bcb-01d60fa33d06>
+
+## Install
+
+**Recommended: one-click build on [CodeFlying](https://www.codeflying.app/andee).** Open the page and tap the
+build button; what you get is an installable package with **the model and voice keys already configured** —
+scan to download, install, and it can talk. No building it yourself, no signing up for keys at three different
+providers. New accounts get a free allowance to get started; after that, tokens are purchased.
+(中文：[codeflying.net/andee](https://www.codeflying.net/andee))
+
+```text
+1. Open  https://www.codeflying.app/andee  →  build  →  scan to download
+2. Install
+3. Grant Overlay, then Accessibility → the ball appears; tap it to talk
+```
+
+CodeFlying is a separate service with no direct relationship to this project; its own terms, pricing and data
+handling apply.
+
+**Or download a release.** Every [release](https://github.com/kuafuai/andee/releases/latest) carries a phone
+package and a Mac package, in English and in Chinese:
+
+| Device | Download | After installing |
+| --- | --- | --- |
+| Android phone / tablet (Android 11+) | `andee-<version>-en-android-arm64-v8a.apk` (almost every device) | grant Overlay, then Accessibility |
+| Mac, Apple silicon (macOS 14+) | `andee-<version>-en-mac-arm64.dmg` | open the dmg, drag Andee to Applications; allow Accessibility and Screen Recording when it asks |
+| Mac, Intel | `andee-<version>-en-mac-x64.dmg` | the same |
+
+Release packages carry **no keys**: after installing, put your CodeFlying key (you get one when you sign up there)
+in ⚙ → **Backend**, or switch to On-device and enter your own model and voice keys. When a newer version is out,
+it tells you once at launch; Upgrade takes you to CodeFlying.
+
+To build it yourself, see [Build from source](#build-from-source). For why each permission is needed and what
+happens if you refuse, see [Permissions](#permissions-why-each-one-and-what-happens-if-you-refuse).
+
+## What it is
 
 **It is not here to help you use your phone. It is here to be the thing that lives in it.** Once it is  
 installed, the device has a resident rather than a set of features: it does its thinking **on that device**,  
@@ -193,7 +228,8 @@ test decides what gets written: *"next time I deal with them, would not knowing 
 it wrong?"* The notebook is **private** — the tools are `localOnly` and filtered out of the hub  
 payload, so habits and promises never leave the device. On top of it sits a real scheduler, under  
 a hard rule: the moment it says "I'll remind you", the task must already be set and confirmed. And it  
-is yours to read: **What it remembers** lists every memory and every scheduled task — all deletable.
+is yours to read: the **notebook** has eight tabs — Self · Cares · Diary · Plan · People · Wiki · Memories ·
+Todos — and every memory and todo there is deletable.
 **Finished topics get put away, not deleted.** A conversation that has ended is the most expensive
 thing in every later request and the least likely to be needed again, so the nightly review folds it
 into a titled summary with a one-line marker left in its place — and the verbatim conversation is
@@ -206,6 +242,18 @@ After a conversation goes quiet the device sends a `(to yourself …)` turn — 
 conversation alone, *"nobody is watching you, nobody is waiting for you to answer."* Two rules:  
 make no sound, and do not touch the device. It closes out its own promises, notes which habits are  
 worth turning into a scene next time, and ends empty-handed rather than inventing something to record.
+
+**9. It has things of its own.** (new)
+It keeps **who it is** (a short first-person account it rewrites as things happen), **what it cares about** (a
+community you handed it, something it promised someone, a question it wants to work out — each with how often it
+means to look), **the people it knows** (only the ones it has actually dealt with, never copied from your
+contacts), and a **wiki** (the plans, research and reviews it writes, as Markdown files you can open and send on).
+Every night it writes a **diary** page in its own voice — a status report is refused.
+**It gets up by itself, with nobody asking**: while you are using the device it checks about every 20 minutes
+whether something has waited too long, and if so works on it for a while — writing a plan, tidying the people it
+knows, noting a thought, at most one bubble. It **does not touch the screen, speak, or send anything for you**
+then, and the device enforces that. How overdue something is, and whether it got done, are counted by the device
+from the record, not taken from the model. Settings → On its own turns it off.
 
 ### Face — a character, not a theme
 
@@ -318,38 +366,10 @@ channels — speech, text, a full-screen page, saved artifacts, long text, and p
 Everything drawn here is in this repository, down to the guard rails — see  
 [Why you can check this instead of trusting it](#why-you-can-check-this-instead-of-trusting-it).
 
-## Quick start
+## Build from source
 
-The fastest route skips the two things that actually stop people: **building it yourself, and wiring  
-up tokens.**
-
-**[codeflying.app](https://www.codeflying.app/andee)** (English) · **[codeflying.net](https://www.codeflying.net/andee)**  
-(Chinese) is a general platform for exactly that shape of problem — **you describe the app you want in  
-words, and it develops and publishes it for you.** No Android knowledge required. Ask it for Andee and  
-it hands you an installable package with the keys already configured. Or open the  
-**[one-click page](https://www.codeflying.app/andee)**, tap the build button, and get a  
-pre-configured package with a QR code — scan to download.
-
-**It is a separate service with no direct relationship to this project** — not Andee's build channel,  
-and not covered by anything in this repository. Its own terms, pricing and data handling apply.
-
-Two things it does **not** skip. **You still install the package** — the device side is still an APK  
-that has to be put on the device. And **the free token allowance is finite**: it covers getting  
-started, and once it runs out, tokens are purchased.
-
-```text
-1. Open  https://www.codeflying.app/andee    (Chinese: https://www.codeflying.net/andee)
-2. Describe the Andee you want
-3. Build → download the package (keys already configured) → install
-4. Grant Overlay, then Accessibility → the ball appears
-```
-
-Or take the middle route — **a bare debug APK is attached to the
-[latest release](https://github.com/kuafuai/andee/releases/latest)**. That skips building it yourself,
-but **not** the token setup: no keys are configured, it comes up in English, and CodeFlying is off, so
-you put your own model and voice keys in under ⚙ → **Backend → On-device** before it can do anything.
-It is a stopgap for trying the thing rather than a distribution build; the release notes say why and
-what it costs.
+If you only want to use it, see [Install](#install) above. This is the route for building it yourself; the full
+Android steps are further down, under [Provisioning](#provisioning).
 
 **On a Mac**, build the desktop app from the same checkout (Apple silicon, macOS 14+, the Command Line Tools
 for `swiftc`, and the same JDK 17–20):
@@ -410,6 +430,9 @@ JAVA_HOME=~/jdk-x64/jdk-17.0.20.1+1/Contents/Home \
   ./gradlew :desktop:packageDmg --no-daemon         # → Andee-1.0.0.dmg (x86_64)
 ./gradlew --stop && ./gradlew :desktop:packageDmg   # → Andee-1.0.0.dmg (arm64)
 ```
+
+Both architectures write the **same** file, `desktop/build/compose/binaries/main/dmg/Andee-1.0.0.dmg`, so the
+second build overwrites the first — rename it to the name in the table above before building the other one.
 
 **Two failures here are silent.**
 
@@ -487,7 +510,7 @@ which surfaces as a **connect timeout** — the device looks like it has a netwo
 has is a blank field. Everything else still works; it is just mute and deaf.
 Whichever you pick, the audio goes to that provider — see [DISCLAIMER.md](DISCLAIMER.md).
 
-> **If you took the CodeFlying route in [Quick Start](#quick-start), both keys are already baked in.**  
+> **If you took the CodeFlying route in [Install](#install), both keys are already baked in.**  
 > ⚙ → **Backend** will show **CodeFlying** as the active tab; LLM, ASR, TTS and the long tail of  
 > third-party APIs (image / video / music generation, geolocation, weather, PDF, search, news,  
 > stocks, …) all go through one key, wrapped and billed by CodeFlying so you don't sign up for each  
@@ -699,7 +722,7 @@ If you want to see how the decisions were made rather than only what was decided
   Describe the Andee you want, and it hands you an installable package with the keys already  
   configured — nothing to compile locally, and nothing about Android to understand first. A free  
   token allowance gets you started; it is finite, and once it runs out, tokens are purchased.
-- **Self-hosted.** Clone, build, install. See [Quick start](#quick-start) and the provisioning  
+- **Self-hosted.** Clone, build, install. See [Build from source](#build-from-source) and the provisioning  
   walkthrough in [Provisioning](#provisioning). Point it at any OpenAI-compatible endpoint and it  
   runs with no private backend at all.
 - **Bring your own body.** The tool contract is the seam. Anything that can speak it — a phone, a  
@@ -715,7 +738,7 @@ Pure Kotlin, no Compose; the whole thing hangs off two pillars, `WindowManager` 
 | What                      | Value               | Why                                                                                       |
 | ------------------------- | ------------------- | ----------------------------------------------------------------------------------------- |
 | Android Gradle Plugin     | 8.3.1               | `agp` in `gradle/libs.versions.toml`                                                      |
-| Kotlin                    | 1.9.22              | pinned at the top of `app/build.gradle`                                                   |
+| Kotlin                    | 2.1.21              | pinned in the root `build.gradle`; all three modules move together                        |
 | compileSdk / targetSdk    | 34                  | Android 14                                                                                |
 | minSdk                    | 30                  | Android 11 — `AccessibilityAction.ACTION_IME_ENTER` and `takeScreenshot` are both API 30+ |
 | Java / Kotlin JVM target  | 1.8                 | `sourceCompatibility` 1.8, `jvmTarget = '1.8'`                                            |
@@ -855,7 +878,7 @@ Gradle reads either.
 - Network (WiFi / 4G / 5G all fine). ASR and TTS go over the public internet, the brain hub goes over  
   the LAN; in `local` mode only the public internet is used
 
-### Install
+### Installing a build you made
 
 ```bash
 ./gradlew installDebug         # device attached over USB, or already on wireless adb
@@ -1105,6 +1128,9 @@ Blur or avoid anything private — yours or anyone else's — before it goes up.
 | Show and tell | What you built with it, fun or not — see [Showcase](#showcase) |
 | Security | Vulnerabilities — privately, never in a public issue. See [SECURITY.md](SECURITY.md) |
 | Product / online | Trying Andee without building it yourself — [codeflying.app](https://www.codeflying.app/andee) · [codeflying.net](https://www.codeflying.net/andee) |
+| WeChat | Add Andee as a friend — scan the code below, or tap the WeChat icon at the foot of the chat |
+
+<p align="center"><img src="images/wechat-qr.jpg" width="220" alt="Scan with WeChat to add Andee as a friend"></p>
 
 ## Security disclosure
 

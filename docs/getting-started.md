@@ -10,7 +10,7 @@ Pick the route that matches what you want to do:
 
 - **Try it without building:** use the [CodeFlying build page](https://www.codeflying.app/andee) for a pre-configured APK. This is a separate service, and its own terms and token limits apply.
 - **Try a repository build:** download the bare debug APK from the [latest release](https://github.com/kuafuai/andee/releases/latest). It has no credentials, so you must configure the on-device model and voice keys later.
-- **Build it yourself:** follow the Android requirements and commands in [Quick start](../README.md#quick-start), then use the detailed [Provisioning](../README.md#provisioning) reference if the toolchain is not ready.
+- **Build it yourself:** follow the Android requirements and commands in [Build from source](../README.md#build-from-source), then use the detailed [Provisioning](../README.md#provisioning) reference if the toolchain is not ready.
 
 For a first run, use a real Android 11 (API 30) or newer device. An emulator can install the app, but most device-control features are not meaningful there.
 
