@@ -242,6 +242,15 @@ class TextInputActivity : Activity() {
             backdrop.setImageBitmap(bmp)
             backdrop.foreground = ColorDrawable(Backdrop.scrim())
         }
+        // Tap the empty space above the strip = done typing. The field keeps
+        // focus otherwise — an EditText never lets go on its own — and the pill
+        // has no ✕, only camera/album/words/send. Clearing focus hides the
+        // keyboard, and the inset listener below already closes the field once
+        // the keys are really gone ([scheduleCloseWhenGone]).
+        backdrop.setOnClickListener {
+            field.clearFocus()
+            hideKeyboard()
+        }
 
         // One row, anchored at the bottom. See the backdrop above for why the
         // window is no longer see-through.
@@ -670,6 +679,14 @@ class TextInputActivity : Activity() {
         runCatching {
             (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
                 .showSoftInput(field, 0)
+        }
+    }
+
+    private fun hideKeyboard() {
+        runCatching { field.windowInsetsController?.hide(android.view.WindowInsets.Type.ime()) }
+        runCatching {
+            (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                .hideSoftInputFromWindow(field.windowToken, 0)
         }
     }
 

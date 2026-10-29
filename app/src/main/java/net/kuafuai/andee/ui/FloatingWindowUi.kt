@@ -202,6 +202,18 @@ class FloatingWindowUi(
         fun onMinimizeClick()
 
         /**
+         * A swipe up from the bottom edge of the full card — the system home
+         * gesture, which a fullscreen touchable overlay would otherwise swallow
+         * before the launcher ever saw it (a touch that has entered this window
+         * cannot be forwarded by returning false from `onTouchEvent`). The
+         * window detects it itself and reports it, because that is the one path
+         * that does not need the accessibility service — which this ROM is free
+         * to revoke. The host folds the card, exactly as [onMinimizeClick]
+         * does: the two are the same intent reached by two gestures.
+         */
+        fun onHomeSwipe()
+
+        /**
          * Two taps on the ball — the user wants to type instead of talk.
          *
          * On the ball rather than as a key in the top bar, because the ball is
@@ -525,6 +537,14 @@ class FloatingWindowUi(
 
     private var slide: ValueAnimator? = null
 
+    /**
+     * The fold/unfold animation in flight, or null. Owns the root view's scale
+     * during a zoom between the full card and the corner square — see
+     * [enterCompact] and [exitCompact]. Separate from [slide], which is the
+     * compact ball's perch slide and never overlaps a fold.
+     */
+    private var foldAnim: ValueAnimator? = null
+
     fun isShown(): Boolean = root != null
 
     /**
@@ -563,10 +583,13 @@ class FloatingWindowUi(
             gravity = Gravity.TOP or Gravity.START
             x = dm.widthPixels - side - dp(COMPACT_MARGIN_DP)
             y = dm.heightPixels - side - dp(COMPACT_MARGIN_DP)
-            // FLAG_LAYOUT_IN_SCREEN alone is not enough: since API 30 the window
-            // also fits the system-bar insets by default, so on the Honor phone a
-            // MATCH_PARENT card still started below the status bar and stopped
-            // above the navigation bar. Zero lets the card cover the display.
+            // Truly edge-to-edge. Since API 30 the window fits the system-bar
+            // insets by default (statusBars | navigationBars | captionBar), so a
+            // MATCH_PARENT card stopped below the status bar *and* above the
+            // navigation bar — a band of the user's wallpaper left at the bottom
+            // is exactly the "not fullscreen" look. Fit nothing so the card runs
+            // from the display's top to its bottom; the toolbar steps around the
+            // status bar itself in [insetTopBar].
             fitInsetsTypes = 0
             layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -2124,6 +2147,7 @@ class FloatingWindowUi(
     private fun enterCompact() {
         val p = params ?: return
         slide?.cancel()
+        foldAnim?.cancel()
         // A signboard cannot survive the fold — the window shrinks to a corner
         // square smaller than the pane. Evict through [signboardEvictor] so
         // CardUi's own callbacks fire (timeout semantics, holding state).
@@ -2136,30 +2160,70 @@ class FloatingWindowUi(
         fullGeometry = intArrayOf(p.x, p.y, p.width, p.height)
         val side = dp(COMPACT_DP)
         val dm = context.resources.displayMetrics
-        p.width = side
-        p.height = side
-        // X is normally the resting corner, a thumb's width in (see
-        // [compactHomeY] for why the same gap is deliberate on Y). A fold that
-        // lands already clinging skips the resting corner entirely, though —
-        // nothing will slide it afterwards — so it has to be born at [perchX],
-        // or the same cling would sit at a different X depending on whether the
-        // task started before or after the card folded.
-        p.x = if (perched) perchX() else dm.widthPixels - side - dp(COMPACT_MARGIN_DP)
-        p.y = compactHomeY()
-        // The fold usually happens because a task started, so the perch is
-        // normally already wanted by the time we get here. Applied outright
-        // rather than slid: it is one motion with the fold, not a second one.
-        homeX = p.x
-        homeY = p.y
+        // The corner the card is shrinking into. X is normally the resting
+        // corner, a thumb's width in (see [compactHomeY] for why the same gap is
+        // deliberate on Y). A fold that lands already clinging is born at
+        // [perchX] instead, or the cling would sit at a different X depending on
+        // whether the task started before or after the fold.
+        val cx = if (perched) perchX() else dm.widthPixels - side - dp(COMPACT_MARGIN_DP)
+        val cy = if (perched) perchY() else compactHomeY()
+        // homeY is the *resting* corner, always — a clinging fold parks at
+        // perchY but must climb back to compactHomeY when the task ends.
+        homeX = cx
+        homeY = compactHomeY()
         perchApplied = perched
-        if (perched) p.y = perchY()
-        applyCompactAppearance()
-        syncWorking()
-        retimeStroll()
-        // Everything above is placed from whatever [winYOrigin] the *last* fold
-        // measured, because the square's own frame does not exist until this one
-        // has been laid out. Re-measure as soon as it does.
-        ui.post { reseatCompact() }
+        val v = root
+        if (v == null) {
+            // Nothing on screen yet — land the geometry outright.
+            p.x = cx; p.y = cy; p.width = side; p.height = side
+            applyCompactAppearance()
+            syncWorking()
+            retimeStroll()
+            ui.post { reseatCompact() }
+            return
+        }
+        // The card is a floating overlay, so it cannot ride the launcher's own
+        // home animation — the system zooms the launcher behind it, which is
+        // already at home. Draw the same zoom ourselves: shrink the whole card
+        // toward the screen centre and fade the *window* out, then land the
+        // window on the corner square once the content is gone. The fade is
+        // window alpha — the ball is a TextureView, which does not reliably
+        // honour a view-level alpha, but the compositor always honours `p.alpha`.
+        // The fade is also what makes the shape change invisible — a tall card
+        // cannot scale into a square corner without it.
+        v.pivotX = dm.widthPixels / 2f
+        v.pivotY = dm.heightPixels / 2f
+        v.scaleX = 1f
+        v.scaleY = 1f
+        foldAnim = ValueAnimator.ofFloat(1f, 0f).apply {
+            duration = FOLD_ANIM_MS
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { a ->
+                val t = a.animatedValue as Float
+                val s = FOLD_SCALE_MIN + (1f - FOLD_SCALE_MIN) * t
+                v.scaleX = s
+                v.scaleY = s
+                p.alpha = t
+                runCatching { wm.updateViewLayout(v, p) }
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    foldAnim = null
+                    v.scaleX = 1f
+                    v.scaleY = 1f
+                    p.alpha = 1f
+                    p.x = cx; p.y = cy; p.width = side; p.height = side
+                    runCatching { wm.updateViewLayout(v, p) }
+                    applyCompactAppearance()
+                    syncWorking()
+                    retimeStroll()
+                    // Placed from whatever [winYOrigin] the last fold measured —
+                    // re-measure now that the square's own frame exists.
+                    ui.post { reseatCompact() }
+                }
+            })
+            start()
+        }
     }
 
     /**
@@ -2190,51 +2254,99 @@ class FloatingWindowUi(
     private fun exitCompact() {
         val p = params ?: return
         slide?.cancel()
+        foldAnim?.cancel()
         // Same eviction as the fold, in the other direction: the card grows
         // and the signboard's compact geometry (ball at the window's bottom)
         // is meaningless inside it.
         evictSignboard()
         perchApplied = false
+        // The restore target is always the full card: [enterCompact] snapshots
+        // `fullGeometry` only after the typing band is put back, so it is the
+        // edge-to-edge rectangle. Belt-and-braces against a stale compact-sized
+        // value (service killed while folded, then restored): never grow to
+        // anything smaller than about a third of the screen.
+        val dm = context.resources.displayMetrics
         val g = fullGeometry ?: intArrayOf(
             0, 0,
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
         )
-        // Belt-and-braces: a stale stored geometry can be a compact-sized
-        // rectangle (service killed while folded, then restored). Growing the
-        // window to a corner square is worse than useless, so never restore
-        // anything smaller than about a third of the screen.
-        val dm = context.resources.displayMetrics
-        if (g[2] >= dm.widthPixels / 3 && g[3] >= dm.heightPixels / 3) {
-            p.x = g[0]; p.y = g[1]; p.width = g[2]; p.height = g[3]
-        } else {
-            p.x = 0; p.y = 0
-            p.width = WindowManager.LayoutParams.MATCH_PARENT
-            p.height = WindowManager.LayoutParams.MATCH_PARENT
-        }
+        val whole = g[2] >= dm.widthPixels / 3 && g[3] >= dm.heightPixels / 3
+        val fx = if (whole) g[0] else 0
+        val fy = if (whole) g[1] else 0
+        val fw = if (whole) g[2] else WindowManager.LayoutParams.MATCH_PARENT
+        val fh = if (whole) g[3] else WindowManager.LayoutParams.MATCH_PARENT
         fullGeometry = null
-        // The fill is [applyWindow]'s to set — it is the only place that knows
-        // whether the compositor agreed to blur — and [setCompact] calls it
-        // immediately after this, before the next frame.
+        val v = root
+        if (v == null) {
+            p.x = fx; p.y = fy; p.width = fw; p.height = fh
+            showCardChrome()
+            ball?.scaleX = BALL_SCALE
+            ball?.scaleY = BALL_SCALE
+            syncWorking()
+            retimeStroll()
+            return
+        }
+        // The chrome comes up immediately so it is there to grow into, and the
+        // ball takes its full-card scale now. The real ball area height is set
+        // by [BallHostFrame.onSizeChanged] once the window is laid out full.
+        showCardChrome()
+        ball?.scaleX = BALL_SCALE
+        ball?.scaleY = BALL_SCALE
+        // Land the window fullscreen first, then zoom the content up out of the
+        // centre — the mirror of the fold's shrink-and-fade.
+        p.x = fx; p.y = fy; p.width = fw; p.height = fh
+        runCatching { wm.updateViewLayout(v, p) }
+        v.pivotX = dm.widthPixels / 2f
+        v.pivotY = dm.heightPixels / 2f
+        v.scaleX = FOLD_SCALE_MIN
+        v.scaleY = FOLD_SCALE_MIN
+        p.alpha = 0f
+        runCatching { wm.updateViewLayout(v, p) }
+        foldAnim = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = FOLD_ANIM_MS
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { a ->
+                val t = a.animatedValue as Float
+                val s = FOLD_SCALE_MIN + (1f - FOLD_SCALE_MIN) * t
+                v.scaleX = s
+                v.scaleY = s
+                p.alpha = t
+                runCatching { wm.updateViewLayout(v, p) }
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    foldAnim = null
+                    v.scaleX = 1f
+                    v.scaleY = 1f
+                    p.alpha = 1f
+                    syncWorking()
+                    retimeStroll()
+                }
+            })
+            start()
+        }
+    }
+
+    /**
+     * Bring back the pieces of the card that the fold hid. Called at the start
+     * of an unfold, so the chrome is already there while the card grows into it.
+     *
+     * The two areas' heights are deliberately not set here: the window is still
+     * the corner square, and the real height only exists after the layout pass
+     * the geometry change is about to trigger — see [BallHostFrame.onSizeChanged].
+     */
+    private fun showCardChrome() {
         topBarView?.visibility = View.VISIBLE
         sceneChip?.visibility = if (sceneTitle != null) View.VISIBLE else View.GONE
         muteKey?.visibility = View.VISIBLE
         historyView?.visibility = View.VISIBLE
         tipsView?.visibility = View.VISIBLE
         backdrop?.visibility = View.VISIBLE
-        // The two areas' heights are deferred to [BallHostFrame.onSizeChanged]
-        // rather than computed here: the window is still the corner square at
-        // this point, and the real height only exists after the layout pass
-        // that this geometry change is about to trigger.
-        //
         // Anything that arrived while folded — which is most of it, since the
-        // card is folded for the whole time the assistant is working — has
-        // only ever been appended to a list that wasn't being laid out.
+        // card is folded for the whole time the assistant is working — has only
+        // ever been appended to a list that wasn't being laid out.
         historyView?.refresh()
-        ball?.scaleX = BALL_SCALE
-        ball?.scaleY = BALL_SCALE
-        syncWorking()
-        retimeStroll()
     }
 
     /**
@@ -2248,7 +2360,12 @@ class FloatingWindowUi(
     private fun applyWindow() {
         val v = root ?: return
         val p = params ?: return
-        p.alpha = if (captureHidden || away) 0f else 1f
+        // A fold/unfold fade owns the window alpha while it runs — it writes
+        // `p.alpha` on every frame, so this must not stamp 1f back over the
+        // start value (which for an unfold is 0f). Outside that, capture and
+        // away are the only reasons the whole window goes transparent.
+        p.alpha = if (foldAnim?.isRunning == true) p.alpha
+            else if (captureHidden || away) 0f else 1f
         // FLAG_LAYOUT_IN_SCREEN is what makes the unfolded card actually
         // fullscreen. Without it the window's frame is the *content* area —
         // the display minus the status and navigation bars — so a MATCH_PARENT
@@ -2923,6 +3040,67 @@ class FloatingWindowUi(
             return dx * dx + dy * dy <= r * r
         }
 
+        // ---- Home-swipe gesture (full card only) ----
+        //
+        // A swipe up from the bottom strip is the system home gesture, which
+        // this fullscreen touchable overlay would otherwise swallow before the
+        // launcher could act (a touch that has entered this window cannot be
+        // forwarded by returning false from [onTouchEvent]). Detected here, in
+        // [dispatchTouchEvent] and therefore on *every* event whether or not a
+        // child owns the touch. [onInterceptTouchEvent] is only re-consulted on
+        // MOVE once a child has claimed the DOWN, and the bottom strip is the
+        // one place nothing does — the community row's gesture-bar padding is a
+        // dead zone, so a DOWN there reaches no child and the intercept never
+        // sees the MOVE that is the whole gesture. This is the one path to
+        // "home folds the card" that does not need the accessibility service,
+        // which this ROM is entitled to revoke.
+        private var homeSwipeTracking = false
+        private var homeSwipeStartX = 0f
+        private var homeSwipeStartY = 0f
+        private var homeSwipeCommitted = false
+
+        override fun dispatchTouchEvent(e: MotionEvent): Boolean {
+            if (e.actionMasked == MotionEvent.ACTION_DOWN) {
+                // Use display coordinates: a resized card's bottom can sit
+                // beside the input field, far above the phone's navigation edge.
+                val screenBottom = wm.maximumWindowMetrics.bounds.bottom
+                homeSwipeTracking = !compact && signboard == null && typingTop == 0 &&
+                    foldAnim?.isRunning != true &&
+                    HomeSwipeRegion.contains(e.rawY, screenBottom, dp(HOME_SWIPE_STRIP_DP))
+                homeSwipeStartX = e.x
+                homeSwipeStartY = e.y
+                homeSwipeCommitted = false
+            }
+            if (homeSwipeTracking && e.actionMasked == MotionEvent.ACTION_MOVE &&
+                !homeSwipeCommitted
+            ) {
+                val up = homeSwipeStartY - e.y
+                if (up >= dp(HOME_SWIPE_TRIGGER_DP) &&
+                    up > kotlin.math.abs(e.x - homeSwipeStartX)
+                ) {
+                    // Cancel a child's pending click/scroll before taking the gesture.
+                    val cancel = MotionEvent.obtain(e)
+                    cancel.action = MotionEvent.ACTION_CANCEL
+                    super.dispatchTouchEvent(cancel)
+                    cancel.recycle()
+                    homeSwipeCommitted = true
+                    android.util.Log.i("AndeeNavigation", "home swipe startY=$homeSwipeStartY rawY=${e.rawY} screenBottom=${wm.maximumWindowMetrics.bounds.bottom}")
+                    listeners.onHomeSwipe()
+                }
+            }
+            val owned = homeSwipeTracking
+            val handled = if (homeSwipeCommitted) true else super.dispatchTouchEvent(e)
+            if (e.actionMasked == MotionEvent.ACTION_UP ||
+                e.actionMasked == MotionEvent.ACTION_CANCEL
+            ) {
+                homeSwipeTracking = false
+                homeSwipeCommitted = false
+            }
+            // Accept DOWN even over empty bottom padding. Returning false here
+            // would prevent this window from receiving the rest of the swipe.
+            return owned || handled
+        }
+
         override fun onTouchEvent(e: MotionEvent): Boolean {
             val p = params ?: return false
             val ballH = ballAreaView?.height ?: return false
@@ -3112,6 +3290,16 @@ class FloatingWindowUi(
          */
         private const val SWIPE_COMMIT = 3f
 
+        /** Only the physical navigation edge may start a home gesture. */
+        private const val HOME_SWIPE_STRIP_DP = 24
+
+        /**
+         * How far the finger must climb from its down position, inside the home
+         * strip, before the swipe is committed as home. Several times the touch
+         * slop, so a tap on the community row's glyphs never reads as a swipe.
+         */
+        private const val HOME_SWIPE_TRIGGER_DP = 48
+
         /**
          * Where the card splits: ball above, scrollback below. Also the touch
          * boundary between them (see [BallHostFrame.onSizeChanged]) — the list
@@ -3199,6 +3387,20 @@ class FloatingWindowUi(
         private const val SIGN_OVERLAP_FRACTION = 0.235f
 
         private const val PERCH_SLIDE_MS = 240L
+
+        /**
+         * How long the card takes to zoom between full and folded. Kept near the
+         * perch slide so the two motions read as one family, and short enough
+         * that a fold never delays a task starting — see [enterCompact].
+         */
+        private const val FOLD_ANIM_MS = 220L
+
+        /**
+         * How far the card shrinks during a fold before it fades out. Not the
+         * corner square's own scale — the card is tall and the corner is square,
+         * so the two can never match; the fade covers the hand-off.
+         */
+        private const val FOLD_SCALE_MIN = 0.5f
 
         /** The last-few-pixels pull onto the ledge when a drag lets go. */
         private const val SNAP_MS = 150L

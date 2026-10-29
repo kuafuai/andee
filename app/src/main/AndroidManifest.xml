@@ -203,6 +203,7 @@
              Theme.Body.Stage.NoPreview,它让前者不闪黑。 -->
         <activity
             android:name=".ui.SelfCheckActivity"
+            android:autoRemoveFromRecents="true"
             android:theme="@style/Theme.Body.Stage.NoPreview"
             android:exported="true"
             android:launchMode="singleTop"
@@ -246,6 +247,8 @@
             android:name=".ui.TextInputActivity"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true"
+            android:autoRemoveFromRecents="true"
+            android:taskAffinity=""
             android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize"
             android:exported="false"
