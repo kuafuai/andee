@@ -770,7 +770,7 @@ object VoiceConfig {
          * (1..200) so a stray zero doesn't make the brain refuse everything
          * and a stray thousand doesn't burn an unbounded bill.
          */
-        const val DEFAULT_MAX_STEPS = 25
+        const val DEFAULT_MAX_STEPS = 40
 
         fun maxSteps(context: Context): Int =
             (context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

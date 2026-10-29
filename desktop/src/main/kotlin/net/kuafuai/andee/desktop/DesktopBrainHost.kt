@@ -47,7 +47,7 @@ class DesktopBrainHost(
     override fun logWarn(tag: String, msg: String, t: Throwable?) = Log.w(tag, msg, t)
     override fun logError(tag: String, msg: String, t: Throwable?) = Log.e(tag, msg, t)
 
-    override fun maxSteps(): Int = Settings.get("max_steps").toIntOrNull()?.coerceIn(1, 200) ?: 25
+    override fun maxSteps(): Int = Settings.get("max_steps").toIntOrNull()?.coerceIn(1, 200) ?: 40
 
     override fun activeSceneName(): String? = Settings.get("scene").ifEmpty { null }
         ?.takeIf { DesktopNotebook.book.scene(it) != null }

@@ -207,7 +207,7 @@
     <string name="settings_section_diagnostics">Diagnostics</string>
     <string name="settings_section_advanced">Advanced</string>
     <string name="settings_max_steps">Max steps per task</string>
-    <string name="settings_max_steps_note">The most tool calls the AI may make in a single task before stopping with a final answer. Guards against runaway loops and bills. Default 25 — a dozen steps is enough for most tasks.</string>
+    <string name="settings_max_steps_note">The most tool calls the AI may make in a single task before stopping with a final answer. Guards against runaway loops and bills. Default 40 — a dozen steps is enough for most tasks.</string>
     <string name="settings_advanced_note">Show the cloud option, typing, diagnostics and factory reset. Nothing here for day-to-day use.</string>
     <string name="settings_grounding">Grounding capture</string>
     <string name="settings_grounding_note">Records coordinate taps and screenshots to files/grounding for offline analysis — it photographs whatever you are doing. Needs the accessibility service restarted to take effect.</string>

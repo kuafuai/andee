@@ -251,7 +251,7 @@ fun SettingsScreen(
         }
         // ---- 单次任务最多步数 ----
         Section(st("settings_max_steps"), note = st("settings_max_steps_note")) {
-            GlassField(st("settings_max_steps"), v["max_steps"].orEmpty(), { v["max_steps"] = it }, hint = "25")
+            GlassField(st("settings_max_steps"), v["max_steps"].orEmpty(), { v["max_steps"] = it }, hint = "40")
 
         }
         // ---- Mac only: the shell ----
