@@ -342,6 +342,10 @@ class BodyCoreService : Service() {
                 dispatcher.compactForUser()
             }
 
+            override fun onWeChatClick() {
+                net.kuafuai.andee.ui.WeChatQrUi(this@BodyCoreService).show()
+            }
+
             override fun onNotebookClick() {
                 net.kuafuai.andee.ui.NotebookUi(this@BodyCoreService) {}.show()
             }

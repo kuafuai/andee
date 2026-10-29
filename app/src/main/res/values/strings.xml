@@ -499,6 +499,11 @@
         words rather than the raw enum values ("没接住" is not a word a person
         uses; 踩过的坑 is).
     -->
+    <string name="wechat_title">加 Andee 为微信好友</string>
+    <string name="wechat_hint">用微信扫码，添加 Andee 为好友</string>
+    <string name="wechat_save">保存到相册</string>
+    <string name="wechat_saved">已保存到相册，在微信「扫一扫」里选图片即可</string>
+    <string name="wechat_save_failed">没存上，可以截屏保存</string>
     <string name="notebook_title">它记得的事</string>
     <string name="notebook_copy_all">复制全部</string>
     <string name="notebook_copied">已复制</string>

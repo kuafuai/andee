@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -129,6 +130,7 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
     var pending by remember { mutableStateOf(Assistant.pending) }
     val attached = remember { androidx.compose.runtime.mutableStateListOf<Attachment>().apply { addAll(ChatPreview.attachments) } }
     var dropping by remember { mutableStateOf(false) }
+    var wechat by remember { mutableStateOf(System.getProperty("andee.shot.wechat") == "1") }
     var muted by remember { mutableStateOf(Assistant.muted) }
     var recording by remember { mutableStateOf(Meeting.isActive()) }
     // A folded stretch is one card standing where its messages stood — the phone's rule, so the
@@ -329,8 +331,11 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
             )
             Box(Modifier.clickable { openLink(GITHUB_URL) }.padding(horizontal = 5.dp, vertical = 2.dp)) { Icon(AndeeIcon.GITHUB, Palette.photoInk, 13.dp) }
             Box(Modifier.clickable { openLink(DISCORD_URL) }.padding(horizontal = 5.dp, vertical = 2.dp)) { Icon(AndeeIcon.DISCORD, Palette.photoInk, 13.dp) }
+            // WeChat is not a link: it shows Andee's QR code, to add it as a friend.
+            Box(Modifier.clickable { wechat = true }.padding(horizontal = 5.dp, vertical = 2.dp)) { Icon(AndeeIcon.WECHAT, Palette.photoInk, 13.dp) }
         }
     }
+    if (wechat) WeChatQr(onDone = { wechat = false })
     if (dropping) {
         Box(
             Modifier.fillMaxSize().padding(10.dp)
@@ -614,3 +619,38 @@ private fun Modifier.fadeTop(height: androidx.compose.ui.unit.Dp): Modifier = th
         )
     }
 
+
+/** Andee's WeChat QR code over the conversation; a click outside it or on ✕ closes it. */
+@Composable
+private fun WeChatQr(onDone: () -> Unit) {
+    val zh = Strings.lang() == "zh"
+    val img: androidx.compose.ui.graphics.ImageBitmap? = remember { wechatQr() }
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)).clickable(onClick = onDone),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.widthIn(max = 340.dp).background(Palette.cardSolid, RoundedCornerShape(22.dp)).border(1.dp, Palette.hairline, RoundedCornerShape(22.dp)).clickable(enabled = false) {}.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (zh) "加 Andee 为微信好友" else "Add Andee on WeChat", color = Palette.title, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                Box(Modifier.clickable(onClick = onDone).padding(6.dp)) { Icon(AndeeIcon.CLOSE, Palette.secondary, 14.dp) }
+            }
+            Spacer(Modifier.height(12.dp))
+            if (img != null) {
+                androidx.compose.foundation.Image(img, contentDescription = "WeChat QR",
+                    modifier = Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(14.dp)).padding(6.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(if (zh) "用微信扫码，添加 Andee 为好友" else "Scan with WeChat to add Andee as a friend", color = Palette.label, fontSize = 13.sp)
+        }
+    }
+}
+
+private object WeChatQrImage
+
+private fun wechatQr(): androidx.compose.ui.graphics.ImageBitmap? = runCatching {
+    val bytes = WeChatQrImage::class.java.getResourceAsStream("/wechat_qr.png")!!.use { it.readBytes() }
+    org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap()
+}.getOrNull()

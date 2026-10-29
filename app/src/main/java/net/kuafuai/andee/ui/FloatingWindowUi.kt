@@ -173,6 +173,9 @@ class FloatingWindowUi(
          */
         fun onOpenCommunityLink(url: String) {}
 
+        /** The WeChat glyph beside them: Andee's QR code ([WeChatQrUi]). */
+        fun onWeChatClick() {}
+
         /** The 小本本 key — what it remembers. See [NotebookUi]. */
         fun onNotebookClick() {}
 
@@ -336,7 +339,10 @@ class FloatingWindowUi(
      * sits after; the tap hands the URL out through
      * [Listeners.onOpenCommunityLink], which is the host's trip to make.
      */
-    private fun communityLink(res: Int, url: String, label: String): View {
+    private fun communityLink(res: Int, url: String, label: String): View =
+        communityGlyph(res, label) { listeners.onOpenCommunityLink(url) }
+
+    private fun communityGlyph(res: Int, label: String, onClick: () -> Unit): View {
         val icon = ImageView(context).apply {
             setImageResource(res)
             setColorFilter(Color.parseColor(Glass.PHOTO_INK))
@@ -348,7 +354,7 @@ class FloatingWindowUi(
             setPadding(dp(7), dp(4), dp(7), dp(4))
             isClickable = true
             Glass.pressable(this)
-            setOnClickListener { listeners.onOpenCommunityLink(url) }
+            setOnClickListener { onClick() }
             addView(icon, LinearLayout.LayoutParams(dp(16), dp(16)))
         }
     }
@@ -2532,6 +2538,8 @@ class FloatingWindowUi(
         communityRow.addView(tipsLine)
         communityRow.addView(communityLink(R.drawable.ic_github, GITHUB_URL, "GitHub"))
         communityRow.addView(communityLink(R.drawable.ic_discord, DISCORD_URL, "Discord"))
+        // WeChat is not a link: it opens Andee's QR code, to add it as a friend.
+        communityRow.addView(communityGlyph(R.drawable.ic_wechat, "WeChat") { listeners.onWeChatClick() })
         // The input pill, always there on the full card like the Mac's composer. It is not a field: an overlay
         // cannot raise the keyboard on this ROM, so a tap opens the real one ([TextInputActivity]) in its place.
         val inputRow = LinearLayout(context).apply {

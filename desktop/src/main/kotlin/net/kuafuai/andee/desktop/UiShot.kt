@@ -38,6 +38,8 @@ fun main(args: Array<String>) {
         if (k == "theme") Palette.setNight(v == "night")
         if (k == "brain") Settings.save(mapOf("brain" to v))
     }
+    // `chat … wechat`: the conversation with the WeChat QR card open.
+    if (args.getOrElse(4) { "" } == "wechat") System.setProperty("andee.shot.wechat", "1")
     if (args.getOrElse(4) { "" } == "empty") Scrollback.wipe() else seed()
     @Suppress("UNUSED_VARIABLE") val unused = 0
     if (args.getOrElse(4) { "" } == "pending") {

@@ -475,6 +475,11 @@
     <string name="notebook_dump_next">" · next "</string>
     <string name="notebook_dump_last_error">"   last error: "</string>
 
+    <string name="wechat_title">Add Andee on WeChat</string>
+    <string name="wechat_hint">Scan with WeChat to add Andee as a friend</string>
+    <string name="wechat_save">Save to Photos</string>
+    <string name="wechat_saved">Saved. In WeChat\'s Scan, pick it from your photos</string>
+    <string name="wechat_save_failed">Could not save it; take a screenshot instead</string>
     <string name="notebook_title">What it remembers</string>
     <string name="notebook_copy_all">Copy all</string>
     <string name="notebook_copied">Copied</string>
