@@ -1,5 +1,6 @@
 package net.kuafuai.andee.desktop
 
+import net.kuafuai.andee.util.Log
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -99,11 +100,14 @@ object VersionCheck {
     fun remindAtLaunch() {
         Thread({
             Thread.sleep(LAUNCH_DELAY_MS)
-            val r = probe() as? Result.Behind ?: return@Thread
-            if (AskGate.current != null) return@Thread
+            val p = probe()
+            Log.i("Version", "launch check: ${current()} → $p")
+            val r = p as? Result.Behind ?: return@Thread
+            if (AskGate.current != null) return@Thread.also { Log.i("Version", "a card is up; not reminding this launch") }
             val zh = Strings.lang() == "zh"
             val go = if (zh) "去升级" else "Upgrade"
             val a = AskGate.ask(behindText(r), listOf(go, if (zh) "以后再说" else "Later"), REMIND_MS, speak = false)
+            Log.i("Version", "reminder answered: ${a.button ?: a.how}")
             if (a.button == go) runCatching { net.kuafuai.andee.desktop.mac.Bridge.open(upgradeUrl()) }
         }, "version-remind").apply { isDaemon = true }.start()
     }
