@@ -207,10 +207,10 @@ class FloatingWindowUi(
          * gesture, which a fullscreen touchable overlay would otherwise swallow
          * before the launcher ever saw it (a touch that has entered this window
          * cannot be forwarded by returning false from `onTouchEvent`). The
-         * window detects it itself and reports it, because that is the one path
-         * that does not need the accessibility service — which this ROM is free
-         * to revoke. The host folds the card, exactly as [onMinimizeClick]
-         * does: the two are the same intent reached by two gestures.
+         * window detects it itself so folding does not need accessibility.
+         * Returning the underlying app to the launcher is best-effort: the host
+         * uses accessibility HOME when available, then a launcher Intent, which
+         * a ROM may restrict from the background.
          */
         fun onHomeSwipe()
 

@@ -368,10 +368,16 @@ class BodyCoreService : Service() {
             // A user home gesture must also leave the app underneath the overlay.
             override fun onHomeSwipe() {
                 dispatcher.compactForUser()
-                val handled = ScreenBodyService.get()?.performGlobalAction(
+                val homeResult = ScreenBodyService.get()?.performGlobalAction(
                     AccessibilityService.GLOBAL_ACTION_HOME,
-                ) == true
-                if (!handled) {
+                )
+                if (homeResult != true) {
+                    if (homeResult == false) {
+                        android.util.Log.w(
+                            "AndeeNavigation",
+                            "GLOBAL_ACTION_HOME returned false; card folded, attempting launcher fallback",
+                        )
+                    }
                     runCatching {
                         startActivity(Intent(Intent.ACTION_MAIN).apply {
                             addCategory(Intent.CATEGORY_HOME)
