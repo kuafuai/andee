@@ -82,10 +82,12 @@ class ScreenBodyService : AccessibilityService() {
      */
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
-        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            event.packageName?.toString()?.let { pkg ->
-                net.kuafuai.andee.device.DeviceState.foregroundPkg = pkg
-                BodyCoreService.get()?.noteForegroundPackage(pkg)
+        when (event.eventType) {
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                event.packageName?.toString()?.let { pkg ->
+                    net.kuafuai.andee.device.DeviceState.foregroundPkg = pkg
+                    BodyCoreService.get()?.noteForegroundPackage(pkg, event.className?.toString())
+                }
             }
         }
         BodyCoreService.get()?.noteAccessibilityEvent(event)

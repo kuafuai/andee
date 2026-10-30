@@ -266,6 +266,11 @@ class SelfCheckActivity : StageActivity() {
      */
     private var settings: SettingsUi? = null
 
+    /** The icon is a trampoline to an overlay, not a blank recent-task card. */
+    private fun finishLauncherEntry() {
+        if (isTaskRoot) finishAndRemoveTask() else finish()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -361,8 +366,9 @@ class SelfCheckActivity : StageActivity() {
 
         val svc = BodyCoreService.get()
         if (!restored && !checkOpen && !carrying && svc != null && svc.ensureOverlays()) {
+            svc.noteOwnActivity()
             svc.dispatcherForNotification()?.expand()
-            finish()
+            finishLauncherEntry()
             return
         }
         // Accessibility is ours and the overlay grant is in hand, so the ball
@@ -373,7 +379,7 @@ class SelfCheckActivity : StageActivity() {
         // checklist for a device that is working, which is the exact report
         // this branch was rewritten to stop producing.
         if (!restored && !checkOpen && !carrying && svc == null && ScreenBodyService.get() != null && Settings.canDrawOverlays(this)) {
-            finish()
+            finishLauncherEntry()
             return
         }
 

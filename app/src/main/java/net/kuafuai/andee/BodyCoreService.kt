@@ -377,6 +377,28 @@ class BodyCoreService : Service() {
                 dispatcher.compactForUser()
             }
 
+            // A user home gesture must also leave the app underneath the overlay.
+            override fun onHomeSwipe() {
+                dispatcher.compactForUser()
+                val homeResult = ScreenBodyService.get()?.performGlobalAction(
+                    AccessibilityService.GLOBAL_ACTION_HOME,
+                )
+                if (homeResult != true) {
+                    if (homeResult == false) {
+                        android.util.Log.w(
+                            "AndeeNavigation",
+                            "GLOBAL_ACTION_HOME returned false; card folded, attempting launcher fallback",
+                        )
+                    }
+                    runCatching {
+                        startActivity(Intent(Intent.ACTION_MAIN).apply {
+                            addCategory(Intent.CATEGORY_HOME)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        })
+                    }.onFailure { android.util.Log.w("BodyCoreService", "Cannot open home", it) }
+                }
+            }
+
             /**
              * Re-show a page from the scrollback, or read a message fullscreen.
              *
@@ -1203,6 +1225,8 @@ class BodyCoreService : Service() {
             return
         }
         typingFromFullscreen = true
+        // The short-lived Activity may not emit its own accessibility event.
+        noteOwnActivity()
         net.kuafuai.andee.ui.TextInputActivity.start(this, then)
     }
 
@@ -1223,6 +1247,7 @@ class BodyCoreService : Service() {
      * a better reason than the user's place does.
      */
     private fun typingFinished() {
+        noteOwnActivity()
         window.setTypingTop(0)
         window.setAway(false)
         if (typingFromFullscreen && !window.isCompact()) dispatcher.expand()
@@ -1376,6 +1401,7 @@ class BodyCoreService : Service() {
      * app the brain is about to drive.
      */
     private fun closeTyping() {
+        if (net.kuafuai.andee.ui.TextInputActivity.isShowing) noteOwnActivity()
         net.kuafuai.andee.ui.TextInputActivity.dismiss()
     }
 
@@ -1457,6 +1483,7 @@ class BodyCoreService : Service() {
             android.content.IntentFilter().apply {
                 addAction(android.content.Intent.ACTION_SCREEN_ON)
                 addAction(android.content.Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
             },
             androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
         )
@@ -1495,7 +1522,26 @@ class BodyCoreService : Service() {
 
     private val screenReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(c: android.content.Context?, i: android.content.Intent?) {
-            screenOn = i?.action != android.content.Intent.ACTION_SCREEN_OFF
+            when (i?.action) {
+                Intent.ACTION_SCREEN_ON -> screenOn = true
+                Intent.ACTION_SCREEN_OFF -> screenOn = false
+                // Home can leave the launcher already in front behind our overlay,
+                // so there may be no accessibility foreground change to observe.
+                Intent.ACTION_CLOSE_SYSTEM_DIALOGS -> {
+                    val reason = i.getStringExtra("reason")
+                    // Recentapps also accompanies our own task transitions.
+                    // Ignore those delayed broadcasts, but keep the system edge
+                    // gesture working when Android owns the touch stream.
+                    val internalTransition = android.os.SystemClock.uptimeMillis() -
+                        ownActivityTransitionAt < 1_000L
+                    if ((reason == "homekey" || (reason == "recentapps" && !internalTransition)) &&
+                        ::window.isInitialized && ::dispatcher.isInitialized && !window.isCompact()
+                    ) {
+                        android.util.Log.i("AndeeNavigation", "fold from system reason=$reason")
+                        dispatcher.compactForUser()
+                    }
+                }
+            }
         }
     }
 
@@ -1653,7 +1699,82 @@ class BodyCoreService : Service() {
      * body happens to be up to hear about it. What needs a body is the scene
      * logic, and that is all this does.
      */
-    fun noteForegroundPackage(pkg: String) {
+    /** Navigation between apps, excluding transient keyboard and system windows. */
+    private val homeNavigation = net.kuafuai.andee.ui.HomeNavigationTracker()
+
+    /** The launcher package — what "home" resolves to. Cached; it does not change while we run. */
+    private val homePackage: String? by lazy {
+        packageManager.resolveActivity(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0,
+        )?.activityInfo?.packageName
+    }
+
+    /**
+     * The launcher's home *activity*, the class that is only ever in front when
+     * the user is actually on the home screen. On this ROM that is
+     * `com.hihonor.android.launcher.unihome.UniHomeLauncher`; a slow home swipe
+     * passes through the recents `ListView` first, so both count in
+     * [noteForegroundPackage] — but the launcher's menu, its folders and every
+     * systemui surface report the same package under different class names, and
+     * none of them are home.
+     */
+    private val homeActivity: String? by lazy {
+        packageManager.resolveActivity(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0,
+        )?.activityInfo?.name
+    }
+
+    /**
+     * Whether [cls] is the launcher's home activity, tolerating the short class
+     * name some ROMs report in the event in place of the fully-qualified one
+     * [homeActivity] resolves to.
+     */
+    private fun isHomeActivity(cls: String?): Boolean {
+        val ha = homeActivity ?: return false
+        if (cls == null) return false
+        if (cls == ha) return true
+        val simple = ha.substringAfterLast('.')
+        return cls == simple || cls.endsWith(".$simple")
+    }
+
+    /** Input methods do not change the app navigation tracked by [homeNavigation]. */
+    private val inputMethodPackages: Set<String> by lazy {
+        runCatching {
+            val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+                as android.view.inputmethod.InputMethodManager
+            imm.enabledInputMethodList.map { it.packageName }.toSet()
+        }.getOrDefault(emptySet())
+    }
+
+    private var ownActivityTransitionAt = 0L
+
+    /** Mark an app-owned trampoline even when it finishes before accessibility sees it. */
+    fun noteOwnActivity() {
+        ownActivityTransitionAt = android.os.SystemClock.uptimeMillis()
+        homeNavigation.note(packageName, packageName, homePackage, false)
+    }
+
+    fun noteForegroundPackage(pkg: String, cls: String? = null) {
+        val returnedFromAnotherApp = homeNavigation.note(
+            pkg, packageName, homePackage,
+            pkg in inputMethodPackages || pkg == "android" || pkg == "com.android.systemui",
+        )
+        // The launcher entry expands the overlay and immediately finishes.
+        // That can report Home again without ever reporting our short-lived
+        // Activity. A launcher -> launcher event is therefore not navigation;
+        // folding on it makes every subsequent icon launch close itself.
+        // Explicit Home/Recents uses the system-dialog receiver, and an upward
+        // swipe on the card uses onHomeSwipe, even with Home already underneath.
+        val isRecents = pkg == homePackage &&
+            (cls == RECENTS_CLASS || cls == "$homePackage.quickstep.RecentsActivity")
+        val isHomeSurface = pkg == homePackage && isHomeActivity(cls)
+        val wentHome = isRecents || (isHomeSurface && returnedFromAnotherApp)
+        if (wentHome) android.util.Log.i("AndeeNavigation", "fold from foreground pkg=$pkg cls=$cls")
+        if (wentHome && ::window.isInitialized && ::dispatcher.isInitialized &&
+            !window.isCompact()
+        ) {
+            dispatcher.compactForUser()
+        }
         maybeAutoEnterScene(pkg)
     }
 
@@ -3479,6 +3600,14 @@ class BodyCoreService : Service() {
         fun get(): BodyCoreService? = instanceRef.get()
 
         private const val TAG = "Body"
+
+        /**
+         * The window class the launcher reports for its recents screen. A slow
+         * home swipe drags through recents before it lands on home, and folding
+         * on it is what ties the fold to the swipe itself rather than only to
+         * the gesture's end. See [noteForegroundPackage].
+         */
+        private const val RECENTS_CLASS = "android.widget.ListView"
 
         /** Start-intent extra: also claim the microphone. See [promoteForMicrophone]. */
         private const val EXTRA_MICROPHONE = "microphone"
