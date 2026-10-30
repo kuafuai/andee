@@ -33,6 +33,13 @@ object MacVoice {
     @Volatile var onPartial: (String) -> Unit = {}
     @Volatile var onFinal: (String) -> Unit = {}
     @Volatile var onState: (State) -> Unit = {}
+    /**
+     * Fired when a turn could not be heard — the engine failed to start, or the
+     * server refused the handshake. The window puts it in the scrollback as an
+     * error row, the same place the phone's `reportVoiceFailure` leaves it, so a
+     * dead voice key reads as a message instead of a tap that did nothing.
+     */
+    @Volatile var onError: (String) -> Unit = {}
 
     enum class State { IDLE, LISTENING, SPEAKING }
 
@@ -227,6 +234,8 @@ object MacVoice {
             listening.set(false)
             Log.w(TAG, "asr: $msg")
             onPartial.invoke("")
+            // `onError` alone resolves to this very method, so name the object.
+            this@MacVoice.onError(msg)
         }
         override fun onClosed() { disarmWatchdog(); listening.set(false) }
     }

@@ -165,6 +165,11 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
             heard = ""
             Thread { Assistant.say(said) }.start()
         }
+        net.kuafuai.andee.desktop.voice.MacVoice.onError = { msg ->
+            // The phone's `svc_voice_error_line` row: a red bubble in the scrollback, so a
+            // refused handshake (a dead key, a closed service) is said instead of swallowed.
+            Scrollback.add(Scrollback.Role.ERROR, (if (Strings.lang() == "zh") "语音：" else "Voice: ") + msg)
+        }
     }
     LaunchedEffect(Unit) { pending = Assistant.pending }
     // A message that arrives while the page is open scrolls into view smoothly. The first run is skipped: the
