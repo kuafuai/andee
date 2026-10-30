@@ -2110,25 +2110,7 @@ class BodyCoreService : Service() {
                 if (rebuiltByReset) {
                     rebuiltByReset = false
                 } else {
-                    val after = net.kuafuai.andee.config.VoiceConfig.hubConfig(this)
-                    val afterBrain = net.kuafuai.andee.config.VoiceConfig.brainConfig(this)
-                    if (before.url != after.url || before.deviceName != after.deviceName ||
-                        !beforeBrain.sameBackend(afterBrain)
-                    ) {
-                        android.util.Log.i("Body", "brain/hub config changed → restart brain")
-                        // Restarting the local brain discards the conversation,
-                        // which is the right trade only when the user changed
-                        // *who* answers: the key, the endpoint or the mode.
-                        stopBrain()
-                        startBrain()
-                    } else if (beforeBrain != afterBrain) {
-                        // Model, thinking or effort: the same backend, asked
-                        // differently on the next request. Rebuilding for this
-                        // used to wipe a conversation every time the thinking
-                        // switch was touched.
-                        android.util.Log.i("Body", "brain tuned in place: model=${afterBrain.model} thinking=${afterBrain.thinking}/${afterBrain.reasoningEffort}")
-                        localBrain?.retune(afterBrain)
-                    }
+                    reconcileBackendAfterSettings(before, beforeBrain)
                 }
                 // The self-check card can be sitting *under* this sheet: its
                 // 打开设置 row opens us on top of itself. So this picker is
@@ -2842,6 +2824,42 @@ class BodyCoreService : Service() {
      *   is written either way: it is a log of what happened, not an
      *   interruption.
      */
+    /**
+     * Re-read the backend after a settings sheet closed, and bounce the brain if
+     * *who answers* changed.
+     *
+     * Public because this service is not the only host that raises a
+     * [SettingsUi]: [net.kuafuai.andee.ui.SelfCheckActivity] raises its own, on
+     * the reasoning that the page only appears when there is no service. That is
+     * true of one of the two ways the page appears and false of the other — it
+     * also appears while this service is running, when only *accessibility* is
+     * missing, and then there is a live brain holding whatever was configured
+     * when it started. Saving a key from that sheet used to write the pref and
+     * leave the ball answering "no key" until the next process start, because
+     * nothing re-read the config.
+     *
+     * Restarting the local brain discards the conversation, which is the right
+     * trade only when the user changed *who* answers: the key, the endpoint or
+     * the mode. Model, thinking and effort are re-applied in place.
+     */
+    fun reconcileBackendAfterSettings(
+        beforeHub: net.kuafuai.andee.config.VoiceConfig.HubConfig,
+        beforeBrain: net.kuafuai.andee.config.BrainConfig,
+    ) {
+        val afterHub = net.kuafuai.andee.config.VoiceConfig.hubConfig(this)
+        val afterBrain = net.kuafuai.andee.config.VoiceConfig.brainConfig(this)
+        if (beforeHub.url != afterHub.url || beforeHub.deviceName != afterHub.deviceName ||
+            !beforeBrain.sameBackend(afterBrain)
+        ) {
+            android.util.Log.i("Body", "brain/hub config changed → restart brain")
+            stopBrain()
+            startBrain()
+        } else if (beforeBrain != afterBrain) {
+            android.util.Log.i("Body", "brain tuned in place: model=${afterBrain.model} thinking=${afterBrain.thinking}/${afterBrain.reasoningEffort}")
+            localBrain?.retune(afterBrain)
+        }
+    }
+
     private fun startBrain(announce: Boolean = true) {
         val bc = net.kuafuai.andee.config.VoiceConfig.brainConfig(this)
         // One line that answers "is my override in effect?" without reading

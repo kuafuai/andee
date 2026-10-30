@@ -526,10 +526,19 @@ class SelfCheckActivity : StageActivity() {
      *
      * The three wipes are the only thing the service was carrying, and each is
      * one static call plus a brain rebuild — so here they are just the static
-     * call, because there is no brain to rebuild. That is not a degraded version
-     * of `BodyCoreService.clearChatHistory`: what that method's second half is
-     * *for* is a model still holding the conversation, and on this path nothing
-     * is.
+     * call, because the wipes themselves need no brain. That is not a degraded
+     * version of `BodyCoreService.clearChatHistory`: what that method's second
+     * half is *for* is a model still holding the conversation, and on this path
+     * nothing is.
+     *
+     * **"This is the path where there is no service" is only half true**, and
+     * the other half is why [openOwnSettings] now reconciles the backend on
+     * dismiss: the page also appears while the service *is* running — it falls
+     * through whenever [BodyCoreService.ensureOverlays] cannot vouch for the
+     * overlay, which includes the case where accessibility is off but the
+     * service and its brain are alive. Saving a key from this sheet in that
+     * state wrote the pref and left the ball answering "no key" until the next
+     * launch, because nothing re-read the config.
      *
      * Two sheets can never exist at once. The only way to this page is
      * [onCreate] falling through, which happens when the service is absent or
@@ -543,10 +552,17 @@ class SelfCheckActivity : StageActivity() {
      */
     private fun openOwnSettings() {
         if (settings?.isShowing() == true) return
+        // Snapshot before the sheet opens. This page can be up while the service
+        // is running (see the note above), so the brain that has to be told is
+        // whatever `get()` answers now — not a null check we could skip.
+        val beforeHub = VoiceConfig.hubConfig(this)
+        val beforeBrain = VoiceConfig.brainConfig(this)
         val s = SettingsUi(
             context = this,
             onDismiss = {
                 settings = null
+                BodyCoreService.get()
+                    ?.reconcileBackendAfterSettings(beforeHub, beforeBrain)
                 paintedLang = VoiceConfig.uiLanguage(this)
                 // Re-run the list, not just repaint it: the user came here to
                 // fill in a key, and the row they were sent from is exactly the
