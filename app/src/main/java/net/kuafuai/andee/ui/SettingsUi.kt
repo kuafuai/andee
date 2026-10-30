@@ -795,10 +795,10 @@ class SettingsUi(
         linkNote(huoshanBlock, lctx.getString(R.string.settings_no_key_use_codeflying)) {
             pickBrain(VoiceConfig.BRAIN_CODEFLYING)
         }
-        field(huoshanBlock, "asr_endpoint", lctx.getString(R.string.settings_voice_asr_endpoint))
-        field(huoshanBlock, "asr_resource_id", lctx.getString(R.string.settings_voice_asr_resource_id))
-        field(huoshanBlock, "tts_endpoint", lctx.getString(R.string.settings_voice_tts_endpoint))
-        field(huoshanBlock, "tts_resource_id", lctx.getString(R.string.settings_voice_tts_resource_id))
+        field(huoshanBlock, "asr_endpoint", lctx.getString(R.string.settings_voice_asr_endpoint), hint = VoiceConfig.DEFAULT_ASR_ENDPOINT)
+        field(huoshanBlock, "asr_resource_id", lctx.getString(R.string.settings_voice_asr_resource_id), hint = VoiceConfig.DEFAULT_ASR_RESOURCE)
+        field(huoshanBlock, "tts_endpoint", lctx.getString(R.string.settings_voice_tts_endpoint), hint = VoiceConfig.DEFAULT_TTS_ENDPOINT)
+        field(huoshanBlock, "tts_resource_id", lctx.getString(R.string.settings_voice_tts_resource_id), hint = VoiceConfig.DEFAULT_TTS_RESOURCE)
         field(
             huoshanBlock,
             "tts_sample_rate",
