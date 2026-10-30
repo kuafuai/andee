@@ -52,7 +52,7 @@
     <string name="common_save">Save</string>
     <string name="settings_factory_reset_confirm_title">Factory reset?</string>
     <string name="settings_factory_reset_list_intro">These are deleted for good — there is no backup:</string>
-    <string name="settings_factory_reset_after">The device goes back to a fresh install: keys have to be entered again and the wake word has to be recorded again.</string>
+    <string name="settings_factory_reset_after">The device goes back to a fresh install: the CodeFlying key is kept, other keys have to be entered again and the wake word has to be recorded again.</string>
     <string name="settings_factory_reset_back">No, go back</string>
     <string name="settings_factory_reset_confirm">Erase everything</string>
     <!-- The two destructive buttons sit together at the foot of the
@@ -624,6 +624,7 @@
     <string name="narrate_dog">Moving a leg…</string>
     <string name="narrate_market_search">Finding a tool…</string>
     <string name="narrate_market_call">Calling an external service…</string>
+    <string name="brain_review_name">looking back over the conversation</string>
     <string name="narrate_default">Running %1$s…</string>
 
     <!--

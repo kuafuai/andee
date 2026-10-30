@@ -96,4 +96,34 @@ class NotebookBookTest {
         b.wipe()
         assertTrue(b.memories().isEmpty())
     }
+
+    @Test
+    fun `a fresh notebook gets the nightly picture once, and again after a wipe`() {
+        val (_, b) = fresh()
+        val seeded = b.seedDefaults(zh = true)
+        assertEquals(1, seeded.size)
+        val t = seeded.single()
+        assertEquals("cron", t.mode)
+        assertEquals(NotebookBook.NIGHTLY_PICTURE_CRON, t.cronExpr)
+        assertTrue(t.nextRunAt > System.currentTimeMillis())
+        assertNull(NotebookBook.bundledTodo(t.what))
+        assertEquals(1, b.todos("pending").size)
+
+        // Dropped by the user: the next start must not bring it back.
+        b.patchTodo(t.id, status = "dropped")
+        assertTrue(b.seedDefaults(zh = true).isEmpty())
+        assertEquals(0, b.todos("pending").size)
+
+        b.wipe()
+        assertEquals(1, b.seedDefaults(zh = false).size)
+        assertEquals(NotebookBook.NIGHTLY_PICTURE_EN, b.todos("pending").single().what)
+    }
+
+    @Test
+    fun `not seeded beside one already set on the same schedule`() {
+        val (_, b) = fresh()
+        b.addTodo(Todo("t1", "my own nine o'clock", "cron", 0L, NotebookBook.NIGHTLY_PICTURE_CRON, 1L, 0L, "", "", "active", 0L, false))
+        assertTrue(b.seedDefaults(zh = true).isEmpty())
+        assertEquals(listOf("t1"), b.todos("pending").map { it.id })
+    }
 }

@@ -918,6 +918,7 @@ class LocalBrain(
     private fun describe(text: String, kind: TurnKind): String = when (kind) {
         TurnKind.WAKE, TurnKind.NOTIFY -> WakeText.what(text)
         TurnKind.WORK -> text.lineSequence().first().removePrefix("[You woke yourself: ").substringBefore(" — ")
+        TurnKind.SWEEP, TurnKind.HARVEST -> host.text(BrainText.REVIEW_NAME)
         else -> text.lineSequence().first()
     }.take(80)
 

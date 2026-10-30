@@ -54,7 +54,15 @@ object FactoryReset {
     )
 
     private val TARGETS: List<Target> = listOf(
-        Target(R.string.factory_reset_target_keys) { prefs(it, "voice_prefs") },
+        // The CodeFlying key survives, as on the Mac: it is the account the device talks through, and a reset
+        // that left the device mute until the user found the key again was reported as a bug.
+        Target(R.string.factory_reset_target_keys) { ctx ->
+            val keep = ctx.getSharedPreferences("voice_prefs", Context.MODE_PRIVATE).getString(KEPT_KEY, null)
+            prefs(ctx, "voice_prefs")
+            if (!keep.isNullOrBlank()) {
+                ctx.getSharedPreferences("voice_prefs", Context.MODE_PRIVATE).edit().putString(KEPT_KEY, keep).commit()
+            }
+        },
 
         Target(R.string.factory_reset_target_notebook) { Notebook.wipe(it) },
 
@@ -124,6 +132,9 @@ object FactoryReset {
         Log.i(TAG, "factory reset: $cleared/${TARGETS.size} targets cleared")
         return cleared
     }
+
+    /** The one setting a reset keeps. */
+    private const val KEPT_KEY = "codeflying_key"
 
     // ---- the individual deeds ----
 

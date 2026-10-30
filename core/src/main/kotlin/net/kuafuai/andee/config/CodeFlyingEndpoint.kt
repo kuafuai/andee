@@ -6,7 +6,7 @@ package net.kuafuai.andee.config
  * The three URL shapes below are the only place the paths `/voice/llm`, `/voice/asr/...` and
  * `/baas-api` are written, so the phone and the Mac cannot drift apart on them.
  *
- * [parse] accepts a bare host (`124.71.176.202`, `host:8080`) or one with a scheme
+ * [parse] accepts a bare host (`baas.kuafuai.net`, `host:8080`) or one with a scheme
  * (`https://host`). A scheme the user typed wins over [sslDefault]; a bare host takes the default,
  * which on the phone is the build's `CODEFLYING_SSL_ENABLED` and on the Mac is off.
  */
@@ -14,7 +14,7 @@ class CodeFlyingEndpoint private constructor(val host: String, val ssl: Boolean)
     private val http get() = if (ssl) "https" else "http"
     private val ws get() = if (ssl) "wss" else "ws"
 
-    /** Bare origin, e.g. `http://124.71.176.202`. */
+    /** Bare origin, e.g. `https://baas.kuafuai.net`. */
     val baseUrl: String get() = "$http://$host"
 
     /** Origin of the market tools; the bare `/api/` on that host is the front end's static directory. */

@@ -212,4 +212,6 @@ enum class BrainText {
     NARRATE_MARKET_SEARCH,
     NARRATE_MARKET_CALL,
     NARRATE_DEFAULT,
+    /** What a stopped review is called in the stop row — its instruction is model-facing English, not a name. */
+    REVIEW_NAME,
 }

@@ -1524,9 +1524,14 @@ class CommandDispatcher(
                     .put("scheduled", if (Scheduler.exactAllowed(appContext)) "exact" else "inexact")
                     .put(
                         "note",
-                        "Set. When it comes due and is dealt with, close it with " +
-                            "todos(action=done, id=…) — otherwise it stays in the " +
-                            "\"promised but not done\" list forever." +
+                        (if (todo.mode == "cron") {
+                            "Set. It repeats: do not close it with todos(action=done) when it comes due — " +
+                                "that ends the series. Drop or pause it only when the user asks."
+                        } else {
+                            "Set. When it comes due and is dealt with, close it with " +
+                                "todos(action=done, id=…) — otherwise it stays in the " +
+                                "\"promised but not done\" list forever."
+                        }) +
                             if (Scheduler.exactAllowed(appContext)) {
                                 ""
                             } else {

@@ -2566,6 +2566,8 @@ class BodyCoreService : Service() {
     private fun clearNotebook() {
         net.kuafuai.andee.config.Notebook.wipe(this)
         android.util.Log.i("Body", "notebook cleared")
+        // An empty notebook starts with its default todos, as on first start.
+        net.kuafuai.andee.config.Scheduler.catchUp(this)
     }
 
     /**
@@ -3358,7 +3360,7 @@ class BodyCoreService : Service() {
     private fun wakeBrainFor(brain: net.kuafuai.andee.brain.LocalBrain, todo: net.kuafuai.andee.config.Todo, epoch: Int = brain.stopEpochNow()) {
         // Prompt, not display: [notifyPageClosed] on why the model-facing set is English and what that costs.
         brain.wake(
-            net.kuafuai.andee.brain.WakeText.due(todo.id, todo.what, todo.untrusted),
+            net.kuafuai.andee.brain.WakeText.due(todo.id, todo.what, todo.untrusted, repeats = todo.mode == "cron"),
             untrusted = todo.untrusted,
             epoch = epoch,
         )

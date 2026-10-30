@@ -205,6 +205,8 @@ object Scheduler {
      * the brain (service alive) or a notification (service gone).
      */
     fun catchUp(context: Context): List<net.kuafuai.andee.config.Todo> {
+        // A fresh notebook (first start, or after a reset) gets its default todos here, so the loop below arms them.
+        runCatching { Notebook.seedDefaults(context) }.onFailure { Log.w(TAG, "could not seed default todos", it) }
         val now = System.currentTimeMillis()
         val missed = mutableListOf<net.kuafuai.andee.config.Todo>()
         for (todo in Notebook.todos(context, "all")) {

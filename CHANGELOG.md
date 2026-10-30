@@ -1546,7 +1546,7 @@ because a release this size is the norm.
   added the service's IP address to that file, which is the right move *for a `http://` address*. The
   address then became `https://andee.kuafuai.net`, which needs no exception at all, and the entry was
   deleted rather than left in place: an exception for a host nobody calls only widens what this app
-  will talk to in the clear. `124.71.176.202` (the CodeFlying backend) is still listed and still needs
+  will talk to in the clear. The CodeFlying backend's plain-HTTP address is still listed and still needs
   to be. The rule to carry forward is that this file tracks the addresses actually in use — adding a
   line is part of pointing the app at plain HTTP, and removing it is part of moving away.
 

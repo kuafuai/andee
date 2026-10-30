@@ -301,7 +301,7 @@ fun SettingsScreen(
                 "chat" -> ConfirmBlock(st("settings_clear_chat_confirm_title"), st("settings_clear_chat_confirm_body"), st("settings_clear_chat_confirm"),
                     onNo = { confirm = "" }) { Assistant.clearConversation(); confirm = "" }
                 "notes" -> ConfirmBlock(st("settings_clear_notes_confirm_title"), st("settings_clear_notes_confirm_body"), st("settings_clear_notes_confirm"),
-                    onNo = { confirm = "" }) { DesktopNotebook.book.wipe(); confirm = "" }
+                    onNo = { confirm = "" }) { DesktopNotebook.book.wipe(); DesktopScheduler.catchUp(); confirm = "" }
                 "factory" -> ConfirmBlock(
                     st("settings_factory_reset_confirm_title"),
                     st("settings_factory_reset_list_intro") + "\n" + factoryItems(zh).joinToString("\n") { "· $it" } + "\n" + st("settings_factory_reset_after"),
@@ -451,8 +451,8 @@ internal fun ConfirmBlock(title: String, body: String, confirmLabel: String, onN
 
 /** What 恢复出厂设置 removes on the Mac, in the order the confirmation lists it. */
 private fun factoryItems(zh: Boolean): List<String> =
-    if (zh) listOf("所有设置和 Key", "小本本（记忆、提醒、情景）", "保险箱里的账号", "聊天记录和它生成过的页面", "SSH 钥匙和命令白名单")
-    else listOf("All settings and keys", "The notebook (memories, reminders, scenes)", "The vault accounts", "The chat history and pages it made", "SSH keys and the command allow-list")
+    if (zh) listOf("所有设置和 Key（CodeFlying key 保留）", "小本本（记忆、提醒、情景）", "保险箱里的账号", "聊天记录和它生成过的页面", "SSH 钥匙和命令白名单")
+    else listOf("All settings and keys (the CodeFlying key is kept)", "The notebook (memories, reminders, scenes)", "The vault accounts", "The chat history and pages it made", "SSH keys and the command allow-list")
 
 /** Wipes everything the card promised to. Irreversible; the confirmation lists it first. */
 private fun factoryReset() {
@@ -461,7 +461,12 @@ private fun factoryReset() {
     runCatching { net.kuafuai.andee.desktop.mac.MacVault.wipe() }
     runCatching { net.kuafuai.andee.desktop.shell.AndeeAgent.keys().forEach { net.kuafuai.andee.desktop.shell.AndeeAgent.delete(it.name) } }
     runCatching { AppDirs.file("shell_always_allow.json").delete() }
+    // The CodeFlying key survives, as on the phone: without it the device is mute until the user finds it again.
+    val keep = Settings.get("codeflying_key")
     runCatching { AppDirs.file("settings.properties").delete() }
+    if (keep.isNotBlank()) runCatching { Settings.save(mapOf("codeflying_key" to keep)) }
+    // A fresh notebook starts with its default todos, as on first launch.
+    runCatching { DesktopScheduler.catchUp() }
     Strings.changed()
 }
 

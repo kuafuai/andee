@@ -491,6 +491,40 @@ class NotebookBook(private val store: NotebookStore) {
         }
     }
 
+    /**
+     * The todos a notebook starts with: today one, the nightly picture ([NIGHTLY_PICTURE_CRON]). Added once per
+     * notebook — the `meta` flag is what makes it once, so a user who drops or pauses it is not overruled at the
+     * next start, and a wipe (清空小本本, 恢复出厂设置) takes the flag with it and a fresh notebook gets it again.
+     * Not added beside an open todo on the same schedule, which is how it would be set by hand.
+     *
+     * Returns what was added, for the caller to arm; empty when there was nothing to do. Throws when the store
+     * refuses, like every other write here.
+     */
+    @Synchronized
+    fun seedDefaults(zh: Boolean, now: Long = System.currentTimeMillis()): List<Todo> {
+        val b = JSONObject(book().toString())
+        val meta = b.optJSONObject("meta") ?: JSONObject()
+        if (meta.optBoolean(META_SEEDED)) return emptyList()
+        val open = todos("pending")
+        val added = mutableListOf<Todo>()
+        if (open.none { it.mode == "cron" && it.cronExpr == NIGHTLY_PICTURE_CRON }) {
+            val next = CronExpr.nextAfter(NIGHTLY_PICTURE_CRON, now)
+            if (next != null) {
+                added += Todo(
+                    newTodoId(), if (zh) NIGHTLY_PICTURE_ZH else NIGHTLY_PICTURE_EN, "cron", 0L,
+                    NIGHTLY_PICTURE_CRON, next, 0L, "", "", "active", now, false,
+                )
+            }
+        }
+        val arr = b.optJSONArray("todos") ?: JSONArray()
+        added.forEach { arr.put(toJson(it)) }
+        b.put("todos", arr)
+        b.put("meta", meta.put(META_SEEDED, true))
+        write(b)
+        if (added.isNotEmpty()) Log.i(TAG, "notebook: seeded ${added.size} default todo(s)")
+        return added
+    }
+
     fun todoById(id: String): Todo? {
         val arr = book().optJSONArray("todos") ?: return null
         for (i in 0 until arr.length()) {
@@ -655,6 +689,24 @@ class NotebookBook(private val store: NotebookStore) {
         }
 
     companion object {
+        private const val META_SEEDED = "defaults_seeded"
+
+        /** Every evening at nine. */
+        const val NIGHTLY_PICTURE_CRON = "0 21 * * *"
+
+        /**
+         * Model-facing (it is what the wake-up message carries) and shown in 待办, so in the user's language.
+         * It says what to do and leaves how to the model: a market image tool, a page, its own drawing code —
+         * whichever this body has.
+         */
+        const val NIGHTLY_PICTURE_ZH =
+            "每晚回顾：把今天的事过一遍（对话、做过的事、日记），据此画一张「你和我」的图，要有意境。" +
+                "画好放到屏幕上给用户看，再用一两句话说画的是什么。今天没什么事就画安静的一天，不要硬凑。"
+        const val NIGHTLY_PICTURE_EN =
+            "Evening look-back: go over today (the conversation, what you did, your diary) and from it make a " +
+                "picture of \"you and me\" with some mood to it. Put it on the screen for the user and say in a " +
+                "sentence or two what it shows. If nothing much happened, paint a quiet day rather than inventing one."
+
         /**
          * A todo's `what` that numbers several items ("1) … 2) …", "①…②…"): refused with the reason, because one todo
          * cannot be half done — the part that was not is lost when it is closed. Null when it is one thing.

@@ -1,6 +1,6 @@
 package net.kuafuai.andee.market
 
-import android.util.Log
+import net.kuafuai.andee.util.Log
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -10,7 +10,9 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * The CodeFlying app market, lent to the brain as two tools.
+ * The CodeFlying app market, lent to the brain as two tools — by both bodies, which is why it is
+ * in core: the phone (`AndroidBrainHost`) and the Mac (`DesktopBrainHost`) list [tools] and route
+ * [hasMethod] here, and neither adds anything of its own.
  *
  * **Only exists in CodeFlying mode.** [enabled] is wired from `BrainConfig.mode`;
  * when it is false [tools] returns an empty array and [hasMethod] says no, so a
@@ -221,8 +223,8 @@ class MarketTools(
             "Search the app market for a third-party capability this device does not have — " +
                 "express delivery tracking, weather, news, translation, image and music generation, " +
                 "SMS, stock quotes, and several hundred more. Call this FIRST whenever the user asks " +
-                "for something none of the device.* or screen.* tools cover; do not tell them the " +
-                "phone cannot do it before you have looked here. Returns each match's name, what it " +
+                "for something none of your other tools cover; do not tell them this device " +
+                "cannot do it before you have looked here. Returns each match's name, what it " +
                 "does, and the parameters it takes — read those before calling market_call."
 
         val DESC_CALL =

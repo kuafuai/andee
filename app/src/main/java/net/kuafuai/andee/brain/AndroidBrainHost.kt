@@ -167,6 +167,7 @@ class AndroidBrainHost(
         BrainText.NARRATE_DOG -> R.string.narrate_dog
         BrainText.NARRATE_MARKET_SEARCH -> R.string.narrate_market_search
         BrainText.NARRATE_MARKET_CALL -> R.string.narrate_market_call
+        BrainText.REVIEW_NAME -> R.string.brain_review_name
         BrainText.NARRATE_DEFAULT -> R.string.narrate_default
     }
 }

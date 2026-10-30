@@ -103,8 +103,13 @@ object DesktopScheduler {
         if (s.arm.isNotEmpty() || s.cancel.isNotEmpty()) Log.i(TAG, "plan: armed ${s.arm.size}, cancelled ${s.cancel.size}")
     }
 
-    /** At launch: re-arm the future, fire what was missed while the app was closed. */
+    /**
+     * At launch and after a wipe: seed a fresh notebook's default todos, re-arm the future, fire what was missed
+     * while the app was closed.
+     */
     fun catchUp() {
+        runCatching { DesktopNotebook.book.seedDefaults(zh = Strings.lang() == "zh") }
+            .onFailure { Log.w(TAG, "could not seed default todos", it) }
         val now = System.currentTimeMillis()
         for (t in DesktopNotebook.book.todos("pending")) {
             if (t.status != "active") continue
@@ -309,8 +314,13 @@ class NotebookTools(private val onSceneChanged: (String?) -> Unit) {
             .put("scheduled", "exact")
             .put(
                 "note",
-                "Set. When it comes due and is dealt with, close it with todos(action=done, id=…) — otherwise it " +
-                    "stays in the \"promised but not done\" list forever. This only fires while Andee is running; " +
+                (if (t.mode == "cron") {
+                    "Set. It repeats: do not close it with todos(action=done) when it comes due — that ends the " +
+                        "series. Drop or pause it only when the user asks. "
+                } else {
+                    "Set. When it comes due and is dealt with, close it with todos(action=done, id=…) — otherwise it " +
+                        "stays in the \"promised but not done\" list forever. "
+                }) + "This only fires while Andee is running; " +
                     "if the Mac is off or Andee is closed, it is caught up the next time Andee starts.",
             )
     }

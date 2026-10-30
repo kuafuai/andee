@@ -29,7 +29,7 @@
     <string name="common_save">保存</string>
     <string name="settings_factory_reset_confirm_title">恢复出厂设置？</string>
     <string name="settings_factory_reset_list_intro">下面这些会被删掉，删了就找不回来：</string>
-    <string name="settings_factory_reset_after">设备会回到刚装好的样子：需要重新填 key，唤醒词要重新录。</string>
+    <string name="settings_factory_reset_after">设备会回到刚装好的样子：CodeFlying key 会保留，其他 key 要重新填，唤醒词要重新录。</string>
     <string name="settings_factory_reset_back">不，返回</string>
     <string name="settings_factory_reset_confirm">确认清空</string>
     <!-- The three destructive buttons sit together at the foot of the 诊断
@@ -711,6 +711,7 @@
     -->
     <string name="narrate_market_search">找工具…</string>
     <string name="narrate_market_call">调用外部服务…</string>
+    <string name="brain_review_name">回顾这段对话</string>
     <string name="narrate_default">正在 %1$s…</string>
 
     <!--

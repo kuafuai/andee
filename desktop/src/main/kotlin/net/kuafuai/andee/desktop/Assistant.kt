@@ -150,7 +150,29 @@ object Assistant {
             device,
             gear,
             peerTools,
+            marketTools(),
         )
+    }
+
+    /**
+     * The CodeFlying market (`market_search` / `market_call`), the phone's [net.kuafuai.andee.market.MarketTools].
+     * Built from the config the brain is built from, so it is inert — no tools listed, nothing claimed — on any
+     * other backend, and a key or backend change rebuilds the brain and this with it.
+     */
+    private fun marketTools(): DesktopBrainHost.ToolProvider {
+        val cfg = config()
+        val market = net.kuafuai.andee.market.MarketTools(
+            baseUrl = codeFlyingEndpoint()?.marketBaseUrl.orEmpty(),
+            apiKey = cfg.apiKey,
+            enabled = cfg.mode == BrainConfig.BRAIN_CODEFLYING,
+        )
+        return object : DesktopBrainHost.ToolProvider {
+            override fun handles(method: String) = market.tools().length() > 0 && market.hasMethod(method)
+            override fun dispatch(method: String, p: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any =
+                market.call(method, p)
+            override fun extraTools() = market.tools()
+            override fun methodOfExtra(toolName: String) = toolName.takeIf(::handles)
+        }
     }
 
     /**
@@ -343,12 +365,21 @@ object Assistant {
      */
     @Synchronized
     fun clearConversation() {
-        stop()
-        Scrollback.wipe()
-        Pages.wipe()
-        brain?.stop()
+        // Not [stop]: its stopAll writes a 「被你叫停了」 row from the brain's own thread, which lands after the
+        // wipe below and leaves the "empty" history with one line in it. The brain is discarded here anyway, so
+        // it is shut down without a report, and only then is the history cleared.
+        val b = brain
         brain = null
         builtFor = null
+        b?.stop()
+        cancelPending()
+        Nudges.dismiss()
+        guest?.cancel()
+        shell.stopAll()
+        net.kuafuai.andee.desktop.voice.MacVoice.stopSpeaking()
+        busy(false)
+        Scrollback.wipe()
+        Pages.wipe()
         progressClear()
     }
 
@@ -598,5 +629,5 @@ object Assistant {
     private const val WAKE_PATIENCE_MS = 150_000L
 
     private fun dueText(todo: net.kuafuai.andee.config.Todo): String =
-        net.kuafuai.andee.brain.WakeText.due(todo.id, todo.what, todo.untrusted)
+        net.kuafuai.andee.brain.WakeText.due(todo.id, todo.what, todo.untrusted, repeats = todo.mode == "cron")
 }
