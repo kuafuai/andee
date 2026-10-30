@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`18` / `"0.8.0"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`19` / `"0.8.1"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,58 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.8.1] - 2026-10-30
+
+**A cuter Andee, and four fixes that came out of using it.** The default face was retuned against the
+reference illustrations, and the rest is the kind of thing that only shows up on a real device: a key
+saved from the self-check sheet that the running brain never saw, home gestures on the phone, and a
+voice handshake that failed silently.
+
+### Changed
+
+- **The default face, retuned toward the reference illustrations.** A periwinkle body with a peach rim
+  light, bigger and darker eyes with two glints, eyes and cheeks raised (`eyeY 0.09 → 0.07`) with the
+  mouth left low, rounder horns, and finer meshes for the eyes, mouth, horns and props. Gloss drops
+  `0.22 → 0.05` and the rim light becomes fully mixed (`rimTintMix 0.55 → 1.0`), which is what moves it
+  from plastic to matte.
+  The look's `name` is unchanged — this is the same character with a new face, not a new one, so nobody's
+  saved choice moves.
+
+### Fixed
+
+- **Thinking no longer carries the bigger eyes past the edge of the head.** Oversized eyes made the old
+  drift values visible as an error: the thinking drift is now `0.03` (was `0.075`) and the head turn it
+  drives `0.04` (was `0.09`), with the slow sway and the drift capped together at `0.10 rad` so the outer
+  eye cannot roll off the sphere. Brief actions — a shake, a look around — are deliberately *not* capped,
+  since they end before it matters. Checked over 36 frames at `dp 420` and at the folded `dp 136`.
+- **A key saved from the self-check sheet now reaches the running brain.** Measured on a device: v0.8.0
+  reinstalled at 14:30 built its brain with an empty key, self-check reported `brain:FAIL` at 14:30:34,
+  the key was saved at 14:31 (a 36-character `kft_` value in `voice_prefs.xml`) — and the first typed
+  sentence at 14:33 still answered *"no key"*. The brain speaks that line from its own `cfg`, which is a
+  snapshot taken at construction, and nothing re-read it. The self-check page can appear while the
+  service is already running (its `onCreate` falls through whenever `ensureOverlays()` cannot vouch for
+  the overlay, which includes accessibility being off while the brain is alive), so the path that
+  assumed "no service, nothing to rebuild" was only true of one of its two entry points.
+  `BodyCoreService` already made this comparison for its own sheet; it is lifted out as
+  `reconcileBackendAfterSettings(beforeHub, beforeBrain)` and called from both hosts.
+- **Home gestures and overlay navigation on the phone.** Navigation boundaries are covered and failed
+  home actions are logged rather than dropped.
+- **Overlay opening and closing on the phone** does less work per frame, as does layout during keyboard
+  transitions.
+- **A refused voice handshake reads as a scrollback error.** On the Mac a tap that could not connect
+  used to fail silently; the reason now reaches the conversation.
+- **Volcengine voice endpoint and resource defaults show as hints** in settings rather than looking
+  like something already filled in.
+
+### Documentation
+
+- **Volcengine voice needs an entitled resource, not just a key.** A newly opened service defaults to
+  post-paid and can only be used from Volcengine's own trial page — calls over the API are refused, so a
+  correct key in a filled-in field still dies at the handshake. The switch is on the console's
+  **开通管理** page. Recorded because the two failure shapes both surface as `ASR ws refused: …` and
+  neither message points at that page. Two ASR resource ids this build can use are named in the README,
+  and version 2.0 is explicitly ruled out.
 
 ## [0.8.0] - 2026-10-29
 
