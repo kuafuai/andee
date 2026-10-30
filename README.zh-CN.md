@@ -435,9 +435,14 @@ API 只认后一句。刚开通的服务默认是**后付费**，它只能在火
 `ASR ws refused: …` 或者一个服务器错误码。这两句提示都不会叫你去开通管理，所以这件事写在这里。
 
 **如果买的包是另一种 SKU，第三种原因在「识别资源 ID」那一行。** 它就在火山 key 下面
-（`asr_resource_id`），默认 `volc.bigasr.sauc.duration`（按时长计费的包），作为
-`X-Api-Resource-Id` 头发出去，所以买的是并发版（按并发计费）就得把这里换成对应的值。填错了，
-症状和上面两种分不出来：key 没问题，就是调不通。没买时长版以外的包，这一行就别动它。
+（`asr_resource_id`），默认 `volc.bigasr.sauc.duration`（**1.0** 模型的时长版），作为
+`X-Api-Resource-Id` 头发出去；同一个模型的并发版则要换成 `volc.bigasr.sauc.concurrent`。填错了，
+症状和上面两种分不出来：key 没问题，就是调不通。
+
+能跟这一版配上的是 1.0 那两个值，因为发出去的请求里也写死了模型：`model_name` 是 `bigmodel`，
+也就是**豆包流式语音识别模型 1.0**。**2.0**（豆包流式语音识别 2.0，资源 id 是
+`volc.seedasr.sauc.duration` / `volc.seedasr.sauc.concurrent`）是另一个模型，所以控制台只给你
+2.0 的话，改这一行救不回来 —— 要另外把 1.0 的服务也开通。这一行已经填了上面两个 1.0 值之一，就别动它。
 
 > **如果你走的是[安装](#安装)里 CodeFlying 那条路，这两把 Key 都已经在安装包里了。**
 > ⚙ → **后端**会直接显示 **CodeFlying** 这一 tab 为当前后端；LLM、ASR、TTS 以及海量第三方 API

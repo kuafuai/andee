@@ -530,10 +530,16 @@ error code. Neither message points at 开通管理, which is why it is written d
 
 **If the pack you bought is a different SKU, the 识别资源 ID row is the third cause.** It
 sits under the Volcengine key (`asr_resource_id`), defaults to `volc.bigasr.sauc.duration`
-(the by-duration pack) and is sent as the `X-Api-Resource-Id` header, so a by-concurrency
-pack (并发版) needs its own value there instead. Get it wrong and the symptom is
-indistinguishable from the two above: the key is fine, the call just fails. Leave that row
-alone unless you bought something other than the duration pack.
+(the **1.0** model's by-duration pack) and is sent as the `X-Api-Resource-Id` header. A
+by-concurrency pack (并发版) of the same model takes `volc.bigasr.sauc.concurrent` there
+instead. Get it wrong and the symptom is indistinguishable from the two above: the key is
+fine, the call just fails.
+
+The two ids that pair with this build are the 1.0 ones, because the request it sends also names
+the model: `model_name` is `bigmodel`, which is 豆包流式语音识别模型 1.0. The 2.0 service
+(豆包流式语音识别 2.0, resource ids `volc.seedasr.sauc.duration` / `volc.seedasr.sauc.concurrent`)
+is a different model, so if the console only offered you 2.0, this row cannot rescue it — open
+the 1.0 service as well. Leave the row alone once it holds one of the two 1.0 values.
 
 > **If you took the CodeFlying route in [Install](#install), both keys are already baked in.**  
 > ⚙ → **Backend** will show **CodeFlying** as the active tab; LLM, ASR, TTS and the long tail of  
