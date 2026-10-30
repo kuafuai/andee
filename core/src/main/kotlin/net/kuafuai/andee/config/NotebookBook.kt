@@ -497,26 +497,33 @@ class NotebookBook(private val store: NotebookStore) {
      * next start, and a wipe (清空小本本, 恢复出厂设置) takes the flag with it and a fresh notebook gets it again.
      * Not added beside an open todo on the same schedule, which is how it would be set by hand.
      *
-     * Returns what was added, for the caller to arm; empty when there was nothing to do. Throws when the store
+     * An earlier wording of the same todo ([NIGHTLY_PICTURE_OLD]) is rewritten in place, so a notebook seeded
+     * before the text changed gets the new one without a second todo.
+     *
+     * Returns what was added, for the caller to arm; empty when there was nothing to add. Throws when the store
      * refuses, like every other write here.
      */
     @Synchronized
-    fun seedDefaults(zh: Boolean, now: Long = System.currentTimeMillis()): List<Todo> {
+    fun seedDefaults(now: Long = System.currentTimeMillis()): List<Todo> {
         val b = JSONObject(book().toString())
+        val arr = b.optJSONArray("todos") ?: JSONArray()
+        var rewrote = false
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (o.optString("what") in NIGHTLY_PICTURE_OLD) { o.put("what", NIGHTLY_PICTURE); rewrote = true }
+        }
         val meta = b.optJSONObject("meta") ?: JSONObject()
-        if (meta.optBoolean(META_SEEDED)) return emptyList()
-        val open = todos("pending")
+        if (meta.optBoolean(META_SEEDED)) {
+            if (rewrote) { b.put("todos", arr); write(b) }
+            return emptyList()
+        }
         val added = mutableListOf<Todo>()
-        if (open.none { it.mode == "cron" && it.cronExpr == NIGHTLY_PICTURE_CRON }) {
+        if (todos("pending").none { it.mode == "cron" && it.cronExpr == NIGHTLY_PICTURE_CRON }) {
             val next = CronExpr.nextAfter(NIGHTLY_PICTURE_CRON, now)
             if (next != null) {
-                added += Todo(
-                    newTodoId(), if (zh) NIGHTLY_PICTURE_ZH else NIGHTLY_PICTURE_EN, "cron", 0L,
-                    NIGHTLY_PICTURE_CRON, next, 0L, "", "", "active", now, false,
-                )
+                added += Todo(newTodoId(), NIGHTLY_PICTURE, "cron", 0L, NIGHTLY_PICTURE_CRON, next, 0L, "", "", "active", now, false)
             }
         }
-        val arr = b.optJSONArray("todos") ?: JSONArray()
         added.forEach { arr.put(toJson(it)) }
         b.put("todos", arr)
         b.put("meta", meta.put(META_SEEDED, true))
@@ -695,17 +702,27 @@ class NotebookBook(private val store: NotebookStore) {
         const val NIGHTLY_PICTURE_CRON = "0 21 * * *"
 
         /**
-         * Model-facing (it is what the wake-up message carries) and shown in 待办, so in the user's language.
-         * It says what to do and leaves how to the model: a market image tool, a page, its own drawing code —
-         * whichever this body has.
+         * Model-facing, like every wake-up line, so it is English and names no language for the reply: the
+         * notebook may be seeded before anyone has said a word, so the language it must follow is whatever the
+         * conversation turns out to be in. And it names no tool: an image tool exists only where one is
+         * (CodeFlying's market), and a page is what every body can always make.
          */
-        const val NIGHTLY_PICTURE_ZH =
+        const val NIGHTLY_PICTURE =
+            "Evening look-back: go over today (the conversation, what you did, your diary) and from it make a " +
+                "picture of \"you and me\" with some mood to it. If you have an image-generation tool (the market " +
+                "may have one), use it; if not, make it a page with show_html — drawn in HTML, that is enough. Put " +
+                "it on the screen and say in a sentence or two what it shows. Write the page and speak in the " +
+                "language of your recent conversation with the user; only if there has been none, use the " +
+                "interface language. If nothing much happened today, paint a quiet day rather than inventing one."
+
+        /** Earlier wordings, rewritten to [NIGHTLY_PICTURE] where a notebook still holds them. */
+        private val NIGHTLY_PICTURE_OLD = setOf(
             "每晚回顾：把今天的事过一遍（对话、做过的事、日记），据此画一张「你和我」的图，要有意境。" +
-                "画好放到屏幕上给用户看，再用一两句话说画的是什么。今天没什么事就画安静的一天，不要硬凑。"
-        const val NIGHTLY_PICTURE_EN =
+                "画好放到屏幕上给用户看，再用一两句话说画的是什么。今天没什么事就画安静的一天，不要硬凑。",
             "Evening look-back: go over today (the conversation, what you did, your diary) and from it make a " +
                 "picture of \"you and me\" with some mood to it. Put it on the screen for the user and say in a " +
-                "sentence or two what it shows. If nothing much happened, paint a quiet day rather than inventing one."
+                "sentence or two what it shows. If nothing much happened, paint a quiet day rather than inventing one.",
+        )
 
         /**
          * A todo's `what` that numbers several items ("1) … 2) …", "①…②…"): refused with the reason, because one todo

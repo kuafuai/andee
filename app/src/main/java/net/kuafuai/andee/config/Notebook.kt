@@ -181,8 +181,7 @@ object Notebook {
     internal fun toJson(t: Todo): JSONObject = NotebookBook.toJson(t)
     fun newTodoId(): String = NotebookBook.newTodoId()
     fun addTodo(context: Context, todo: Todo) = book(context).addTodo(todo)
-    fun seedDefaults(context: Context): List<Todo> =
-        book(context).seedDefaults(zh = VoiceConfig.uiLanguage(context) == "zh")
+    fun seedDefaults(context: Context): List<Todo> = book(context).seedDefaults()
     fun patchTodo(
         context: Context,
         id: String,

@@ -108,7 +108,7 @@ object DesktopScheduler {
      * while the app was closed.
      */
     fun catchUp() {
-        runCatching { DesktopNotebook.book.seedDefaults(zh = Strings.lang() == "zh") }
+        runCatching { DesktopNotebook.book.seedDefaults() }
             .onFailure { Log.w(TAG, "could not seed default todos", it) }
         val now = System.currentTimeMillis()
         for (t in DesktopNotebook.book.todos("pending")) {
