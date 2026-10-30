@@ -133,7 +133,7 @@ val POSES: Map<Mood, Pose> = mapOf(
 
     // think.webp — eyes up and to the side, and the gaze drift the rim and scan light
     // ride on.
-    Mood.THINKING to Pose(lookX = 0.5f, lookY = 0.9f, hornLean = -8f),
+    Mood.THINKING to Pose(lookX = 0.12f, lookY = 0.7f, hornLean = -8f),
 
     // The mouth is the talk envelope's, which opens the thin smile rather than
     // swapping it for another shape. No pose, so the face is clear while it is

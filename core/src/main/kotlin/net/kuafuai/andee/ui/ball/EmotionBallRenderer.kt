@@ -263,9 +263,9 @@ class EmotionBallRenderer {
          */
         val eye: Mesh =
             if (look.eyeCut > 0f)
-                Eye.build(look.eyeRadius, look.eyeCyl, look.eyeCut, 4, 12)
-            else Capsule.build(look.eyeRadius, look.eyeCyl, 4, 12)
-        val mouth: Mesh = Torus.build(look.mouthR, look.mouthTube, 8, 24, PI.toFloat())
+                Eye.build(look.eyeRadius, look.eyeCyl, look.eyeCut, 10, 48)
+            else Capsule.build(look.eyeRadius, look.eyeCyl, 10, 48)
+        val mouth: Mesh = Torus.build(look.mouthR, look.mouthTube, 10, 48, PI.toFloat())
 
         /**
          * The eye with its top sliced flat, for a look with [BallLook.gestures] —
@@ -284,7 +284,7 @@ class EmotionBallRenderer {
          */
         val eyeCut: Mesh? =
             if (look.gestures)
-                Eye.build(look.eyeRadius, look.eyeCyl, max(GESTURE_LID_CUT, look.eyeCut), 4, 12)
+                Eye.build(look.eyeRadius, look.eyeCyl, max(GESTURE_LID_CUT, look.eyeCut), 10, 48)
             else null
         val horn: Mesh? =
             if (look.hornH > 0f)
@@ -292,8 +292,8 @@ class EmotionBallRenderer {
                     look.hornR, look.hornH, look.hornBend / DEG,
                     // A rounded profile packs its curvature into the last rings,
                     // so it needs more of them than the straight thorn does.
-                    segs = if (look.hornTaper != 1f) 12 else 7,
-                    radialSegs = 12,
+                    segs = if (look.hornTaper != 1f) 20 else 7,
+                    radialSegs = 28,
                     taper = look.hornTaper,
                 )
             else null
@@ -460,15 +460,15 @@ class EmotionBallRenderer {
         // to crown the eye instead of leaning off to one side — that rotation
         // is EYE_ARC_ROT_Z. Its size does not come from the look, so unlike the
         // round eye and the mouth there is only ever one of it.
-        eyeArcMesh = Torus.build(0.1f, 0.03f, 6, 20, EYE_ARC_SPAN)
+        eyeArcMesh = Torus.build(0.1f, 0.03f, 10, 48, EYE_ARC_SPAN)
         lookMeshes = BallLooks.ALL.map { LookMeshes(it) }
         // Low subdivision on purpose: a paw is ~18 dp across on screen, where
         // subdiv 2 is already smooth and subdiv 4 is 16x the triangles for
         // nothing. It gets drawn eight times a frame.
-        handMesh = IcoSphere.build(2)
+        handMesh = IcoSphere.build(3)
         // Pupils and glints. Same unit blob as a paw part, and the same order of
         // cost: four of them a frame, each about 4 dp wide on screen.
-        dotMesh = IcoSphere.build(2)
+        dotMesh = IcoSphere.build(3)
         bubbleSphere = IcoSphere.build(4)
         starMesh = Puff.build(Puff.roundStar(5, 0.54f, 1.3f), 0.55f)
         shieldMesh = Puff.build(Puff.shield(), 0.42f, rings = 5)

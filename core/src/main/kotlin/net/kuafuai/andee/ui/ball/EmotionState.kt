@@ -483,7 +483,9 @@ class EmotionState {
         // purpose, so an actual tool call still lands as an event on top of it
         // rather than disappearing into the bob.
         val workBob = cling * sin(t * 3.4f) * 0.04f
-        rotY = sin(t * 0.22f) * 0.12f + jx * 0.012f + gaze * 0.09f + actRotY
+        // The slow sway and the thinking drift together are capped: past ~0.10 rad the outer eye of a big-eyed look
+        // (Andee) rolls over the edge of the head. Actions (a shake, a look around) are not capped — they are brief.
+        rotY = (sin(t * 0.22f) * 0.12f + jx * 0.012f + gaze * 0.04f).coerceIn(-0.10f, 0.10f) + actRotY
         rotX = sin(t * 0.17f) * 0.06f + jy * 0.009f + actRotX + workBob
         rotZ = tilt + th * sin(t * 0.51f) * 0.09f - clingLean
 
@@ -593,8 +595,11 @@ class EmotionState {
         val peek = cling * (LOOK.clingLift + grip * 0.02f)
         eyeLY = LOOK.eyeY - browL * 0.06f + peek + lookY * 0.08f
         eyeRY = LOOK.eyeY - browR * 0.06f + peek + lookY * 0.08f
-        eyeLX = -LOOK.eyeX + jx * 0.014f + gaze * 0.075f + lookX * 0.06f
-        eyeRX = LOOK.eyeX + jx * 0.014f + gaze * 0.075f + lookX * 0.06f
+        // The thinking drift moves the eyes across the face; 0.075 carried the larger eyes past the edge of the head
+        // (up to 0.11 on top of a 0.345 + 0.215 eye). 0.03 here and 0.04 on the head turn (rotY, was 0.09) keep the
+        // drift visible and the eyes on the ball.
+        eyeLX = -LOOK.eyeX + jx * 0.014f + gaze * 0.03f + lookX * 0.06f
+        eyeRX = LOOK.eyeX + jx * 0.014f + gaze * 0.03f + lookX * 0.06f
         // Eye roll. Two terms, and they are on the same axis on purpose:
         //
         //  * the look's own resting tilt, mirrored per side, which is what makes
