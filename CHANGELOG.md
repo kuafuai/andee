@@ -31,10 +31,31 @@ hash into `versionName` at build time would close this hole; it is not implement
 
 ## [0.8.1] - 2026-10-30
 
-**A cuter Andee, and four fixes that came out of using it.** The default face was retuned against the
-reference illustrations, and the rest is the kind of thing that only shows up on a real device: a key
-saved from the self-check sheet that the running brain never saw, home gestures on the phone, and a
-voice handshake that failed silently.
+**A cuter Andee, a notebook that starts with something in it, and four fixes that came out of using it.**
+The default face was retuned against the reference illustrations; a fresh notebook now comes with one
+todo already in it; and the rest is the kind of thing that only shows up on a real device: a key saved
+from the self-check sheet that the running brain never saw, home gestures on the phone, and a voice
+handshake that failed silently.
+
+### Added
+
+- **A fresh notebook starts with one todo.** Every evening at 21:00 (`0 21 * * *`), it looks back over
+  the day and makes a picture of "you and me" with some mood to it. Seeded once per notebook: a meta flag
+  stops a todo the user dropped or paused from coming back, and a wipe (clear notebook, factory reset)
+  takes the flag with it. Both bodies seed it on their start-up catch-up; the Mac also re-runs that after
+  clearing the notebook or a factory reset.
+  The todo assumes **no particular tool and no particular language**: image generation exists only where
+  there is one (CodeFlying's market), so it says to use an image tool if you have one and otherwise draw
+  the picture as a page with `show_html`. Its text is model-facing English like every other wake-up line,
+  and says to write and speak in the language of the recent conversation, falling back to the interface
+  language — a notebook is seeded before anyone has said a word, so the interface language at that moment
+  is the one thing that is reliably wrong. Notebooks holding an earlier wording are rewritten in place,
+  same id, on the next start.
+- **The Mac has the CodeFlying market.** `MarketTools` moves to `core` (its only Android dependency was
+  the logger) and the Mac registers it as a tool provider built from the brain's own config, so
+  `market_search` / `market_call` exist **only** on the CodeFlying backend, as on the phone — inert, no
+  tools listed and nothing claimed, on any other backend. A key or backend change rebuilds the brain and
+  this with it.
 
 ### Changed
 
@@ -45,6 +66,9 @@ voice handshake that failed silently.
   from plastic to matte.
   The look's `name` is unchanged — this is the same character with a new face, not a new one, so nobody's
   saved choice moves.
+- **A repeating todo is not closed when it comes due.** `done` ends a cron series for good, so the first
+  evening's answer would have been the last. The wake-up line (`WakeText.due(repeats)`), the `todo`
+  result on both bodies, and the prompt now all say so.
 
 ### Fixed
 
@@ -63,6 +87,13 @@ voice handshake that failed silently.
   assumed "no service, nothing to rebuild" was only true of one of its two entry points.
   `BodyCoreService` already made this comparison for its own sheet; it is lifted out as
   `reconcileBackendAfterSettings(beforeHub, beforeBrain)` and called from both hosts.
+- **Factory reset keeps the CodeFlying key**, on both bodies, and the confirmation now says so instead of
+  leaving it to be discovered. The phone cleared it along with the rest of `voice_prefs`; the Mac deleted
+  it too and only *looked* as if it kept it, because settings were saved again afterwards.
+- **A cleared conversation no longer contains a line about itself.** `clearConversation` called `stop()`,
+  whose `stopAll` writes 「被你叫停了」 from the brain's own thread — after the wipe. The discarded brain
+  is now shut down without a report and the history is cleared afterwards. A stopped review is also named
+  「回顾这段对话」 in that row rather than the first line of its English instruction.
 - **Home gestures and overlay navigation on the phone.** Navigation boundaries are covered and failed
   home actions are logged rather than dropped.
 - **Overlay opening and closing on the phone** does less work per frame, as does layout during keyboard
@@ -71,6 +102,9 @@ voice handshake that failed silently.
   used to fail silently; the reason now reaches the conversation.
 - **Volcengine voice endpoint and resource defaults show as hints** in settings rather than looking
   like something already filled in.
+- **The cleartext exception for `124.71.176.202` is gone** from both network security configs. CodeFlying
+  is `https://baas.kuafuai.net` now, and an exception for a host nobody calls only widens what the app
+  may talk to in the clear.
 
 ### Documentation
 
