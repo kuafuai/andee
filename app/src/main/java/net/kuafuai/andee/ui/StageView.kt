@@ -21,6 +21,8 @@ import net.kuafuai.andee.R
 import net.kuafuai.andee.config.Stage
 import net.kuafuai.andee.config.VoiceConfig
 import net.kuafuai.andee.i18n.AppLocale
+import net.kuafuai.andee.stage.StageLine
+import net.kuafuai.andee.stage.StageShell
 
 /**
  * The stage: the middle of the unfolded card, where the conversation used to be, and Andee's own.
@@ -155,7 +157,7 @@ class StageView(context: Context) : LinearLayout(context) {
         drawnVersion = s.version
         drawn = html
         // An https origin, so https images and media load (no mixed content).
-        web.loadDataWithBaseURL("https://stage.andee.local/", html, "text/html", "utf-8", null)
+        web.loadDataWithBaseURL(StageShell.BASE_URL, html, "text/html", "utf-8", null)
     }
 
     /** The voice pipeline's live line: a draft, a final, or "" to clear. */
@@ -205,17 +207,17 @@ class StageView(context: Context) : LinearLayout(context) {
         removeCallbacks(ticker)
         val live0 = liveText.trim()
         if (live0.isNotEmpty()) {
-            show(sentences(live0).lastOrNull() ?: live0, fade = false)
+            show(StageLine.sentences(live0).lastOrNull() ?: live0, fade = false)
             return
         }
-        lines = sentences(lastLine)
+        lines = StageLine.sentences(lastLine)
         index = 0
         if (lines.isEmpty()) {
             live.visibility = View.GONE
             return
         }
         show(lines[0], fade = false)
-        postDelayed(ticker, if (lines.size > 1) dwell(lines[0]) else LINGER_MS)
+        postDelayed(ticker, if (lines.size > 1) StageLine.dwell(lines[0]) else StageLine.LINGER_MS)
     }
 
     private var lines: List<String> = emptyList()
@@ -229,7 +231,7 @@ class StageView(context: Context) : LinearLayout(context) {
             }
             index++
             show(lines[index], fade = true)
-            postDelayed(this, if (index == lines.lastIndex) LINGER_MS else dwell(lines[index]))
+            postDelayed(this, if (index == lines.lastIndex) StageLine.LINGER_MS else StageLine.dwell(lines[index]))
         }
     }
 
@@ -277,55 +279,22 @@ class StageView(context: Context) : LinearLayout(context) {
         }
     }
 
-    /** The device's half of the page: everything but the fragment. */
+    /** The page: the fragment inside the shell both bodies share ([StageShell]), in this palette. */
     private fun shell(fragment: String): String {
         fun css(hex: String): String {
             val c = Color.parseColor(hex)
             return "rgba(${Color.red(c)},${Color.green(c)},${Color.blue(c)},${"%.3f".format(java.util.Locale.US, Color.alpha(c) / 255f)})"
         }
         val night = Theme.night
-        val lang = VoiceConfig.uiLanguage(context)
-        val glass = if (night) "rgba(255,255,255,.10)" else "rgba(0,0,0,.07)"
-        val edge = if (night) "rgba(255,255,255,.16)" else "rgba(255,255,255,.55)"
-        val well = if (night) "rgba(255,255,255,.08)" else "rgba(0,0,0,.06)"
-        return """<!doctype html><html lang="$lang"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data: blob:; media-src https: data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src data:; connect-src 'none'">
-<style>
-:root{--ink:${css(Glass.TITLE)};--ink2:${css(Glass.LABEL)};--muted:${css(Glass.SECONDARY)};--accent:${css(Glass.ACCENT)};
---ok:${css(Glass.OK)};--warn:${css(Glass.WARN)};--danger:${css(Glass.DANGER)};--glass:$glass;--edge:$edge;--well:$well;color-scheme:${if (night) "dark" else "light"}}
-*{box-sizing:border-box}html,body{margin:0;background:transparent;overflow-x:hidden}canvas,svg{max-width:100%}
-body{color:var(--ink2);font:15px/1.5 system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;padding:6px 14px 64px;-webkit-tap-highlight-color:transparent}
-h1,h2,h3{color:var(--ink);margin:.2em 0 .35em;line-height:1.25}h1{font-size:24px}h2{font-size:19px}h3{font-size:16px}
-p{margin:.35em 0}a{color:var(--accent);text-decoration:none}img,video{max-width:100%;border-radius:14px}
-.card{background:var(--glass);border-radius:20px;padding:14px 16px;margin:10px 0;box-shadow:inset 0 1px 0 var(--edge)}
-.stat{font-size:34px;font-weight:700;color:var(--ink);line-height:1.1}.label{font-size:12px;color:var(--muted);letter-spacing:.04em}
-.muted{color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.grid>.card{margin:0;min-width:0}
-.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0}
-.pill{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--well);font-size:12px;color:var(--ink2)}
-.progress{height:6px;border-radius:3px;background:var(--well);overflow:hidden}.progress>i{display:block;height:100%;background:var(--accent);border-radius:3px}
-.btn{display:inline-block;border:0;border-radius:999px;padding:9px 16px;background:var(--accent);color:#fff;font:600 14px system-ui,sans-serif}
-ul.list,ol.list{padding-left:1.1em;margin:.3em 0}
-</style>
-<script>window.andee={theme:"${if (night) "night" else "day"}",lang:"$lang",say:function(t){try{AndeeStage.say(String(t))}catch(e){}}};</script>
-${chartScript(fragment)}
-</head><body>$fragment</body></html>"""
-    }
-
-    /**
-     * Chart.js, inlined — only when the fragment uses it, so a stage without a chart does not carry 200 KB.
-     * Inline because the page may load no script from the network, and with its defaults set to the theme
-     * (text in --muted, grid lines in --well), so a chart Andee writes in three lines already looks like ours.
-     */
-    private fun chartScript(fragment: String): String {
-        if (!fragment.contains("Chart")) return ""
-        val js = chartJs ?: runCatching {
-            context.assets.open("stage/chart.umd.js").bufferedReader().use { it.readText() }
-        }.getOrNull()?.also { chartJs = it } ?: return ""
-        return "<script>$js</script><script>(function(){var s=getComputedStyle(document.documentElement);" +
-            "Chart.defaults.color=s.getPropertyValue('--muted');Chart.defaults.borderColor=s.getPropertyValue('--well');" +
-            "Chart.defaults.font.family='system-ui,-apple-system,sans-serif';Chart.defaults.maintainAspectRatio=false;" +
-            "Chart.defaults.plugins.legend.labels.boxWidth=12;})();</script>"
+        val theme = StageShell.Theme(
+            night = night,
+            ink = css(Glass.TITLE), ink2 = css(Glass.LABEL), muted = css(Glass.SECONDARY), accent = css(Glass.ACCENT),
+            ok = css(Glass.OK), warn = css(Glass.WARN), danger = css(Glass.DANGER),
+            glass = if (night) "rgba(255,255,255,.10)" else "rgba(0,0,0,.07)",
+            edge = if (night) "rgba(255,255,255,.16)" else "rgba(255,255,255,.55)",
+            well = if (night) "rgba(255,255,255,.08)" else "rgba(0,0,0,.06)",
+        )
+        return StageShell.html(fragment, theme, VoiceConfig.uiLanguage(context), "AndeeStage.say(t)")
     }
 
     private inner class Bridge {
@@ -345,30 +314,9 @@ ${chartScript(fragment)}
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
-    internal companion object {
-        /** About two seconds a sentence, a little more for a long one; never so long the line looks stuck. */
-        fun dwell(s: String): Long = (SENTENCE_MS + (s.length - 20).coerceAtLeast(0) * PER_CHAR_MS).coerceAtMost(MAX_SENTENCE_MS)
-
-        /** A reply cut where a reader would pause: Chinese and English sentence ends, and line breaks. */
-        fun sentences(text: String): List<String> =
-            Regex("""[^。！？!?；;\n]+[。！？!?；;]*|(?<=[.!?])\s+""").findAll(text.trim())
-                .map { it.value.trim() }
-                .flatMap { piece -> piece.split(Regex("""(?<=[.!?])\s+(?=[A-Z0-9"“‘(])""")).asSequence() }
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-                .toList()
-
-        const val SENTENCE_MS = 2_000L
-        const val PER_CHAR_MS = 40L
-        const val MAX_SENTENCE_MS = 4_000L
-        const val FADE_MS = 140L
-
-        /** How long the last sentence stays before the line goes. */
-        const val LINGER_MS = 4_000L
-
-        /** Read once per process; it is a constant file. */
-        @Volatile private var chartJs: String? = null
+    private companion object {
         const val TAP_WINDOW_MS = 1_500L
         const val SAY_GAP_MS = 2_000L
+        const val FADE_MS = 140L
     }
 }

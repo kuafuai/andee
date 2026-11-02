@@ -168,7 +168,7 @@ assets whose provenance is worth stating rather than leaving to be inferred:
 | File | Status |
 |---|---|
 | `app/src/main/res/drawable-nodpi/backdrop.jpg` | Supplied by the project owner as the unfolded card's background (see `ui/Backdrop.kt`), and licensed with the rest of this tree. |
-| `app/src/main/assets/stage/chart.umd.js` | [Chart.js](https://www.chartjs.org) v4.4.1, unmodified, MIT License, © 2023 Chart.js Contributors (the notice is kept at the top of the file). Loaded into the stage when a stage uses it (see `ui/StageView.kt`). sha256 `74401d738dd3e03ee5dfb3b6841210fe2c4ead8a960c4011ca4ba0b78a9fd8f3`. |
+| `core/src/main/resources/stage/chart.umd.js` | [Chart.js](https://www.chartjs.org) v4.4.1, unmodified, MIT License, © 2023 Chart.js Contributors (the notice is kept at the top of the file). Inlined into a stage that uses it, on both bodies (see `stage/StageShell.kt`). sha256 `74401d738dd3e03ee5dfb3b6841210fe2c4ead8a960c4011ca4ba0b78a9fd8f3`. |
 | `app/src/main/assets/onboarding/**.mp3` | The onboarding's spoken lines, synthesised by this project with Volcengine TTS (speaker `zh_female_vv_uranus_bigtts`) from the script in `tools/onboarding_voice.py`, and licensed with the rest of this tree. |
 
 If you fork this and would rather not redistribute that image, it is one file and

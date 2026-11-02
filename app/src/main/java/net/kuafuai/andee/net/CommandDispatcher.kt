@@ -1007,36 +1007,8 @@ class CommandDispatcher(
             // Not `screen.`: it drives no app, so it must not fold the card — the
             // stage is *in* the card. Writes go through [Stage], which owns size,
             // rate and versions; a refusal comes back as a sentence to act on.
-            "stage.set" -> {
-                val html = requireNotNull(params?.optString("html")?.ifEmpty { null }) { "stage.set requires html" }
-                val err = net.kuafuai.andee.config.Stage.set(appContext, html, params?.optString("title"))
-                if (err != null) {
-                    JSONObject().put("error", err)
-                } else {
-                    val s = net.kuafuai.andee.config.Stage.current(appContext)
-                    JSONObject().put("set", true).put("version", s?.version ?: 0)
-                        .put("slots", org.json.JSONArray(net.kuafuai.andee.stage.StageSlots.names(html)))
-                        .put("note", "It is up on your stage now. Do not describe it again in your reply; say in a sentence that it is there if it is news to them.")
-                }
-            }
-            "stage.update" -> {
-                val slot = requireNotNull(params?.optString("slot")?.ifEmpty { null }) { "stage.update requires slot" }
-                val html = params?.optString("html") ?: ""
-                val err = net.kuafuai.andee.config.Stage.update(appContext, slot, html)
-                if (err != null) JSONObject().put("error", err)
-                else JSONObject().put("updated", slot).put("version", net.kuafuai.andee.config.Stage.current(appContext)?.version ?: 0)
-            }
-            "stage.get" -> {
-                val s = net.kuafuai.andee.config.Stage.current(appContext)
-                if (s == null) {
-                    JSONObject().put("empty", true).put("note", "Nothing is on your stage yet.")
-                } else {
-                    JSONObject().put("empty", false).put("title", s.title).put("version", s.version)
-                        .put("changed", Scheduler.formatLocal(s.updatedAt))
-                        .put("slots", org.json.JSONArray(net.kuafuai.andee.stage.StageSlots.names(s.fragment)))
-                        .put("html", s.fragment)
-                }
-            }
+            "stage.set", "stage.update", "stage.get" ->
+                net.kuafuai.andee.config.Stage.store(appContext).handle(method, params)
 
             "ui.list_pages" -> {
                 val arr = org.json.JSONArray()
