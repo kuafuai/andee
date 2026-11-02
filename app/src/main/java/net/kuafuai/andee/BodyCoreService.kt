@@ -824,9 +824,9 @@ class BodyCoreService : Service() {
         // *everything* that is wrong, so the no-brain complaint must not also
         // fire here or the user gets two cards arguing about the same fact.
         // `runStartupSelfCheck` reports it, in context, with the other rows.
-        // The settings card's factory reset still announces normally — see
-        // [applyFactoryReset] — because there the user just wiped the config
-        // and needs to be told the device is now mute.
+        // The settings card's factory reset is quiet too, for a different
+        // reason: it opens the onboarding, whose model page says it — see
+        // [applyFactoryReset].
         startBrain(announce = false)
         startWakeWord()
         startPlanMind()
@@ -1379,6 +1379,11 @@ class BodyCoreService : Service() {
      *   problems.
      */
     private fun reportNoBrain(what: String, card: Boolean = true) {
+        // Before the first-run story is finished, its model page is where this
+        // is said, and it cannot be passed without a key. A row written now
+        // would outlive the key the user is about to paste: the first thing
+        // they read in the conversation would be a complaint already fixed.
+        if (!net.kuafuai.andee.ui.OnboardingState.isComplete(this)) return
         net.kuafuai.andee.ui.ChatHistory.addError(what)
         if (!card) return
         val openSettingsLabel = AppLocale.str(this, R.string.svc_btn_open_settings)
@@ -2520,12 +2525,29 @@ class BodyCoreService : Service() {
      * then reads the emptied prefs, lands on the default (hub, no URL) and
      * dials nothing — which is what a fresh install does. It also re-runs
      * [catchUpPromises] with no promises left to catch.
+     *
+     * Then the first-run story opens, because a reset promises the next thing
+     * the user sees is a fresh install — and on a fresh install that is the
+     * onboarding, not a ball waiting on a device nobody has introduced itself
+     * to. The wipe cleared [net.kuafuai.andee.ui.OnboardingState], so the
+     * Activity takes its onboarding branch and hides our overlays itself.
+     * `announce = false` for the same reason as the service's own start: the
+     * onboarding's model page is where a missing brain is said, and a no-brain
+     * card raised behind it would be a second voice about the same fact.
+     * `CLEAR_TASK` because the Activity is `singleTop`: one already on top
+     * would get `onNewIntent` and keep showing the checklist.
      */
     private fun applyFactoryReset() {
         val cleared = net.kuafuai.andee.config.FactoryReset.wipe(this)
         android.util.Log.i("Body", "factory reset: $cleared target(s) cleared — rebuilding the brain")
         stopBrain()
-        startBrain()
+        startBrain(announce = false)
+        runCatching {
+            startActivity(
+                Intent(this, net.kuafuai.andee.ui.SelfCheckActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+            )
+        }.onFailure { android.util.Log.w("Body", "factory reset: could not open onboarding", it) }
     }
 
     /**

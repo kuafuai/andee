@@ -3,6 +3,117 @@
     <string name="notification_relay_label">Andee notification access</string>
     <string name="accessibility_service_description">Andee needs this to see what is on screen and to tap, swipe and type for you. A floating ball appears on the home screen: tap it to talk, long-press to open the conversation.</string>
 
+    <!-- First run: three concrete stories, only the missing setup, then names. -->
+    <string name="onboarding_prelude_badge">Before we start</string>
+    <string name="onboarding_prelude_title">First, how shall we talk?</string>
+    <string name="onboarding_prelude_body">Pick a language and whether I speak. You can change both in Settings later.</string>
+    <string name="onboarding_prelude_lang">Language</string>
+    <string name="onboarding_prelude_sound">Sound</string>
+    <string name="onboarding_prelude_sound_on">Sound on</string>
+    <string name="onboarding_prelude_sound_on_note">I read my answers aloud</string>
+    <string name="onboarding_prelude_sound_off">Muted</string>
+    <string name="onboarding_prelude_sound_off_note">Text only</string>
+    <string name="onboarding_prelude_next">Done</string>
+    <string name="onboarding_intro_badge">Hi, I’m Andee</string>
+    <string name="onboarding_intro_title">I’ll move into your device\nand become its soul.</string>
+    <string name="onboarding_intro_chatbot_name">Chatbot</string>
+    <string name="onboarding_intro_chatbot">Waits to be asked.</string>
+    <string name="onboarding_intro_agent_name">Agent</string>
+    <string name="onboarding_intro_agent">Waits to be told.</string>
+    <string name="onboarding_intro_me_name">Me</string>
+    <string name="onboarding_intro_me">Doesn’t wait. Always here.</string>
+    <string name="onboarding_intro_next">So what can you do for me?</string>
+
+    <string name="onboarding_story_badge">Say you want to buy something.</string>
+    <string name="onboarding_shop_title">Tell me what you want. I’ll see it through.</string>
+    <string name="onboarding_shop_body">I know what you like. I open several apps, find coupons, compare prices and have another agent double-check. Before paying, I come back to you.</string>
+    <string name="onboarding_shop_request">“Buy my usual milk. Keep it under $10.”</string>
+    <string name="onboarding_shop_coupon">Store app · Found a coupon</string>
+    <string name="onboarding_shop_compare">Second store · Compared the same item</string>
+    <string name="onboarding_shop_agent">Price agent · Double-checked the deal</string>
+    <string name="onboarding_shop_result">Saved $3 · Total $8.60</string>
+    <string name="onboarding_shop_confirm">I’ll wait for you before paying</string>
+    <string name="onboarding_shop_next">What about customers?</string>
+
+    <string name="onboarding_customer_badge">I don’t miss questions, and you never teach me twice.</string>
+    <string name="onboarding_customer_title">When a customer arrives, I catch them first.</string>
+    <string name="onboarding_customer_body">Enquiries from every app reach me first. I clarify them and hand you only the decisions that need you.</string>
+    <string name="onboarding_customer_in">Customer: Can 100 units arrive by Friday?</string>
+    <string name="onboarding_customer_reply">Me: Which city? Do you need an invoice?</string>
+    <string name="onboarding_customer_memory">I remembered: this customer needs an invoice</string>
+    <string name="onboarding_customer_handoff">Only the decisions that need you reach you</string>
+    <string name="onboarding_customer_next">Can you save me some money too?</string>
+
+    <string name="onboarding_subscription_badge">The money that leaves quietly each month is the easiest to forget.</string>
+    <string name="onboarding_subscription_title">Auto-renewals? I keep an eye on them.</string>
+    <string name="onboarding_subscription_body">I know what you use and what you stopped using long ago, and I tell you what to cancel.</string>
+    <string name="onboarding_subscription_digest">Auto-charges this month</string>
+    <string name="onboarding_subscription_one">Video streaming</string>
+    <string name="onboarding_subscription_two">Cloud storage · unopened 3 months</string>
+    <string name="onboarding_subscription_three">Fitness app · unused 6 months</string>
+    <string name="onboarding_subscription_one_price">$8/mo</string>
+    <string name="onboarding_subscription_two_price">$5/mo</string>
+    <string name="onboarding_subscription_three_price">$10/mo</string>
+    <string name="onboarding_subscription_keep">In use</string>
+    <string name="onboarding_subscription_cancel">Cancel?</string>
+    <string name="onboarding_subscription_saved">Cancel these two, save $180 a year</string>
+    <string name="onboarding_subscription_ask">I ask you before cancelling anything</string>
+    <string name="onboarding_subscription_handover">Leave chores like this to me.</string>
+    <string name="onboarding_subscription_next">OK, let’s get started</string>
+
+    <string name="onboarding_setup_badge">%1$d more and I’m ready</string>
+    <string name="onboarding_setup_skip_note">I skip anything that is already set up</string>
+    <string name="onboarding_permission_overlay_title">First, keep me within reach.</string>
+    <string name="onboarding_permission_overlay_body">Allow display over other apps, and whatever app you are in, I wait at the edge of the screen and come back with the result.</string>
+    <string name="onboarding_permission_overlay_action">Allow floating window</string>
+    <string name="onboarding_permission_accessibility_title">Let me actually do the work.</string>
+    <string name="onboarding_permission_accessibility_body">With accessibility on, I can see, tap, swipe and type, only while doing what you gave me.</string>
+    <string name="onboarding_permission_accessibility_action">Enable accessibility</string>
+    <string name="onboarding_permission_microphone_title">Let me hear you.</string>
+    <string name="onboarding_permission_microphone_body">Allow the microphone and just tell me what you need. When you are not talking to me, your audio is not sent to the model.</string>
+    <string name="onboarding_permission_microphone_action">Allow microphone</string>
+    <string name="onboarding_permission_safety_title">You stay in control</string>
+    <string name="onboarding_permission_safety_body">Before payment, important messages and other consequential actions, I stop and ask you.</string>
+
+    <string name="onboarding_model_badge">One last setup item</string>
+    <string name="onboarding_model_title">Choose a brain for me.</string>
+    <string name="onboarding_model_body">No technical knowledge needed. Pick CodeFlying for the simple route, or Local model if you already have your own model API.</string>
+    <string name="onboarding_model_recommended">Recommended</string>
+    <string name="onboarding_model_codeflying_note">The simple route. One key covers the model, voice and many tools. New users get free credit; usage beyond that is billed.</string>
+    <string name="onboarding_model_local_title">Local model</string>
+    <string name="onboarding_model_local_note">I run on this device and use your own model endpoint and billing. Enter an API key; the endpoint and model name can use the defaults.</string>
+    <string name="onboarding_model_key_hint">Paste the key here</string>
+    <string name="onboarding_model_base_hint">Leave blank to use %1$s</string>
+    <string name="onboarding_model_name_hint">Leave blank to use %1$s</string>
+    <string name="onboarding_model_open_site">Get free credit and copy a key</string>
+    <string name="onboarding_model_save">Save and continue</string>
+    <string name="onboarding_model_key_required">One key to go. Paste it and we carry on.</string>
+    <string name="onboarding_voice_title">Then let me hear and speak.</string>
+    <string name="onboarding_voice_body">A local model brings no voice, so it needs its own setup. Pick who listens to you and who speaks for me, and fill in that key.</string>
+    <string name="onboarding_voice_more">Endpoints and resource IDs have working defaults; change them in Settings.</string>
+    <string name="onboarding_voice_key_required">Voice still needs a key. Fill in the key for the service you picked so I can hear you and speak.</string>
+
+
+    <string name="onboarding_meet_badge">Finally, let’s meet.</string>
+    <string name="onboarding_meet_title">What should we call each other?</string>
+    <string name="onboarding_meet_body">I’ll remember these names and use them whenever we talk or work.</string>
+    <string name="onboarding_meet_assistant">What would you like to call me?</string>
+    <string name="onboarding_meet_andy">Andy</string>
+    <string name="onboarding_meet_other">Other</string>
+    <string name="onboarding_meet_custom_hint">Type a name you like</string>
+    <string name="onboarding_meet_user">What should I call you?</string>
+    <string name="onboarding_meet_user_hint">For example: Sam, Ms. Lee</string>
+    <string name="onboarding_meet_continue">That’s us</string>
+    <string name="onboarding_meet_name_required">Give me a name to call you, and we can begin.</string>
+
+    <string name="onboarding_ready_badge">Ready</string>
+    <string name="onboarding_ready_title">%1$s, I’ll remember you.</string>
+    <string name="onboarding_ready_body">I’m %1$s. Just say what you want done; I’ll find the app, the tool, or another Andee, and keep going until there is a result.</string>
+    <string name="onboarding_ready_memory">I remember your preferences and the people who matter</string>
+    <string name="onboarding_ready_proactive">I keep watch over what you hand me</string>
+    <string name="onboarding_ready_control">I ask before anything consequential</string>
+    <string name="onboarding_ready_start">Start doing things together</string>
+
     <!--
         English mirror of values/strings.xml. Same keys, same order, one entry
         per Chinese entry — a key added on one side and not the other falls

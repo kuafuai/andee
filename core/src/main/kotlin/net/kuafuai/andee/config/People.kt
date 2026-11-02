@@ -89,9 +89,23 @@ class People(
     /** The user's own record, created on first use. */
     fun owner(): Person = synchronized(lock) {
         all().firstOrNull { it.isOwner } ?: run {
-            val p = blank("owner", "用户", "the person who lives with this device", isOwner = true).copy(weight = 5)
+            val p = blank("owner", OWNER_PLACEHOLDER, "the person who lives with this device", isOwner = true).copy(weight = 5)
             put(p); p
         }
+    }
+
+    /**
+     * What the user asked to be called, or null while the owner record still carries the placeholder. Read-only:
+     * unlike [owner] it never creates the record, since it runs on every turn.
+     */
+    fun ownerName(): String? =
+        all().firstOrNull { it.isOwner }?.name?.trim()?.takeIf { it.isNotEmpty() && it != OWNER_PLACEHOLDER }
+
+    /** The user told us what to call them (first run). Theirs, so the record is marked as written by them. */
+    fun setOwnerName(name: String) = synchronized(lock) {
+        val nm = name.trim().take(MAX_TEXT)
+        if (nm.isEmpty()) return@synchronized
+        put(owner().copy(name = nm, byUser = true))
     }
 
     // ---- writing -------------------------------------------------------------------
@@ -347,6 +361,9 @@ class People(
 
     companion object {
         const val SECTION = "people"
+
+        /** The owner record's name until the user gives one. */
+        const val OWNER_PLACEHOLDER = "用户"
         const val MAX_PEOPLE = 300
         const val MAX_TEXT = 300
         const val MAX_RELATION = 400

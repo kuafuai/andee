@@ -8,6 +8,117 @@
     -->
     <string name="accessibility_service_description">开启后 Andee 才能看到屏幕上有什么，并代你点按、滑动、输入。桌面上会多一颗悬浮小球：点一下跟它说话，长按展开对话记录。</string>
 
+    <!-- First run: three concrete stories, only the missing setup, then names. -->
+    <string name="onboarding_prelude_badge">开始之前</string>
+    <string name="onboarding_prelude_title">先定一下，我们怎么交流</string>
+    <string name="onboarding_prelude_body">选好语言和声音，以后在设置里也能改。</string>
+    <string name="onboarding_prelude_lang">语言</string>
+    <string name="onboarding_prelude_sound">声音</string>
+    <string name="onboarding_prelude_sound_on">开启声音</string>
+    <string name="onboarding_prelude_sound_on_note">我会把回答读出来</string>
+    <string name="onboarding_prelude_sound_off">静音</string>
+    <string name="onboarding_prelude_sound_off_note">只显示文字</string>
+    <string name="onboarding_prelude_next">选好了</string>
+    <string name="onboarding_intro_badge">你好，我是 Andee</string>
+    <string name="onboarding_intro_title">我会住进你的设备，\n成为它的灵魂。</string>
+    <string name="onboarding_intro_chatbot_name">聊天机器人</string>
+    <string name="onboarding_intro_chatbot">等你开口。</string>
+    <string name="onboarding_intro_agent_name">智能体</string>
+    <string name="onboarding_intro_agent">等你派活。</string>
+    <string name="onboarding_intro_me_name">我</string>
+    <string name="onboarding_intro_me">不用等，一直在。</string>
+    <string name="onboarding_intro_next">那你能帮我做什么？</string>
+
+    <string name="onboarding_story_badge">比如，你想买点东西</string>
+    <string name="onboarding_shop_title">你想买的，我替你一路办到</string>
+    <string name="onboarding_shop_body">我记得你的口味，自己开几个 App 找券、比价，再请别的助手核对一遍。付款前，我回来问你。</string>
+    <string name="onboarding_shop_request">“帮我买常喝的牛奶，别超过 60 元”</string>
+    <string name="onboarding_shop_coupon">淘宝 · 领取店铺券</string>
+    <string name="onboarding_shop_compare">京东 · 比较同款价格</string>
+    <string name="onboarding_shop_agent">价格助手 · 再核对一次</string>
+    <string name="onboarding_shop_result">省了 18 元 · 到手 ¥53.80</string>
+    <string name="onboarding_shop_confirm">付款前我等你确认</string>
+    <string name="onboarding_shop_next">那客户来了呢？</string>
+
+    <string name="onboarding_customer_badge">我不漏问，你也不用每次从头教我</string>
+    <string name="onboarding_customer_title">客户来了，我先替你接住</string>
+    <string name="onboarding_customer_body">各个 App 来的询单我先接住、问清楚，只把要你拍板的交给你。</string>
+    <string name="onboarding_customer_in">客户：100 件，周五能到吗？</string>
+    <string name="onboarding_customer_reply">我：发到哪个城市？需要开发票吗？</string>
+    <string name="onboarding_customer_memory">我记住了：这位客户需要专票</string>
+    <string name="onboarding_customer_handoff">只把要你决定的事交给你</string>
+    <string name="onboarding_customer_next">还能帮我省点钱吗？</string>
+
+    <string name="onboarding_subscription_badge">每个月悄悄扣的钱，最容易忘</string>
+    <string name="onboarding_subscription_title">自动续费，我替你盯着</string>
+    <string name="onboarding_subscription_body">哪些在用、哪些早就不用了，我都记着。该退的，我提醒你。</string>
+    <string name="onboarding_subscription_digest">这个月的自动扣费</string>
+    <string name="onboarding_subscription_one">视频会员</string>
+    <string name="onboarding_subscription_two">网盘会员 · 3 个月没打开</string>
+    <string name="onboarding_subscription_three">健身 App · 半年没用</string>
+    <string name="onboarding_subscription_one_price">¥25/月</string>
+    <string name="onboarding_subscription_two_price">¥15/月</string>
+    <string name="onboarding_subscription_three_price">¥30/月</string>
+    <string name="onboarding_subscription_keep">在用</string>
+    <string name="onboarding_subscription_cancel">建议退订</string>
+    <string name="onboarding_subscription_saved">退掉这两个，一年省 ¥540</string>
+    <string name="onboarding_subscription_ask">退订前，我先问你一声</string>
+    <string name="onboarding_subscription_handover">这种麻烦事，交给我。</string>
+    <string name="onboarding_subscription_next">好，我们开始吧</string>
+
+    <string name="onboarding_setup_badge">还差 %1$d 项，我就准备好了</string>
+    <string name="onboarding_setup_skip_note">已经开好的，我会自动跳过</string>
+    <string name="onboarding_permission_overlay_title">先让我出现在你面前</string>
+    <string name="onboarding_permission_overlay_body">开启“悬浮窗”后，不管你在用哪个 App，我都在屏幕边上等你，办完事回来告诉你结果。</string>
+    <string name="onboarding_permission_overlay_action">去开启悬浮窗</string>
+    <string name="onboarding_permission_accessibility_title">让我真正能动手</string>
+    <string name="onboarding_permission_accessibility_body">开启无障碍服务后，我才能在你交给我的事里看屏幕、点按、滑动和输入。</string>
+    <string name="onboarding_permission_accessibility_action">去开启无障碍服务</string>
+    <string name="onboarding_permission_microphone_title">让我听见你</string>
+    <string name="onboarding_permission_microphone_body">允许使用麦克风后，你直接对我说要做什么就行。你不跟我说话时，我不会把声音发给模型。</string>
+    <string name="onboarding_permission_microphone_action">允许使用麦克风</string>
+    <string name="onboarding_permission_safety_title">你始终做主</string>
+    <string name="onboarding_permission_safety_body">付款、发重要消息这类关键操作前，我会停下来问你。</string>
+
+    <string name="onboarding_model_badge">最后一项配置</string>
+    <string name="onboarding_model_title">给我选一个大脑</string>
+    <string name="onboarding_model_body">不用懂技术。想省心就选 CodeFlying；你已经有自己的模型接口，就选本地模型。</string>
+    <string name="onboarding_model_recommended">推荐</string>
+    <string name="onboarding_model_codeflying_note">最省心。模型、语音和各种工具用一把密钥，不用逐个申请。新用户有免费额度，超出后按量计费。</string>
+    <string name="onboarding_model_local_title">本地模型</string>
+    <string name="onboarding_model_local_note">我在这台设备上运行，用你自己的模型接口和账单。需要填 API Key；接口地址和模型名称可以先用默认值。</string>
+    <string name="onboarding_model_key_hint">把密钥粘贴到这里</string>
+    <string name="onboarding_model_base_hint">留空则使用 %1$s</string>
+    <string name="onboarding_model_name_hint">留空则使用 %1$s</string>
+    <string name="onboarding_model_open_site">领取免费额度并复制密钥</string>
+    <string name="onboarding_model_save">保存，继续</string>
+    <string name="onboarding_model_key_required">还差一把密钥，粘贴进来我们就继续。</string>
+    <string name="onboarding_voice_title">再让我能听、能说</string>
+    <string name="onboarding_voice_body">本地模型不带语音，要单独配。选好谁来听你说话、谁来替我开口，填上对应的密钥就行。</string>
+    <string name="onboarding_voice_more">接口地址、资源 ID 都有默认值，要改去设置里。</string>
+    <string name="onboarding_voice_key_required">语音还差密钥。填上选中那家的密钥，我才能听见你、开口说话。</string>
+
+
+    <string name="onboarding_meet_badge">最后，我们认识一下</string>
+    <string name="onboarding_meet_title">以后，我们怎么称呼彼此？</string>
+    <string name="onboarding_meet_body">我会记住这个称呼，以后聊天、办事都这样叫。</string>
+    <string name="onboarding_meet_assistant">你想怎么叫我？</string>
+    <string name="onboarding_meet_andy">安迪</string>
+    <string name="onboarding_meet_other">其它</string>
+    <string name="onboarding_meet_custom_hint">输入你喜欢的名字</string>
+    <string name="onboarding_meet_user">我该怎么称呼你？</string>
+    <string name="onboarding_meet_user_hint">比如：老陈、李女士</string>
+    <string name="onboarding_meet_continue">就这样认识吧</string>
+    <string name="onboarding_meet_name_required">告诉我一个称呼，我们就可以开始了。</string>
+
+    <string name="onboarding_ready_badge">准备好了</string>
+    <string name="onboarding_ready_title">%1$s，我记住你了</string>
+    <string name="onboarding_ready_body">我是%1$s。以后你只要说想做什么，我会自己找 App、找工具、找别的 Andee，一直跟到有结果。</string>
+    <string name="onboarding_ready_memory">我记得你的偏好和重要的人</string>
+    <string name="onboarding_ready_proactive">你交代的事，我主动盯着</string>
+    <string name="onboarding_ready_control">关键操作前，我先问你</string>
+    <string name="onboarding_ready_start">开始一起做事</string>
+
     <!-- The notification listener, named in system settings. -->
     <string name="notification_relay_label">Andee 通知读取</string>
 

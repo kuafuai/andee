@@ -85,7 +85,8 @@ class DesktopBrainHost(
 
     override fun planIndex(): String = DesktopNotebook.plans.indexForPrompt()
 
-    override fun selfIndex(): String = DesktopNotebook.book.selfhood.indexForPrompt()
+    override fun selfIndex(): String =
+        DesktopNotebook.book.selfhood.indexForPrompt(ownerName = DesktopNotebook.book.people.ownerName())
 
     override fun wikiIndex(): String = DesktopNotebook.book.wiki.indexForPrompt()
 

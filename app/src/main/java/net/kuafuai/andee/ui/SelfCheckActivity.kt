@@ -1,5 +1,6 @@
 package net.kuafuai.andee.ui
 
+import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.graphics.drawable.ColorDrawable
@@ -14,6 +15,7 @@ import net.kuafuai.andee.ScreenBodyService
 import net.kuafuai.andee.config.FactoryReset
 import net.kuafuai.andee.config.Notebook
 import net.kuafuai.andee.config.VoiceConfig
+import net.kuafuai.andee.device.PermissionRequestActivity
 import net.kuafuai.andee.device.SelfCheck
 import net.kuafuai.andee.i18n.AppLocale
 
@@ -225,6 +227,9 @@ class SelfCheckActivity : StageActivity() {
      */
     private lateinit var ui: SelfCheckUi
 
+    /** The first-run story, hosted on the same stage as the fallback check. */
+    private lateinit var onboarding: OnboardingUi
+
     /**
      * The fullscreen backdrop. Built once and **never rebuilt** — see
      * [installBackdrop].
@@ -364,8 +369,14 @@ class SelfCheckActivity : StageActivity() {
         val errand = intent?.getParcelableExtra<Intent>(EXTRA_ERRAND)
         val carrying = errand != null
 
+        // First run outranks the launcher's normal trampoline behaviour. A
+        // configured device still skips every setup item it already has, but
+        // it must be allowed to finish the story and names before an icon tap
+        // starts meaning "open the assistant".
+        val onboardingNeeded = !OnboardingState.isComplete(this) && !carrying
+
         val svc = BodyCoreService.get()
-        if (!restored && !checkOpen && !carrying && svc != null && svc.ensureOverlays()) {
+        if (!restored && !checkOpen && !carrying && !onboardingNeeded && svc != null && svc.ensureOverlays()) {
             svc.noteOwnActivity()
             svc.dispatcherForNotification()?.expand()
             finishLauncherEntry()
@@ -378,7 +389,7 @@ class SelfCheckActivity : StageActivity() {
         // (first launch after a fresh grant). Falling through here would draw a
         // checklist for a device that is working, which is the exact report
         // this branch was rewritten to stop producing.
-        if (!restored && !checkOpen && !carrying && svc == null && ScreenBodyService.get() != null && Settings.canDrawOverlays(this)) {
+        if (!restored && !checkOpen && !carrying && !onboardingNeeded && svc == null && ScreenBodyService.get() != null && Settings.canDrawOverlays(this)) {
             finishLauncherEntry()
             return
         }
@@ -389,6 +400,16 @@ class SelfCheckActivity : StageActivity() {
         // question "was there a page?" has to survive the process: see
         // [SelfCheck.setPageOpen]. [onStageLeaving] is what clears it.
         SelfCheck.setPageOpen(this, true)
+        if (onboardingNeeded) {
+            // An upgraded, already-working install can have overlay windows on
+            // screen before this Activity starts. They outrank Activities and
+            // would cover or intercept this first-run surface. A service that
+            // starts later sees page_open and stays hidden on its own; these
+            // calls cover the service that was already alive.
+            CardUi.dismissCurrent()
+            NudgeUi.dismissAll()
+            svc?.ballWindow()?.hide()
+        }
         //
         // No service: accessibility is off, or the overlay grant is missing, or
         // the app was just reinstalled. There is no ball, no card and no window
@@ -399,6 +420,44 @@ class SelfCheckActivity : StageActivity() {
         // honest, see [installBackdrop].
         paintedLang = VoiceConfig.uiLanguage(this)
         installBackdrop()
+
+        if (onboardingNeeded) {
+            onboarding = OnboardingUi(
+                context = this,
+                host = stage,
+                onOpenFinding = { openOnboardingFinding(it) },
+                onOpenUrl = { url ->
+                    openErrand(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                },
+                onSaveModel = { updates ->
+                    val beforeHub = VoiceConfig.hubConfig(this)
+                    val beforeBrain = VoiceConfig.brainConfig(this)
+                    VoiceConfig.save(this, updates)
+                    BodyCoreService.get()
+                        ?.reconcileBackendAfterSettings(beforeHub, beforeBrain)
+                },
+                onPrefsChanged = {
+                    // The ball window is hidden, not gone: its strings and its
+                    // speaker key are repainted in place so it comes back right.
+                    paintedLang = VoiceConfig.uiLanguage(this)
+                    BodyCoreService.get()?.ballWindow()?.let { w ->
+                        w.setMuted(VoiceConfig.muted(this))
+                        w.onLocaleChanged()
+                    }
+                },
+                onComplete = {
+                    // Normally onStageLeaving clears this a moment later. Do it
+                    // here too so a process death between the final tap and the
+                    // exit animation cannot reopen the diagnostic page.
+                    SelfCheck.setPageOpen(this, false)
+                    leave()
+                },
+            )
+            onboarding.show()
+            revealStage()
+            return
+        }
+
         ui = SelfCheckUi(
             context = this,
             host = stage,
@@ -466,6 +525,24 @@ class SelfCheckActivity : StageActivity() {
                 Toast.makeText(this, getString(R.string.check_fix_no_screen), Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    /** Open the exact repair door described by SelfCheck's live finding. */
+    private fun openOnboardingFinding(finding: SelfCheck.Finding) {
+        val there = when (val fix = finding.fix) {
+            is SelfCheck.Fix.Screen -> Intent(fix.action).apply {
+                fix.component?.let { component = ComponentName.unflattenFromString(it) }
+                fix.data?.let { data = Uri.parse(it) }
+                fix.extras.forEach { (name, value) -> putExtra(name, value) }
+            }
+
+            is SelfCheck.Fix.Grant -> Intent(this, PermissionRequestActivity::class.java)
+                .putExtra("permissions", fix.permissions.toTypedArray())
+
+            is SelfCheck.Fix.Link -> Intent(Intent.ACTION_VIEW, Uri.parse(fix.url))
+            else -> return
+        }
+        openErrand(there)
     }
 
     /**
@@ -557,10 +634,19 @@ class SelfCheckActivity : StageActivity() {
         // whatever `get()` answers now — not a null check we could skip.
         val beforeHub = VoiceConfig.hubConfig(this)
         val beforeBrain = VoiceConfig.brainConfig(this)
+        // A reset from this sheet ends in the first-run story, as the service's
+        // does. Recreating runs [onCreate] again, which sees the cleared
+        // onboarding state and takes that branch; done on dismiss, so the sheet
+        // is gone before the stage is rebuilt under it.
+        var wiped = false
         val s = SettingsUi(
             context = this,
             onDismiss = {
                 settings = null
+                if (wiped) {
+                    recreate()
+                    return@SettingsUi
+                }
                 BodyCoreService.get()
                     ?.reconcileBackendAfterSettings(beforeHub, beforeBrain)
                 paintedLang = VoiceConfig.uiLanguage(this)
@@ -570,7 +656,10 @@ class SelfCheckActivity : StageActivity() {
                 // is what 重新检查 calls.
                 if (::ui.isInitialized) ui.start()
             },
-            onFactoryReset = { FactoryReset.wipe(this) },
+            onFactoryReset = {
+                FactoryReset.wipe(this)
+                wiped = true
+            },
             onClearChat = { ChatHistory.wipe(this) },
             onClearNotes = { Notebook.wipe(this) },
             // This host is an Activity: it can open a browser itself, and the
@@ -683,6 +772,15 @@ class SelfCheckActivity : StageActivity() {
     override fun onResume() {
         super.onResume()
 
+        if (::onboarding.isInitialized) {
+            if (resumedOnce) {
+                onboarding.refresh()
+                settleRecheck()
+            }
+            resumedOnce = true
+            return
+        }
+
         // Order matters here, and it is the reverse of what it was.
         //
         // Every row on this page sends the user out — 去开启, 允许, 去下载 — so
@@ -746,6 +844,16 @@ class SelfCheckActivity : StageActivity() {
      * the row's own button is the thing that fixes it.
      */
     private fun settleRecheck() {
+        if (::onboarding.isInitialized) {
+            for (at in SETTLE_AT_MS) {
+                settle.postDelayed(
+                    { if (::onboarding.isInitialized) onboarding.refresh() },
+                    at,
+                )
+            }
+            return
+        }
+        if (!::ui.isInitialized) return
         if (ui.outstanding() == 0) return
         for (at in SETTLE_AT_MS) {
             settle.postDelayed(
@@ -768,6 +876,7 @@ class SelfCheckActivity : StageActivity() {
         settings = null
         // Guarded because this also runs when onCreate threw before the card was
         // built, and dying is not a good moment to throw a second exception.
+        if (::onboarding.isInitialized) onboarding.destroy()
         if (::ui.isInitialized) ui.destroy()
         super.onDestroy()
     }

@@ -7,6 +7,7 @@ import net.kuafuai.andee.R
 import net.kuafuai.andee.i18n.AppLocale
 import net.kuafuai.andee.screen.GroundingLog
 import net.kuafuai.andee.ui.ChatHistory
+import net.kuafuai.andee.ui.OnboardingState
 import net.kuafuai.andee.wake.WakeTemplates
 import java.io.File
 
@@ -91,6 +92,10 @@ object FactoryReset {
      */
     private val ALSO_CLEARED: List<(Context) -> Unit> = listOf(
         { prefs(it, "gear_launches") },
+        // A reset promises the next launch looks freshly installed. The
+        // onboarding choices themselves are mirrored in the notebook/voice
+        // prefs above; this only clears completion and the last page.
+        { OnboardingState.reset(it) },
     )
 
     /**

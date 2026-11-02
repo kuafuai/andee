@@ -128,4 +128,15 @@ class SelfhoodTest {
         assertTrue(line.contains("社区") && line.contains("1.5"))
         assertNotNull(id)
     }
+
+    @Test fun theNameTheUserGaveRidesOnTheIndexLine() {
+        assertEquals("", me.indexForPrompt())                // nobody named me, nothing else to say
+        me.setName("安迪")
+        assertEquals("安迪", me.name())
+        val line = me.indexForPrompt(ownerName = "老陈")
+        assertTrue(line, line.startsWith("Your name: 安迪"))
+        assertTrue(line, line.contains("Call them: 老陈."))
+        me.setName("Andee")                                   // being called what I am is no name at all
+        assertNull(me.name())
+    }
 }

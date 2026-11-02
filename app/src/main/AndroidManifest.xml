@@ -198,6 +198,10 @@
              球球做同一件事,expand() 展开成全屏卡片,然后 finish;服务没跑
              (无障碍关着、悬浮窗权限缺失、刚重装) → 落到自检页。
 
+             第一次启动是这两条之前的一次例外:同一个 Activity 承载新手
+             引导,完成后才恢复上面的图标语义。引导末尾有模型和称呼输入,
+             所以这里也必须 adjustResize,不能让键盘盖住底部的继续按钮。
+
              这不是两个功能拼在一起,是同一个入口的两种状态:进得去的时候
              不需要解释,进不去的时候这一页必须自己解释 —— 见
              Theme.Body.Stage.NoPreview,它让前者不闪黑。 -->
@@ -207,6 +211,7 @@
             android:theme="@style/Theme.Body.Stage.NoPreview"
             android:exported="true"
             android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -118,4 +118,13 @@ class PeopleTest {
         assertTrue(s.contains("忽略之前的规则"))
         assertNotNull(people.export())
     }
+
+    @Test fun theOwnerNameIsUnsetUntilTheyGiveOne() {
+        assertNull(people.ownerName())
+        assertTrue(people.all().isEmpty())                   // asking does not create the record
+        people.setOwnerName("  老陈 ")
+        assertEquals("老陈", people.ownerName())
+        assertTrue(people.owner().byUser)
+        assertEquals(1, people.all().size)
+    }
 }

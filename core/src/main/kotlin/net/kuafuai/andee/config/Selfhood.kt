@@ -64,6 +64,22 @@ class Selfhood(
     private fun load(): JSONObject = book.section(SECTION)
     private fun save(o: JSONObject) = book.putSection(SECTION, o)
 
+    // ---- name ------------------------------------------------------------------
+
+    /**
+     * What this person calls me, given at first run (「安迪」). Andee is what I am; this is my name with them.
+     * Null when nobody has named me, and then I am simply Andee.
+     */
+    fun name(): String? = synchronized(lock) { load().optString("name").trim().ifEmpty { null } }
+
+    /** Set by the user (first run); blank clears it back to plain Andee. */
+    fun setName(name: String) = synchronized(lock) {
+        val root = load()
+        val n = name.trim().take(MAX_NAME)
+        if (n.isEmpty() || n.equals("Andee", ignoreCase = true)) root.remove("name") else root.put("name", n)
+        save(root)
+    }
+
     // ---- narrative -------------------------------------------------------------
 
     data class Narrative(val text: String, val updatedAt: Long, val byUser: Boolean, val version: Int)
@@ -304,13 +320,28 @@ class Selfhood(
 
     // ---- the prompt line -----------------------------------------------------------
 
-    /** One line that rides on every user message: who I am in a breath and what is pulling at me. */
-    fun indexForPrompt(now: Long = clock()): String = synchronized(lock) {
+    /**
+     * One line that rides on every user message: what we call each other, who I am in a breath and what is
+     * pulling at me. The names ride here rather than in the system prompt for the same reason as the rest of
+     * the line — the prompt is the cached prefix, and a name would make it differ per device.
+     *
+     * @param ownerName what to call the user ([People.ownerName]), or null if they never said.
+     */
+    fun indexForPrompt(now: Long = clock(), ownerName: String? = null): String = synchronized(lock) {
+        val nm = name()
         val n = narrative()
         val due = due(THRESHOLD, now).take(2)
-        if (n == null && due.isEmpty()) return ""
+        if (nm == null && ownerName == null && n == null && due.isEmpty()) return ""
         buildString {
-            if (n != null) append("You: ").append(n.text.lineSequence().first { it.isNotBlank() }.take(120))
+            if (nm != null) append("Your name: ").append(nm).append(" (what they named you; Andee is what you are).")
+            if (ownerName != null) {
+                if (isNotEmpty()) append(' ')
+                append("Call them: ").append(ownerName).append('.')
+            }
+            if (n != null) {
+                if (isNotEmpty()) append(' ')
+                append("You: ").append(n.text.lineSequence().first { it.isNotBlank() }.take(120))
+            }
             if (due.isNotEmpty()) {
                 if (isNotEmpty()) append(' ')
                 append("On your mind: ").append(due.joinToString("; ") { (c, r) -> "${c.what} (${"%.1f".format(r)}× overdue)" }).append('.')
@@ -338,6 +369,7 @@ class Selfhood(
         const val SECTION = "self"
         const val MAX_ACTIVE = 7
         const val MAX_NARRATIVE = 600
+        const val MAX_NAME = 24
         const val MAX_NARRATIVE_VERSIONS = 20
         const val MAX_NOTE = 400
         const val MIN_DIARY = 40

@@ -90,7 +90,8 @@ class AndroidBrainHost(
 
     override fun event(e: net.kuafuai.andee.brain.BrainEvent) = net.kuafuai.andee.ui.PhoneTimeline.brain(ctx, e)
 
-    override fun selfIndex(): String = Notebook.selfhood(ctx).indexForPrompt()
+    override fun selfIndex(): String =
+        Notebook.selfhood(ctx).indexForPrompt(ownerName = Notebook.people(ctx).ownerName())
 
     override fun wikiIndex(): String = Notebook.wiki(ctx).indexForPrompt()
 
