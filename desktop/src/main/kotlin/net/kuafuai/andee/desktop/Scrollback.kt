@@ -24,6 +24,9 @@ object Scrollback {
     private const val MAX_TOPICS = 60
     private const val MAX_TEXT = 4000
 
+    /** [Row.kind] of an assistant row that is a page's card ([addPage]). */
+    const val KIND_PAGE = "page"
+
     /**
      * [EVENT] is something that happened that is not conversation — a todo woke it, the review ran, it wrote its
      * diary, it got up by itself ([TimelineEvents]). Shown in the timeline, **never** given to the brain:
@@ -65,6 +68,20 @@ object Scrollback {
         if (t.isEmpty()) return
         synchronized(lock) {
             rows += Row(nextId++, System.currentTimeMillis(), role, t.take(MAX_TEXT))
+            while (rows.size > MAX_ROWS) rows.removeAt(0)
+        }
+        saveAndNotify()
+    }
+
+    /**
+     * A page it made, as its card in the conversation: an assistant row (the brain reads the title, as
+     * before) with `kind = "page"` and the page id in `ref`, which the chat draws as a share card.
+     */
+    fun addPage(title: String, pageId: Long) {
+        val t = title.trim()
+        if (t.isEmpty()) return
+        synchronized(lock) {
+            rows += Row(nextId++, System.currentTimeMillis(), Role.ASSISTANT, t.take(MAX_TEXT), kind = KIND_PAGE, ref = pageId.toString())
             while (rows.size > MAX_ROWS) rows.removeAt(0)
         }
         saveAndNotify()

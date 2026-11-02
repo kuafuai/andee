@@ -14,6 +14,7 @@ import CoreLocation
 import CoreGraphics
 import Foundation
 import ScreenCaptureKit
+import WebKit
 
 // MARK: - helpers
 
@@ -826,4 +827,82 @@ public func andee_location() -> UnsafeMutablePointer<CChar> {
     }
     _ = out.wait(timeout: .now() + 10)
     return json(result)
+}
+
+// MARK: - pages (ui.show_html's card in the conversation)
+
+/// 1 when the session's screen is locked. The page is then kept as a card in the
+/// conversation instead of being opened in a browser nobody can see.
+@_cdecl("andee_screen_locked")
+public func andee_screen_locked() -> Int32 {
+    guard let d = CGSessionCopyCurrentDictionary() as? [String: Any] else { return 0 }
+    return (d["CGSSessionScreenIsLocked"] as? Bool ?? false) ? 1 : 0
+}
+
+private final class SnapDelegate: NSObject, WKNavigationDelegate {
+    var onFinish: (() -> Void)?
+    private func fire() { let f = onFinish; onFinish = nil; f?() }
+    func webView(_ w: WKWebView, didFinish n: WKNavigation!) { fire() }
+    func webView(_ w: WKWebView, didFail n: WKNavigation!, withError e: Error) { fire() }
+    func webView(_ w: WKWebView, didFailProvisionalNavigation n: WKNavigation!, withError e: Error) { fire() }
+}
+
+/// The top `width`×`height` points of an HTML file, laid out at that width (a phone's),
+/// written as a PNG — the picture on the page's card, the phone's PageThumbs on WebKit.
+/// Rendered in a borderless window parked off-screen: a WKWebView outside any window
+/// snapshots blank. Blocks the caller up to `timeoutMs`; never call it on the main thread.
+@_cdecl("andee_html_snapshot")
+public func andee_html_snapshot(_ htmlPath: UnsafePointer<CChar>, _ outPath: UnsafePointer<CChar>,
+                                _ width: Int32, _ height: Int32, _ timeoutMs: Int32) -> Int32 {
+    if Thread.isMainThread { return 0 }
+    let src = URL(fileURLWithPath: String(cString: htmlPath))
+    let out = URL(fileURLWithPath: String(cString: outPath))
+    let w = CGFloat(width), h = CGFloat(height)
+    let done = DispatchSemaphore(value: 0)
+    var ok: Int32 = 0
+    var keep: (NSWindow, WKWebView, SnapDelegate)? = nil
+    DispatchQueue.main.async {
+        let win = NSWindow(contentRect: NSRect(x: -20000, y: -20000, width: w, height: h),
+                           styleMask: .borderless, backing: .buffered, defer: false)
+        win.isReleasedWhenClosed = false
+        win.ignoresMouseEvents = true
+        let web = WKWebView(frame: NSRect(x: 0, y: 0, width: w, height: h))
+        // The page's own background, else the black a page opens on (as on the phone).
+        web.underPageBackgroundColor = .black
+        win.contentView = web
+        win.orderBack(nil)
+        let d = SnapDelegate()
+        func finish() {
+            win.orderOut(nil)
+            keep = nil
+            done.signal()
+        }
+        d.onFinish = {
+            // Time for the page's own scripts and fonts, as on the phone.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                let cfg = WKSnapshotConfiguration()
+                cfg.rect = CGRect(x: 0, y: 0, width: w, height: h)
+                web.takeSnapshot(with: cfg) { img, _ in
+                    if let img = img, let tiff = img.tiffRepresentation,
+                       let rep = NSBitmapImageRep(data: tiff),
+                       let png = rep.representation(using: .png, properties: [:]),
+                       (try? png.write(to: out)) != nil {
+                        ok = 1
+                    }
+                    finish()
+                }
+            }
+        }
+        web.navigationDelegate = d
+        keep = (win, web, d)
+        // As UTF-8, which is how every page is written: a page that forgot its
+        // <meta charset> is otherwise guessed as GBK or Latin-1 and drawn as mojibake.
+        if let html = try? String(contentsOf: src, encoding: .utf8) {
+            web.loadHTMLString(html, baseURL: src.deletingLastPathComponent())
+        } else {
+            web.loadFileURL(src, allowingReadAccessTo: src.deletingLastPathComponent())
+        }
+    }
+    _ = done.wait(timeout: .now() + .milliseconds(Int(timeoutMs)))
+    return ok
 }

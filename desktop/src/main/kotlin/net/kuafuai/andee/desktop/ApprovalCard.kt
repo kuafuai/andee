@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -101,7 +104,7 @@ fun ApprovalCard(p: ApprovalGate.Pending) {
             }
             Text(t("Andee 想运行一条命令", "Andee wants to run a command"), color = Palette.text, fontSize = 17.sp)
             Text(a.why, color = Palette.text, fontSize = 14.sp)
-            Mono(a.command)
+            CommandText(a.command, zh)
             Text(t("在 ", "in ") + a.cwd, color = Palette.secondary, fontSize = 12.sp)
             Text(
                 t("风险：", "Risk: ") + tierName(a.tier, zh) + " — " + a.reason,
@@ -144,6 +147,45 @@ private fun tierName(t: Tier, zh: Boolean) = when (t) {
     Tier.HIGH -> if (zh) "高" else "high"
     Tier.CRITICAL -> if (zh) "致命" else "critical"
 }
+
+/**
+ * The command, in a box that cannot grow past [COMMAND_MAX_HEIGHT] and scrolls inside it. It used to be the whole
+ * command, unbounded: a model writing a 17 KB game into a file with one heredoc made a card taller than the screen,
+ * its Allow / Deny buttons off the bottom, and 15 s of the UI thread spent laying out monospace — so the turn sat in
+ * "running a command" until the 2-minute timeout denied it. Past [COMMAND_MAX_LINES] lines or [COMMAND_MAX_CHARS]
+ * characters only the head is shown, and the card says how much is not: such commands are almost always "write this
+ * content to a file", and the head is where the target and the method are.
+ */
+@Composable
+private fun CommandText(command: String, zh: Boolean) {
+    val lines = command.lines()
+    var shown = lines.take(COMMAND_MAX_LINES).joinToString("\n")
+    if (shown.length > COMMAND_MAX_CHARS) shown = shown.take(COMMAND_MAX_CHARS)
+    val hiddenLines = lines.size - shown.lines().size
+    val hiddenChars = command.length - shown.length
+    Box(
+        Modifier.fillMaxWidth().heightIn(max = COMMAND_MAX_HEIGHT)
+            .background(Palette.well, RoundedCornerShape(10.dp)),
+    ) {
+        SelectionContainer {
+            Text(
+                shown, color = Palette.text, fontSize = 13.sp, fontFamily = FontFamily.Monospace,
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(10.dp),
+            )
+        }
+    }
+    if (hiddenChars > 0) {
+        Text(
+            if (zh) "命令很长，只显示开头；还有 ${maxOf(hiddenLines, 1)} 行（${hiddenChars} 字）没显示。"
+            else "A long command: only the start is shown; ${maxOf(hiddenLines, 1)} more lines ($hiddenChars characters) are not.",
+            color = Palette.secondary, fontSize = 12.sp,
+        )
+    }
+}
+
+private val COMMAND_MAX_HEIGHT = 220.dp
+private const val COMMAND_MAX_LINES = 60
+private const val COMMAND_MAX_CHARS = 4000
 
 @Composable
 private fun Mono(text: String) {

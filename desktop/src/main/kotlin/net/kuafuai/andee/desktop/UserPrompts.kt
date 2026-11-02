@@ -113,12 +113,19 @@ class UiTools : DesktopBrainHost.ToolProvider {
         val explicit = p.optString("revise").trim().toLongOrNull()?.let { Pages.pageById(it)?.groupId }
         val group = Pages.armOrResolve(explicit)
         val page = Pages.add(title, html, group) ?: throw IllegalStateException("the page could not be saved")
-        // The phone renders in an in-app WebView; the Mac's honest first cut opens
-        // the page in the default browser. The shelf (list_pages / get_page / the
-        // per-turn index) is what the model reads back, and that works the same.
+        // Either way it is a card in the conversation, as on the phone: the page's top in it, a click opens it.
+        Scrollback.addPage(title, page.id)
+        // Locked: keep it there and open nothing — a browser behind the lock screen is a page nobody saw
+        // reported as shown. Same rule as the phone.
+        if (net.kuafuai.andee.desktop.mac.Bridge.screenLocked()) {
+            return JSONObject().put("shown", false).put("saved", true).put("in_conversation", true)
+                .put("id", page.id).put("title", title).put("version", page.version)
+                .put("note", "The screen is locked, so the page was not opened. It is saved and sits in the conversation " +
+                    "as a card they can click once they unlock. Tell them in a sentence; do not call show_html again for it.")
+        }
+        // The phone renders in an in-app WebView; the Mac opens the page in the default browser.
         runCatching { net.kuafuai.andee.desktop.mac.Bridge.open(page.file!!.absolutePath) }
             .onFailure { Log.w("UiTools", "could not open the page: ${it.message}") }
-        Scrollback.add(Scrollback.Role.ASSISTANT, title)
         return JSONObject().put("opened", true).put("id", page.id).put("title", title)
             .put("version", page.version).put("closed", false)
     }

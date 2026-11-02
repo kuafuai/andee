@@ -161,7 +161,7 @@ object Pages {
         val overVersions = entries.groupBy { it.groupId }
             .flatMap { (_, revs) -> revs.sortedBy { it.version }.dropLast(MAX_VERSIONS) }
         for (old in overVersions) {
-            old.file?.let { runCatching { it.delete() } }
+            old.file?.let { runCatching { it.delete(); PageThumbs.fileFor(it).delete() } }
             entries.removeIf { it.id == old.id }
         }
         var pages = 0
@@ -170,7 +170,7 @@ object Pages {
             if (e.file == null) continue
             pages++
             if (pages > MAX_PAGES) {
-                runCatching { e.file.delete() }
+                runCatching { e.file.delete(); PageThumbs.fileFor(e.file).delete() }
                 entries[i] = e.copy(file = null)
             }
         }

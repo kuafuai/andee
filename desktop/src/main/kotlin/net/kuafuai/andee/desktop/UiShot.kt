@@ -37,6 +37,7 @@ fun main(args: Array<String>) {
         if (k == "lang") Settings.save(mapOf("lang" to v))
         if (k == "theme") Palette.setNight(v == "night")
         if (k == "brain") Settings.save(mapOf("brain" to v))
+        if (k == "pagethumb") System.setProperty("andee.shot.pagethumb", v)
     }
     // `chat … wechat`: the conversation with the WeChat QR card open.
     if (args.getOrElse(4) { "" } == "wechat") System.setProperty("andee.shot.wechat", "1")
@@ -45,6 +46,20 @@ fun main(args: Array<String>) {
     if (args.getOrElse(4) { "" } == "pending") {
         Scrollback.add(Scrollback.Role.ASSISTANT, "这一版改的是手感和反馈：\n\n" + "金豆出现了，每吃 5 个普通豆随机长出一颗金色豆子，6.5 秒后消失，最后一秒会闪，吃到 3 分。撞死时棋盘会抖一下、蛇头位置炸开一层红粒子。".repeat(4) + "\n\n要是你原本想改的是别的东西，跟我说一句我就接着改。")
         Pages.add("贪吃蛇", "<html>", null)?.let { Assistant.beginEdit(it) }
+    }
+    // `chat … page [pagethumb=<png>]`: a page's card at the foot of the conversation. WebKit cannot draw here
+    // (no AppKit run loop), so the picture is the given PNG, or the card shows its placeholder.
+    if (args.getOrElse(4) { "" } == "page") {
+        val html = "<!doctype html><meta name=viewport content='width=device-width'><style>body{margin:0;font-family:sans-serif;" +
+            "background:linear-gradient(160deg,#1e3a8a,#0ea5e9);color:#fff;padding:28px 20px}h1{font-size:26px;margin:0 0 6px}" +
+            ".c{background:rgba(255,255,255,.16);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;" +
+            "justify-content:space-between;font-size:18px}</style><h1>本周三城天气</h1><p>北京 · 上海 · 深圳</p>" +
+            "<div class=c><span>北京 ☀️ 晴</span><b>18°</b></div><div class=c><span>上海 🌧 小雨</span><b>21°</b></div>"
+        Pages.add("本周三城天气", html, null)?.let { p ->
+            Scrollback.addPage(p.title, p.id)
+            val thumb = System.getProperty("andee.shot.pagethumb")
+            if (thumb != null) p.file?.let { File(thumb).copyTo(PageThumbs.fileFor(it), overwrite = true) }
+        }
     }
     if (args.getOrElse(4) { "" } == "attach") {
         val img = java.awt.image.BufferedImage(600, 400, java.awt.image.BufferedImage.TYPE_INT_RGB).also { b ->
@@ -110,6 +125,22 @@ fun main(args: Array<String>) {
         when {
             askCard != null -> AskShot(askCard)
             screen == "bubble" -> BubbleShot()
+            // `approval`: a shell approval for a very long command (a whole file in a heredoc), the case that
+            // used to push the buttons off the screen.
+            screen == "approval" -> Box(Modifier.background(Color(0xFFB9C0C8)).padding(24.dp)) {
+                val body = (1..400).joinToString("\n") { "  <div class=\"row\">line $it of the snake game</div>" }
+                ApprovalCard(
+                    ApprovalGate.Pending(
+                        net.kuafuai.andee.desktop.shell.ShellTools.Approval(
+                            command = "cat > ~/Andee/snake/index.html <<'HTML'\n<!doctype html>\n$body\nHTML",
+                            why = "把贪吃蛇保存成文件", cwd = "/Users/mac/Andee",
+                            tier = net.kuafuai.andee.desktop.shell.RiskClassifier.Tier.LOW, reason = "写入工作目录",
+                            allowAlways = true, second = false,
+                        ),
+                        java.util.concurrent.CompletableFuture(),
+                    ),
+                )
+            }
             screen == "confirm" -> Box(Modifier.background(Color(0xFF1C1C1E)).padding(24.dp)) {
                 ConfirmBlock("清空聊天记录？", "对话记录和它生成过的页面会删掉，这场对话聊过的内容它也会忘掉。小本本不受影响。", "确认清空", {}, {})
             }

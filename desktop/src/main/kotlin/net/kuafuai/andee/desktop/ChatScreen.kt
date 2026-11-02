@@ -278,7 +278,11 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
                 }
                 items(items, key = { it.key }) { it ->
                     when (it) {
-                        is ChatItem.Message -> if (it.row.role == Scrollback.Role.EVENT) EventRow(it.row, onOpenWiki) else Bubble(it.row)
+                        is ChatItem.Message -> when {
+                            it.row.role == Scrollback.Role.EVENT -> EventRow(it.row, onOpenWiki)
+                            it.row.kind == Scrollback.KIND_PAGE -> PageCard(it.row)
+                            else -> Bubble(it.row)
+                        }
                         is ChatItem.Folded -> TopicCard(it.topic, it.count, onOpen = { onOpenTopic(it.topic.id) }, onContinue = { onContinueTopic(it.topic) })
                     }
                 }

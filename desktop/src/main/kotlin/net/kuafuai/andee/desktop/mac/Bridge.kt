@@ -44,6 +44,8 @@ object Bridge {
         fun andee_notif_latest_id(): Long
         fun andee_own_window_at(x: Double, y: Double): Int
         fun andee_camera_shot(path: String, front: Int, maxSide: Int): Int
+        fun andee_screen_locked(): Int
+        fun andee_html_snapshot(htmlPath: String, outPath: String, width: Int, height: Int, timeoutMs: Int): Int
         fun andee_brightness_get(): Double
         fun andee_brightness_set(b: Double): Int
         fun andee_location(): Pointer
@@ -115,6 +117,13 @@ object Bridge {
 
     /** Capture one camera frame to [path] as PNG; false when there is no camera or permission. */
     fun cameraShot(path: String, front: Boolean, maxSide: Int = 1280) = lib?.andee_camera_shot(path, if (front) 1 else 0, maxSide) == 1
+
+    /** The session's screen is locked: a page is then kept in the conversation, not opened. */
+    fun screenLocked(): Boolean = lib?.andee_screen_locked() == 1
+
+    /** The top [width]×[height] points of an HTML file as a PNG at [out]. Blocking; never on the main thread. */
+    fun htmlSnapshot(html: String, out: String, width: Int, height: Int, timeoutMs: Int = 8000): Boolean =
+        lib?.andee_html_snapshot(html, out, width, height, timeoutMs) == 1
 
     /** The main display's brightness, 0–1. */
     fun brightnessGet(): Double = lib?.andee_brightness_get() ?: -1.0
