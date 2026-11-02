@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`19` / `"0.8.1"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`20` / `"0.9.0"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,85 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.9.0] - 2026-11-02
+
+**A first run that is a story rather than a checklist, and a stage in the middle of the home screen.**
+
+The launcher's first open used to be a list of things to switch on. It is now Andee introducing itself,
+in its own recorded voice, before asking for anything. And the phone's unfolded card now shows a page
+Andee writes and keeps — the conversation is one tap away.
+
+### Added
+
+- **A first-run onboarding in Andee's own voice (Android).** Language and sound first, then Andee introducing
+  itself (it moves into this device; chatbots and agents wait, it does not), three performed scenes
+  (shopping, a customer, auto-renewals it suggests cancelling), and only then the setup still missing —
+  permissions, a brain, and names. Every line is first person: Andee speaks, the buttons are the user's
+  reply. The ball sits on the card the whole way, survives page changes, and wears the face each beat
+  calls for. Scenes are built in their final state and only revealed, so with animations off a page is
+  still complete.
+- **The onboarding speaks (Android).** Each page plays a pre-recorded line in Andee's own voice
+  (`VoiceConfig.TTS_SPEAKER`) from `assets/onboarding/<lang>/<id>.mp3` — 10 lines, in Chinese and English.
+  Recorded rather than synthesised **because no key exists yet at first run**. A page plays its line when
+  sound is on, any page change stops it, and the prelude (language and sound) is deliberately silent: it
+  is where the user decides whether Andee speaks at all. `tools/onboarding_voice.py` holds the script and
+  takes the key from the environment only.
+- **Andee's stage (Android).** The phone's unfolded card shows a stage in the middle by default, where the
+  conversation was — an HTML board Andee writes and keeps, with 舞台 | 对话 a small segmented control
+  beside the ball. Three tools: `set_stage` / `update_stage` / `get_stage`.
+  - **Andee writes only the inside of the page; the device supplies the shell** — charset, viewport, and
+    a CSP that allows no network for scripts or fetches (https images and media are allowed), the theme's
+    colours as CSS variables, house classes in the glass style, and `window.andee.say()`, honoured only
+    after a real tap.
+  - `update_stage` replaces one data-slot, quoted or not, so a changing number costs a few tokens.
+    20 versions kept, 60 KB cap, 30 writes an hour.
+  - Chart.js 4.4.1 is bundled (MIT) as a hand-placed file — `core/src/main/resources/stage/chart.umd.js`,
+    so it does **not** appear in `THIRD_PARTY_NOTICES.md`, which is generated from Gradle dependencies —
+    and inlined only when a stage uses it, with its defaults set to the theme.
+  - The empty stage invites Andee to furnish it, and a line under the stage plays the last message a
+    sentence at a time, once, then goes.
+  - **A stranger's turn cannot change the stage or see it** — a notification or a friend's request is
+    priced the same as the rest of the guarded surface.
+- **A page is a share card in the conversation**, on both bodies — the same glass as the bubbles, with
+  the top of the page itself in it: header (kind, version, time), title, the picture, and a footer saying
+  a tap opens it. The picture is the page rendered once by an off-screen view and kept as
+  `page_<id>.thumb.png`, deleted with the page, so a page nobody has opened still has one.
+- **A locked phone keeps the page in the conversation.** `show_html` used to be refused outright, which
+  threw away the whole page the model had just written. It is now archived and left as that card; nothing
+  is opened over the keyguard, and nothing is opened on unlock either — one vendor holds `USER_PRESENT`
+  back from a background app (measured), so a page could otherwise appear a minute late or never.
+- **The Mac gets the same page cards**, with the page picture from a new bridge call
+  (`andee_html_snapshot`: an off-screen `WKWebView` laid out at a phone's width, read as UTF-8 so a page
+  without `<meta charset>` is not drawn as mojibake), and the same behaviour when the screen is locked.
+
+### Changed
+
+- **Accessibility and microphone are amber, not red.** With accessibility off, the ball, the card, typing
+  and the brain all still work (measured) — only touching the screen is lost. So those rows are `WARN`
+  rather than `FAIL`, and their wording says what is actually lost. The self-check card lists red (must
+  fix) and amber (works, something missing) apart, and its headline speaks for the worst tier present.
+  The onboarding still asks for both, but each may be skipped ("先跳过") and the skip is remembered.
+- **A long command no longer hides Approve.** The Mac's approval card showed the command whole and
+  unbounded, so a 17 KB heredoc made a card taller than the screen, pushed Allow/Deny off it, and stalled
+  the UI for 15 s laying out monospace — the turn then sat in "running a command" until the 2-minute
+  timeout. The command now sits in a scrolling box of bounded height, and past 60 lines / 4000 characters
+  only the head is shown with a line saying how much is not.
+
+### Fixed
+
+- **A muted answer puts the face back to calm.** Reading an answer aloud is what took the ball off
+  THINKING; muted, nothing was read and nothing else reset it, so the ball kept "thinking" after every
+  muted answer — most visibly when a page was closed and the card unfolded. Meetings and calls, which are
+  also silent, keep their own state.
+- **A factory reset reopens the onboarding**, from the ball's settings and from the self-check host, and
+  the no-brain row is not written to the history before onboarding is done, where it outlived the key.
+
+### Internal
+
+- **The stage's store and shell moved to `core`** (`StageStore`, `StageShell`, `StageSlots`, `StageLine`)
+  so the Mac can have the same stage later without a second copy. No behaviour change on the phone; the
+  Mac still has no stage, and its platform prompt says so.
 
 ## [0.8.1] - 2026-10-30
 
