@@ -139,4 +139,17 @@ class SelfhoodTest {
         me.setName("Andee")                                   // being called what I am is no name at all
         assertNull(me.name())
     }
+
+    @Test fun theStagesCareIsSeededOnceAndAWriteKeepsItCurrent() {
+        val id = me.seedStageCare("打理我的舞台", "首页第一眼", "设备")
+        assertNotNull(id)
+        assertNull(me.seedStageCare("打理我的舞台", "首页第一眼", "设备"))       // once per notebook
+        now += 30 * h
+        assertEquals(listOf(id), me.due().map { it.first.id })                    // a day unchanged: due
+        me.stageTouched()
+        assertTrue(me.due().isEmpty())                                            // changed in conversation: not due
+        me.setCareByUser(id!!, "dropped")
+        assertNull(me.stageCare())                                                 // the user let it go
+        assertNull(me.seedStageCare("打理我的舞台", "首页第一眼", "设备"))       // and it does not come back
+    }
 }

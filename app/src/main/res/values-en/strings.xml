@@ -511,6 +511,13 @@
     <string name="history_role_you">You · %1$s</string>
     <string name="history_role_assistant">Andee · %1$s</string>
     <string name="history_role_error">Error · %1$s</string>
+    <string name="settings_section_timeline">In the conversation</string>
+    <string name="stage_tab_chat">Chat</string>
+    <string name="stage_tab_stage">Stage</string>
+    <string name="stage_empty_title">This is Andee’s place</string>
+    <string name="stage_empty_body">Nothing here yet. When it has a free moment it will put something up itself.</string>
+    <string name="stage_empty_button">Ask it to set it up now</string>
+    <string name="stage_furnish_turn">The stage in the middle of your home screen is your place, and it is still empty. Set it up — start with a page about yourself.</string>
     <string name="history_page_kind">Page</string>
     <string name="history_page_footer">A page by Andee · Tap to open</string>
     <string name="history_role_page_open">Page · %1$s · Tap to reopen</string>

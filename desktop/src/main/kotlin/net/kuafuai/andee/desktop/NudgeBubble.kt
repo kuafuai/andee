@@ -224,7 +224,7 @@ object Nudges {
 /**
  * The plan, thought about without being asked ([net.kuafuai.andee.brain.PlanMind]) — the Mac's twin of the
  * phone's `planTick`. Every [TICK_MS], whether or not anyone is at the Mac — the device is Andee's own:
- * the morning look once a day, then the muse while they are free. On its own thread, because both block on a
+ * the muse while they are free (today's plan is written by the morning todo). On its own thread, because both block on a
  * model call and the bubble timers must not wait behind one.
  */
 object PlanTicks {
@@ -242,10 +242,6 @@ object PlanTicks {
         val plans = DesktopNotebook.plans
         val mind = net.kuafuai.andee.brain.PlanMind(cfg, plans) { warn, msg -> if (warn) Log.w("Plan", msg) else Log.i("Plan", msg) }
         val level = Nudges.level()
-        if (mind.morning(Strings.lang(), level.perDay)) {
-            DesktopScheduler.syncPlan()
-            TimelineEvents.morning(plans.day(plans.today())?.intent.orEmpty())
-        }
         val free = !Assistant.working() && !Meeting.isActive() && AskGate.current == null && ApprovalGate.current == null
         if (free && level != NudgeBook.Level.OFF) {
             mind.muse(Strings.lang())?.let { id -> plans.bubbleForItem(id, Nudges.book, level, Nudges.muted())?.let(Nudges::post) }

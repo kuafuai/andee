@@ -21,7 +21,7 @@ object SelfWork {
     /** Reads, whatever their action. */
     private val READS = setOf(
         "note.recall", "note.people", "note.wiki_search", "note.wiki_read",
-        "ui.list_pages", "ui.get_page", "ui.list_topics", "ui.get_topic", "gear.list", "scene.list", "scene.get",
+        "ui.list_pages", "ui.get_page", "ui.list_topics", "ui.get_topic", "gear.list", "scene.list", "scene.get", "stage.get",
         "screen.ui_tree", "screen.screenshot", "screen.look_region", "screen.wait",
         "device.notifications", "device.apps", "device.battery", "device.connectivity", "device.location", "device.facts",
     )

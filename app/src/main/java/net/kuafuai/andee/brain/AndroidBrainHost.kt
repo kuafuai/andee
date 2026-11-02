@@ -95,6 +95,8 @@ class AndroidBrainHost(
 
     override fun wikiIndex(): String = Notebook.wiki(ctx).indexForPrompt()
 
+    override fun stageIndex(): String = net.kuafuai.andee.config.Stage.indexForPrompt(ctx)
+
     override fun foldTopic(title: String, summary: String, rows: List<ScrollRow>, text: String): FoldedTopic? {
         val said = rows.map { it.handle as ChatHistory.Entry }
         val entries = (said + ChatHistory.eventsWithin(said)).sortedBy { it.id }

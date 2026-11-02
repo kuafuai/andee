@@ -136,7 +136,8 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
     // A folded stretch is one card standing where its messages stood — the phone's rule, so the
     // conversation still reads top to bottom. The sidebar's topic list is only another way in.
     // 全部 shows what happened as well as what was said; 只看对话 hides the event rows. Remembered across launches.
-    var showEvents by remember { mutableStateOf(Settings.get("timeline_events") != "off") }
+    // A preference in Settings now (it was a key in the header); read here so returning from Settings shows it.
+    val showEvents = Settings.get("timeline_events") != "off"
     val items = remember(rows, showEvents) { chatItems(if (showEvents) rows else rows.filter { it.role != Scrollback.Role.EVENT }) }
     // The list is created already standing on the newest message. Opening the page used to start at the top
     // and then animate down through the whole conversation, which read as the chat scrolling itself on every
@@ -248,8 +249,6 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
     Column(Modifier.fillMaxSize()) {
         Header(
             muted = muted, onToggleMute = { Assistant.setMuted(!muted) },
-            showEvents = showEvents,
-            onToggleEvents = { showEvents = !showEvents; Settings.save(mapOf("timeline_events" to if (showEvents) "on" else "off")) },
             live = recording || voice == net.kuafuai.andee.desktop.voice.MacVoice.State.LISTENING,
             status = when {
                 recording -> if (Strings.lang() == "zh") "正在录音" else "Recording"
@@ -364,7 +363,7 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
 
 /** Title, or a one-line status when something is live. Stop is with the input box, where the hand already is. */
 @Composable
-private fun Header(status: String?, live: Boolean, muted: Boolean, onToggleMute: () -> Unit, showEvents: Boolean = true, onToggleEvents: () -> Unit = {}) {
+private fun Header(status: String?, live: Boolean, muted: Boolean, onToggleMute: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -380,11 +379,6 @@ private fun Header(status: String?, live: Boolean, muted: Boolean, onToggleMute:
         )
         Spacer(Modifier.weight(1f))
         val zh = Strings.lang() == "zh"
-        Text(
-            if (showEvents) (if (zh) "全部" else "Everything") else (if (zh) "只看对话" else "Talk only"),
-            color = Palette.label, fontSize = 12.sp,
-            modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable { onToggleEvents() }.padding(horizontal = 10.dp, vertical = 6.dp),
-        )
         Row(
             Modifier.clip(RoundedCornerShape(16.dp)).clickable { onToggleMute() }.padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,

@@ -98,51 +98,66 @@ class NotebookBookTest {
     }
 
     @Test
-    fun `a fresh notebook gets the nightly picture once, and again after a wipe`() {
+    fun `a fresh notebook gets the morning and the evening once, and again after a wipe`() {
         val (_, b) = fresh()
         val seeded = b.seedDefaults()
-        assertEquals(1, seeded.size)
-        val t = seeded.single()
-        assertEquals("cron", t.mode)
-        assertEquals(NotebookBook.NIGHTLY_PICTURE_CRON, t.cronExpr)
-        assertTrue(t.nextRunAt > System.currentTimeMillis())
-        assertNull(NotebookBook.bundledTodo(t.what))
-        assertEquals(1, b.todos("pending").size)
+        assertEquals(setOf(NotebookBook.NIGHTLY_PICTURE_CRON, NotebookBook.MORNING_TODO_CRON), seeded.map { it.cronExpr }.toSet())
+        assertEquals("seeded in one pass, two distinct ids", 2, seeded.map { it.id }.toSet().size)
+        for (t in seeded) {
+            assertEquals("cron", t.mode)
+            assertTrue(t.nextRunAt > System.currentTimeMillis())
+            assertNull(NotebookBook.bundledTodo(t.what))
+        }
+        assertEquals(2, b.todos("pending").size)
 
-        // Dropped by the user: the next start must not bring it back.
-        b.patchTodo(t.id, status = "dropped")
+        // Dropped by the user: the next start must not bring them back.
+        for (t in seeded) b.patchTodo(t.id, status = "dropped")
         assertTrue(b.seedDefaults().isEmpty())
         assertEquals(0, b.todos("pending").size)
 
         b.wipe()
-        assertEquals(1, b.seedDefaults().size)
-        assertEquals(NotebookBook.NIGHTLY_PICTURE, b.todos("pending").single().what)
+        assertEquals(2, b.seedDefaults().size)
+        assertEquals(setOf(NotebookBook.NIGHTLY_PICTURE, NotebookBook.MORNING_TODO), b.todos("pending").map { it.what }.toSet())
+    }
+
+    @Test
+    fun `a notebook seeded before the morning todo existed gets it once`() {
+        val (_, b) = fresh()
+        b.seedDefaults()
+        val morning = b.todos("pending").single { it.cronExpr == NotebookBook.MORNING_TODO_CRON }
+        // Simulate the old notebook: only the evening, and only the old flag.
+        b.patchTodo(morning.id, status = "dropped")
+        b.clearMetaForTest("morning_seeded")
+        val added = b.seedDefaults()
+        assertEquals(listOf(NotebookBook.MORNING_TODO_CRON), added.map { it.cronExpr })
+        assertTrue(b.seedDefaults().isEmpty())
     }
 
     @Test
     fun `not seeded beside one already set on the same schedule`() {
         val (_, b) = fresh()
         b.addTodo(Todo("t1", "my own nine o'clock", "cron", 0L, NotebookBook.NIGHTLY_PICTURE_CRON, 1L, 0L, "", "", "active", 0L, false))
-        assertTrue(b.seedDefaults().isEmpty())
-        assertEquals(listOf("t1"), b.todos("pending").map { it.id })
+        assertEquals(listOf(NotebookBook.MORNING_TODO_CRON), b.seedDefaults().map { it.cronExpr })
+        assertEquals(2, b.todos("pending").size)
+        assertTrue(b.todos("pending").any { it.id == "t1" })
     }
 
     @Test
     fun `the old Chinese wording is rewritten in place, not added beside`() {
         val (_, b) = fresh()
         b.seedDefaults()
-        val id = b.todos("pending").single().id
+        val id = b.todos("pending").single { it.cronExpr == NotebookBook.NIGHTLY_PICTURE_CRON }.id
         // Simulate a notebook seeded with the first wording.
         b.wipe()
         val old = "每晚回顾：把今天的事过一遍（对话、做过的事、日记），据此画一张「你和我」的图，要有意境。" +
             "画好放到屏幕上给用户看，再用一两句话说画的是什么。今天没什么事就画安静的一天，不要硬凑。"
         b.addTodo(Todo(id, old, "cron", 0L, NotebookBook.NIGHTLY_PICTURE_CRON, 1L, 0L, "", "", "active", 0L, false))
-        b.seedDefaults()   // first pass on this book: sets the flag, rewrites, adds nothing beside it
+        b.seedDefaults()   // first pass on this book: sets the flags, rewrites, adds nothing beside it
         assertTrue(b.seedDefaults().isEmpty())
-        val t = b.todos("pending").single()
+        val t = b.todos("pending").single { it.cronExpr == NotebookBook.NIGHTLY_PICTURE_CRON }
         assertEquals(id, t.id)
         assertEquals(NotebookBook.NIGHTLY_PICTURE, t.what)
-        assertTrue(t.what.contains("show_html"))
+        assertTrue(t.what.contains("show_html") && t.what.contains("set_stage"))
 
         // Already seeded (the flag is set) and still holding the old wording: rewritten all the same.
         b.addTodo(Todo("t9", old, "cron", 0L, "0 22 * * *", 1L, 0L, "", "", "active", 0L, false))

@@ -985,6 +985,9 @@ class LocalBrain(
             // the full list; this is the four or five newest, to make the shelf
             // visible at all.
             val pages = host.pagesIndex()
+            // The stage: what is up in the middle of the home screen right now. Same position and same
+            // reasoning as the pages — it changes with every set_stage, and the system prompt must not.
+            val stage = host.stageIndex()
             // And the conversations that have been put away. Same position, same
             // reasoning as the three above; the fourth is that this one is about
             // an ABSENCE — see the note where it is appended.
@@ -1059,6 +1062,13 @@ class LocalBrain(
                             "\n\n(pages you have made on this device — §7; the newest few, `#id title (vN)`; " +
                                 "use list_pages for all of them and get_page to read one back before revising " +
                                 "it — reading it back is what files your revision as its next version)\n$pages"
+                        } +
+                        // The stage (§7, "Your stage"). The host words the line, empty
+                        // stage included — an empty stage is an invitation, not nothing.
+                        if (stage.isEmpty()) {
+                            ""
+                        } else {
+                            "\n\n(your stage — the middle of your home screen, see §7)\n$stage"
                         } +
                         // And the conversations that have been put away. The same
                         // position and the same reason as the other three, plus
@@ -2079,6 +2089,7 @@ class LocalBrain(
 8. The plan (your plan line; day_plan get for detail). Keep today's plan true: if there is none, write one (day_plan write, date=today); if what happened in this conversation changed it, rewrite it; after 20:00, also draft tomorrow's — and before you do, read today's outcomes (day_plan get): keep what landed, do less of or move what he ignored or declined, carry over what was moved. If your plan line says the weekly look at the directions is due, do it now: plan_directions list, then mark done what is done, pause what has stalled, and add what he newly said he is working toward. Every item points at a long-term direction or a todo in `because`; at most 5 that interrupt (remind/ask), at the times you would really choose; a quiet day is a fine plan, and `quiet` says what you will leave alone today.
    Long-term directions (plan_directions add) come only from what he said or did — quote it in `source`; a goal you think would be good for him is not his. With no directions yet, one `ask` item a day may be getting to know him (what he is busy with lately, what he would like you to keep an eye on — in his language), until he has answered or ignored it twice. Never put back what he removed.
 9. Your own record ("Your own life" in the prompt). Something he handed you to look after this time that is not among your cares → cares add, his words in `source` (do not ask the three intake questions here — he is not present; leave them for next time in the care's note). A care this conversation moved → cares update with a one-line note. Someone you dealt with other than him → person find, then upsert or log. Something long you worked out for him that should be findable later → wiki_write (wiki_search first; revise rather than duplicate). After 20:00, if tonight's diary page is not written yet → diary write, in your own voice and only about what really happened. If who you are or what you are busy with has changed → self_note write. If you have never written yourself down (self_note get comes back empty) and you have by now been through some real things with him — something he handed you, a few conversations that told you what you are here for — write the first version: who you are here, what you are busy with, what you currently judge, what you promised; only what really happened.
+10. Your stage — only if this turn carries a stage line (a device without one has none). Its day has a shape: the morning puts today's plan up, and the evening look-back puts the day's story and picture up and leaves it there overnight — so in the evening, if tonight's story is on it, leave it alone (tomorrow's plan goes up in the morning, not now). Otherwise: if what is up there no longer holds, or this conversation produced something worth leaving up (a thing you are minding for him), change it — update_stage for one part, set_stage for the whole. If it is empty, put up a page about yourself. If it is still right, leave it; the stage is a board, not a feed.
 
 If this conversation genuinely produced nothing new, record nothing — ending empty-handed is allowed. Forcing one in just dirties the notebook."""
 

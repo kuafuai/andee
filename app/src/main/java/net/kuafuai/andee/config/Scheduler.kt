@@ -207,6 +207,17 @@ object Scheduler {
     fun catchUp(context: Context): List<net.kuafuai.andee.config.Todo> {
         // A fresh notebook (first start, or after a reset) gets its default todos here, so the loop below arms them.
         runCatching { Notebook.seedDefaults(context) }.onFailure { Log.w(TAG, "could not seed default todos", it) }
+        // The phone has a stage, so it seeds the care of keeping it (see Selfhood.seedStageCare). In the
+        // interface language: it is shown in 小本本 → 在意 as well as read by the model.
+        runCatching {
+            val en = VoiceConfig.uiLanguage(context) == VoiceConfig.LANG_EN
+            Notebook.selfhood(context).seedStageCare(
+                what = if (en) "Keep my stage" else "打理我的舞台",
+                why = if (en) "The middle of my home screen is the first thing they see when they open me; a day unchanged is worth a look."
+                else "首页中间是他打开我时第一眼看到的地方，一天没变就该看看要不要换。",
+                source = if (en) "the device: the stage is yours" else "设备：舞台是你自己的地方",
+            )
+        }.onFailure { Log.w(TAG, "could not seed the stage's care", it) }
         val now = System.currentTimeMillis()
         val missed = mutableListOf<net.kuafuai.andee.config.Todo>()
         for (todo in Notebook.todos(context, "all")) {

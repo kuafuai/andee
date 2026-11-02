@@ -56,7 +56,7 @@ class ReviewEventsTest {
             "locale" -> Locale.ENGLISH
             "maxSteps" -> 10
             "persona", "platformPrompt", "notebookIndex", "scenesIndex", "pagesIndex", "topicsIndex",
-            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "wikiIndex", "reviewRecord" -> ""
+            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "stageIndex", "wikiIndex", "reviewRecord" -> ""
             "scrollback" -> rows
             "toolLists" -> listOf(JSONArray().put(JSONObject().put("name", "remember").put("method", "note.remember").put("description", "r")
                 .put("parameters", JSONObject().put("type", "object").put("properties", JSONObject()))))

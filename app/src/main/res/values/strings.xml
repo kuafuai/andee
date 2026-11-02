@@ -494,6 +494,13 @@
     <string name="history_role_you">你 · %1$s</string>
     <string name="history_role_assistant">Andee · %1$s</string>
     <string name="history_role_error">出错 · %1$s</string>
+    <string name="settings_section_timeline">对话里显示</string>
+    <string name="stage_tab_chat">对话</string>
+    <string name="stage_tab_stage">舞台</string>
+    <string name="stage_empty_title">这里是 Andee 的地方</string>
+    <string name="stage_empty_body">它还没布置。等它空下来，会自己在这里放点东西。</string>
+    <string name="stage_empty_button">现在就让它布置</string>
+    <string name="stage_furnish_turn">首页中间这块舞台是你的地方，现在还空着。布置一下吧，第一次就写写你自己。</string>
     <string name="history_page_kind">页面</string>
     <string name="history_page_footer">Andee 做的页面 · 点击打开</string>
     <string name="history_role_page_open">界面 · %1$s · 点击重新打开</string>

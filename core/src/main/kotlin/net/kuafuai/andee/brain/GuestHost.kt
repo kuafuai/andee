@@ -28,6 +28,7 @@ class GuestHost(private val inner: BrainHost) : BrainHost by inner {
     override fun activeSceneName(): String? = null
     override fun scrollback(): List<ScrollRow> = emptyList()
     override fun pagesIndex(): String = ""
+    override fun stageIndex(): String = ""          // the owner's home screen is the owner's
     override fun topicsIndex(): String = ""
     override fun gearIndex(): String = ""
     override fun friendsIndex(): String = ""

@@ -17,6 +17,9 @@ object TurnGuards {
 
     private val SCENE_WRITES = setOf("scene.save", "scene.enter", "scene.delete")
 
+    /** The home screen's middle is the first thing the user sees; a stranger does not get to paint it. */
+    private val STAGE_WRITES = setOf("stage.set", "stage.update")
+
     private val PLAN_WRITES = setOf("note.directions", "note.day_plan")
 
     /**
@@ -36,6 +39,12 @@ object TurnGuards {
      */
     private val GEAR_SILENT_OK = setOf("gear.note", "gear.list")
 
+    /**
+     * The review may keep the stage current (review rule 10): it is Andee's own board, it drives no app and
+     * opens nothing, so it is the notebook's kind of write, not the device's.
+     */
+    private val STAGE_SILENT_OK = setOf("stage.get", "stage.set", "stage.update")
+
     /** The user's own choice of which kinds of app the model is told about. Only a live, trusted turn may move it. */
     private const val GEAR_VISIBILITY = "gear.visibility"
 
@@ -49,7 +58,7 @@ object TurnGuards {
     fun check(method: String, silent: Boolean, untrusted: Boolean) {
         // The quiet-hour sweep may think and write to the notebook, but must not
         // touch the device.
-        if (silent && !method.startsWith("note.") && method !in GEAR_SILENT_OK) {
+        if (silent && !method.startsWith("note.") && method !in GEAR_SILENT_OK && method !in STAGE_SILENT_OK) {
             throw IllegalStateException(
                 "A silent turn may only use the notebook (note.*); it must not touch the device: $method",
             )
@@ -99,6 +108,13 @@ object TurnGuards {
         // Same stranger, a different prize: a scene is standing instructions the
         // model works by afterwards, and one whose rules say "reply to my
         // messages for me" is a capability. Reading and leaving stay open.
+        if (untrusted && method in STAGE_WRITES) {
+            throw IllegalStateException(
+                "This turn started from somebody else's words (a notification, or a friend's Andee), so your stage " +
+                    "cannot be changed from it: $method. If something here deserves a place there, put it up the next " +
+                    "time the user talks to you.",
+            )
+        }
         if (untrusted && method in SCENE_WRITES) {
             throw IllegalStateException(
                 "This turn started from somebody else's words (a notification, or a friend's Andee), so scenes cannot be " +

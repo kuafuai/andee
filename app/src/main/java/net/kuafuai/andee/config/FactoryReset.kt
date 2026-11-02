@@ -96,6 +96,8 @@ object FactoryReset {
         // onboarding choices themselves are mirrored in the notebook/voice
         // prefs above; this only clears completion and the last page.
         { OnboardingState.reset(it) },
+        // The stage is something it made in this life; a reset is a fresh one.
+        { Stage.wipe(it) },
     )
 
     /**

@@ -180,6 +180,12 @@ class FloatingWindowUi(
         /** 打开 › on a timeline row: the wiki article it names. */
         fun onWikiOpen(id: String) {}
 
+        /** A button on the stage called `andee.say(text)` from a real tap: the user's words to Andee. */
+        fun onStageSay(text: String) {}
+
+        /** 「现在就让它布置」 on an empty stage. */
+        fun onStageFurnish() {}
+
         /** The 小本本 key — what it remembers. See [NotebookUi]. */
         fun onNotebookClick() {}
 
@@ -318,6 +324,17 @@ class FloatingWindowUi(
     private var historyView: HistoryListView? = null
 
     /**
+     * The stage: the same slot as [historyView], and shown instead of it unless the user switched to the
+     * conversation ([onStage], kept in `home_view`). See [StageView].
+     */
+    private var stageView: StageView? = null
+    /** 舞台 | 对话: both named, the current one lit, so where you are and where else you can go are both on screen. */
+    private var viewTabs: LinearLayout? = null
+    private var tabStage: TextView? = null
+    private var tabChat: TextView? = null
+    private var onStage = net.kuafuai.andee.config.VoiceConfig.homeView(context) != "chat"
+
+    /**
      * 「情景 · X ✕」, centred under the ball while a scene is active. Its own
      * view rather than a row in the control pill, because the pill's bounds are
      * an input to the card's split ([ballAreaHeight]) and a scene starting
@@ -337,13 +354,6 @@ class FloatingWindowUi(
     private var inputPill: View? = null
     private var muteLabel: TextView? = null
 
-    /** 全部 / 只看对话 beside the ball; shown and hidden with the 朗读 key. */
-    private var eventsKey: TextView? = null
-
-    private fun paintEventsKey() {
-        val on = historyView?.showEvents ?: net.kuafuai.andee.config.VoiceConfig.timelineEvents(context)
-        eventsKey?.text = AppLocale.str(context, if (on) R.string.tl_show_all else R.string.tl_show_talk)
-    }
     private var mutedNow = false
 
     /** Reflect the 朗读 / 静音 setting on the speaker key. Any thread. */
@@ -1103,8 +1113,9 @@ class FloatingWindowUi(
             tipsText?.text = AppLocale.str(context, R.string.window_tips)
             inputHint?.text = AppLocale.str(context, R.string.window_input_hint)
             paintMute()
-            paintEventsKey()
+            paintViewKey()
             historyView?.onLocaleChanged()
+            stageView?.onLocaleChanged()
             renderSceneChip()
         }
     }
@@ -1133,6 +1144,7 @@ class FloatingWindowUi(
             }
             applyPaletteToChrome()
             historyView?.onThemeChanged()
+            stageView?.onThemeChanged()
             renderSceneChip()
             // The scrim is now the other palette's, and [paintCard] only pushes it when
             // it differs from what the image already carries.
@@ -1207,7 +1219,10 @@ class FloatingWindowUi(
      * both — which it did.
      */
     fun setSubtitle(text: String, kind: SubtitleKind = SubtitleKind.PARTIAL) {
-        ui.post { historyView?.setLive(text, kind) }
+        ui.post {
+            historyView?.setLive(text, kind)
+            stageView?.setLive(text)
+        }
     }
 
     fun clearSubtitle() = setSubtitle("")
@@ -1966,7 +1981,8 @@ class FloatingWindowUi(
         topBarView?.visibility = View.GONE
         sceneChip?.visibility = View.GONE
         muteKey?.visibility = View.GONE
-        eventsKey?.visibility = View.GONE
+        viewTabs?.visibility = View.GONE
+        stageView?.visibility = View.GONE
         // Not just invisible — GONE, so the ball area has the whole window to
         // itself. A scrollback left in the layout would cover most of a 168dp
         // square and there would be nothing left to see the ball in.
@@ -2053,20 +2069,32 @@ class FloatingWindowUi(
             lp.leftMargin = minOf(left, w - kw - dp(8)); lp.topMargin = top
             key.layoutParams = lp
         }
-        // 全部 / 只看对话: the same spot mirrored to the lower left, and visible whenever 朗读 is.
-        val ev = eventsKey ?: return
-        ev.visibility = key.visibility
-        val elp = ev.layoutParams as? FrameLayout.LayoutParams ?: return
-        if (ev.width == 0) ev.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
-        val ew = if (ev.width > 0) ev.width else ev.measuredWidth
-        val eh = if (ev.height > 0) ev.height else ev.measuredHeight
-        val ecx = w / 2f - d * 0.707f - dp(16)
-        val eleft = maxOf((ecx - ew / 2f).toInt(), dp(8))
-        val etop = (cy - eh / 2f).toInt()
-        if (elp.leftMargin == eleft && elp.topMargin == etop) return
-        elp.leftMargin = eleft; elp.topMargin = etop
-        ev.layoutParams = elp
+        placeTabs(cy, r, w)
     }
+
+    /**
+     * 舞台 | 对话 beside the ball at its lower left — the mirror of 朗读 — so it takes no height from the
+     * middle (a strip of its own between the ball and the stage was in the way on a phone's screen).
+     */
+    private fun placeTabs(cyBall: Float, r: Float, w: Int) {
+        val v = viewTabs ?: return
+        val lp = v.layoutParams as? FrameLayout.LayoutParams ?: return
+        if (v.width == 0) v.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        val vw = if (v.width > 0) v.width else v.measuredWidth
+        val vh = if (v.height > 0) v.height else v.measuredHeight
+        // Wider than 朗读, so it is placed by its right edge, just clear of the sphere at 45°, not by its centre.
+        val right = w / 2f - r * 0.707f - dp(10)
+        val left = maxOf((right - vw).toInt(), dp(8))
+        val top = (cyBall - vh / 2f).toInt()
+        if (lp.leftMargin == left && lp.topMargin == top) return
+        lp.leftMargin = left; lp.topMargin = top
+        v.layoutParams = lp
+    }
+
+    /** The newest message of the conversation, whole: the stage's live line reads it a sentence at a time. */
+    private fun lastSaid(): String =
+        ChatHistory.snapshot().lastOrNull { it.role == ChatHistory.Role.ASSISTANT || it.role == ChatHistory.Role.USER }
+            ?.text?.take(LAST_SAID_MAX).orEmpty()
 
     /**
      * Centre the scene chip just under the sphere's lower edge — the same
@@ -2160,10 +2188,12 @@ class FloatingWindowUi(
     }
 
     private fun setHistoryHeight(px: Int) {
-        val v = historyView ?: return
-        val lp = v.layoutParams ?: return
-        lp.height = px
-        v.layoutParams = lp
+        for (v in listOfNotNull<View>(historyView, stageView)) {
+            val lp = v.layoutParams ?: continue
+            if (lp.height == px) continue
+            lp.height = px
+            v.layoutParams = lp
+        }
     }
 
     /**
@@ -2173,10 +2203,12 @@ class FloatingWindowUi(
      * rows underneath the bar — the two are stacked at the same edge.
      */
     private fun setHistoryBottomMargin(px: Int) {
-        val v = historyView ?: return
-        val lp = v.layoutParams as? FrameLayout.LayoutParams ?: return
-        lp.bottomMargin = px
-        v.layoutParams = lp
+        for (v in listOfNotNull<View>(historyView, stageView)) {
+            val lp = v.layoutParams as? FrameLayout.LayoutParams ?: continue
+            if (lp.bottomMargin == px) continue
+            lp.bottomMargin = px
+            v.layoutParams = lp
+        }
     }
 
     private fun enterCompact() {
@@ -2383,14 +2415,55 @@ class FloatingWindowUi(
         topBarView?.visibility = View.VISIBLE
         sceneChip?.visibility = if (sceneTitle != null) View.VISIBLE else View.GONE
         muteKey?.visibility = View.VISIBLE
-        eventsKey?.visibility = View.VISIBLE
-        historyView?.visibility = View.VISIBLE
+        applyHomeView()
         tipsView?.visibility = View.VISIBLE
         backdrop?.visibility = View.VISIBLE
         // Anything that arrived while folded — which is most of it, since the
         // card is folded for the whole time the assistant is working — has only
         // ever been appended to a list that wasn't being laid out.
         historyView?.refresh()
+        stageView?.refresh()
+    }
+
+    /** Stage or conversation in the middle, and the keys that belong to each. Main thread, card unfolded. */
+    private fun applyHomeView() {
+        stageView?.visibility = if (onStage) View.VISIBLE else View.GONE
+        historyView?.visibility = if (onStage) View.GONE else View.VISIBLE
+        viewTabs?.visibility = View.VISIBLE
+        paintViewKey()
+    }
+
+    /** Light the tab for where the user is; both keep their names. */
+    private fun paintViewKey() {
+        val st = tabStage ?: return
+        val ch = tabChat ?: return
+        st.text = AppLocale.str(context, R.string.stage_tab_stage)
+        ch.text = AppLocale.str(context, R.string.stage_tab_chat)
+        for ((tab, on) in listOf(st to onStage, ch to !onStage)) {
+            tab.background = if (on) Glass.thumb(context, dp(12)) else null
+            tab.setTextColor(Color.parseColor(if (on) Glass.TITLE else Glass.SECONDARY))
+            tab.setTypeface(null, if (on) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+            tab.isSelected = on
+        }
+    }
+
+    /** The 全部 / 只看对话 preference changed in Settings: show the conversation that way. */
+    fun onTimelineSettingChanged() {
+        ui.post { historyView?.showEvents = net.kuafuai.andee.config.VoiceConfig.timelineEvents(context) }
+    }
+
+    /** Switch the middle of the card; remembered, so the card reopens the way it was left. */
+    fun showStage(on: Boolean) {
+        ui.post {
+            if (onStage == on) return@post
+            onStage = on
+            net.kuafuai.andee.config.VoiceConfig.setHomeView(context, if (on) "stage" else "chat")
+            if (root != null && !isCompact()) {
+                applyHomeView()
+                if (on) stageView?.refresh() else historyView?.refresh()
+                root?.requestLayout()
+            }
+        }
     }
 
     /**
@@ -2661,8 +2734,33 @@ class FloatingWindowUi(
                 Gravity.BOTTOM,
             ),
         )
-        ChatHistory.setListener { ui.post { historyView?.refresh() } }
+        ChatHistory.setListener {
+            ui.post {
+                historyView?.refresh()
+                stageView?.setLastLine(lastSaid())
+            }
+        }
         history.refresh()
+
+        // ---- The stage, in the same slot: Andee's own ----
+        val stage = StageView(context).apply {
+            onSay = { listeners.onStageSay(it) }
+            onFurnish = { listeners.onStageFurnish() }
+            onOpenChat = { showStage(false) }
+            setLastLine(lastSaid())
+        }
+        stageView = stage
+        root.addView(
+            stage,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                Gravity.BOTTOM,
+            ),
+        )
+        net.kuafuai.andee.config.Stage.setListener { ui.post { stageView?.refresh() } }
+        stage.visibility = if (onStage) View.VISIBLE else View.GONE
+        history.visibility = if (onStage) View.GONE else View.VISIBLE
 
         // ---- Bottom tips ----
         //
@@ -2760,24 +2858,28 @@ class FloatingWindowUi(
         paintMute()
         root.addView(mute, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.START))
 
-        // ---- 全部 / 只看对话, at the ball's lower left: the mirror of 朗读, and about the list below it ----
-        val events = TextView(context).apply {
-            textSize = Glass.Type.CAPTION
-            setTextColor(Color.parseColor(Glass.PHOTO_INK))
-            setPadding(dp(8), dp(6), dp(8), dp(6))
+        // ---- 舞台 | 对话: a small segmented pill at the ball's lower left, both names always showing ----
+        fun tab(toStage: Boolean) = TextView(context).apply {
+            textSize = Glass.Type.MICRO
+            gravity = Gravity.CENTER
+            setPadding(dp(10), dp(4), dp(10), dp(4))
             isClickable = true
             Glass.pressable(this)
-            visibility = View.GONE
-            setOnClickListener {
-                val h = historyView ?: return@setOnClickListener
-                h.showEvents = !h.showEvents
-                net.kuafuai.andee.config.VoiceConfig.setTimelineEvents(context, h.showEvents)
-                paintEventsKey()
-            }
+            setOnClickListener { showStage(toStage) }
         }
-        eventsKey = events
-        paintEventsKey()
-        root.addView(events, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.START))
+        val ts = tab(true).also { tabStage = it }
+        val tc = tab(false).also { tabChat = it }
+        val tabs = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(2), dp(2), dp(2), dp(2))
+            background = Glass.well(context, dp(14))
+            visibility = View.GONE
+            addView(ts)
+            addView(tc)
+        }
+        viewTabs = tabs
+        paintViewKey()
+        root.addView(tabs, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.START))
 
         // ---- Top-right controls ----
         //
@@ -3310,6 +3412,9 @@ class FloatingWindowUi(
     }
 
     companion object {
+        /** How much of the last message the stage's live line cycles through. */
+        private const val LAST_SAID_MAX = 600
+
         /** The project's public home, opened from the foot of the card. */
         private const val GITHUB_URL = "https://github.com/kuafuai/andee"
         private const val DISCORD_URL = "https://discord.gg/PYujCQyqu"

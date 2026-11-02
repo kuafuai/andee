@@ -920,6 +920,60 @@
     }
   },
   {
+    "localOnly": true,
+    "method": "stage.set",
+    "name": "set_stage",
+    "description": "Put content on your stage: the middle of your home screen, where the\nconversation used to be. It is the first thing the user sees when they\nopen you, it stays until you change it, and it is yours \u2014 show what you\nwant them to find there: what you are busy with for them, something you\nmade, today's plan, a thing worth a glance. It replaces everything that\nwas there. (Revising one part? Use update_stage.)\n\nWrite only the inside of the page \u2014 the device supplies the rest:\ncharset, viewport, the theme's colours (they follow day/night by\nthemselves), and these classes, already in the house glass style:\n`card` (a glass panel), `stat` (a big number), `label` (a small caption),\n`muted`, `pill`, `grid` (two columns), `row` (space-between line),\n`progress` with an `<i style=\"width:40%\">` inside, `btn` (a button).\nCSS variables: --ink --ink2 --muted --accent --glass --edge --well --ok\n--warn --danger. You may add your own `<style>` and `<script>` (a clock,\na countdown, an animation run on their own and cost nothing).\n\nMark the parts you will want to change later with `data-slot=\"name\"`\non a container, so a later update_stage can replace just that part.\n\nCharts: Chart.js 4 is already on the page as the global `Chart` \u2014 do\nNOT load it (or anything) from a CDN, that is blocked. Give the canvas a\nsized container, e.g. `<div class=\"card\" style=\"height:220px\"><canvas\nid=\"c\"><\/canvas><\/div>` then `new Chart(document.getElementById('c'),\n{type:'line', data:{\u2026}, options:{\u2026}})`. Its text and grid already follow\nthe theme; use `getComputedStyle(document.documentElement)\n.getPropertyValue('--accent')` for a series colour. For a single tiny\nsparkline an inline <svg> is lighter.\n\nRules the device enforces: no network from the page (no fetch, no\nremote scripts); images and media may load from https URLs. A button\ncan talk to you: `onclick=\"andee.say('帮我退订网盘')\"` sends that sentence\nto you as if the user said it \u2014 it only works from a real tap.\nKeep it under ~60 KB. Do not put the conversation's answer here as well\nas saying it; the stage is for what is worth leaving up.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "html": {
+          "description": "The content of the stage: HTML for the inside of <body>, with any <style>/<script> it needs.",
+          "type": "string"
+        },
+        "title": {
+          "description": "A short name for what is on the stage now, e.g. 「本周三城天气」. Shown to you in later turns.",
+          "type": "string"
+        }
+      },
+      "required": ["html"]
+    }
+  },
+  {
+    "localOnly": true,
+    "method": "stage.update",
+    "name": "update_stage",
+    "description": "Replace the inside of one part of your stage: the element marked\n`data-slot=\"<slot>\"` when you set it. Everything else stays as it is.\nThis is how a changing number, a progress bar or one card is kept\ncurrent without rewriting the whole stage. The error names the slots\nthat exist if the one you asked for does not.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "html": {
+          "description": "The new inside of that part.",
+          "type": "string"
+        },
+        "slot": {
+          "description": "The data-slot name of the part to replace.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot",
+        "html"
+      ]
+    }
+  },
+  {
+    "localOnly": true,
+    "method": "stage.get",
+    "name": "get_stage",
+    "description": "Read back what is on your stage now: its title, version, when it was\nlast changed, its slots and the HTML you wrote. Call it before revising\nthe stage in a way that should keep what is there.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
     "method": "ui.list_pages",
     "name": "list_pages",
     "description": "The pages you have made on this device, newest first, with the id each\none is read back by. This is the half of your own work you cannot\notherwise see: the pages you build with `show_html` stay on the tablet\nafterwards \u2014 the user has a panel listing all of them (产物 on a Chinese\ndevice, *Made for you* on an English one) \u2014 but the record does not ride\nin your context, so without this call a page you built yesterday does\nnot exist.\n\nCall it before answering anything that refers to earlier work\n(「上次那个表格」「我做的番茄钟」「把昨天那页改一下」) and before rebuilding\nsomething the user may already have. A page that already exists is\nusually a page to revise, not a second one to build beside it.\n\nONE ROW PER ARTIFACT, not one per revision: the id is the **current**\nversion's, and that is the one to read with get_page. `version` says how\nmany revisions that page has been through \u2014 a v4 has been revised three\ntimes, so the user is likely attached to details you cannot see from the\ntitle. Older revisions are not lost (get_page still takes their ids) but\nthey are not listed: what you are being told is what is *current*.\n\nEach entry carries the id, the page's title, when it was made, its size\nin bytes, and `available`. **`available: false` means the page\nitself is gone** (only the newest 100 are kept) \u2014 the row still records\nthat it was made, and saying that honestly beats both silence and\npretending to remember what was in it.",

@@ -68,4 +68,14 @@ class TurnGuardsTest {
         assertEquals(true, refused("peer.ask", untrusted = true).contains("cannot hand work"))
         refused("peer.ask", silent = true)
     }
+
+    @Test
+    fun `the review may keep the stage but a stranger may not paint it`() {
+        for (m in listOf("stage.get", "stage.set", "stage.update")) TurnGuards.check(m, silent = true, untrusted = false)
+        TurnGuards.check("stage.get", silent = false, untrusted = true)
+        for (m in listOf("stage.set", "stage.update")) {
+            val r = refused(m, untrusted = true)
+            assert(r.contains("stage cannot be changed")) { r }
+        }
+    }
 }

@@ -101,6 +101,9 @@ interface BrainHost {
     /** One line of who I am and what is pulling at me (`Selfhood`). Empty for a host without it. */
     fun selfIndex(): String = ""
 
+    /** What is on the stage (the home screen's middle), one or two lines. Empty for a host without one. */
+    fun stageIndex(): String = ""
+
     /** One line of what is in the wiki (`WikiBook`). Empty for a host without one. */
     fun wikiIndex(): String = ""
 

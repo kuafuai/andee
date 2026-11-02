@@ -387,6 +387,7 @@ class SettingsUi(
         notifySection(form)
         nudgeSection(form)
         driveSection(form)
+        timelineSection(form)
         vaultSection(form)
         maxStepsSection(form)
 
@@ -1379,6 +1380,20 @@ class SettingsUi(
         val panel = group(form, lctx.getString(R.string.settings_section_drive))
         segmented(panel, "drive", listOf("off" to lctx.getString(R.string.common_off), "on" to lctx.getString(R.string.common_on)))
         note(panel, lctx.getString(R.string.settings_drive_note))
+    }
+
+    /**
+     * What the conversation shows: everything (what was said and the quiet event rows — a todo woke it, a
+     * review ran) or only what was said. It used to be a key beside the ball; it is a preference, not a
+     * control you reach for, so it lives here. 全部 leftmost: the default, and what an unknown value reads as.
+     */
+    private fun timelineSection(form: LinearLayout) {
+        val panel = group(form, lctx.getString(R.string.settings_section_timeline))
+        segmented(
+            panel,
+            "timeline_events",
+            listOf("on" to lctx.getString(R.string.tl_show_all), "off" to lctx.getString(R.string.tl_show_talk)),
+        )
     }
 
     private fun nudgeSection(form: LinearLayout) {

@@ -50,6 +50,7 @@ What you can do here, right now, is exactly what your tool list contains — not
         if (!caps.pages) {
             append("- show_html is not available here yet: give structured answers as a well-laid-out reply instead of a page.\n")
         }
+        append("- There is no stage on this Mac yet: ignore what §7 says about \"Your stage\" (set_stage and the rest are not here), and review rule 10 does not apply.\n")
         append("- You do have your notebook, todos and scenes (§2–§5, §11) — they work the same here, and they are this Mac's own: what you remembered on the phone is not here, and the reverse.\n")
         append("- If the user asks for something this device cannot do yet, say so in one line and, if it fits, offer what you can do instead. Never pretend.")
     }

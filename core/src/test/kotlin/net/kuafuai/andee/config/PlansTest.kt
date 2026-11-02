@@ -159,16 +159,6 @@ class PlansTest {
         TurnGuards.check("note.day_plan", silent = true, untrusted = false)
     }
 
-    @Test fun morningOncePerDayAndNotBeforeFive() {
-        assertTrue(plans.morningDue())
-        plans.markMorning()
-        assertFalse(plans.morningDue())
-        now = LocalDateTime.of(2026, 10, 28, 4, 30).atZone(zone).toInstant().toEpochMilli()
-        assertFalse(plans.morningDue())
-        now = LocalDateTime.of(2026, 10, 28, 7, 0).atZone(zone).toInstant().toEpochMilli()
-        assertTrue(plans.morningDue())
-    }
-
     private fun slotItem(slot: String, what: String) = JSONObject()
         .put("slot", slot).put("kind", "ask").put("what", what).put("because", "规律喝水")
         .put("buttons", JSONArray(listOf("好", "不用"))).put("dismiss", "不用")
@@ -210,17 +200,5 @@ class PlansTest {
         assertFalse(plans.indexForPrompt().contains("A week since"))
         now += Plans.WEEK_MS
         assertTrue(plans.indexForPrompt().contains("A week since"))
-    }
-
-    @Test fun morningContextCarriesYesterdaysOutcomes() {
-        write(item("10:00", "该喝水啦"))
-        val todo = plans.reconcile().arm.single()
-        now = todo.at
-        plans.recordOutcome(plans.bubbleFor(todo, nudges, NudgeBook.Level.NORMAL, emptySet())!!, "button", null)
-        now = LocalDateTime.of(2026, 10, 28, 8, 0).atZone(zone).toInstant().toEpochMilli()
-        val c = plans.morningContext()
-        assertTrue(c.contains("Yesterday's plan"))
-        assertTrue(c.contains("\"该喝水啦\" → done"))
-        assertTrue(c.contains("Today's draft:\n(none)"))
     }
 }

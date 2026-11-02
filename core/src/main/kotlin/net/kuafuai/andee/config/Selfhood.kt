@@ -282,6 +282,33 @@ class Selfhood(
         list[i]
     }
 
+    // ---- the stage's care ---------------------------------------------------------
+
+    /**
+     * A body with a stage (the phone) seeds one care: keeping it. A habit, a day apart, so a stage nobody has
+     * touched for a day comes due like anything else Andee looks after and the heartbeat can get up for it.
+     * Seeded **once per notebook** (the flag is what makes it once), so a user who drops or pauses it is not
+     * overruled at the next start; a wipe takes the flag with it. Returns the id when it was added now.
+     */
+    fun seedStageCare(what: String, why: String, source: String): String? = synchronized(lock) {
+        if (load().optBoolean(STAGE_CARE_SEEDED)) return null
+        val r = addCare("habit", what, why, source, intervalHours = 24.0)
+        val id = r?.takeIf { it.startsWith("id:") }?.removePrefix("id:")
+        val root = load()
+        root.put(STAGE_CARE_SEEDED, true)
+        if (id != null) root.put(STAGE_CARE_ID, id)
+        save(root)
+        id
+    }
+
+    /** The stage's care while it is still active, else null (never seeded, or the user let it go). */
+    fun stageCare(): Care? = load().optString(STAGE_CARE_ID).ifEmpty { null }?.let(::care)?.takeIf { it.status == "active" }
+
+    /** The stage was just changed, from any turn: its care is up to date, so the heartbeat does not get up for it. */
+    fun stageTouched() {
+        stageCare()?.let { settle(it.id, Effect.ACTED, null) }
+    }
+
     // ---- diary -------------------------------------------------------------------
 
     fun today(): String = Instant.ofEpochMilli(clock()).atZone(zone).toLocalDate().toString()
@@ -369,6 +396,8 @@ class Selfhood(
         const val SECTION = "self"
         const val MAX_ACTIVE = 7
         const val MAX_NARRATIVE = 600
+        private const val STAGE_CARE_SEEDED = "stage_care_seeded"
+        private const val STAGE_CARE_ID = "stage_care_id"
         const val MAX_NAME = 24
         const val MAX_NARRATIVE_VERSIONS = 20
         const val MAX_NOTE = 400

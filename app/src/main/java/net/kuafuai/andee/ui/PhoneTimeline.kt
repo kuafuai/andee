@@ -82,5 +82,4 @@ object PhoneTimeline {
     fun told(c: Context, app: String, line: String, original: String) = body(Body.TOLD, s(c, R.string.tl_told, app, line), original)
     fun held(c: Context, app: String, text: String) = body(Body.IGNORED, s(c, R.string.tl_held, app), text)
     fun capped(c: Context, app: String, text: String) = body(Body.IGNORED, s(c, R.string.tl_capped, app), text)
-    fun morning(c: Context, intent: String) = body(Body.MORNING, s(c, R.string.tl_morning), intent)
 }

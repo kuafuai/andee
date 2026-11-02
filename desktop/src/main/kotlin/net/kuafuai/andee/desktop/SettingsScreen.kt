@@ -240,6 +240,14 @@ fun SettingsScreen(
             ) { v["drive"] = it }
             Note(st("settings_drive_note"))
         }
+        // ---- 对话里显示: everything, or only what was said. A preference, not a control you reach for, so it
+        // left the chat header for here — the phone moved it the same way. 全部 leftmost; unset reads as 全部. ----
+        Section(st("settings_section_timeline")) {
+            SegmentedPicker(
+                listOf("on" to st("tl_show_all"), "off" to st("tl_show_talk")),
+                v["timeline_events"].orEmpty().ifEmpty { if (Settings.get("timeline_events") == "off") "off" else "on" },
+            ) { v["timeline_events"] = it }
+        }
         // ---- 保险箱: a summary here, and the door to the card ----
         Section(st("settings_section_vault")) {
             val vaultN = remember { runCatching { net.kuafuai.andee.desktop.mac.MacVault.entries().size }.getOrDefault(0) }

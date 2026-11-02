@@ -448,18 +448,6 @@ class Plans(
 
     private fun meta(root: JSONObject): JSONObject = root.optJSONObject("meta") ?: JSONObject()
 
-    private fun minuteOfDay(): Int = Instant.ofEpochMilli(clock()).atZone(zone).toLocalTime().let { it.hour * 60 + it.minute }
-
-    /** Today's plan has not been looked at in the light of the morning yet, and it is morning or later. */
-    fun morningDue(): Boolean = synchronized(lock) {
-        meta(load()).optString("morning_date") != today() && minuteOfDay() >= MORNING_FROM_MIN
-    }
-
-    fun markMorning() = synchronized(lock) {
-        val root = load()
-        root.put("meta", meta(root).put("morning_date", today())); save(root)
-    }
-
     /**
      * Whether to ask "is it the moment for one of today's loose-time items?" — only when there is such an item
      * to decide about, outside the night, not more often than [MUSE_GAP_MS] and not more than [MUSE_PER_DAY]
@@ -479,39 +467,6 @@ class Plans(
         val m = meta(root)
         val count = if (m.optString("muse_date") == today()) m.optInt("muse_count") + 1 else 1
         root.put("meta", m.put("muse_at", clock()).put("muse_date", today()).put("muse_count", count)); save(root)
-    }
-
-    /** Everything the morning look needs, as text: who, what for, what happened yesterday, what is on today. */
-    fun morningContext(): String = synchronized(lock) {
-        val root = load()
-        buildString {
-            append("Now: ").append(Instant.ofEpochMilli(clock()).atZone(zone).toLocalDateTime().toString().take(16).replace('T', ' '))
-            append(" (").append(LocalDate.parse(today()).dayOfWeek).append(")\n\n")
-            val dirs = dirs(root).filter { it.status == "active" }
-            append("Long-term directions:\n")
-            if (dirs.isEmpty()) append("(none yet)\n")
-            dirs.forEach { append("- ${it.title}: ${it.howIHelp} (because: ${it.why}; from: ${it.source})\n") }
-            val y = root.optJSONObject("days")?.optJSONObject(LocalDate.parse(today()).minusDays(1).toString())?.let(::toDay)
-            append("\nYesterday's plan and what happened:\n")
-            if (y == null) append("(none)\n") else y.items.forEach { append("- ${it.time.ifEmpty { it.slot }} ${it.kind} \"${it.what}\" → ${it.status}${if (it.note.isNotEmpty()) " (${it.note})" else ""}\n") }
-            val t = root.optJSONObject("days")?.optJSONObject(today())?.let(::toDay)
-            append("\nToday's draft:\n")
-            if (t == null) {
-                append("(none)\n")
-            } else {
-                append("intent: ${t.intent}\n")
-                t.items.forEach { append("- ${it.time.ifEmpty { it.slot }} ${it.kind} \"${it.what}\" because ${it.because} → ${it.status}\n") }
-                if (t.quiet.isNotEmpty()) append("quiet: ${t.quiet.joinToString("; ")}\n")
-                if (t.userDropped.isNotEmpty()) append("removed by the user today (never put back): ${t.userDropped.joinToString("; ")}\n")
-            }
-            val end = LocalDate.parse(today()).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-            val due = book.todos("pending").filter { it.nudge.isEmpty() && it.status == "active" && it.nextRunAt in 1 until end }
-            append("\nTodos due today:\n")
-            if (due.isEmpty()) append("(none)\n")
-            due.forEach { append("- ${Instant.ofEpochMilli(it.nextRunAt).atZone(zone).toLocalTime().toString().take(5)} ${it.what}\n") }
-            val notes = book.indexForPrompt()
-            if (notes.isNotEmpty()) append("\nWhat your notebook holds about them:\n").append(notes).append('\n')
-        }
     }
 
     /** Today's loose-time interrupting items, for the muse to choose from (or not). Null when there are none. */
@@ -632,7 +587,6 @@ class Plans(
         const val KEEP_DAYS = 7L
         /** A planned bubble is worth showing for an hour after its time, not longer. */
         const val ITEM_TTL_MIN = 60L
-        const val MORNING_FROM_MIN = 5 * 60
         const val MUSE_GAP_MS = 40 * 60_000L
         const val MUSE_PER_DAY = 12
         const val MUSE_TTL_MIN = 30L

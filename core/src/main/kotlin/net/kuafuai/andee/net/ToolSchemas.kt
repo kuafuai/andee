@@ -1083,6 +1083,86 @@ object ToolSchemas {
         // and not in [CommandDispatcher.LOCKED_BLOCKED]: a rolled-up card and a
         // locked screen do not get in the way of reading a file.
         // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+        // stage.* — the middle of the home screen, which is Andee's own. Not
+        // under `screen.`: writing it drives no app and must not fold the card.
+        // ------------------------------------------------------------------
+        tool(
+            name = "set_stage",
+            method = "stage.set",
+            description = """
+        Put content on your stage: the middle of your home screen, where the
+        conversation used to be. It is the first thing the user sees when they
+        open you, it stays until you change it, and it is yours — show what you
+        want them to find there: what you are busy with for them, something you
+        made, today's plan, a thing worth a glance. It replaces everything that
+        was there. (Revising one part? Use update_stage.)
+
+        Write only the inside of the page — the device supplies the rest:
+        charset, viewport, the theme's colours (they follow day/night by
+        themselves), and these classes, already in the house glass style:
+        `card` (a glass panel), `stat` (a big number), `label` (a small caption),
+        `muted`, `pill`, `grid` (two columns), `row` (space-between line),
+        `progress` with an `<i style="width:40%">` inside, `btn` (a button).
+        CSS variables: --ink --ink2 --muted --accent --glass --edge --well --ok
+        --warn --danger. You may add your own `<style>` and `<script>` (a clock,
+        a countdown, an animation run on their own and cost nothing).
+
+        Mark the parts you will want to change later with `data-slot="name"`
+        on a container, so a later update_stage can replace just that part.
+
+        Charts: Chart.js 4 is already on the page as the global `Chart` — do
+        NOT load it (or anything) from a CDN, that is blocked. Give the canvas a
+        sized container, e.g. `<div class="card" style="height:220px"><canvas
+        id="c"></canvas></div>` then `new Chart(document.getElementById('c'),
+        {type:'line', data:{…}, options:{…}})`. Its text and grid already follow
+        the theme; use `getComputedStyle(document.documentElement)
+        .getPropertyValue('--accent')` for a series colour. For a single tiny
+        sparkline an inline <svg> is lighter.
+
+        Rules the device enforces: no network from the page (no fetch, no
+        remote scripts); images and media may load from https URLs. A button
+        can talk to you: `onclick="andee.say('帮我退订网盘')"` sends that sentence
+        to you as if the user said it — it only works from a real tap.
+        Keep it under ~60 KB. Do not put the conversation's answer here as well
+        as saying it; the stage is for what is worth leaving up.
+    """.trimIndent(),
+            required = listOf("html"),
+            props = mapOf(
+                "html" to prop("string", "The content of the stage: HTML for the inside of <body>, with any <style>/<script> it needs."),
+                "title" to prop("string", "A short name for what is on the stage now, e.g. 「本周三城天气」. Shown to you in later turns."),
+            ),
+            localOnly = true,
+        ),
+        tool(
+            name = "update_stage",
+            method = "stage.update",
+            description = """
+        Replace the inside of one part of your stage: the element marked
+        `data-slot="<slot>"` when you set it. Everything else stays as it is.
+        This is how a changing number, a progress bar or one card is kept
+        current without rewriting the whole stage. The error names the slots
+        that exist if the one you asked for does not.
+    """.trimIndent(),
+            required = listOf("slot", "html"),
+            props = mapOf(
+                "slot" to prop("string", "The data-slot name of the part to replace."),
+                "html" to prop("string", "The new inside of that part."),
+            ),
+            localOnly = true,
+        ),
+        tool(
+            name = "get_stage",
+            method = "stage.get",
+            description = """
+        Read back what is on your stage now: its title, version, when it was
+        last changed, its slots and the HTML you wrote. Call it before revising
+        the stage in a way that should keep what is there.
+    """.trimIndent(),
+            required = emptyList(),
+            props = emptyMap<String, JSONObject>(),
+            localOnly = true,
+        ),
         tool(
             name = "list_pages",
             method = "ui.list_pages",

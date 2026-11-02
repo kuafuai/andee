@@ -491,6 +491,14 @@ class BodyCoreService : Service() {
              * folds and waits for the fold — a second one fired from here would
              * be racing it.
              */
+            override fun onStageSay(text: String) {
+                submitUserTurn(text, "stage")
+            }
+
+            override fun onStageFurnish() {
+                submitUserTurn(AppLocale.str(this@BodyCoreService, R.string.stage_furnish_turn), "stage")
+            }
+
             override fun onSuggestionClick(name: String, title: String, example: String) {
                 net.kuafuai.andee.config.ScenePresets.adoptIfMissing(
                     this@BodyCoreService,
@@ -2112,6 +2120,7 @@ class BodyCoreService : Service() {
             onDismiss = {
                 settings = null
                 voiceFailureReported = false
+                window.onTimelineSettingChanged()
                 if (rebuiltByReset) {
                     rebuiltByReset = false
                 } else {
@@ -3225,7 +3234,7 @@ class BodyCoreService : Service() {
         }
     }
 
-    /** Unlocking is the user arriving: the natural moment for the morning look. */
+    /** Unlocking is the user arriving: a natural moment for the muse and the heartbeat. */
     private val presentReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(c: android.content.Context, i: android.content.Intent) {
             planTick()
@@ -3263,10 +3272,6 @@ class BodyCoreService : Service() {
             }
             val lang = net.kuafuai.andee.config.VoiceConfig.uiLanguage(this)
             val level = net.kuafuai.andee.brain.NudgeBook.Level.of(net.kuafuai.andee.config.VoiceConfig.nudgeLevel(this))
-            if (mind.morning(lang, level.perDay)) {
-                net.kuafuai.andee.config.Scheduler.syncPlan(this)
-                net.kuafuai.andee.ui.PhoneTimeline.morning(this, plans.day(plans.today())?.intent.orEmpty())
-            }
             if (free && level != net.kuafuai.andee.brain.NudgeBook.Level.OFF) {
                 mind.muse(lang)?.let { id ->
                     plans.bubbleForItem(id, dispatcher.nudgeBook, level, net.kuafuai.andee.config.VoiceConfig.nudgeMuted(this))

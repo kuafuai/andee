@@ -492,9 +492,10 @@ class NotebookBook(private val store: NotebookStore) {
     }
 
     /**
-     * The todos a notebook starts with: today one, the nightly picture ([NIGHTLY_PICTURE_CRON]). Added once per
-     * notebook — the `meta` flag is what makes it once, so a user who drops or pauses it is not overruled at the
-     * next start, and a wipe (清空小本本, 恢复出厂设置) takes the flag with it and a fresh notebook gets it again.
+     * The todos a notebook starts with: the morning ([MORNING_TODO_CRON]: today's plan, and today on the stage) and
+     * the evening ([NIGHTLY_PICTURE_CRON]: the day's story and picture). Each is added once per notebook, by **its
+     * own** `meta` flag — so a user who drops or pauses one is not overruled at the next start, a notebook seeded
+     * before the morning one existed still gets it, and a wipe (清空小本本, 恢复出厂设置) takes the flags with it.
      * Not added beside an open todo on the same schedule, which is how it would be set by hand.
      *
      * An earlier wording of the same todo ([NIGHTLY_PICTURE_OLD]) is rewritten in place, so a notebook seeded
@@ -513,23 +514,32 @@ class NotebookBook(private val store: NotebookStore) {
             if (o.optString("what") in NIGHTLY_PICTURE_OLD) { o.put("what", NIGHTLY_PICTURE); rewrote = true }
         }
         val meta = b.optJSONObject("meta") ?: JSONObject()
-        if (meta.optBoolean(META_SEEDED)) {
-            if (rewrote) { b.put("todos", arr); write(b) }
-            return emptyList()
-        }
+        val pending = todos("pending")
         val added = mutableListOf<Todo>()
-        if (todos("pending").none { it.mode == "cron" && it.cronExpr == NIGHTLY_PICTURE_CRON }) {
-            val next = CronExpr.nextAfter(NIGHTLY_PICTURE_CRON, now)
-            if (next != null) {
-                added += Todo(newTodoId(), NIGHTLY_PICTURE, "cron", 0L, NIGHTLY_PICTURE_CRON, next, 0L, "", "", "active", now, false)
-            }
+        var flagged = false
+        for ((flag, cron, what) in DEFAULT_TODOS) {
+            if (meta.optBoolean(flag)) continue
+            meta.put(flag, true)
+            flagged = true
+            if (pending.any { it.mode == "cron" && it.cronExpr == cron }) continue
+            val next = CronExpr.nextAfter(cron, now) ?: continue
+            added += Todo(newTodoId(), what, "cron", 0L, cron, next, 0L, "", "", "active", now, false)
         }
+        if (!flagged && !rewrote) return emptyList()
         added.forEach { arr.put(toJson(it)) }
         b.put("todos", arr)
-        b.put("meta", meta.put(META_SEEDED, true))
+        b.put("meta", meta)
         write(b)
         if (added.isNotEmpty()) Log.i(TAG, "notebook: seeded ${added.size} default todo(s)")
         return added
+    }
+
+    /** Tests only: forget one meta flag, as a notebook written by an older build would not have it. */
+    @Synchronized
+    internal fun clearMetaForTest(flag: String) {
+        val b = JSONObject(book().toString())
+        b.optJSONObject("meta")?.remove(flag)
+        write(b)
     }
 
     fun todoById(id: String): Todo? {
@@ -697,26 +707,65 @@ class NotebookBook(private val store: NotebookStore) {
 
     companion object {
         private const val META_SEEDED = "defaults_seeded"
+        private const val META_MORNING_SEEDED = "morning_seeded"
+
+        /** (meta flag, schedule, text) of each default todo. The evening keeps the flag it always had. */
+        private val DEFAULT_TODOS = listOf(
+            Triple(META_SEEDED, NIGHTLY_PICTURE_CRON, NIGHTLY_PICTURE),
+            Triple(META_MORNING_SEEDED, MORNING_TODO_CRON, MORNING_TODO),
+        )
 
         /** Every evening at nine. */
         const val NIGHTLY_PICTURE_CRON = "0 21 * * *"
 
+        /** Every morning at half past seven. */
+        const val MORNING_TODO_CRON = "30 7 * * *"
+
+        /**
+         * The start of the day: write today's plan, then put today on the stage — one ordinary turn with every
+         * tool, where it used to be a no-tool call (`PlanMind.morning`) on a ten-minute tick plus a second turn
+         * for the stage. Model-facing, so English and naming no language for the reply, like [NIGHTLY_PICTURE].
+         * The plan rules that are not in `day_plan`'s own description are here.
+         */
+        const val MORNING_TODO =
+            "Morning: start the day. First today's plan — day_plan get (today, and yesterday to see what landed, " +
+                "was declined or ignored) and plan_directions list, then day_plan write, or leave the draft if it " +
+                "is still right. Learn from yesterday: do less of what they ignored or declined, carry over what " +
+                "moved. Never invent a goal they did not state; with no directions yet, at most one ask today, to " +
+                "get to know them. Then, if you have a stage (set_stage), put today on it: what you mean to do for " +
+                "them and what you are minding — short, a board, not a report; last night's story and picture step " +
+                "aside. Close with one short line of good morning about the day, no more; in the language of your " +
+                "recent conversation with the user, or the interface language if there has been none."
+
         /**
          * Model-facing, like every wake-up line, so it is English and names no language for the reply: the
          * notebook may be seeded before anyone has said a word, so the language it must follow is whatever the
-         * conversation turns out to be in. And it names no tool: an image tool exists only where one is
-         * (CodeFlying's market), and a page is what every body can always make.
+         * conversation turns out to be in. And it names no tool it cannot be sure of: an image tool exists only
+         * where one is (CodeFlying's market), and the stage only on a body that has one (the phone) — a page is
+         * what every body can always make, so that is the fallback.
+         *
+         * It goes on the stage, not a full-screen page, so it is what the user finds the next time they open
+         * Andee, and it stays there until the morning puts today's plan up (review rule 10 leaves it alone).
          */
         const val NIGHTLY_PICTURE =
+            "Evening look-back: go over today (the conversation, what you did, your diary) and from it write a short " +
+                "story of the day — a few sentences, in your own voice, about you and him — and make a picture of " +
+                "\"you and me\" with some mood to it. If you have an image-generation tool (the market may have one), " +
+                "use it for the picture; if not, draw it in HTML. If you have a stage (set_stage), put the picture " +
+                "and the story there, the picture on top — an https image goes in as <img src>; it stays up until " +
+                "morning. If you have no stage, show them with show_html instead. Then say in a sentence or two what " +
+                "it shows. Write and speak in the language of your recent conversation with the user; only if there " +
+                "has been none, use the interface language. If nothing much happened today, tell a quiet day rather " +
+                "than inventing one."
+
+        /** Earlier wordings, rewritten to [NIGHTLY_PICTURE] where a notebook still holds them. */
+        private val NIGHTLY_PICTURE_OLD = setOf(
             "Evening look-back: go over today (the conversation, what you did, your diary) and from it make a " +
                 "picture of \"you and me\" with some mood to it. If you have an image-generation tool (the market " +
                 "may have one), use it; if not, make it a page with show_html — drawn in HTML, that is enough. Put " +
                 "it on the screen and say in a sentence or two what it shows. Write the page and speak in the " +
                 "language of your recent conversation with the user; only if there has been none, use the " +
-                "interface language. If nothing much happened today, paint a quiet day rather than inventing one."
-
-        /** Earlier wordings, rewritten to [NIGHTLY_PICTURE] where a notebook still holds them. */
-        private val NIGHTLY_PICTURE_OLD = setOf(
+                "interface language. If nothing much happened today, paint a quiet day rather than inventing one.",
             "每晚回顾：把今天的事过一遍（对话、做过的事、日记），据此画一张「你和我」的图，要有意境。" +
                 "画好放到屏幕上给用户看，再用一两句话说画的是什么。今天没什么事就画安静的一天，不要硬凑。",
             "Evening look-back: go over today (the conversation, what you did, your diary) and from it make a " +
@@ -750,7 +799,17 @@ class NotebookBook(private val store: NotebookStore) {
         const val MAX_SCENES = 30
         const val MAX_SCENE_PROMPT = 3000
 
-        fun newTodoId(): String = "t" + System.currentTimeMillis().toString(36)
+        /**
+         * Time-based, and never the same twice: two todos made in one millisecond (the defaults are seeded in
+         * one pass) used to share an id, so dropping one dropped the other.
+         */
+        fun newTodoId(): String {
+            val now = System.currentTimeMillis()
+            val ms = lastTodoMs.updateAndGet { maxOf(it + 1, now) }
+            return "t" + ms.toString(36)
+        }
+
+        private val lastTodoMs = java.util.concurrent.atomic.AtomicLong(0L)
 
         fun toTodo(o: JSONObject): Todo = Todo(
             id = o.optString("id"),

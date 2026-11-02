@@ -726,6 +726,7 @@ object VoiceConfig {
                 "notify" to notifyScope(context),
                 "nudge" to nudgeLevel(context),
                 "drive" to if (driveEnabled(context)) "on" else "off",
+                "timeline_events" to if (timelineEvents(context)) "on" else "off",
                 "lang" to uiLanguage(context),
                 "sweep" to p.getString("sweep", "on")!!,
                 "sweep_quiet_minutes" to p.getString(
@@ -905,6 +906,17 @@ object VoiceConfig {
 
         fun setTimelineEvents(context: Context, on: Boolean) {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("timeline_events", if (on) "on" else "off").apply()
+        }
+
+        /**
+         * What the middle of the unfolded card shows: `stage` (Andee's own, the default) or `chat`.
+         * Written the moment the key is tapped, like `timeline_events`; anything but `chat` reads as the stage.
+         */
+        fun homeView(context: Context): String =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("home_view", null) ?: "stage"
+
+        fun setHomeView(context: Context, view: String) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("home_view", view).apply()
         }
 
         fun driveEnabled(context: Context): Boolean =

@@ -85,7 +85,6 @@ object TimelineEvents {
     fun capped(app: String, text: String) = body(Body.IGNORED, t("收到 $app 的通知，这个小时看得太多了，先放着", "A notification from $app came in past the hourly limit; kept for later"), text)
     fun undecided(app: String, text: String) = body(Body.IGNORED, t("收到 $app 的通知，没拿定主意，没处理", "A notification from $app came in; could not decide, left it"), text)
     fun scene(title: String?) = body(Body.SCENE, if (title != null) t("进入情景：$title", "Entered the scene: $title") else t("退出了情景", "Left the scene"))
-    fun morning(intent: String) = body(Body.MORNING, t("早上想好了今天的打算", "Thought out today's plan this morning"), intent)
 
     /** The row's mark, from the app's own icon set (an emoji would take whatever font the Mac has). */
     fun mark(kind: String): AndeeIcon = when (kind) {

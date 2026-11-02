@@ -35,6 +35,7 @@ class GuestHostTest {
         assertEquals("", guest.pagesIndex())
         assertEquals("", guest.topicsIndex())
         assertEquals("", guest.gearIndex())
+        assertEquals("", guest.stageIndex())
         assertTrue(guest.scrollback().isEmpty())
         // The same individual, though.
         assertEquals("owner's persona", guest.persona())
