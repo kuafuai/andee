@@ -3,7 +3,9 @@ package net.kuafuai.andee.ui
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.RippleDrawable
 import android.content.res.ColorStateList
 import android.view.GestureDetector
@@ -11,6 +13,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -786,6 +789,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
 
     private fun buildRow(e: ChatHistory.Entry): View {
         if (e.role == ChatHistory.Role.EVENT) return buildEventRow(e)
+        if (e.role == ChatHistory.Role.PAGE && e.page != null) return buildPageRow(e)
         val mine = e.role == ChatHistory.Role.USER
         val bad = e.role == ChatHistory.Role.ERROR
 
@@ -870,6 +874,151 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                     if (mine) leftMargin = dp(40) else rightMargin = dp(40)
                 },
+            )
+        }
+    }
+
+    /**
+     * A page it made, as a share card: the same glass as every other row, with
+     * the top of the page itself in it — the way a mini-program card shows what
+     * is behind it before you open it. Header (kind, time, version), title, the
+     * picture ([PageThumbs], made once and kept beside the page), and a footer
+     * that says the whole card opens it.
+     *
+     * Same shoulder and same material as Andee's own bubbles, because it is
+     * Andee's: what sets it apart is the picture, not a louder colour. A page
+     * whose file was cleared falls back to the plain bubble in [buildRow].
+     */
+    private fun buildPageRow(e: ChatHistory.Entry): View {
+        val card = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(11), dp(12), dp(10))
+            background = RippleDrawable(ColorStateList.valueOf(ripple()), glass(false), null)
+            isClickable = true
+            setOnClickListener { onPageClick?.invoke(e) }
+        }
+
+        // Header: what it is, when, which version.
+        card.addView(LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(ImageView(context).apply {
+                setImageResource(R.drawable.ic_artifacts)
+                setColorFilter(Color.parseColor(Glass.ACCENT))
+            }, LinearLayout.LayoutParams(dp(14), dp(14)))
+            addView(TextView(context).apply {
+                text = lctx.getString(R.string.history_page_kind)
+                textSize = Glass.Type.MICRO
+                letterSpacing = 0.05f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(Color.parseColor(Glass.ACCENT))
+            }, LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = dp(6) })
+            addView(TextView(context).apply {
+                text = buildString {
+                    if (e.version > 1) append("v").append(e.version).append(" · ")
+                    append(clock.format(Date(e.ts)))
+                }
+                textSize = Glass.Type.MICRO
+                setTextColor(Color.parseColor(Glass.SECONDARY))
+            })
+        }, LinearLayout.LayoutParams(MATCH, WRAP))
+
+        card.addView(TextView(context).apply {
+            text = e.text
+            textSize = Glass.Type.BODY
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.parseColor(Glass.LABEL))
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6) })
+
+        // The picture, or until it exists a skeleton in the same frame, so the
+        // card does not change height when it arrives.
+        val preview = AspectFrame(context, PageThumbs.ASPECT).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = dp(12).toFloat()
+                setColor(film(Glass.LABEL, 0x14))
+            }
+            clipToOutline = true
+        }
+        val skeleton = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(16), dp(14), dp(14))
+            for ((i, frac) in listOf(0.5f, 0.9f, 0.75f, 0.6f).withIndex()) {
+                addView(LinearLayout(context).apply {
+                    addView(View(context).apply {
+                        background = GradientDrawable().apply {
+                            cornerRadius = dp(3).toFloat()
+                            setColor(film(Glass.LABEL, if (i == 0) 0x33 else 0x1A))
+                        }
+                    }, LinearLayout.LayoutParams(0, dp(if (i == 0) 9 else 6), frac))
+                    addView(View(context), LinearLayout.LayoutParams(0, 1, 1f - frac))
+                }, LinearLayout.LayoutParams(MATCH, WRAP).apply { if (i > 0) topMargin = dp(10) })
+            }
+        }
+        val shot = ImageView(context).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            visibility = View.GONE
+        }
+        preview.addView(skeleton, android.widget.FrameLayout.LayoutParams(MATCH, MATCH))
+        preview.addView(shot, android.widget.FrameLayout.LayoutParams(MATCH, MATCH))
+        card.addView(preview, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(9) })
+
+        fun show(bmp: android.graphics.Bitmap?) {
+            if (bmp == null) return
+            shot.setImageBitmap(bmp)
+            shot.visibility = View.VISIBLE
+            shot.alpha = 0f
+            shot.animate().alpha(1f).setDuration(220).start()
+            skeleton.visibility = View.GONE
+        }
+        val page = e.page
+        if (page != null) {
+            val ready = PageThumbs.cached(page)
+            if (ready != null) {
+                shot.setImageBitmap(ready)
+                shot.visibility = View.VISIBLE
+                skeleton.visibility = View.GONE
+            } else {
+                // Needs this list's window to render in; asked once it has one.
+                post {
+                    (rootView as? android.widget.FrameLayout)?.let { host ->
+                        PageThumbs.request(host, page) { show(it) }
+                    }
+                }
+            }
+        }
+
+        // Footer: a hairline, then whose page it is and what a tap does.
+        card.addView(View(context).apply {
+            setBackgroundColor(film(Glass.LABEL, 0x1A))
+        }, LinearLayout.LayoutParams(MATCH, maxOf(1, dp(1) / 2 + 1)).apply { topMargin = dp(10) })
+        card.addView(TextView(context).apply {
+            text = lctx.getString(R.string.history_page_footer)
+            textSize = Glass.Type.MICRO
+            setTextColor(Color.parseColor(Glass.SECONDARY))
+        }, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(7) })
+
+        // Andee's side, like its bubbles; a card is narrower than a full row so
+        // it reads as an object handed over rather than as a line of text.
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.START
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(8) }
+            addView(card, LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(72) })
+        }
+    }
+
+    /** A frame whose height is its width × [ratio]. */
+    private class AspectFrame(context: Context, private val ratio: Float) : android.widget.FrameLayout(context) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val w = MeasureSpec.getSize(widthMeasureSpec)
+            super.onMeasure(
+                MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec((w * ratio).toInt(), MeasureSpec.EXACTLY),
             )
         }
     }

@@ -877,7 +877,34 @@ class CommandDispatcher(
                 // [takeRevisionGroup]. Resolved once, here, because both branches
                 // below archive the same bytes and must agree on the grouping.
                 val group = takeRevisionGroup(params)
-                if (net.kuafuai.andee.ui.HtmlActivity.pageUp) {
+                if (keyguardLocked()) {
+                    // Locked: keep the page as a card in the conversation, and
+                    // open nothing. It used to be refused here with everything
+                    // else that draws, which threw away the whole page the
+                    // model had just written. Not shown over the keyguard (a
+                    // page can hold anything, and the lock screen is the one
+                    // place anybody holding the phone can read), and not opened
+                    // on unlock either: HONOR holds back USER_PRESENT from a
+                    // background app, measured — a page that pops up a minute
+                    // late, or never, is worse than one waiting in the chat.
+                    val archived = net.kuafuai.andee.ui.ChatHistory.addPage(title, html, group)
+                    if (archived == null) {
+                        org.json.JSONObject().put("error", "The phone is locked and the page could not be saved. " +
+                            "Tell the user, and draw it again once they have unlocked.")
+                    } else {
+                        org.json.JSONObject()
+                            .put("shown", false)
+                            .put("saved", true)
+                            .put("in_conversation", true)
+                            .put("title", title)
+                            .put(
+                                "note",
+                                "The phone is locked, so the page was not opened. It is saved and sits in the " +
+                                    "conversation as a card they can tap to open once they unlock. Tell them in a " +
+                                    "sentence; do not call show_html again for it.",
+                            )
+                    }
+                } else if (net.kuafuai.andee.ui.HtmlActivity.pageUp) {
                     // A page is already up: put the new one *in its place*.
                     // This used to be refused with "ask the user to dismiss it
                     // first", and the model said exactly that — so the most
@@ -2192,7 +2219,8 @@ class CommandDispatcher(
             "device.permissions.request",
             "ui.ask",
             "ui.alert",
-            "ui.show_html",
+            // Not `ui.show_html`: a locked page is kept as a card in the
+            // conversation instead — see its branch.
         )
 
         /**

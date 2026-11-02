@@ -511,6 +511,8 @@
     <string name="history_role_you">You · %1$s</string>
     <string name="history_role_assistant">Andee · %1$s</string>
     <string name="history_role_error">Error · %1$s</string>
+    <string name="history_page_kind">Page</string>
+    <string name="history_page_footer">A page by Andee · Tap to open</string>
     <string name="history_role_page_open">Page · %1$s · Tap to reopen</string>
     <string name="history_topic_label">Topic</string>
     <string name="history_topic_meta">%1$s · %2$d messages</string>

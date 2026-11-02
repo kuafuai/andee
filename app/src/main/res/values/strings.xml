@@ -494,6 +494,8 @@
     <string name="history_role_you">你 · %1$s</string>
     <string name="history_role_assistant">Andee · %1$s</string>
     <string name="history_role_error">出错 · %1$s</string>
+    <string name="history_page_kind">页面</string>
+    <string name="history_page_footer">Andee 做的页面 · 点击打开</string>
     <string name="history_role_page_open">界面 · %1$s · 点击重新打开</string>
     <!-- 话题: a finished stretch of conversation, folded into one card. -->
     <string name="history_topic_label">话题</string>

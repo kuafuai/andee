@@ -600,7 +600,7 @@ object ChatHistory {
             val doomed = entries.filter { it.role == Role.PAGE && it.groupId == group }
                 .sortedByDescending { it.version }
             for (e in doomed) {
-                e.page?.let { runCatching { it.delete() } }
+                e.page?.let { dropPageFile(it) }
                 entries.remove(e)
             }
             entries.add(hit.copy(page = null, version = hit.version))
@@ -693,6 +693,12 @@ object ChatHistory {
      * Falls back to null on IO failure; the caller still has the HTML string
      * and can stage it itself, it just won't be in the list.
      */
+    /** A page's bytes and the picture of it its card shows ([PageThumbs]). */
+    private fun dropPageFile(page: File) {
+        runCatching { page.delete() }
+        runCatching { PageThumbs.fileFor(page).delete() }
+    }
+
     fun addPage(title: String, html: String, groupId: Long? = null): File? {
         val ctx = appContext ?: return null
         val (id, group, version) = synchronized(lock) {
@@ -789,7 +795,7 @@ object ChatHistory {
         for (old in overVersions) {
             val i = entries.indexOfFirst { it.id == old.id }
             if (i < 0) continue
-            old.page?.let { runCatching { it.delete() } }
+            old.page?.let { dropPageFile(it) }
             entries.removeAt(i)
         }
         // Pages next, so one that just lost its file is an ordinary row below.
@@ -799,7 +805,7 @@ object ChatHistory {
             if (e.page == null) continue
             pages++
             if (pages > MAX_PAGES) {
-                runCatching { e.page.delete() }
+                dropPageFile(e.page)
                 entries[i] = e.copy(page = null)
             }
         }
