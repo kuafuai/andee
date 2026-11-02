@@ -19,6 +19,7 @@ object OnboardingState {
     private const val KEY_PAGE = "page"
     private const val KEY_ASSISTANT_NAME = "assistant_name"
     private const val KEY_USER_NAME = "user_name"
+    private const val KEY_SKIPPED = "skipped"
 
     enum class Page {
         PRELUDE,
@@ -70,6 +71,14 @@ object OnboardingState {
             .onFailure { android.util.Log.w("Onboarding", "could not save Andee's name", it) }
         runCatching { Notebook.people(context).setOwnerName(user) }
             .onFailure { android.util.Log.w("Onboarding", "could not save the user's name", it) }
+    }
+
+    /** Setup steps the user chose to skip ("先跳过"), so a Settings trip does not ask again. */
+    fun skipped(context: Context): Set<String> =
+        prefs(context).getStringSet(KEY_SKIPPED, emptySet()).orEmpty()
+
+    fun skip(context: Context, id: String) {
+        prefs(context).edit().putStringSet(KEY_SKIPPED, skipped(context) + id).apply()
     }
 
     fun complete(context: Context) {

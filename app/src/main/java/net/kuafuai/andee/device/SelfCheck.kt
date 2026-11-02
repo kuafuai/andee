@@ -329,10 +329,13 @@ object SelfCheck {
             context.contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
         ).orEmpty().split(':').any { ComponentName.unflattenFromString(it) == cn }
+        // WARN, not FAIL: the body no longer dies with this grant. Measured with
+        // it off — the ball, the card, typing and the brain all work; what is
+        // lost is touching the screen. Red is kept for "cannot be used at all".
         return Finding(
             id = "accessibility",
             title = R.string.check_title_accessibility,
-            level = if (on) Level.OK else Level.FAIL,
+            level = if (on) Level.OK else Level.WARN,
             detail = if (on) R.string.check_detail_accessibility_on
             else R.string.check_detail_accessibility_off,
             fix = if (on) Fix.Nothing else Fix.Screen(Settings.ACTION_ACCESSIBILITY_SETTINGS),
@@ -877,7 +880,8 @@ object SelfCheck {
         return Finding(
             id = "microphone",
             title = R.string.check_title_microphone,
-            level = if (on) Level.OK else Level.FAIL,
+            // WARN: without it there is no voice, but double-tap still types.
+            level = if (on) Level.OK else Level.WARN,
             detail = if (on) R.string.check_detail_mic_on else R.string.check_detail_mic_off,
             fix = if (on) Fix.Nothing else Fix.Grant(listOf(p)),
         )

@@ -77,6 +77,9 @@
     <string name="onboarding_permission_microphone_title">让我听见你</string>
     <string name="onboarding_permission_microphone_body">允许使用麦克风后，你直接对我说要做什么就行。你不跟我说话时，我不会把声音发给模型。</string>
     <string name="onboarding_permission_microphone_action">允许使用麦克风</string>
+    <string name="onboarding_permission_skip">先跳过</string>
+    <string name="onboarding_skip_accessibility_note">跳过的话，我能陪你聊天、记事、提醒，但还不能替你操作手机。以后在自检里随时能开。</string>
+    <string name="onboarding_skip_microphone_note">跳过的话，你可以打字跟我说。以后在自检里随时能开。</string>
     <string name="onboarding_permission_safety_title">你始终做主</string>
     <string name="onboarding_permission_safety_body">付款、发重要消息这类关键操作前，我会停下来问你。</string>
 
@@ -853,7 +856,7 @@
     <string name="check_title_disk">存储空间</string>
 
     <string name="check_detail_accessibility_on">已开启，球和屏幕操作都在跑。</string>
-    <string name="check_detail_accessibility_off">没开。球、语音、点按滑动全都不存在 —— 这条不开，其他都不用看。开关在无障碍设置的「已下载的应用」里，不在第一屏上。</string>
+    <string name="check_detail_accessibility_off">没开。球和聊天都还在，但我碰不到屏幕：不能替你点按、滑动、输入。开关在无障碍设置的「已下载的应用」里，不在第一屏上。</string>
     <string name="check_detail_overlay_on">已允许，球能画出来。</string>
     <string name="check_detail_overlay_off">没开。球和卡片都画不出来，而服务在后台其实跑得好好的 —— 所以看起来像「什么都没发生」。</string>
     <string name="check_detail_network_on">已联网。</string>
@@ -895,7 +898,7 @@
     <string name="check_detail_secure_missing">没授权，往别的应用里打字（type_text）用不了。这条在设置里没有开关 —— 只能插上线用 adb 给。</string>
     <string name="check_detail_secure_spare">没授权，不过不影响打字 —— 现在走的是无障碍输入法。它只给上面那条备用通道用，没有也行。</string>
     <string name="check_detail_mic_on">已允许。</string>
-    <string name="check_detail_mic_off">没允许。点球不会有任何反应 —— 这是最不像权限问题的一条。</string>
+    <string name="check_detail_mic_off">没允许。我听不见你说话，点球不会开始听；双击球可以打字跟我说。</string>
     <string name="check_detail_voice_key_ok">已填。识别和合成用它连服务商。</string>
     <string name="check_detail_voice_key_missing">还没填。源码里不带密钥，得你自己去开一个语音服务,把 Key 填进 ⚙ →「后端」→「本机」。没有它，听和说都连不上 —— 报出来的却是连接超时，看着像网络坏了。其余功能照常。</string>
     <string name="check_detail_voice_key_codeflying_missing">语音用的是 CodeFlying 的密钥，和大脑是同一个，填进 ⚙ →「后端」→「CodeFlying」即可。没有它，听和说都连不上。</string>
@@ -929,7 +932,9 @@
     <!-- 卡片的出口，两处都用它：头部的 ✕ 和底部的实心按钮。故意和设置卡
          「完成」是同一个词 —— 这就是同一张卡。 -->
     <string name="check_page_done">完成</string>
-    <string name="check_page_issues">%1$d 项需要处理</string>
+    <string name="check_page_issues">%1$d 项必须处理</string>
+    <string name="check_page_suggest">能用了 · 还有 %1$d 项建议处理</string>
+    <string name="check_page_warn_lead">下面几项不影响使用，开了会更好用。</string>
     <string name="check_page_notes_lead">下面几条仅供参考，不影响使用。</string>
     <string name="check_card_title">有 %1$d 项需要处理</string>
     <string name="check_card_open">去处理</string>

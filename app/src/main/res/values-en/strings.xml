@@ -72,6 +72,9 @@
     <string name="onboarding_permission_microphone_title">Let me hear you.</string>
     <string name="onboarding_permission_microphone_body">Allow the microphone and just tell me what you need. When you are not talking to me, your audio is not sent to the model.</string>
     <string name="onboarding_permission_microphone_action">Allow microphone</string>
+    <string name="onboarding_permission_skip">Skip for now</string>
+    <string name="onboarding_skip_accessibility_note">If you skip, I can still chat, keep notes and remind you, but can’t operate your phone. You can turn it on any time from the self-check.</string>
+    <string name="onboarding_skip_microphone_note">If you skip, you can type to me. You can allow it any time from the self-check.</string>
     <string name="onboarding_permission_safety_title">You stay in control</string>
     <string name="onboarding_permission_safety_body">Before payment, important messages and other consequential actions, I stop and ask you.</string>
 
@@ -768,7 +771,7 @@
     <string name="check_title_disk">Storage</string>
 
     <string name="check_detail_accessibility_on">On. The ball and every screen action are running.</string>
-    <string name="check_detail_accessibility_off">Off. No ball, no voice, no tapping or swiping — with this one off, nothing else here matters either. The switch lives under "Downloaded apps" in the accessibility settings, not on the first screen.</string>
+    <string name="check_detail_accessibility_off">Off. The ball and chat still work, but I can’t touch the screen: no tapping, swiping or typing for you. The switch lives under \"Downloaded apps\" in the accessibility settings, not on the first screen.</string>
     <string name="check_detail_overlay_on">Allowed. The ball can be drawn.</string>
     <string name="check_detail_overlay_off">Off. Neither the ball nor any card can be drawn, while the service runs perfectly well in the background — which is why it looks like nothing happened at all.</string>
     <string name="check_detail_network_on">Online.</string>
@@ -811,7 +814,7 @@
     <string name="check_detail_secure_missing">Not granted, so typing into other apps (type_text) is unavailable. There is no switch for this in Settings — it can only be given over adb with the cable plugged in.</string>
     <string name="check_detail_secure_spare">Not granted, and typing works anyway — it goes through the accessibility input method. This is only needed by the spare channel above.</string>
     <string name="check_detail_mic_on">Allowed.</string>
-    <string name="check_detail_mic_off">Not allowed. Tapping the ball does nothing at all — the failure that least resembles a permission problem.</string>
+    <string name="check_detail_mic_off">Not allowed. I can’t hear you, so tapping the ball won’t start listening; double-tap it to type to me instead.</string>
     <string name="check_detail_voice_key_ok">Set. Recognition and synthesis use it to reach the provider.</string>
     <string name="check_detail_voice_key_missing">Not set. The source ships without a key — open a speech service of your own and put its key in ⚙ → Backend → On-device. Without it, hearing and speaking cannot connect, and what you get back is a connection timeout that looks like a network fault. Everything else works.</string>
     <string name="check_detail_voice_key_codeflying_missing">Voice uses the same CodeFlying key as the brain: put it in ⚙ → Backend → CodeFlying. Without it, listening and speaking cannot connect.</string>
@@ -846,7 +849,9 @@
          the filled button in the footer. Deliberately the same word as the
          settings card's "Done" — these are the same card. -->
     <string name="check_page_done">Done</string>
-    <string name="check_page_issues">%1$d to sort out</string>
+    <string name="check_page_issues">%1$d must be fixed</string>
+    <string name="check_page_suggest">Ready to use · %1$d more worth doing</string>
+    <string name="check_page_warn_lead">These don’t stop anything working, but help.</string>
     <string name="check_page_notes_lead">The rest is just for reference and changes nothing.</string>
     <string name="check_card_title">%1$d thing(s) need attention</string>
     <string name="check_card_open">Fix it</string>

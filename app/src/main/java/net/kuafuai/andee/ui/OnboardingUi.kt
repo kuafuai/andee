@@ -5,6 +5,8 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
 import android.text.Editable
@@ -48,6 +50,14 @@ import net.kuafuai.andee.ui.ball.Mood
  * result arrives last. Every view is built in its final state and the
  * choreography only hides and reveals it, so with system animations off (or a
  * tap on the button mid-scene) the page is simply complete.
+ *
+ * **And it speaks.** Each page has a pre-recorded line in Andee's own voice
+ * (`assets/onboarding/<lang>/<page>.mp3`, made by `tools/onboarding_voice.py`,
+ * which holds the script). Recorded, not synthesised, because no key exists
+ * yet. It plays when a page appears and sound is on, stops on any page change,
+ * and while it plays the ball wears SPEAKING with the page's face layered on
+ * top, so the mouth moves and the expression stays. The ball is always the
+ * Andee look here, since the recording is Andee's voice.
  */
 class OnboardingUi(
     private val context: Context,
@@ -66,6 +76,14 @@ class OnboardingUi(
 
     /** Persistent across pages: a GL context per page would be a flicker per tap. */
     private var ball: EmotionBallTextureView? = null
+
+    /** The page's face; while a line plays it rides on SPEAKING as the emotion. */
+    private var face: Mood = Mood.CALM
+    private var player: MediaPlayer? = null
+    private var talking = false
+
+    /** `<lang>/<clip>` last started, so a repaint of the same page does not replay it. */
+    private var lastClip: String? = null
 
     /** Every pending beat of the current page's scene; cleared on each render. */
     private val beats = Handler(Looper.getMainLooper())
@@ -107,9 +125,9 @@ class OnboardingUi(
 
     fun show() {
         if (root != null) return
-        // Same as ExpressionsUi: this process may not have a service that has
-        // already applied the saved look, and the ball draws the global one.
-        BallLooks.requestByName(VoiceConfig.ballLook(context))
+        // Andee's own look, whatever is saved: the recorded voice is Andee's.
+        // Not saved — the user's pick comes back in [destroy].
+        BallLooks.requestByName("andee")
         ball = EmotionBallTextureView(context).apply {
             alpha = 0f
             elevation = dp(24).toFloat()
@@ -136,8 +154,15 @@ class OnboardingUi(
 
     private var justGranted = false
 
+    /** The host is going to the background (a Settings trip): stop talking. */
+    fun pause() {
+        stopVoice()
+    }
+
     fun destroy() {
         captureModelDrafts()
+        stopVoice()
+        BallLooks.requestByName(VoiceConfig.ballLook(context))
         beats.removeCallbacksAndMessages(null)
         root?.animate()?.cancel()
         root?.let { host.removeView(it) }
@@ -172,10 +197,16 @@ class OnboardingUi(
         render(animated = true)
     }
 
+    /**
+     * The setup steps still to show: any of [REQUIRED_GATES] the checklist does
+     * not call OK, minus the ones the user skipped. Only [SKIPPABLE] ones can
+     * be skipped; without the overlay there is no Andee to come back to.
+     */
     private fun requiredMissing(): List<SelfCheck.Finding> {
         val byId = SelfCheck.local(context).associateBy { it.id }
+        val skipped = OnboardingState.skipped(context)
         return REQUIRED_GATES.mapNotNull { id ->
-            byId[id]?.takeIf { it.level == SelfCheck.Level.FAIL }
+            byId[id]?.takeIf { SelfCheck.needsAttention(it) && id !in skipped }
         }
     }
 
@@ -209,6 +240,7 @@ class OnboardingUi(
 
         host.addView(next, FrameLayout.LayoutParams(MATCH, MATCH))
         ball?.bringToFront()
+        speak(clipFor(page, gate))
         if (old == null || !animated) {
             old?.let { host.removeView(it) }
             Glass.enter(next)
@@ -686,6 +718,23 @@ class OnboardingUi(
             })
         }, spacedParams(12))
         footer.addView(primaryButton(lctx.getString(action)) { onOpenFinding(finding) })
+        // Accessibility and the microphone each cost a capability, not Andee:
+        // say what is lost, and let the user go on without it.
+        val skipNote = when (finding.id) {
+            "accessibility" -> R.string.onboarding_skip_accessibility_note
+            "microphone" -> R.string.onboarding_skip_microphone_note
+            else -> null
+        }
+        if (skipNote != null && finding.id in SKIPPABLE) {
+            footer.addView(textLink(lctx.getString(R.string.onboarding_permission_skip)) {
+                OnboardingState.skip(context, finding.id)
+                render(animated = true)
+            }.apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(MATCH, WRAP))
+            footer.addView(bodyCopy(lctx.getString(skipNote)).apply {
+                gravity = Gravity.CENTER
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.CAPTION)
+            }, LinearLayout.LayoutParams(MATCH, WRAP))
+        }
     }
 
     // ---- Model --------------------------------------------------------------
@@ -1018,7 +1067,74 @@ class OnboardingUi(
     // ---- Choreography -------------------------------------------------------
 
     private fun mood(m: Mood) {
-        ball?.setMood(m)
+        face = m
+        paintFace()
+    }
+
+    private fun paintFace() {
+        val b = ball ?: return
+        if (talking) {
+            b.setMood(Mood.SPEAKING)
+            b.setEmotion(face)
+        } else {
+            b.setEmotion(null)
+            b.setMood(face)
+        }
+    }
+
+    // ---- Voice --------------------------------------------------------------
+
+    /**
+     * The line for this page, or null for none. The prelude is silent: it is
+     * where the user decides whether Andee may speak at all, so it must not
+     * speak before they have.
+     */
+    private fun clipFor(page: OnboardingState.Page, gate: SelfCheck.Finding?): String? = when {
+        page == OnboardingState.Page.PRELUDE -> null
+        page == OnboardingState.Page.PERMISSIONS && gate != null -> "perm_${gate.id}"
+        else -> page.name.lowercase()
+    }
+
+    /** Play [clip] in the current language, unless it is already the one playing or sound is off. */
+    private fun speak(clip: String?) {
+        if (clip == null) {
+            stopVoice()
+            lastClip = null
+            return
+        }
+        val key = VoiceConfig.uiLanguage(context) + "/" + clip
+        if (key == lastClip) return
+        stopVoice()
+        lastClip = key
+        if (!soundOn) return
+        val mp = runCatching {
+            context.assets.openFd("onboarding/$key.mp3").use { fd ->
+                MediaPlayer().apply {
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build(),
+                    )
+                    setDataSource(fd.fileDescriptor, fd.startOffset, fd.length)
+                    prepare()
+                }
+            }
+        }.getOrNull() ?: return
+        mp.setOnCompletionListener { if (player === it) stopVoice() }
+        player = mp
+        talking = true
+        paintFace()
+        mp.start()
+    }
+
+    private fun stopVoice() {
+        player?.let { runCatching { it.stop() }; it.release() }
+        player = null
+        if (talking) {
+            talking = false
+            paintFace()
+        }
     }
 
     /** The ball's reward for a permission the user just went out and granted. */
@@ -1374,6 +1490,9 @@ class OnboardingUi(
         /** How far the two kinds that wait step back once "me" has landed. */
         private const val RECEDED = 0.32f
         private val REQUIRED_GATES = listOf("overlay", "accessibility", "microphone")
+
+        /** Gates that cost a capability rather than Andee itself, and may be skipped. */
+        private val SKIPPABLE = setOf("accessibility", "microphone")
 
         /** The ball's view; its centre is [BALL_LIFT_DP] above the card's edge. */
         private const val BALL_DP = 160

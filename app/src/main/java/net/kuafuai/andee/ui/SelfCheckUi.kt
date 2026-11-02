@@ -426,6 +426,11 @@ class SelfCheckUi(
     private fun render(found: List<SelfCheck.Finding>) {
         last = found
         val attention = found.filter { SelfCheck.needsAttention(it) }
+        // Two tiers inside "needs attention": red cannot be used at all, amber
+        // works with something missing. They are listed apart so an amber row
+        // is never read as the reason nothing works.
+        val fails = attention.filter { it.level == SelfCheck.Level.FAIL }
+        val warns = attention.filter { it.level == SelfCheck.Level.WARN }
         val rest = found.filterNot { SelfCheck.needsAttention(it) }
 
         // Where the user was, read before a single row is removed. Tearing the
@@ -439,10 +444,14 @@ class SelfCheckUi(
         val keep = scroller?.scrollY ?: 0
 
         hero?.removeAllViews()
-        hero?.addView(summary(attention.size))
+        hero?.addView(summary(fails.size, warns.size))
 
         rows?.removeAllViews()
-        attention.forEach { rows?.addView(row(it)) }
+        fails.forEach { rows?.addView(row(it)) }
+        if (warns.isNotEmpty()) {
+            if (fails.isNotEmpty()) rows?.addView(sectionHeading(R.string.check_page_warn_lead))
+            warns.forEach { rows?.addView(row(it)) }
+        }
         if (rest.isNotEmpty()) {
             if (attention.isNotEmpty()) rows?.addView(sectionHeading(R.string.check_page_notes_lead))
             rest.forEach { rows?.addView(row(it)) }
@@ -984,17 +993,23 @@ class SelfCheckUi(
 
     // ---- Small parts ----
 
-    private fun summary(problems: Int): View = LinearLayout(context).apply {
+    /** The headline speaks for the worst tier present: red, else amber, else green. */
+    private fun summary(fails: Int, warns: Int): View = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
+        val problems = fails + warns
         addView(TextView(context).apply {
-            text = if (problems == 0) {
-                lctx.getString(R.string.check_page_ok_title)
-            } else {
-                lctx.getString(R.string.check_page_issues, problems)
+            text = when {
+                fails > 0 -> lctx.getString(R.string.check_page_issues, fails)
+                warns > 0 -> lctx.getString(R.string.check_page_suggest, warns)
+                else -> lctx.getString(R.string.check_page_ok_title)
             }
             setTextSize(TypedValue.COMPLEX_UNIT_SP, Glass.Type.TITLE)
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor(if (problems == 0) Glass.OK else Glass.DANGER))
+            when {
+                fails > 0 -> setTextColor(Color.parseColor(Glass.DANGER))
+                warns > 0 -> setTextColor(WARN_AMBER)
+                else -> setTextColor(Color.parseColor(Glass.OK))
+            }
         })
         // Only in the clean case: a green headline with no sentence under it
         // leaves the user wondering whether the list below is part of the

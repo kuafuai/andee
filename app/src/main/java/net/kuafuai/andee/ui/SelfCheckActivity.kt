@@ -769,6 +769,12 @@ class SelfCheckActivity : StageActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        // A Settings trip for a permission: the line must not keep talking there.
+        if (::onboarding.isInitialized) onboarding.pause()
+    }
+
     override fun onResume() {
         super.onResume()
 
