@@ -3550,10 +3550,16 @@ class BodyCoreService : Service() {
             // scrollback row above is already the answer; the user
             // reads it after they hang up.
             // And not when the user has muted answers (the card's 朗读 key): the row above is the answer.
-            if (!meeting.isActive() && !net.kuafuai.andee.device.CallState.isActive &&
-                !net.kuafuai.andee.config.VoiceConfig.muted(this)
-            ) {
+            val muted = net.kuafuai.andee.config.VoiceConfig.muted(this)
+            if (!meeting.isActive() && !net.kuafuai.andee.device.CallState.isActive && !muted) {
                 tts.speak(plain, script.cues)
+            } else if (muted && !meeting.isActive() && !net.kuafuai.andee.device.CallState.isActive) {
+                // Muted, the answer is never read, and reading is what used to
+                // take the face off THINKING (SPEAKING, then the drain's IDLE).
+                // Without this the ball kept "thinking" after every muted answer
+                // — most visibly when a page was closed and the card unfolded.
+                // Meetings and calls are left as they were: their own state owns the face.
+                window.setState(FloatingWindowUi.State.IDLE)
             }
         }
     }
