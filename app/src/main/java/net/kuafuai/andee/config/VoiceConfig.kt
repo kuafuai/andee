@@ -909,11 +909,13 @@ object VoiceConfig {
         }
 
         /**
-         * What the middle of the unfolded card shows: `stage` (Andee's own, the default) or `chat`.
-         * Written the moment the key is tapped, like `timeline_events`; anything but `chat` reads as the stage.
+         * What the middle of the unfolded card shows: `stage` (Andee's own) or `chat`, as the user last picked
+         * it. Written the moment the key is tapped, like `timeline_events`; anything but `chat` reads as the
+         * stage. Null until they pick: the card then follows whether the stage has anything on it — see
+         * `FloatingWindowUi.onStage`.
          */
-        fun homeView(context: Context): String =
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("home_view", null) ?: "stage"
+        fun homeView(context: Context): String? =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("home_view", null)
 
         fun setHomeView(context: Context, view: String) {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("home_view", view).apply()

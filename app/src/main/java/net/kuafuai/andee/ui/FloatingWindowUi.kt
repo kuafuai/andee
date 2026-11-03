@@ -331,7 +331,19 @@ class FloatingWindowUi(
     private var viewTabs: LinearLayout? = null
     private var tabStage: TextView? = null
     private var tabChat: TextView? = null
-    private var onStage = net.kuafuai.andee.config.VoiceConfig.homeView(context) != "chat"
+    private var onStage = stageWanted()
+
+    /**
+     * Whether the middle of the card should be the stage. The user's own pick when they have made one;
+     * until then, only once the stage has something on it. A new device's stage is empty, and the
+     * conversation's empty state is where a new user is offered a way in (the scene bubbles) — landing
+     * on a board that says "not furnished yet" hid that behind a tab.
+     */
+    private fun stageWanted(): Boolean =
+        when (net.kuafuai.andee.config.VoiceConfig.homeView(context)) {
+            null -> net.kuafuai.andee.config.Stage.current(context) != null
+            else -> net.kuafuai.andee.config.VoiceConfig.homeView(context) != "chat"
+        }
 
     /**
      * 「情景 · X ✕」, centred under the ball while a scene is active. Its own
@@ -2404,14 +2416,19 @@ class FloatingWindowUi(
     /** Switch the middle of the card; remembered, so the card reopens the way it was left. */
     fun showStage(on: Boolean) {
         ui.post {
-            if (onStage == on) return@post
-            onStage = on
             net.kuafuai.andee.config.VoiceConfig.setHomeView(context, if (on) "stage" else "chat")
-            if (root != null && !isCompact()) {
-                applyHomeView()
-                if (on) stageView?.refresh() else historyView?.refresh()
-                root?.requestLayout()
-            }
+            followStage(on)
+        }
+    }
+
+    /** Put the stage or the conversation in the middle, without recording it as the user's pick. Main thread only. */
+    private fun followStage(on: Boolean) {
+        if (onStage == on) return
+        onStage = on
+        if (root != null && !isCompact()) {
+            applyHomeView()
+            if (on) stageView?.refresh() else historyView?.refresh()
+            root?.requestLayout()
         }
     }
 
@@ -2707,7 +2724,14 @@ class FloatingWindowUi(
                 Gravity.BOTTOM,
             ),
         )
-        net.kuafuai.andee.config.Stage.setListener { ui.post { stageView?.refresh() } }
+        net.kuafuai.andee.config.Stage.setListener {
+            ui.post {
+                stageView?.refresh()
+                // For a user who never picked: the first furnishing puts the stage in the middle,
+                // and a wipe that empties it gives the middle back to the conversation.
+                if (net.kuafuai.andee.config.VoiceConfig.homeView(context) == null) followStage(stageWanted())
+            }
+        }
         stage.visibility = if (onStage) View.VISIBLE else View.GONE
         history.visibility = if (onStage) View.GONE else View.VISIBLE
 
