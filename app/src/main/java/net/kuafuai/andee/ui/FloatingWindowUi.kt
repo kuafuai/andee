@@ -31,7 +31,6 @@ import net.kuafuai.andee.config.VoiceConfig
 import net.kuafuai.andee.i18n.AppLocale
 import net.kuafuai.andee.ui.ball.Action
 import net.kuafuai.andee.ui.ball.BallLooks
-import net.kuafuai.andee.ui.ball.CLING_HIDDEN
 import net.kuafuai.andee.ui.ball.EmotionBallTextureView
 import net.kuafuai.andee.ui.ball.Mood
 import net.kuafuai.andee.ui.ball.SPHERE_RADIUS_FRACTION
@@ -502,60 +501,37 @@ class FloatingWindowUi(
     /** Geometry to put back when the fold ends — see [enterCompact]. */
     private var fullGeometry: IntArray? = null
 
-    /**
-     * The three independent reasons the ball can be hanging off the ledge, and
-     * the derived answer to "is it hanging".
-     *
-     * Split because they are owned by different parties and they *will*
-     * disagree. The task owns [perchedByTask] — it clings while driving an app
-     * and climbs back to speak. The user owns [perchedByUser] by dragging it
-     * onto the edge, and that placement has to survive the next task ending, or
-     * the ball would haul itself out of the corner the user deliberately put it
-     * in. A page the brain put on screen owns [perchedByPage] for exactly as
-     * long as that page is up.
-     *
-     * The page needs its own flag rather than borrowing the task's: `show_html`
-     * almost always runs *inside* a task, so setting the task flag would be a
-     * no-op on the way in and — far worse — clearing it on the way out would
-     * haul the ball back up in the middle of a task that is still running.
-     *
-     * A hand on the ball outranks all of it: dragging it off the ledge clears
-     * every flag, because "get out of my way" and "come back here" are the same
-     * gesture from the user's side.
-     *
-     * Main thread only.
-     */
-    private var perchedByTask = false
-    private var perchedByUser = false
-    private var perchedByPage = false
-    private val perched: Boolean get() = perchedByTask || perchedByUser || perchedByPage
+    /** A task is running — the busy face while folded. Main thread only. */
+    private var working = false
 
     /**
-     * Compact spot with no task running — where the ball climbs back to.
-     *
-     * Tracked explicitly rather than sampled off the window when a task starts,
-     * because at that moment `p.y` may be halfway through the previous climb:
-     * two tasks in quick succession would then record a mid-flight value as home
-     * and the ball would settle somewhere it had never been.
-     *
-     * X is tracked for the same reason and one more: a cling *moves* the ball
-     * sideways to [perchX], so on the way back up there is no longer any
-     * "wherever it already is" to fall back on. Without [homeX] the ball would
-     * climb off the ledge and stay pinned against the right screen edge at
-     * whatever height it rests at, which reads as stuck rather than as parked —
-     * a worse position than the corner it would have returned to.
+     * Where the folded ball sits when it is a whole ball (not docked): the last
+     * spot the user dropped it, or the corner a fold lands in. Main thread only.
      */
     private var homeX = 0
     private var homeY = 0
 
     /**
-     * Whether the perch pose is currently on, which is not the same as
-     * [perched]: a task can start while the card is open, and the perch only
-     * exists in the compact geometry. Also the drag's own latch — the finger
-     * owns `p.y` mid-drag, so this flips as the ball crosses the ledge and the
-     * geometry only catches up on release.
+     * The folded ball has slid into the right screen edge and only half its face
+     * shows (see [dock]). The window is then the small tab [dockTabW]×[dockTabH],
+     * not the square — that is the point: issue #33 was the square's transparent
+     * band eating taps meant for the app underneath, and the tab is a fraction of
+     * its area. It answers taps exactly as the ball does.
+     *
+     * Main thread only.
      */
-    private var perchApplied = false
+    private var docked = false
+
+    /** The docked ball's centre, in window `p.y` space; the user moves it along the edge. */
+    private var dockCy = 0
+
+    /** Dock again once the card folds back, because it was docked when it unfolded. */
+    private var dockOnFold = false
+
+    /** A signboard took the ball out of the edge; [hideSignboard] puts it back. */
+    private var signInterruptedDock = false
+
+    private val dockRunnable = Runnable { dock() }
 
     // ---- Idle fidget (see [strollStep]) ----
     private val strollRunnable = Runnable { strollStep() }
@@ -569,7 +545,7 @@ class FloatingWindowUi(
      * The fold/unfold animation in flight, or null. Owns the root view's scale
      * during a zoom between the full card and the corner square — see
      * [enterCompact] and [exitCompact]. Separate from [slide], which is the
-     * compact ball's perch slide and never overlaps a fold.
+     * compact ball's dock slide and never overlaps a fold.
      */
     private var foldAnim: ValueAnimator? = null
 
@@ -622,11 +598,9 @@ class FloatingWindowUi(
             layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         }
-        // Where the ball climbs back to when a task ends. [enterCompact] is the
-        // other place this is set, and it is the one that usually runs — but
-        // show() adds the window already folded and so never passes through it.
-        // Left at its 0 default, the first unperch slid the ball to the top of
-        // the screen.
+        // The folded ball's resting spot. [enterCompact] is the other place this
+        // is set, and it is the one that usually runs — but show() adds the
+        // window already folded and so never passes through it.
         homeX = p.x
         homeY = p.y
         // Keep the restore target, but add the overlay already compact.
@@ -669,7 +643,7 @@ class FloatingWindowUi(
             ui.post {
                 refreshWinYOrigin()
                 val pp = params ?: return@post
-                if (!perchApplied) {
+                if (!docked) {
                     pp.y = compactHomeY()
                     homeX = pp.x
                     homeY = pp.y
@@ -677,6 +651,7 @@ class FloatingWindowUi(
                 }
             }
             retimeStroll()
+            armDock()
             true
         } catch (_: Throwable) {
             false
@@ -715,9 +690,9 @@ class FloatingWindowUi(
      * While folded, the window grows: the card rides on top, the ball area
      * drops to the bottom of the taller window, and `p.x/p.y` are recomputed
      * so the ball keeps its on-screen spot — the card *appears around* the
-     * ball rather than the ball moving under a card. A perched ball climbs
-     * back first (it cannot hold a sign hanging by its paws); [hideSignboard]
-     * re-applies the perch, so the pose the sign interrupted survives it.
+     * ball rather than the ball moving under a card. A docked ball comes out
+     * of the edge first (half a face cannot hold a sign); [hideSignboard] puts
+     * it back, so the place the sign interrupted survives it.
      *
      * While fullscreen, the signboard is a centred pane over the scrollback —
      * same window, so still no coordinate translation.
@@ -744,6 +719,14 @@ class FloatingWindowUi(
             return true
         }
         val side = dp(COMPACT_DP)
+        ui.removeCallbacks(dockRunnable)
+        // A ball half inside the screen edge cannot hold a sign: come out first,
+        // to the resting X at the same height, and go back in when it is down.
+        slide?.cancel()
+        if (docked) {
+            signInterruptedDock = true
+            undockTo(dm.widthPixels - side - dp(COMPACT_MARGIN_DP), dockCy - side / 2)
+        }
         // The width the card will get; measured here so the window can grow
         // by exactly the card's height in the same updateViewLayout.
         val w = foldedWidth?.coerceIn(side, dm.widthPixels - dp(32))
@@ -758,13 +741,8 @@ class FloatingWindowUi(
         // above the head.
         val overlap = (side * SIGN_OVERLAP_FRACTION).toInt()
         val h = content.measuredHeight + side - overlap
-        // Ball keeps its spot. If it is hanging off the ledge, use the
-        // climb-back target: holding a sign and gripping a ledge are two
-        // different poses and the ledge loses.
-        val ballY = if (perchApplied) homeY else p.y
-        slide?.cancel()
-        perchApplied = false
-        syncWorking()
+        // Ball keeps its spot.
+        val ballY = p.y
         p.width = w
         p.height = h
         p.x = (p.x + side / 2) - w / 2
@@ -798,7 +776,7 @@ class FloatingWindowUi(
     /**
      * Take the signboard down and shrink back to the bare corner ball,
      * keeping the ball's on-screen spot — the inverse of [showSignboard].
-     * Re-applies the perch afterwards if the sign had interrupted one.
+     * Goes back into the edge afterwards if the sign had taken it out.
      *
      * Main thread only. No-op when nothing is up.
      */
@@ -812,19 +790,10 @@ class FloatingWindowUi(
         val side = dp(COMPACT_DP)
         // Shrink the window around wherever the ball is *holding the sign*
         // (bottom of the taller window), so the card goes away without the
-        // ball moving a single pixel. Perching is deliberately NOT done
-        // here: in the "帮我看看" flow, beginTask lands one main-loop tick
-        // later (CardUi.close runs hideSignboard synchronously, then the
-        // onDone callback posts it), and setWorking→applyPerch slides to
-        // the ledge as a proper 240ms hop. Pre-deciding the perch here used
-        // to fight that: perchApplied was already true when applyPerch ran,
-        // it returned without sliding, and the ball sat half-sunk where the
-        // tall window's bottom had been until something else moved it —
-        // the exact "先变成一半再瞬移" glitch. One owner for the perch
-        // transition, and it is the one that animates.
+        // ball moving a single pixel; going back into the edge is a slide of
+        // its own, after.
         refreshWinYOrigin()
         val holdY = p.y + p.height - side
-        val wantPerch = perchedByUser || perchedByPage
         p.x = p.x + p.width / 2 - side / 2
         p.y = holdY
         p.width = side
@@ -837,27 +806,21 @@ class FloatingWindowUi(
             }
         }
         runCatching { wm.updateViewLayout(v, p) }
-        if (wantPerch) {
-            perchApplied = true
-            // Both axes: the X here is the card's centre, not the ball's own,
-            // because the window was card-wide a line ago and the ball was being
-            // kept under the tail. Putting the perch back has to undo that too,
-            // or the ball re-clings in the middle of the bottom edge — the one
-            // spot a cling must not sit.
-            slideTo(perchX(), perchY())
-        } else {
-            perchApplied = false
-            homeX = p.x
-            homeY = p.y
-        }
+        homeX = p.x
+        homeY = p.y
         syncWorking()
         retimeStroll()
+        if (signInterruptedDock) {
+            signInterruptedDock = false
+            dock()
+        } else {
+            armDock()
+        }
     }
 
     /**
-     * Keep a held signboard on screen. Unlike [clampCompact] there is no
-     * ledge to stop at — a ball holding a sign does not grip — and the whole
-     * card has to stay readable, not just the ball.
+     * Keep a held signboard on screen. Unlike [clampCompact] the whole card
+     * has to stay readable, not just the ball.
      *
      * Main thread only.
      */
@@ -987,7 +950,13 @@ class FloatingWindowUi(
         val v = root ?: return true
         return try {
             ui.removeCallbacks(strollRunnable)
+            ui.removeCallbacks(dockRunnable)
             slide?.cancel()
+            // The next window is built as the square; a docked flag left over
+            // would treat it as the tab.
+            docked = false
+            signInterruptedDock = false
+            ball?.setSideLedge(false)
             cancelFoldAnimation()
             parkedFrom = null
             wm.removeView(v)
@@ -1339,7 +1308,7 @@ class FloatingWindowUi(
                     // position, and restoring a mid-flight number would strand the
                     // ball half-way between two resting places.
                     slide?.end()
-                    parkedFrom = intArrayOf(p.x, p.y)
+                    parkedFrom = intArrayOf(p.x, p.y, p.width, p.height)
                     p.x = -p.width - dp(32)
                     runCatching { wm.updateViewLayout(v, p) }
                     parked = true
@@ -1366,10 +1335,12 @@ class FloatingWindowUi(
             parkedFrom = null
             val v = root ?: return@post
             val p = params ?: return@post
-            if (!compact || p.width != dp(COMPACT_DP)) return@post
+            if (!compact || p.width != from[2] || p.height != from[3]) return@post
             p.x = from[0]
             p.y = from[1]
             runCatching { wm.updateViewLayout(v, p) }
+            // A countdown that ran out while parked was refused (see [dock]).
+            armDock()
         }
     }
 
@@ -1478,10 +1449,7 @@ class FloatingWindowUi(
      * line before shrinking to the square, and then spend it on the square's
      * `p.y`. That is the bug behind "球球悬在底部上面": every value here is
      * subtracted from a screen Y, so a 126 that belonged to the outgoing frame
-     * lifted the folded ball 126 px clear of the edge its paws are drawn to
-     * grip. The ledge was right whenever [applyPerch] happened to re-measure
-     * afterwards and wrong whenever the fold arrived already perched — which is
-     * the ordinary case, since a task starts before its first `screen.*` call.
+     * lifted the folded ball 126 px clear of the edge it was meant to sit on.
      *
      * Main thread only.
      */
@@ -1500,74 +1468,47 @@ class FloatingWindowUi(
         bottomEdge() - dp(COMPACT_DP) - dp(COMPACT_MARGIN_DP) - winYOrigin
 
     /**
-     * The assistant is working: sink the corner ball half-way below the bottom
-     * screen edge, hang it there by two paws, and put a busy face on it. Haul
-     * back up when the task ends, which is also when the answer starts being
-     * read aloud.
-     *
-     * The two halves say different things and both are wanted. The face says
-     * "I'm working"; the perch says "and you can have your corner back while I
-     * do". A thumb-sized ball sitting fully in frame for a minute of app
-     * driving is an obstruction over the very app it is driving — but making it
-     * vanish would strand the user, since the ball is the only way to reach the
-     * assistant once the card is folded. Half a ball is the trade: still
-     * visible, still tappable, out of the way.
-     *
-     * Getting *out* of the way is what makes coming back legible. The climb back
-     * at [endTask] is the ball stepping forward to speak, and there is nothing
-     * to step forward from if it never stepped back.
-     *
-     * Only one of the two reasons to hang — the user can drag the ball onto the
-     * ledge themselves, and that outlasts the task. See [perchedByTask].
+     * The assistant is working: put a busy face on the folded ball, and get out
+     * of the way of the app it is about to drive by going into the edge
+     * ([dock]). It stays there when the task ends; the user pulls it out.
      */
     fun setWorking(on: Boolean) {
         ui.post {
-            if (perchedByTask == on) return@post
-            if (on) dropSignboardBeforePerch()
-            perchedByTask = on
-            applyPerch()
+            if (working == on) return@post
+            working = on
+            if (on) {
+                dropSignboardBeforeDock()
+                dock()
+            }
             syncWorking()
             retimeStroll()
         }
     }
 
     /**
-     * A page the brain composed is on screen — cling to the ledge until it is
-     * gone.
-     *
-     * The card is folded by then, but a folded ball is still a thumb-sized
-     * opaque thing sitting on top of a page whose whole reason for existing is
-     * to be looked at, and it lands wherever it last was, which is as likely as
-     * not the middle of it. Half a ball on the bottom edge keeps the assistant
-     * reachable without standing in front of what it just drew.
-     *
-     * Independent of [setWorking]; see [perchedByPage] for why it has to be.
+     * A page the brain composed (or a trip out of the card) is on screen: go
+     * into the edge, so a ball landing wherever it last was does not stand in
+     * front of the thing that was just drawn. Closing the page leaves it there.
      */
-    fun setPagePerched(on: Boolean) {
+    fun setPageShown(on: Boolean) {
         ui.post {
-            if (perchedByPage == on) return@post
-            if (on) dropSignboardBeforePerch()
-            perchedByPage = on
-            applyPerch()
-            syncWorking()
-            retimeStroll()
+            if (!on) return@post
+            dropSignboardBeforeDock()
+            dock()
         }
     }
 
     /**
-     * Tell the ball whether it is currently hanging off a screen edge.
-     *
-     * Conditional on being folded, not just on there being a task: the ball
-     * grows paws, stretches and swings from them, and in the middle of a
-     * fullscreen card there is no edge for any of that to hang off — it would
-     * read as a ball sprouting hands into thin air. Main thread only.
+     * Tell the ball whether a task is running, for its face. Conditional on
+     * being folded: the unfolded card has never worn the busy face. The ledge
+     * pose ([EmotionBallTextureView.setAtLedge]) is never asked for any more —
+     * the ball no longer hangs off the bottom edge. Main thread only.
      */
     private fun syncWorking() {
-        ball?.setWorking(compact && perched)
-        ball?.setAtLedge(compact && perchApplied && !slideRunning())
+        ball?.setWorking(compact && working)
     }
 
-    /** True while a perch/home slide animation is in flight. Main thread only. */
+    /** True while a dock/home slide animation is in flight. Main thread only. */
     private fun slideRunning(): Boolean = slide?.isRunning == true
 
     /**
@@ -1604,8 +1545,8 @@ class FloatingWindowUi(
         }
     }
 
-    /** While a signboard is up the window is card-sized, so a perch slide would drag the whole card into the corner. */
-    private fun dropSignboardBeforePerch() {
+    /** While a signboard is up the window is card-sized, so a dock slide would drag the whole card into the edge. */
+    private fun dropSignboardBeforeDock() {
         if (!compact || signboard == null) return
         signboardEvictor?.invoke()
         if (signboard != null) hideSignboard()
@@ -1625,110 +1566,137 @@ class FloatingWindowUi(
         }
     }
 
-    /**
-     * Move to or from the perched pose, if the window is in a geometry that
-     * has a corner to cling to at all. Nothing to do while the card is
-     * fullscreen; [enterCompact] re-reads [perched], so a task that began with
-     * the card open still perches the moment it folds.
-     *
-     * Both axes on the way down and both on the way back up: going down is a
-     * cling, and a cling picks its side ([perchX]); coming back up restores the
-     * spot the ball was clinging *from* ([homeX]/[homeY]) rather than the spot
-     * it happens to be in, which is the corner. See [homeX] for what goes wrong
-     * if only Y is restored.
-     *
-     * Main thread only.
-     */
-    private fun applyPerch() {
-        if (!compact) return
-        if (perched == perchApplied) return
-        perchApplied = perched
-        refreshWinYOrigin()
-        if (perched) {
-            slideTo(perchX(), perchY())
-        } else {
-            slideTo(homeX, homeY)
+    // ---- Docking into the right edge ----
+    //
+    // The folded ball used to be a 136 dp square that also hung off the bottom
+    // edge by its paws while a task ran. Issue #33: the square's transparent band
+    // took taps meant for the app underneath (a touch that enters this window is
+    // ours; returning false does not hand it on). So the ball is smaller, and when
+    // it has been left alone for [DOCK_AFTER_MS] — or a task starts, or a page
+    // goes up, or it is dropped against the right edge — it slides into the right
+    // edge until half its face shows, and the window shrinks to just that.
+    //
+    // Docked, the ball keeps its whole vocabulary: tap talks, double-tap types,
+    // long-press opens the card. A drag along the edge moves it up and down; a
+    // pull away from the edge brings the whole ball out under the finger.
+    //
+    // The tab is the same picture as the square slid half off-screen: the ball
+    // area keeps the square's size (so the GL surface never resizes) and is
+    // translated inside the smaller window, sphere centre on the window's right
+    // edge, which is the screen's.
+
+    /** Width of the docked tab: the part of the clinging ball that leans out past the edge. */
+    private fun dockTabW(): Int = (dp(COMPACT_DP) * DOCK_SCALE * DOCK_TAB_W_FRACTION).toInt()
+
+    /** Height of the docked tab: horns to paws, plus room for the slip. */
+    private fun dockTabH(): Int = (dp(COMPACT_DP) * DOCK_SCALE * DOCK_TAB_H_FRACTION).toInt()
+
+    /** Start (or restart) the idle countdown to docking. Main thread only. */
+    private fun armDock() {
+        ui.removeCallbacks(dockRunnable)
+        if (root != null && compact && !docked && signboard == null) {
+            ui.postDelayed(dockRunnable, DOCK_AFTER_MS)
         }
     }
 
     /**
-     * Window Y that puts the ball on the bottom screen edge, hanging.
-     *
-     * Absolute, deliberately — an offset from wherever the window happens to be
-     * was the obvious version and it was wrong: drag the ball anywhere but its
-     * default corner and "sink by N pixels" sinks it to somewhere that isn't the
-     * screen edge, leaving the paws gripping thin air.
-     *
-     * The ledge is the bottom edge and only the bottom edge, because a paw needs
-     * something to hook over and the paws are drawn to either side of the ball's
-     * own centre line — there is no rotation of that pose that grips a vertical
-     * edge, so a ball hung off the side of the screen would have its hands in
-     * mid-air. Only the horizontal edge runs the full width and can be gripped
-     * anywhere along it. So a cling moves the ball *along* that edge, never
-     * across it: this picks the Y, [perchX] picks the X, and "which side of the
-     * screen" is answered by [perchX] rather than left to the finger.
-     *
-     * The sphere is centred in the compact window at [SPHERE_RADIUS_FRACTION]
-     * of it; putting [CLING_HIDDEN] of it below the edge puts its centre at
-     * `edge + r * (2 * CLING_HIDDEN - 1)`. [EmotionBallRenderer] derives the
-     * paws' world Y from the same expression, which is why both fractions are
-     * shared rather than local to either. At `CLING_HIDDEN = 0.5` the radius
-     * term is zero and the expression is just "centre on the edge" — the
-     * fraction only starts to matter if that half ever moves.
+     * Slide into the right edge at the ball's current height (or at [atCy], a
+     * docked centre to return to), then become the tab. No-op unless folded,
+     * whole, and holding no sign. Main thread only.
      */
-    private fun perchY(): Int {
+    private fun dock(atCy: Int? = null) {
+        ui.removeCallbacks(dockRunnable)
+        val p = params ?: return
+        if (root == null || !compact || docked || signboard != null || parkedFrom != null) return
+        refreshWinYOrigin()
         val side = dp(COMPACT_DP)
-        val r = side * SPHERE_RADIUS_FRACTION
-        val edge = bottomEdge()
-        return (edge + r * (2f * CLING_HIDDEN - 1f) - side / 2f).toInt() - winYOrigin
+        val cy = clampDockCy(atCy ?: (p.y + side / 2))
+        ui.removeCallbacks(strollRunnable)
+        // Shrinks on the way, so the swap to the tab at the end shows nothing new.
+        ball?.animate()?.scaleX(DOCK_SCALE)?.scaleY(DOCK_SCALE)?.setDuration(DOCK_SLIDE_MS)?.start()
+        slideTo(rightEdge() - side / 2, cy - side / 2, DOCK_SLIDE_MS) {
+            if (compact && signboard == null && !docked) {
+                dockCy = cy
+                docked = true
+                applyDockedGeometry()
+                // Only now, with the window at the edge: grabbing it mid-slide
+                // would be paws on nothing.
+                ball?.setSideLedge(true)
+            }
+        }
     }
 
     /**
-     * Window X for a cling: the bottom-**right** corner, with the drawn sphere
-     * [COMPACT_MARGIN_DP] of clear air from the right screen edge.
-     *
-     * The ball used to stay at whatever X the finger released it at, and the
-     * reason to stop doing that is a gesture conflict the user hit on a phone:
-     * a ball clinging near the middle of the bottom edge sits inside the band
-     * the system claims for "swipe up", so the drag that lifts it off the ledge
-     * goes to the launcher instead of to the ball. A clinging ball is exactly
-     * the one the user has to be able to pull back out — it is the only way to
-     * reach the assistant once the card is folded — so it goes where the system
-     * is least interested in the gesture: the corner. Right rather than left
-     * matches where this app parks the ball everywhere else ([compactHomeY] is
-     * the bottom-right of the visible area, and [show] and [enterCompact] both
-     * build the window there).
-     *
-     * [spherePad] rather than a bare window clamp, because most of the compact
-     * window is transparent air: clamping the *window* to the screen leaves the
-     * *ball* a thumb's width short of the edge. That is deliberate for the
-     * resting corner — the same gap on Y is what keeps the magnet from tripping
-     * at rest, and a ball parked for a task should not be clinging — but a ball
-     * already hanging has no such reason to sit inboard, and every reason not
-     * to.
-     *
-     * Measured, because the paw is what sets the floor here and it is not
-     * where the silhouette is: `blob` draws each paw part in front of the ball
-     * (z = 0.88 against the body's z = 0), so perspective magnifies it. At full
-     * grip the right paw's outer toe lands 47.8 dp from the sphere's centre
-     * against a silhouette radius of 40.3 dp — it overhangs by 7.5 dp. On a
-     * 411 dp-wide phone, from the right screen edge:
-     *
-     *     resting corner   x = W - side - margin      claw  52.2 dp in
-     *     perchX()         x = W - side + pad - margin claw   8.2 dp in
-     *     drag limit       x = W - side + pad          claw   7.8 dp *out*
-     *
-     * So the corner is as far right as this can go: a margin under ~10 dp
-     * starts cutting the toe that hangs over, and [clampCompact] already lets a
-     * dragged ball push past that. [COMPACT_MARGIN_DP] clears it with room and
-     * costs nothing, being the inset the ball already uses against the bottom.
-     *
-     * Main thread only.
+     * Put the window in the tab shape at [dockCy]. Visually a no-op against a
+     * square whose sphere centre is already on the edge — only the off-screen
+     * half and the transparent band go. Main thread only.
      */
-    private fun perchX(): Int {
+    private fun applyDockedGeometry() {
+        val v = root ?: return
+        val p = params ?: return
+        val area = v.ballAreaView ?: return
         val side = dp(COMPACT_DP)
-        val dm = context.resources.displayMetrics
-        return dm.widthPixels - side + spherePad() - dp(COMPACT_MARGIN_DP)
+        val w = dockTabW()
+        val h = dockTabH()
+        p.width = w
+        p.height = h
+        p.x = rightEdge() - w
+        p.y = dockCy - h / 2
+        (area.layoutParams as? FrameLayout.LayoutParams)?.let {
+            it.width = side
+            it.height = side
+            it.gravity = Gravity.TOP or Gravity.START
+            area.layoutParams = it
+        }
+        area.translationX = (w - side / 2).toFloat()
+        area.translationY = (h / 2 - side / 2).toFloat()
+        // The right edge is where the system's back gesture starts; without this
+        // a drag on the tab would be taken as "back".
+        v.systemGestureExclusionRects = listOf(Rect(0, 0, w, h))
+        runCatching { wm.updateViewLayout(v, p) }
+    }
+
+    /**
+     * Leave the edge: the square again, placed at ([x], [y]) at once. The caller
+     * slides it on from there if it wants to. Main thread only.
+     */
+    private fun undockTo(x: Int, y: Int) {
+        val v = root ?: return
+        val p = params ?: return
+        docked = false
+        squareBallArea()
+        // Lets go of the edge and grows back; the cling stands the body up as it eases off.
+        ball?.setSideLedge(false)
+        ball?.animate()?.scaleX(1f)?.scaleY(1f)?.setDuration(DOCK_SLIDE_MS)?.start()
+        val side = dp(COMPACT_DP)
+        p.width = side
+        p.height = side
+        p.x = x
+        p.y = y
+        runCatching { wm.updateViewLayout(v, p) }
+    }
+
+    /** The ball area back to filling the window, untranslated. Main thread only. */
+    private fun squareBallArea() {
+        val v = root ?: return
+        val area = v.ballAreaView ?: return
+        (area.layoutParams as? FrameLayout.LayoutParams)?.let {
+            it.width = FrameLayout.LayoutParams.MATCH_PARENT
+            it.height = FrameLayout.LayoutParams.MATCH_PARENT
+            it.gravity = Gravity.TOP or Gravity.START
+            area.layoutParams = it
+        }
+        area.translationX = 0f
+        area.translationY = 0f
+        v.systemGestureExclusionRects = emptyList()
+    }
+
+    /** A docked centre kept clear of the status bar and the bottom edge. */
+    private fun clampDockCy(cy: Int): Int {
+        val half = dockTabH() / 2 + dp(8)
+        val top = topEdge() + half - winYOrigin
+        val bottom = bottomEdge() - half - winYOrigin
+        return cy.coerceIn(top, bottom.coerceAtLeast(top))
     }
 
     /**
@@ -1744,42 +1712,9 @@ class FloatingWindowUi(
     }
 
     /**
-     * Should the ball be gripping the ledge, given where the window is now?
-     *
-     * The rule is physical rather than a tuned distance: it grabs on once the
-     * drawn sphere's *underside* has reached the ledge, i.e. once the ball is
-     * visibly touching the bottom edge. [SNAP_GRACE_DP] is the only fudge — it
-     * lets a finger that got close enough count, without which the user would
-     * have to land the ball on an exact pixel row to make it cling.
-     *
-     * Sized so the ball's own resting corner is comfortably outside it: at rest
-     * the sphere clears the ledge by about 60 dp, so parking in the corner the
-     * ordinary way does not trip the magnet.
-     *
-     * While a signboard is held the window is taller than the ball area, so
-     * the sphere's underside is `y + winYOrigin + (window height − side/2)`,
-     * not `y + side/2` — without this a held signboard thought the ball was
-     * always on the ledge and drag-to-hold fought the magnet.
-     *
-     * Main thread only.
-     */
-    private fun wantsPerch(y: Int): Boolean {
-        val side = dp(COMPACT_DP)
-        val sphereBottom = y + winYOrigin + windowH() - side / 2 +
-            (side * SPHERE_RADIUS_FRACTION).toInt()
-        return sphereBottom >= bottomEdge() - dp(SNAP_GRACE_DP)
-    }
-
-    /**
      * Keep a dragged ball reachable: the sphere may go flush with any edge but
-     * not past it.
-     *
-     * Y stops at [perchY] rather than at the screen edge — dragging *down* past
-     * the ledge has nowhere further to go, and stopping there means the finger
-     * is already holding the ball exactly where the magnet wants it. Nothing
-     * clamped X or Y before this, and a ball dragged off the side of the screen
-     * was simply gone: it is the only way to reach the assistant once folded, so
-     * losing it is not a recoverable state.
+     * not past it. A ball dragged off the side of the screen used to be simply
+     * gone, and it is the only way to reach the assistant once folded.
      *
      * Main thread only.
      */
@@ -1788,30 +1723,16 @@ class FloatingWindowUi(
         val pad = spherePad()
         val dm = context.resources.displayMetrics
         p.x = p.x.coerceIn(-pad, dm.widthPixels - side + pad)
-        // Signboard up: the whole pane stays on screen and there is no ledge
-        // to stop at (a holding ball does not grip). Down: the original rule.
         if (signboard != null) {
             clampHeld(p)
         } else {
-            p.y = p.y.coerceIn(-pad - winYOrigin, perchY())
+            p.y = p.y.coerceIn(-pad - winYOrigin, bottomEdge() - side + pad - winYOrigin)
         }
     }
 
     /**
-     * End of a drag: commit the pose the drag was already showing, and pull the
-     * window the last few pixels onto the ledge if it is clinging.
-     *
-     * The pull is what makes it read as a magnet rather than as a drop — the
-     * finger is never accurate to the pixel, and a ball left one pixel shy of
-     * the ledge with its paws out is gripping nothing. Short and fast on
-     * purpose: [PERCH_SLIDE_MS] is the assistant announcing a state change,
-     * this is the tail end of the user's own gesture.
-     *
-     * Both axes, though the finger only ever dropped this ball on one: grabbing
-     * the ledge also claims the corner beside it, see [perchX]. The horizontal
-     * half of the pull is the longer one whenever the user hung the ball up
-     * mid-screen, and it is the half that matters — that is the position where
-     * the next swipe up goes to the launcher instead of to the ball.
+     * End of a drag of the whole ball: dropped against the right edge, it goes
+     * in; anywhere else, that is its new spot and the idle countdown starts.
      *
      * Main thread only.
      */
@@ -1820,27 +1741,23 @@ class FloatingWindowUi(
         val p = params ?: return
         if (!compact) return
         clampCompact(p)
-        if (perchApplied) {
-            perchedByUser = true
-            slideTo(perchX(), perchY(), SNAP_MS)
-        } else {
-            homeX = p.x
-            homeY = p.y
-        }
         runCatching { wm.updateViewLayout(v, p) }
+        homeX = p.x
+        homeY = p.y
+        val side = dp(COMPACT_DP)
+        val sphereRight = p.x + side / 2 + (side * SPHERE_RADIUS_FRACTION).toInt()
+        if (signboard == null && sphereRight >= rightEdge() - dp(SNAP_GRACE_DP)) {
+            dock()
+        } else {
+            armDock()
+        }
     }
 
     /**
-     * Y of the ledge the ball hangs off: the bottom of the area a user can
-     * actually see, which is not the bottom of the display.
-     *
-     * On a tablet with a hairline gesture pill those are near enough the same
-     * number that `displayMetrics.heightPixels` looked correct. On a phone they
-     * are not. The navigation bar owns the bottom band and is layered *above*
-     * TYPE_APPLICATION_OVERLAY, while `FLAG_LAYOUT_NO_LIMITS` lets us lay out
-     * underneath it — so hanging half a ball below `heightPixels` put the
-     * visible half behind the nav bar and the ball disappeared. Half a ball is
-     * the entire margin of error here, and the inset is deeper than it.
+     * Y of the bottom of the area a user can actually see, which is not the
+     * bottom of the display: the navigation bar owns the bottom band and is
+     * layered *above* TYPE_APPLICATION_OVERLAY, while `FLAG_LAYOUT_NO_LIMITS`
+     * lets us lay out underneath it.
      */
     private fun bottomEdge(): Int {
         val m = wm.currentWindowMetrics
@@ -1851,25 +1768,41 @@ class FloatingWindowUi(
         return m.bounds.bottom - inset
     }
 
+    /** Y of the top of the visible area: below the status bar and any cutout. */
+    private fun topEdge(): Int {
+        val m = wm.currentWindowMetrics
+        val inset = m.windowInsets
+            .getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            ).top
+        return m.bounds.top + inset
+    }
+
+    /** X of the right edge of the visible area — where the ball docks. */
+    private fun rightEdge(): Int {
+        val m = wm.currentWindowMetrics
+        val inset = m.windowInsets
+            .getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            ).right
+        return m.bounds.right - inset
+    }
+
     /**
-     * Animated rather than teleported: the perch is a statement about what the
-     * assistant is doing, and a ball that jumps has not said anything the user
-     * can follow.
-     *
-     * Both axes travel on one interpolator, because a cling decides both — it
-     * hangs off the bottom edge at [perchY] *and* takes the right corner at
-     * [perchX] — and separating them would read as the ball changing its mind
-     * halfway down. The un-perch passes the current X and so is the vertical
-     * slide it always was; see [applyPerch] for why that one has no business
-     * moving sideways.
+     * Animated rather than teleported: a ball that jumps has not said anything
+     * the user can follow. [then] runs when the slide reaches its target, and
+     * not when it is cancelled (a finger landing on the ball, a fold).
      *
      * Main thread only.
      */
-    private fun slideTo(targetX: Int, targetY: Int, ms: Long = PERCH_SLIDE_MS) {
+    private fun slideTo(targetX: Int, targetY: Int, ms: Long = DOCK_SLIDE_MS, then: (() -> Unit)? = null) {
         val v = root ?: return
         val p = params ?: return
         slide?.cancel()
-        if (p.x == targetX && p.y == targetY) return
+        if (p.x == targetX && p.y == targetY) {
+            then?.invoke()
+            return
+        }
         val fromX = p.x
         val fromY = p.y
         val dx = targetX - fromX
@@ -1884,12 +1817,12 @@ class FloatingWindowUi(
                 runCatching { wm.updateViewLayout(v, p) }
             }
             addListener(object : android.animation.AnimatorListenerAdapter() {
+                private var cancelled = false
+                override fun onAnimationCancel(animation: android.animation.Animator) {
+                    cancelled = true
+                }
                 override fun onAnimationEnd(animation: android.animation.Animator) {
-                    // The geometry is now truly where perchApplied said it was.
-                    // This is the moment the cling (paws, half-sunk body) may
-                    // start — before it, the ball was travelling and a cling
-                    // drawn mid-flight read as chopped-in-half.
-                    syncWorking()
+                    if (!cancelled) then?.invoke()
                 }
             })
             start()
@@ -1936,15 +1869,14 @@ class FloatingWindowUi(
     /**
      * Only when folded, idle, and awake.
      *
-     * Not while working — it is hanging off the edge by its paws, and a ball
-     * that bounces while gripping is doing two incompatible things. Not while
-     * dozing either: the point of SLEEPING is that the device reads as off, and
+     * Not while docked — half a face bouncing against the screen edge reads as
+     * a glitch, not a hop. Not while dozing either: the point of SLEEPING is that the device reads as off, and
      * a ball twitching in its sleep undoes that on its own.
      *
      * Main thread only.
      */
     private fun strollWanted(): Boolean =
-        root != null && compact && !perched && signboard == null &&
+        root != null && compact && !docked && !slideRunning() && signboard == null &&
                 lastState.let { it == null || it == State.IDLE } &&
                 ball?.isDozing() != true
 
@@ -1991,6 +1923,7 @@ class FloatingWindowUi(
         // The whole square is the ball's, so the sphere is centred in it and
         // sized against it.
         setBallAreaHeight(FrameLayout.LayoutParams.MATCH_PARENT)
+        ball?.animate()?.cancel()
         ball?.scaleX = 1f
         ball?.scaleY = 1f
         // The corner square has no cluster to dodge, so the ball sits dead
@@ -2227,18 +2160,19 @@ class FloatingWindowUi(
         fullGeometry = intArrayOf(p.x, p.y, p.width, p.height)
         val side = dp(COMPACT_DP)
         val dm = context.resources.displayMetrics
-        // The corner the card is shrinking into. X is normally the resting
-        // corner, a thumb's width in (see [compactHomeY] for why the same gap is
-        // deliberate on Y). A fold that lands already clinging is born at
-        // [perchX] instead, or the cling would sit at a different X depending on
-        // whether the task started before or after the fold.
-        val cx = if (perched) perchX() else dm.widthPixels - side - dp(COMPACT_MARGIN_DP)
-        val cy = if (perched) perchY() else compactHomeY()
-        // homeY is the *resting* corner, always — a clinging fold parks at
-        // perchY but must climb back to compactHomeY when the task ends.
+        // The corner the card is shrinking into, a thumb's width in. From there
+        // it goes into the edge at once if it was docked when the card opened or
+        // a task is running (the fold is usually the task's first screen call),
+        // and after the idle countdown otherwise.
+        val cx = dm.widthPixels - side - dp(COMPACT_MARGIN_DP)
+        val cy = compactHomeY()
         homeX = cx
-        homeY = compactHomeY()
-        perchApplied = perched
+        homeY = cy
+        docked = false
+        val dockNow = dockOnFold || working
+        // Back to the height it was docked at, not the corner's.
+        val dockAt = if (dockOnFold) dockCy else null
+        dockOnFold = false
         val v = root
         if (v == null) {
             // Nothing on screen yet — land the geometry outright.
@@ -2246,7 +2180,7 @@ class FloatingWindowUi(
             applyCompactAppearance()
             syncWorking()
             retimeStroll()
-            ui.post { reseatCompact() }
+            ui.post { reseatCompact(); if (dockNow) dock(dockAt) else armDock() }
             return
         }
         // A short retreat replaces the old half-size zoom. Keep the current
@@ -2257,7 +2191,7 @@ class FloatingWindowUi(
             applyCompactAppearance()
             syncWorking()
             retimeStroll()
-            ui.post { reseatCompact() }
+            ui.post { reseatCompact(); if (dockNow) dock(dockAt) else armDock() }
         }
     }
 
@@ -2276,12 +2210,12 @@ class FloatingWindowUi(
     private fun reseatCompact() {
         val v = root ?: return
         val p = params ?: return
-        if (!compact || signboard != null || p.width != dp(COMPACT_DP)) return
+        if (!compact || signboard != null || docked || p.width != dp(COMPACT_DP)) return
         val before = winYOrigin
         refreshWinYOrigin()
         if (winYOrigin == before) return
         homeY = compactHomeY()
-        p.y = if (perchApplied) perchY() else homeY
+        p.y = homeY
         runCatching { wm.updateViewLayout(v, p) }
     }
 
@@ -2291,11 +2225,22 @@ class FloatingWindowUi(
         val reversing = foldAnim != null
         slide?.cancel()
         cancelFoldAnimation()
+        ui.removeCallbacks(dockRunnable)
+        // A dock or undock shrink still running would override the card's scale.
+        ball?.animate()?.cancel()
+        // Docked (or only out of the edge for a sign) when the card opened:
+        // go back in when it folds again.
+        dockOnFold = docked || signInterruptedDock
+        signInterruptedDock = false
+        if (docked) {
+            docked = false
+            squareBallArea()
+            ball?.setSideLedge(false)
+        }
         // Same eviction as the fold, in the other direction: the card grows
         // and the signboard's compact geometry (ball at the window's bottom)
         // is meaningless inside it.
         evictSignboard()
-        perchApplied = false
         // The restore target is always the full card: [enterCompact] snapshots
         // `fullGeometry` only after the typing band is put back, so it is the
         // edge-to-edge rectangle. Belt-and-braces against a stale compact-sized
@@ -3161,6 +3106,8 @@ class FloatingWindowUi(
         private var startY = 0f
         private var startParamsX = 0
         private var startParamsY = 0
+        /** The docked centre at the DOWN; a drag along the edge moves it. */
+        private var startDockCy = 0
         private var tracking = false
         private var moved = false
         private var longPressed = false
@@ -3177,7 +3124,7 @@ class FloatingWindowUi(
          * merely sideways-ish.
          *
          * Full card only. The folded ball is dragged around the screen and
-         * magnets to the ledge, so a horizontal flick there is a move, and
+         * docks into the right edge, so a horizontal flick there is a move, and
          * taking it away would cost the user the one thing they do with the
          * corner ball most. In the other direction, the full card's ball
          * never drags the window either — see the move branch.
@@ -3284,6 +3231,9 @@ class FloatingWindowUi(
                     if (signboard != null) {
                         if (e.y < areaTop) return false   // the pane's own touch
                         if (!isOnBall(e.x, e.y, ballH)) return false
+                    } else if (compact && docked) {
+                        // The tab is the ball's visible half and nothing else:
+                        // the whole window is the target.
                     } else if (compact) {
                         // Bare folded ball: circle test only, the whole window
                         // is the area.
@@ -3296,9 +3246,15 @@ class FloatingWindowUi(
                     }
                     // Don't let it bounce under a finger that is already on it.
                     ui.removeCallbacks(strollRunnable)
+                    ui.removeCallbacks(dockRunnable)
+                    if (!docked && slideRunning()) {
+                        // Caught on its way into the edge: stays a whole ball.
+                        ball?.animate()?.scaleX(1f)?.scaleY(1f)?.setDuration(DOCK_SLIDE_MS)?.start()
+                    }
                     slide?.cancel()
                     startX = e.rawX; startY = e.rawY
                     startParamsX = p.x; startParamsY = p.y
+                    startDockCy = dockCy
                     tracking = true
                     moved = false
                     swiping = false
@@ -3319,44 +3275,30 @@ class FloatingWindowUi(
                         }
                     }
                     // Compact only. The full card is a surface, not a widget:
-                    // it has no ledge to grip and no corner to sit in, and a
+                    // it has no edge to dock into and no corner to sit in, and a
                     // diagonal drag on its ball used to carry the whole
                     // window off-screen — no clamp while it went, no magnet
                     // to bring it back.
-                    if (moved && !swiping && compact) {
+                    if (moved && !swiping && compact && docked) {
+                        // Pulled away from the edge: the whole ball comes out
+                        // under the finger and the rest of the drag moves it.
+                        // Otherwise the drag slides the tab along the edge.
+                        if (startX - e.rawX > dp(DOCK_PULL_DP)) {
+                            val side = dp(COMPACT_DP)
+                            undockTo(e.rawX.toInt() - side / 2, e.rawY.toInt() - winYOrigin - side / 2)
+                            clampCompact(p)
+                            runCatching { wm.updateViewLayout(this, p) }
+                            startX = e.rawX; startY = e.rawY
+                            startParamsX = p.x; startParamsY = p.y
+                        } else {
+                            dockCy = clampDockCy(startDockCy + (e.rawY - startY).toInt())
+                            p.y = dockCy - p.height / 2
+                            runCatching { wm.updateViewLayout(this, p) }
+                        }
+                    } else if (moved && !swiping && compact) {
                         p.x = startParamsX + (e.rawX - startX).toInt()
-                        // Y follows the finger even while gripping. The ledge
-                        // used to own Y outright, which kept the paws on their
-                        // line but also meant a ball that had clung — because a
-                        // task started, or because the user put it there — could
-                        // never be pulled back out.
                         p.y = startParamsY + (e.rawY - startY).toInt()
                         clampCompact(p)
-                        // Grab and let go on the way, not on release: the
-                        // paws are drawn on the ledge, so a ball being
-                        // lifted off it has to open its hands while the
-                        // finger is still moving, or it reads as gripping
-                        // thin air. Pose only — the geometry is the
-                        // finger's until ACTION_UP.
-                        val want = wantsPerch(p.y)
-                        if (want != perchApplied) {
-                            perchApplied = want
-                            // The hand that moved it is the authority on
-                            // where it sits, so this is also where the
-                            // user's own claim on the ledge is taken and
-                            // dropped — including over a running task's,
-                            // and over a page the brain is showing.
-                            perchedByUser = want
-                            if (!want) {
-                                perchedByTask = false
-                                perchedByPage = false
-                            }
-                            syncWorking()
-                        }
-                        if (!perchApplied) {
-                            homeX = p.x
-                            homeY = p.y
-                        }
                         runCatching { wm.updateViewLayout(this, p) }
                     }
                     return true
@@ -3369,12 +3311,12 @@ class FloatingWindowUi(
                     // Only a compact drag moved the window, so only it has
                     // anything to settle — a swipe switched looks, and a
                     // full-card touch never moved the window at all.
-                    val wasDrag = moved && !swiping && compact
+                    val wasDrag = moved && !swiping && compact && !docked
                     val flick = if (swiping) e.rawX - startX else 0f
                     tracking = false
                     moved = false
                     swiping = false
-                    if (wasDrag) settleAfterDrag()
+                    if (wasDrag) settleAfterDrag() else armDock()
                     retimeStroll()
                     if (wasTap) registerTap()
                     // Right means forward, the way a stack of cards is dealt.
@@ -3387,11 +3329,11 @@ class FloatingWindowUi(
                 MotionEvent.ACTION_CANCEL -> {
                     if (!tracking) return false
                     ui.removeCallbacks(longPressRunnable)
-                    val wasDrag = moved && !swiping && compact
+                    val wasDrag = moved && !swiping && compact && !docked
                     tracking = false
                     moved = false
                     swiping = false
-                    if (wasDrag) settleAfterDrag()
+                    if (wasDrag) settleAfterDrag() else armDock()
                     retimeStroll()
                     return true
                 }
@@ -3536,9 +3478,13 @@ class FloatingWindowUi(
          * Compact window side and its inset from the screen corner. The sphere
          * is a fixed fraction of the surface's shorter side, so this is the
          * only knob for how big the corner ball reads — the rendered ball is
-         * roughly two thirds of it, and the circular hit test tracks it too.
+         * roughly three fifths of it, and the circular hit test tracks it too.
+         *
+         * 104 since 2026-11-03 (was 136): the user asked for a smaller ball, and
+         * the floor that held it at 136 — paws gripping the bottom edge reached
+         * 47.8 dp from the centre — went with the ledge.
          */
-        private const val COMPACT_DP = 136
+        private const val COMPACT_DP = 104
         private const val COMPACT_MARGIN_DP = 16
 
         /** How long [parkForGesture] waits for the main-thread move to run. */
@@ -3560,7 +3506,28 @@ class FloatingWindowUi(
          */
         private const val SIGN_OVERLAP_FRACTION = 0.235f
 
-        private const val PERCH_SLIDE_MS = 240L
+        private const val DOCK_SLIDE_MS = 240L
+
+        /** Left alone this long, the folded ball goes into the right edge. */
+        private const val DOCK_AFTER_MS = 10_000L
+
+        /** How far a finger must pull the docked ball away from the edge to bring it out. */
+        private const val DOCK_PULL_DP = 24
+
+        /**
+         * Docked, the ball is drawn at this scale of its folded size: it is
+         * clinging to the edge, not sitting on the app, and should take less.
+         */
+        private const val DOCK_SCALE = 0.62f
+
+        /**
+         * The docked tab as fractions of the scaled side. Measured off the
+         * clinging pose (`BallLab --ez side true`): the body leans out ~0.46 of
+         * the side past the edge, horns included, and spans ~0.58 from horn tip
+         * to the lower paw.
+         */
+        private const val DOCK_TAB_W_FRACTION = 0.48f
+        private const val DOCK_TAB_H_FRACTION = 0.68f
 
         private const val CARD_OPEN_MS = 280L
         private const val CARD_CLOSE_MS = 190L
@@ -3568,12 +3535,9 @@ class FloatingWindowUi(
         private const val CARD_CLOSE_SCALE = 0.90f
         private const val CARD_TRAVEL_DP = 18
 
-        /** The last-few-pixels pull onto the ledge when a drag lets go. */
-        private const val SNAP_MS = 150L
-
         /**
-         * How far short of the ledge still counts as touching it, dp. See
-         * [wantsPerch] — the only tuned number in the magnet.
+         * How far short of the right edge a dropped ball still counts as
+         * touching it and goes in, dp. See [settleAfterDrag].
          */
         private const val SNAP_GRACE_DP = 18
 

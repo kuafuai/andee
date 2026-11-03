@@ -953,9 +953,9 @@ class CommandDispatcher(
                     // Folded is not out of the way — a folded ball is still a
                     // thumb-sized opaque disc, and it sits wherever it last
                     // was, which is as likely as not the middle of the page.
-                    // Hang it off the bottom edge for as long as the page is
-                    // up; [onPageClosed] puts it back.
-                    window.setPagePerched(true)
+                    // It goes into the right edge, and stays there after the
+                    // page closes; the user pulls it out.
+                    window.setPageShown(true)
                     // Archived first, so the bytes on screen and the bytes in
                     // the scrollback are the same file. Falls back to a scratch
                     // copy in the cache dir if the archive can't be written — a
@@ -973,7 +973,7 @@ class CommandDispatcher(
                         }
                     }
                     if (opened == null) {
-                        window.setPagePerched(false)
+                        window.setPageShown(false)
                         org.json.JSONObject().put("error", "failed to stage the html")
                     } else {
                         // `closed: false` is not a failure — it is the state of
@@ -999,7 +999,7 @@ class CommandDispatcher(
             // after they are drawn (the 产物 panel is the user's own view of
             // them) but nothing puts that record into the model's context, so
             // without these a page built yesterday does not exist to the brain
-            // that built it. Reading, not drawing: no fold, no perch, and
+            // that built it. Reading, not drawing: no fold, no dock, and
             // nothing appears on screen — `show_html` is still the only door
             // to the user's eyes.
             // ---- stage.* : the middle of the home screen, Andee's own -----------
@@ -1817,14 +1817,13 @@ class CommandDispatcher(
      * The user dismissed a page. Runs on the main thread, from
      * `HtmlActivity.onDestroy`.
      *
-     * Three jobs. Put the ball back (it was hung off the ledge for as long as
-     * the page was up), unfold the card — unconditionally, see below — and tell
+     * Two jobs. Unfold the card — unconditionally, see below — and tell
      * whoever the brain is, the last of which is why the page can be
      * non-blocking at all: the model is no longer sitting in a tool call waiting
      * to find out.
      */
     private fun pageClosed(title: String, openedAt: Long) {
-        window.setPagePerched(false)
+        window.setPageShown(false)
         // And give the card back, full size — whatever shape it was in before
         // the page went up.
         //
@@ -1960,10 +1959,9 @@ class CommandDispatcher(
 
     /**
      * Light the edge glow for the duration of a task, and *only* for the
-     * duration of a task. The corner ball rides along: it perches half off the
-     * screen edge with a busy face for exactly the same span, and steps back
-     * out when this clears — which is the moment the answer starts being read
-     * aloud.
+     * duration of a task. The corner ball rides along: it wears a busy face for
+     * exactly the same span, and goes into the right edge when the task starts
+     * (it stays there after).
      *
      * The obvious design — light it on each tool call, release it a few
      * seconds after the last one — is wrong in exactly the case the glow
@@ -2028,12 +2026,11 @@ class CommandDispatcher(
     }
 
     /**
-     * A task is currently running — the ball is lit and (when folded)
-     * clinging to the ledge.
+     * A task is currently running — the ball is lit.
      *
      * Read by the notification relay to decide whether a signboard is
-     * welcome: a question card popping up mid-task yanks the window out from
-     * under the perch the ball is gripping, and the user's answer would
+     * welcome: a question card popping up mid-task pulls the ball out of the
+     * edge it went into for the task, and the user's answer would
      * interleave with the task's own screen actions. While busy, message
      * notifications land in the ring buffer silently — the brain can still
      * see them via device.notifications, and whoever sent them gets read when

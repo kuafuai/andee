@@ -23,7 +23,7 @@ import net.kuafuai.andee.ui.ball.Mood
  * Extras (all optional): `mood` (a [Mood] name), `emotion` (a [Mood] name worn
  * while `mood` is SPEAKING), `look` (a BallLook name), `action` (an [Action]
  * name, fired once), `bg` (`dark` | `light` | `mid`), `dp` (the ball's side; 168
- * is the real folded size), `working`, `holding`, `ledge`.
+ * is the real folded size), `working`, `holding`, `ledge`, `side` (docked into the right edge).
  *
  * Debug builds only — it lives in `src/debug`, so release never carries it.
  */
@@ -86,6 +86,7 @@ class BallLabActivity : Activity() {
         b.setEmotion(i.getStringExtra("emotion")?.let { runCatching { Mood.valueOf(it.uppercase()) }.getOrNull() })
         b.setWorking(i.getBooleanExtra("working", false))
         b.setAtLedge(i.getBooleanExtra("ledge", false))
+        b.setSideLedge(i.getBooleanExtra("side", false))
         b.setHolding(i.getBooleanExtra("holding", false))
         i.getStringExtra("action")?.let { name ->
             runCatching { Action.valueOf(name.uppercase()) }.getOrNull()?.let { b.trigger(it) }

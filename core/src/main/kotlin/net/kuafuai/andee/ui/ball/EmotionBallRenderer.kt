@@ -121,6 +121,20 @@ class EmotionBallRenderer {
     var atLedge: Boolean = false
 
     /**
+     * Docked into the right screen edge (the phone's folded ball, issue #33):
+     * the same cling as [atLedge] — paws on the edge, the slip and the haul —
+     * with the whole picture turned a quarter so the ledge is the right edge,
+     * the body leaning out [SIDE_RAISE] past it and the head turned back to a
+     * [SIDE_TILT] lean, like peeking round a door frame. Both eyes stay on the
+     * screen side; the window owns the timing, as with [atLedge].
+     */
+    @Volatile
+    var sideLedge: Boolean = false
+
+    /** GL thread: the view is turned for [sideLedge], kept until the cling has let go. */
+    private var sideRoll = false
+
+    /**
      * Written on the GL thread, read by the UI thread: the ball has dozed off.
      *
      * Exposed so [FloatingWindowUi] can keep the idle stroll from sleepwalking.
@@ -520,9 +534,13 @@ class EmotionBallRenderer {
             t,
             resolveMood(dt),
             listening,
-            working && atLedge,
+            (working && atLedge) || sideLedge,
             talking = mood == Mood.SPEAKING,
         )
+        if (sideLedge) sideRoll = true else if (state.cling < 0.01f) sideRoll = false
+        Matrix.setLookAtM(view, 0, 0f, 0f, CAM_Z, 0f, 0f, 0f, 0f, 1f, 0f)
+        // A quarter turn: what was below the ledge is now right of the edge.
+        if (sideRoll) Matrix.rotateM(view, 0, 90f, 0f, 0f, 1f)
 
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
         clipToLedge()
@@ -573,9 +591,16 @@ class EmotionBallRenderer {
             GLES20.glDisable(GLES20.GL_SCISSOR_TEST)
             return
         }
+        GLES20.glEnable(GLES20.GL_SCISSOR_TEST)
+        if (sideRoll) {
+            // The ledge turned with the view: world y = HAND_LEDGE is screen x = -HAND_LEDGE.
+            val line = vw * 0.5f - HAND_LEDGE * (pointFactor / CAM_Z)
+            val keep = (vw - (vw - line) * c).toInt().coerceIn(0, vw)
+            GLES20.glScissor(0, 0, keep, vh)
+            return
+        }
         val line = vh * 0.5f + HAND_LEDGE * (pointFactor / CAM_Z)
         val cut = (line * c).toInt().coerceIn(0, vh)
-        GLES20.glEnable(GLES20.GL_SCISSOR_TEST)
         GLES20.glScissor(0, cut, vw, vh - cut)
     }
 
@@ -759,7 +784,15 @@ class EmotionBallRenderer {
 
     private fun buildRoot() {
         Matrix.setIdentityM(root, 0)
-        Matrix.translateM(root, 0, 0f, state.hopY, 0f)
+        if (sideRoll) {
+            // Out past the edge, and the head turned back from the view's quarter
+            // turn to a lean; both ramp with the cling, so letting go stands it up.
+            val c = state.cling
+            Matrix.translateM(root, 0, 0f, state.hopY + SIDE_RAISE * c, 0f)
+            Matrix.rotateM(root, 0, -90f + SIDE_TILT * c, 0f, 0f, 1f)
+        } else {
+            Matrix.translateM(root, 0, 0f, state.hopY, 0f)
+        }
         Matrix.rotateM(root, 0, state.rotX * DEG, 1f, 0f, 0f)
         Matrix.rotateM(root, 0, state.rotY * DEG, 0f, 1f, 0f)
         Matrix.rotateM(root, 0, state.rotZ * DEG, 0f, 0f, 1f)
@@ -2119,6 +2152,12 @@ class EmotionBallRenderer {
 
         /** The glowing outline. Defines how big the ball looks. */
         private const val RIM = 0.9f
+
+        /** How far a [sideLedge] body leans out past the edge, world units — enough that both eyes clear it. */
+        private const val SIDE_RAISE = 0.72f
+
+        /** The head's lean while peeking from the right edge, degrees anticlockwise. */
+        private const val SIDE_TILT = 15f
 
         /** How much darker than the mood the mouth goes on a pale look. */
         private const val MOUTH_DEEP = 0.40f

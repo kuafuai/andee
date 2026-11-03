@@ -337,7 +337,7 @@ class BodyCoreService : Service() {
                 val there = android.content.Intent(
                     android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url),
                 )
-                window.setPagePerched(true)
+                window.setPageShown(true)
                 net.kuafuai.andee.ui.SelfCheckActivity.showForErrand(this@BodyCoreService, there)
                 dispatcher.compactForUser()
             }
@@ -1289,10 +1289,10 @@ class BodyCoreService : Service() {
     private fun openPageFrom(title: String, file: java.io.File) {
         val wasFullscreen = !window.isCompact()
         dispatcher.compactForUser()
-        // The ball hangs off the ledge rather than sitting on the page.
-        window.setPagePerched(true)
+        // The ball goes into the edge rather than sitting on the page.
+        window.setPageShown(true)
         net.kuafuai.andee.ui.HtmlActivity.showFile(this, file, title.take(24)) {
-            window.setPagePerched(false)
+            window.setPageShown(false)
             if (wasFullscreen) dispatcher.expand()
         }
     }
@@ -2144,7 +2144,7 @@ class BodyCoreService : Service() {
             // The card comes down first: an overlay left up would sit over the
             // page it just opened. Same trip as the self-check card's errand.
             onOpenLink = { url ->
-                window.setPagePerched(true)
+                window.setPageShown(true)
                 net.kuafuai.andee.ui.SelfCheckActivity.showForErrand(
                     this,
                     android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)),
@@ -2236,10 +2236,9 @@ class BodyCoreService : Service() {
             //
             // The assistant is still folded first, and it is not optional: this
             // window is the one covering the screen, and it has to be out of the
-            // way before a page can be seen under it. The ball also goes onto the
-            // ledge (`setPagePerched`), the same shape `openPageFrom` gives a
-            // page, so it hangs off the edge of the card instead of on top of a
-            // row — the page is a fullscreen surface and a ball parked in the
+            // way before a page can be seen under it. The ball also goes into the
+            // right edge (`setPageShown`), the same as `openPageFrom` gives a
+            // page, instead of sitting on top of a row — the page is a fullscreen surface and a ball parked in the
             // middle of it is the bug that flag exists to prevent.
             //
             // Order matters twice. `showForErrand` first, because the page is
@@ -2249,7 +2248,7 @@ class BodyCoreService : Service() {
             // `SelfCheckUi.hide` runs `onDismiss` from `Glass.exit`'s completion
             // and that is what clears [selfCheck].
             onErrand = { there ->
-                window.setPagePerched(true)
+                window.setPageShown(true)
                 net.kuafuai.andee.ui.SelfCheckActivity.showForErrand(this, there)
                 dispatcher.compactForUser()
                 selfCheck?.hide(yielding = true)

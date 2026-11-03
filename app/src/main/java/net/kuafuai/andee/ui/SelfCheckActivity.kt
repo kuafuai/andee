@@ -548,8 +548,8 @@ class SelfCheckActivity : StageActivity() {
     /**
      * Give the screen back to the assistant — which, by now, may well exist.
      *
-     * The first half is the original job: drop the ball off the ledge it was
-     * parked on while this page covered the screen.
+     * The first half is the original job, and a no-op since the ball docks
+     * instead of hanging off the ledge (2026-11-03): it stays in the edge.
      *
      * The second half corrects the assumption the first version was written on
      * ("nothing to unfold: see [onCreate]"). That assumption is true when this
@@ -580,7 +580,7 @@ class SelfCheckActivity : StageActivity() {
         // side of this is a launch with no page. See [SelfCheck.setPageOpen].
         SelfCheck.setPageOpen(this, false)
         val svc = BodyCoreService.get()
-        svc?.ballWindow()?.setPagePerched(false)
+        svc?.ballWindow()?.setPageShown(false)
         // `ensureOverlays` before `expand`, not `expand` on its own.
         //
         // **This is now the only way off this page**, so it is the only thing

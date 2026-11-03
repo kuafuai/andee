@@ -77,6 +77,11 @@ class EmotionBallTextureView @JvmOverloads constructor(
         renderer.atLedge = at
     }
 
+    /** Docked into the right edge, clinging to it — see [EmotionBallRenderer.sideLedge]. */
+    fun setSideLedge(on: Boolean) {
+        renderer.sideLedge = on
+    }
+
     /** A signboard is up and the ball is waiting for the user's choice. */
     fun setHolding(h: Boolean) {
         renderer.holding = h
