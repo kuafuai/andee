@@ -1588,8 +1588,13 @@ class FloatingWindowUi(
     /** Width of the docked tab: the part of the clinging ball that leans out past the edge. */
     private fun dockTabW(): Int = (dp(COMPACT_DP) * DOCK_SCALE * DOCK_TAB_W_FRACTION).toInt()
 
-    /** Height of the docked tab: horns to paws, plus room for the slip. */
-    private fun dockTabH(): Int = (dp(COMPACT_DP) * DOCK_SCALE * DOCK_TAB_H_FRACTION).toInt()
+    /** How much of the docked tab is above the ball's centre: the tallest ears of any look. */
+    private fun dockTabUp(): Int = (dp(COMPACT_DP) * DOCK_SCALE * DOCK_TAB_UP_FRACTION).toInt()
+
+    /** And below it: the lower paw, plus room for the slip. */
+    private fun dockTabDown(): Int = (dp(COMPACT_DP) * DOCK_SCALE * DOCK_TAB_DOWN_FRACTION).toInt()
+
+    private fun dockTabH(): Int = dockTabUp() + dockTabDown()
 
     /** Start (or restart) the idle countdown to docking. Main thread only. */
     private fun armDock() {
@@ -1641,7 +1646,7 @@ class FloatingWindowUi(
         p.width = w
         p.height = h
         p.x = rightEdge() - w
-        p.y = dockCy - h / 2
+        p.y = dockCy - dockTabUp()
         (area.layoutParams as? FrameLayout.LayoutParams)?.let {
             it.width = side
             it.height = side
@@ -1649,7 +1654,7 @@ class FloatingWindowUi(
             area.layoutParams = it
         }
         area.translationX = (w - side / 2).toFloat()
-        area.translationY = (h / 2 - side / 2).toFloat()
+        area.translationY = (dockTabUp() - side / 2).toFloat()
         // The right edge is where the system's back gesture starts; without this
         // a drag on the tab would be taken as "back".
         v.systemGestureExclusionRects = listOf(Rect(0, 0, w, h))
@@ -1693,9 +1698,8 @@ class FloatingWindowUi(
 
     /** A docked centre kept clear of the status bar and the bottom edge. */
     private fun clampDockCy(cy: Int): Int {
-        val half = dockTabH() / 2 + dp(8)
-        val top = topEdge() + half - winYOrigin
-        val bottom = bottomEdge() - half - winYOrigin
+        val top = topEdge() + dockTabUp() + dp(8) - winYOrigin
+        val bottom = bottomEdge() - dockTabDown() - dp(8) - winYOrigin
         return cy.coerceIn(top, bottom.coerceAtLeast(top))
     }
 
@@ -3292,7 +3296,7 @@ class FloatingWindowUi(
                             startParamsX = p.x; startParamsY = p.y
                         } else {
                             dockCy = clampDockCy(startDockCy + (e.rawY - startY).toInt())
-                            p.y = dockCy - p.height / 2
+                            p.y = dockCy - dockTabUp()
                             runCatching { wm.updateViewLayout(this, p) }
                         }
                     } else if (moved && !swiping && compact) {
@@ -3523,11 +3527,14 @@ class FloatingWindowUi(
         /**
          * The docked tab as fractions of the scaled side. Measured off the
          * clinging pose (`BallLab --ez side true`): the body leans out ~0.46 of
-         * the side past the edge, horns included, and spans ~0.58 from horn tip
-         * to the lower paw.
+         * the side past the edge, horns included, and reaches ~0.29 below the
+         * centre to the lower paw. Above the centre is sized for the rabbit's
+         * ears, the tallest of any look at ~0.38 (Andee's horns stop at ~0.27,
+         * and a tab sized for them cut the ears off flat).
          */
         private const val DOCK_TAB_W_FRACTION = 0.48f
-        private const val DOCK_TAB_H_FRACTION = 0.68f
+        private const val DOCK_TAB_UP_FRACTION = 0.44f
+        private const val DOCK_TAB_DOWN_FRACTION = 0.34f
 
         private const val CARD_OPEN_MS = 280L
         private const val CARD_CLOSE_MS = 190L
