@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`20` / `"0.9.0"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`21` / `"0.9.1"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,46 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.9.1] - 2026-11-03
+
+**The folded ball stops sitting on your screen and goes into the edge.**
+
+Folded, the ball was a 136 dp square window — and every pixel of that square was ours. A touch that
+lands in a window cannot be handed to the app underneath, so the transparent band around the sphere was
+dead space that travelled with the ball and swallowed taps meant for what was behind it
+([#33](https://github.com/kuafuai/andee/issues/33)). Left alone, it now slides into the right edge and
+clings there, with a window a tenth the size.
+
+### Changed
+
+- **The folded ball docks into the right edge.** Left alone for 10 seconds — or when a task starts, a page
+  goes up, or the ball is dropped against the right edge — it slides into the right edge, shrinks, and
+  **clings to it**: paws on the edge, leaning out around it with both eyes on the screen side. The window
+  shrinks to just that (~31 × 50 dp) and excludes the back gesture.
+  - **The folded ball is smaller**: 136 → 104 dp. The floor that held it at 136 was the paw gripping the
+    bottom edge, which is gone.
+  - **It keeps its whole vocabulary while docked**: tap talks, double-tap types, long-press opens the card.
+    Dragging *along* the edge moves it up and down; pulling *away* brings the whole ball out under your
+    finger. A signboard takes it out and puts it back at the same height.
+  - **It no longer hangs off the bottom edge.** The side cling is the old ledge cling turned a quarter
+    (`sideLedge`) — paws, slip and haul all come with it, rather than being a second pose that could drift
+    from the first.
+  - The ball area keeps the square's size and is *translated* inside the tab, so the GL surface never
+    resizes and the swap from square to tab is invisible.
+
+### Fixed
+
+- **The docked tab is tall enough for the rabbit's ears.** The tab was sized off Andee's horns and centred
+  on the ball, so a rabbit docked into the edge had its ears cut off flat. Every look's clinging pose was
+  measured in `BallLab`: the rabbit's ears reach ~0.38 of the side above the centre, Andee's horns ~0.27,
+  and every paw ~0.29 below. The tab now reaches 0.44 above and 0.34 below.
+- **A new device opens on the conversation until the stage has something on it.** The card's middle
+  defaulted to the stage, so a fresh install landed on an empty board ("not furnished yet") and the
+  conversation's empty state — the scene bubbles that are a new user's way in — was hidden behind a tab.
+  Until you pick 舞台 or 对话, the middle follows the stage: the conversation while it is empty, the stage
+  from its first write on, and back to the conversation if a wipe empties it. **A pick, once made, is kept
+  whatever the stage holds.**
 
 ## [0.9.0] - 2026-11-02
 
