@@ -3546,7 +3546,7 @@ class FloatingWindowUi(
          * Docked, the ball is drawn at this scale of its folded size: it is
          * clinging to the edge, not sitting on the app, and should take less.
          */
-        private const val DOCK_SCALE = 0.62f
+        private const val DOCK_SCALE = 0.70f
 
         /**
          * The docked tab as fractions of the scaled side. Measured off the
