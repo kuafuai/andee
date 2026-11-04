@@ -1,5 +1,9 @@
 package net.kuafuai.andee.desktop
 
+import androidx.compose.foundation.layout.Box
+
+import androidx.compose.foundation.layout.heightIn
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +55,8 @@ fun SettingsScreen(
         // The key in effect is shown, typed or the build's; saving it back unchanged stores nothing (below).
         put("codeflying_key", Assistant.codeFlyingKey())
     } }
+    // How the user wants notifications handled (NotifyRule): set by telling Andee, shown and editable here.
+    var notifyRule by remember { mutableStateOf(DesktopNotebook.book.notifyRule.text()) }
     var fullOpenAsk by remember { mutableStateOf(false) }
     var advanced by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf("") }   // "", "chat", "notes", "factory"
@@ -199,6 +205,21 @@ fun SettingsScreen(
                 v["notify"].orEmpty().ifEmpty { "off" },
             ) { v["notify"] = it }
             Note(st("settings_notify_note"))
+            Text(t("怎么处理消息", "How to handle messages"), color = Palette.secondary, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+            androidx.compose.foundation.text.BasicTextField(
+                value = notifyRule,
+                onValueChange = { notifyRule = it.take(net.kuafuai.andee.config.NotifyRule.MAX_CHARS) },
+                textStyle = androidx.compose.ui.text.TextStyle(color = Palette.label, fontSize = 14.sp, lineHeight = 20.sp),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(Palette.accent),
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp).heightIn(min = 56.dp).glassWell(12).padding(12.dp),
+                decorationBox = { inner ->
+                    Box {
+                        if (notifyRule.isEmpty()) Text(t("没有设。跟 Andee 说一句就行，比如「消息都帮我处理一下」。", "Not set. Just tell Andee, e.g. \"handle all my messages\"."), color = Palette.muted, fontSize = 14.sp)
+                        inner()
+                    }
+                },
+            )
+            Note(t("每条消息进来时都会按这段话判断要不要处理。清空就恢复默认（多数消息不打扰你）。", "Every incoming message is judged by this. Clear it to go back to the default (most messages left alone)."))
             if (net.kuafuai.andee.desktop.mac.MacNotifications.state == net.kuafuai.andee.desktop.mac.MacNotifications.State.NO_ACCESS) {
                 Text(
                     t("读不到通知：在 系统设置 → 隐私与安全性 → 完全磁盘访问权限 里加上 Andee。",
@@ -330,6 +351,7 @@ fun SettingsScreen(
             PrimaryButton(st("common_save"), Modifier.weight(1f)) {
                 // "lang" is written the instant the header toggle is tapped; the copy held here is from when the card opened.
                 Settings.save(v.toMap().minus("lang") + ("codeflying_key" to v["codeflying_key"].orEmpty().trim().takeIf { it != CodeFlyingBuild.key }.orEmpty()))
+                DesktopNotebook.book.notifyRule.set(notifyRule)
                 v["ball"]?.let { MacBall.pickLook(it) }
                 Thread { Assistant.ensure() }.start()
                 onDone()

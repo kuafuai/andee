@@ -643,6 +643,10 @@ public func andee_notif_since(_ afterId: Int64) -> UnsafeMutablePointer<CChar> {
             o["title"] = req["titl"] as? String ?? ""
             o["subtitle"] = req["subt"] as? String ?? ""
             o["body"] = req["body"] as? String ?? ""
+            // WeChat's request id names a group as `…@chatroom…`; anything else it posts is one-to-one. Other apps: unknown.
+            if let iden = req["iden"] as? String, bundle.lowercased().contains("wechat") {
+                o["chat"] = iden.contains("@chatroom") ? "group" : "private"
+            }
         }
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) {
             o["app"] = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")

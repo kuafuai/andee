@@ -3792,7 +3792,11 @@ class BodyCoreService : Service() {
         val verdict = net.kuafuai.andee.brain.NotificationTriage(bc) { warn, msg ->
             if (warn) android.util.Log.w("Brain", msg) else android.util.Log.i("Brain", msg)
         }
-            .decide(n, net.kuafuai.andee.config.VoiceConfig.uiLanguage(this), scene) ?: return false
+            .decide(
+                n, net.kuafuai.andee.config.VoiceConfig.uiLanguage(this), scene,
+                rule = net.kuafuai.andee.config.Notebook.notifyRule(this).text(),
+                guard = net.kuafuai.andee.config.Notebook.guard(this).text(),
+            ) ?: return false
         when (verdict.action) {
             net.kuafuai.andee.brain.NotificationTriage.Action.IGNORE -> {
                 // Not silence-with-no-record: the ring buffer still has it, so
@@ -3842,10 +3846,14 @@ class BodyCoreService : Service() {
         net.kuafuai.andee.ui.PhoneTimeline.told(this, n.optString("app").ifEmpty { "?" }, script.text, n.optString("latest").ifEmpty { n.optString("text") })
         lastAnswer = script.text
         expectFollowUp = false
+        // The brain did not say this — the triage did — so without a note it has no idea it was said, and the user's
+        // 「回一下」 a moment later would be about nothing it knows of. Silent, costs no call; the next turn reads it.
+        localBrain?.note(net.kuafuai.andee.brain.NotificationTriage.toldNote(n, script.text))
         if (!meeting.isActive() && !net.kuafuai.andee.device.CallState.isActive) {
             tts.speak(script.text, script.cues)
         }
     }
+
 
     /**
      * Act on a notification: hand it to whichever brain is running.

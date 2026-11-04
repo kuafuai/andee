@@ -121,6 +121,7 @@ object Notebook {
     fun selfhood(context: Context): net.kuafuai.andee.config.Selfhood = book(context).selfhood
     fun people(context: Context): net.kuafuai.andee.config.People = book(context).people
     fun guard(context: Context): net.kuafuai.andee.config.Guard = book(context).guard
+    fun notifyRule(context: Context): net.kuafuai.andee.config.NotifyRule = book(context).notifyRule
 
     /** Told after the guard is saved or the book wiped: the red dots on 小本本 and on its 守卫 tab. */
     @Volatile var onGuardChanged: (() -> Unit)? = null

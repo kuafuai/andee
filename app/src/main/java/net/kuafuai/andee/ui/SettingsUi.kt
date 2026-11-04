@@ -1365,7 +1365,30 @@ class SettingsUi(
             panel,
             lctx.getString(R.string.settings_notify_note),
         )
+        // How the user wants notifications handled (NotifyRule): set by telling Andee, shown and editable here.
+        rowLabel(panel, lctx.getString(R.string.settings_notify_rule))
+        val rule = android.widget.EditText(context).apply {
+            background = Glass.well(context, dp(13))
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setTextColor(Color.parseColor(Glass.TITLE))
+            setHintTextColor(Color.parseColor(Glass.MUTED))
+            textSize = Glass.Type.BODY
+            hint = lctx.getString(R.string.settings_notify_rule_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            isSingleLine = false
+            minLines = 2
+            gravity = Gravity.TOP or Gravity.START
+            filters = arrayOf(android.text.InputFilter.LengthFilter(net.kuafuai.andee.config.NotifyRule.MAX_CHARS))
+            setText(notifyRuleEdit ?: net.kuafuai.andee.config.Notebook.notifyRule(context).text())
+        }
+        notifyRuleField = rule
+        panel.addView(rule, rowParams(dp(5)))
+        note(panel, lctx.getString(R.string.settings_notify_rule_note))
     }
+
+    /** The notification rule's box, and what it held across a language rebuild. Saved by [saveAndHide], not by `VoiceConfig`. */
+    private var notifyRuleField: android.widget.EditText? = null
+    private var notifyRuleEdit: String? = null
 
     /**
      * How often the ball may hold up a bubble nobody asked for. Beside the notification setting because it is
@@ -1916,6 +1939,7 @@ class SettingsUi(
         val out = mutableMapOf<String, String>()
         for ((k, et) in fields) out[k] = et.text?.toString().orEmpty()
         for ((k, read) in picks) out[k] = read()
+        notifyRuleEdit = notifyRuleField?.text?.toString()
         return out
     }
 
@@ -1937,6 +1961,7 @@ class SettingsUi(
         // drops blank values, so a text field never could.
         for ((k, read) in picks) updates[k] = read()
         if (updates.isNotEmpty()) VoiceConfig.save(context, updates)
+        notifyRuleField?.let { net.kuafuai.andee.config.Notebook.notifyRule(context).set(it.text?.toString().orEmpty()) }
         hide()
     }
 

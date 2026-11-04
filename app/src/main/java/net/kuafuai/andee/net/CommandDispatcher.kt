@@ -1578,6 +1578,13 @@ class CommandDispatcher(
 
             // Andee's inner life (`LifeTools`): shared logic in core, the same handler as the Mac's, and nothing
             // for the phone to arm. The tool-call id it records is set by the brain host before the call.
+            // How the user wants notifications handled: read by the triage on every message. Shared with the Mac.
+            net.kuafuai.andee.config.NotifyRuleTool.METHOD -> net.kuafuai.andee.config.NotifyRuleTool(
+                Notebook.notifyRule(appContext),
+                scope = { VoiceConfig.notifyScope(appContext) },
+                enable = { VoiceConfig.save(appContext, mapOf("notify" to VoiceConfig.NOTIFY_CHAT)) },
+            ).handle(params)
+
             in net.kuafuai.andee.config.LifeTools.METHODS -> Notebook.life(appContext).handle(method, params).also { r ->
                 // wiki_write show=true: open what was just written — not from a quiet turn, where nobody asked to see it.
                 if (method == "note.wiki_write" && params?.optBoolean("show") == true && !silent && r.optBoolean("written")) {

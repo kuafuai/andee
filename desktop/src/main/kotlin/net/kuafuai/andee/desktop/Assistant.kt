@@ -558,6 +558,9 @@ object Assistant {
             // An event, not a line of conversation: a lone Andee bubble among the timeline's event rows read as it
             // talking to nobody. The row names the app; the original message is the detail.
             TimelineEvents.told(n.optString("app").ifEmpty { "?" }, clean, n.optString("latest").ifEmpty { n.optString("text") })
+            // The brain did not say this — the triage did — so without a note its next turn has no idea it was said,
+            // and 「回一下」 would be about nothing it knows of. The phone writes the same note.
+            ensure().note(net.kuafuai.andee.brain.NotificationTriage.toldNote(n, clean))
             onFinal(clean)
             if (!muted) net.kuafuai.andee.desktop.voice.MacVoice.speak(line)
         }

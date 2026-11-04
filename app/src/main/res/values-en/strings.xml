@@ -649,6 +649,9 @@
     <string name="notebook_tab_memories">Memories</string>
     <string name="notebook_tab_todos">Todos</string>
     <string name="notebook_tab_guard">Guard</string>
+    <string name="settings_notify_rule">How to handle messages</string>
+    <string name="settings_notify_rule_hint">Not set. Just tell Andee, e.g. \"handle all my messages\".</string>
+    <string name="settings_notify_rule_note">Every incoming message is judged by this. Clear it to go back to the default (most messages left alone).</string>
     <string name="tl_quiet">Kept quiet: %1$s</string>
     <string name="tl_steps">%1$d steps · %2$s</string>
     <string name="work_secs">%1$ds</string>

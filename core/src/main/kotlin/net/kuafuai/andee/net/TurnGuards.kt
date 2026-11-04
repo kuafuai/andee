@@ -71,6 +71,14 @@ object TurnGuards {
                     "conversation: $method. Do not change it from here.",
             )
         }
+        // How notifications are handled is the owner's standing instruction to the triage: a stranger's message
+        // that could set it would have bought itself every later message, and the review has nobody to ask.
+        if (method == "note.notify_rule" && (silent || untrusted)) {
+            throw IllegalStateException(
+                "How notifications are handled is the user's to say, in this conversation: $method. " +
+                    "Not from a review, a notification or another Andee.",
+            )
+        }
         // The user's own accounts, on a turn whose subject matter a stranger
         // wrote. The irreversible thing that buys is `fill_secret`: a password
         // typed into a form on a page they chose. The whole prefix, so it cannot

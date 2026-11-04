@@ -204,9 +204,14 @@ class NotificationRelayService : NotificationListenerService() {
             count = m.groupValues[1].toIntOrNull() ?: 1
             headline = m.groupValues[2]
         }
+        // Group or one-to-one, when the app says (a MessagingStyle notification's own flag); left out when unknown.
+        val group = extras.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION, false) ||
+            !extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE).isNullOrBlank()
+        val messaging = extras.containsKey(Notification.EXTRA_MESSAGES)
         val n = JSONObject()
             .put("pkg", sbn.packageName)
             .put("app", appLabel(sbn.packageName))
+            .apply { if (group) put("chat", "group") else if (messaging) put("chat", "private") }
             .put("title", title.take(80))
             .put("text", text.take(160))
             .put("count", count)
@@ -311,8 +316,14 @@ class NotificationRelayService : NotificationListenerService() {
             // window out from under the perch and queue work against the task's
             // own actions. The message stays in the ring buffer
             // (device.notifications) and gets read when the job is done.
+            // Held, not dropped: it is looked at as soon as the task is over (newest per app), so a rule that asks
+            // for every message to be handled is not defeated by a message arriving at a busy moment.
             android.util.Log.i("Body", "notification held: a task is running (${n.optString("app")})")
-            net.kuafuai.andee.ui.PhoneTimeline.held(this, n.optString("app").ifEmpty { "?" }, n.optString("latest"))
+            if (held.put(n.optString("pkg"), n) == null) {
+                net.kuafuai.andee.ui.PhoneTimeline.held(this, n.optString("app").ifEmpty { "?" }, n.optString("latest"))
+            }
+            main.removeCallbacks(retryHeld)
+            main.postDelayed(retryHeld, HELD_RETRY_MS)
             return
         }
         if (!Budget.take()) {
@@ -332,6 +343,23 @@ class NotificationRelayService : NotificationListenerService() {
             val handled = runCatching { svc?.handleNotification(n) }.getOrNull() ?: false
             if (!handled) net.kuafuai.andee.ui.CardUi.post { showSignboardFor(n) }
         }.start()
+    }
+
+    /** Notifications that arrived while a task ran, newest per package. [main] only. */
+    private val held = LinkedHashMap<String, JSONObject>()
+
+    /** Try the held ones again: one at a time, the next only once the turn that one starts is over. [main] only. */
+    private val retryHeld = object : Runnable {
+        override fun run() {
+            if (held.isEmpty()) return
+            val busy = net.kuafuai.andee.BodyCoreService.get()?.dispatcherForNotification()?.isTaskActive() == true
+            if (busy) { main.postDelayed(this, HELD_RETRY_MS); return }
+            val key = held.keys.first()
+            val n = held.remove(key) ?: return
+            if (System.currentTimeMillis() - n.optLong("when") > HELD_MAX_MS) { main.post(this); return }
+            deliver(n)
+            if (held.isNotEmpty()) main.postDelayed(this, HELD_RETRY_MS)
+        }
     }
 
     private fun showSignboardFor(n: JSONObject) {
@@ -444,13 +472,20 @@ class NotificationRelayService : NotificationListenerService() {
          * How long a package's burst is allowed to settle before the newest
          * notification in it is triaged. See [offerForTriage].
          *
-         * Three seconds is a compromise between two things that both hurt. Too
-         * short and a twelve-message burst costs twelve model calls and reads
-         * out the second message of a conversation. Too long and the user has
-         * already picked the tablet up and read it themselves, which makes the
-         * device's announcement an echo.
+         * A compromise between two things that both hurt. Too short and a
+         * twelve-message burst costs twelve model calls and reads out the
+         * second message of a conversation. Too long and the user has already
+         * picked the tablet up and read it themselves, which makes the device's
+         * announcement an echo. Ten seconds since 2026-11-04 (was three), the
+         * user's call: a chat in full flow is one turn, not several.
          */
-        private const val SETTLE_MS = 3_000L
+        private const val SETTLE_MS = 10_000L
+
+        /** How often a notification held behind a task asks again whether the task is over. */
+        private const val HELD_RETRY_MS = 3_000L
+
+        /** A message held longer than this is not worth acting on any more; the ring buffer still has it. */
+        private const val HELD_MAX_MS = 30 * 60 * 1000L
 
         /**
          * `Notification.category` values that mean "this is a status display",
@@ -492,7 +527,8 @@ class NotificationRelayService : NotificationListenerService() {
          * [deliver] is the only caller and it runs on [main], so no lock.
          */
         private object Budget {
-            private const val PER_HOUR = 30
+            /** 40 since 2026-11-04 (was 30), the user's call; the same number on the Mac. */
+            private const val PER_HOUR = 40
             private const val WINDOW_MS = 60 * 60 * 1000L
             private var windowStart = 0L
             private var used = 0

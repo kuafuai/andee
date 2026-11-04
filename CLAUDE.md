@@ -593,9 +593,18 @@ The verdict is `act` / `tell` / `ignore`, and `tell` is the one that pays for it
 
 **Null means "I could not decide", and the answer to that is the old behaviour.** No key, a failed call, an unparseable verdict, no brain to hand an `act` to → `handleNotification` returns false and the relay raises the signboard. A triage that guessed on a network error would be silently dropping messages.
 
-**Four free gates run before the paid one**, each for a different cost, and the order matters: `inScope` (the user's `notify` setting) → `isStructural` (progress bars and group summaries are a status display, not an event — 全部 tier only) → `offerForTriage` (a 3 s per-package debounce, because a group chat posts one notification *per message* and the last of a burst carries the whole thread) → `deliver` (not while a task is running, and not past `Budget`'s hourly cap, which is what stops a looping app from turning the user's key into a subscription). Everything upstream of the model call is free; everything downstream is the user's money.
+**Four free gates run before the paid one**, each for a different cost, and the order matters: `inScope` (the user's `notify` setting) → `isStructural` (progress bars and group summaries are a status display, not an event — 全部 tier only) → `offerForTriage` (a 10 s per-package debounce — 3 s until 2026-11-04 —, because a group chat posts one notification *per message* and the last of a burst carries the whole thread) → `deliver` (not while a task is running, and not past `Budget`'s hourly cap (40, both bodies), which is what stops a looping app from turning the user's key into a subscription). Everything upstream of the model call is free; everything downstream is the user's money.
 
 `notify` defaults to `chat` but **falls back to `off`, and those are deliberately different values.** An unset preference is a device nobody configured, and the honest scope there is the set that already interrupted the user before triage existed. An unrecognised string is a typo or a downgrade — nothing is known about what it meant, so it permits nothing. The picker lists 关 leftmost to match, per the house rule.
+
+#### The owner's rule for notifications (`config/NotifyRule`, `notify_rule`)
+
+The triage is a separate, tool-less call that sees none of the conversation, so 「消息都帮我处理一下」 said to the brain never reached it and it kept answering `ignore`. `notify_rule` (`note.notify_rule`, `NotifyRuleTool`, one handler on both bodies) stores the user's words in the notebook (section `notify_rule`, ≤ 600 chars); `NotificationTriage.decide(…, rule, guard)` puts it in the **system** message as the owner's instruction — ahead of the lean toward silence, behind the rules about instructions inside the notification and money/passwords/codes — and 守卫 with it. The payload stays the stranger's fence. Setting a rule while notifications are off turns them on for chat apps, and says so. **Only a turn the user started may write it** (`TurnGuards`: refused on silent and untrusted turns). Shown and editable under 消息提醒 in Settings on both bodies.
+
+Three things around it, all on both bodies:
+- **A `tell` leaves a note for the brain** (`NotificationTriage.toldNote` → `LocalBrain.note`): the triage said the sentence, not the brain, so the user's 「回一下」 a moment later used to be about nothing it knew of.
+- **Group or one-to-one rides on the record** (`chat`): Mac WeChat's request id (`…@chatroom…`), Android's `EXTRA_IS_GROUP_CONVERSATION` / `EXTRA_CONVERSATION_TITLE` / `EXTRA_MESSAGES`. Mac WeChat posts only 「你收到了一条消息」 unless its own 显示消息详情 is on; that is a WeChat setting, not ours.
+- **A notification that arrives while a turn runs is held, not dropped** (`held`, newest per app): retried every 3 s and looked at once the turn is over, given up after 30 min. Settle is 10 s and the cap 40 an hour on both bodies.
 
 #### A turn whose subject matter came from outside must say so
 

@@ -38,8 +38,13 @@ import java.util.concurrent.TimeUnit
 object MacNotifications {
 
     private const val TAG = "Notify"
-    private const val SETTLE_MS = 3_000L
-    private const val PER_HOUR = 30
+    // The phone's numbers (NotificationRelayService): 10 s and 40 an hour since 2026-11-04, the user's call.
+    private const val SETTLE_MS = 10_000L
+    private const val PER_HOUR = 40
+
+    /** How often a held notification asks whether the turn is over, and how old it may get before it is not worth it. */
+    private const val HELD_RETRY_MS = 3_000L
+    private const val HELD_MAX_MS = 30 * 60 * 1000L
     private const val RING = 50
 
     /** Gives the brain-side pieces to this class without it knowing about the window. */
@@ -150,6 +155,7 @@ object MacNotifications {
             .put("count", 1)
             .put("latest", body.take(160))
             .put("when", r.optLong("when", System.currentTimeMillis()))
+            .apply { r.optString("chat").takeIf { it.isNotEmpty() }?.let { put("chat", it) } }
         synchronized(ring) {
             ring.addLast(n)
             while (ring.size > RING) ring.removeFirst()
@@ -168,8 +174,12 @@ object MacNotifications {
     private fun deliver(n: JSONObject) {
         val h = host ?: return
         if (h.busy()) {
+            // Held, not dropped: looked at as soon as the turn is over (newest per app), so a rule asking for every
+            // message to be handled is not defeated by one arriving at a busy moment. The phone does the same.
             Log.i(TAG, "held: a turn is running (${n.optString("app")})")
-            net.kuafuai.andee.desktop.TimelineEvents.held(n.optString("app").ifEmpty { "?" }, n.optString("latest"))
+            val first = synchronized(held) { held.put(n.optString("pkg"), n) == null }
+            if (first) net.kuafuai.andee.desktop.TimelineEvents.held(n.optString("app").ifEmpty { "?" }, n.optString("latest"))
+            exec.schedule({ retryHeld() }, HELD_RETRY_MS, TimeUnit.MILLISECONDS)
             return
         }
         val now = System.currentTimeMillis()
@@ -183,7 +193,11 @@ object MacNotifications {
         val cfg = h.brainConfig()
         if (cfg.apiKey.isEmpty()) return
         val verdict = NotificationTriage(cfg) { warn, msg -> if (warn) Log.w(TAG, msg) else Log.i(TAG, msg) }
-            .decide(n, h.langTag(), h.scene())
+            .decide(
+                n, h.langTag(), h.scene(),
+                rule = net.kuafuai.andee.desktop.DesktopNotebook.book.notifyRule.text(),
+                guard = net.kuafuai.andee.desktop.DesktopNotebook.book.guard.text(),
+            )
         when (verdict?.action) {
             null -> {
                 Log.w(TAG, "no verdict for ${n.optString("app")}; left in the buffer")
@@ -198,6 +212,19 @@ object MacNotifications {
             NotificationTriage.Action.TELL -> if (verdict.line.isNotBlank()) h.tell(n, verdict.line)
             NotificationTriage.Action.ACT -> h.act(lookQuery(n))
         }
+    }
+
+    /** Notifications that arrived while a turn ran, newest per app. */
+    private val held = LinkedHashMap<String, JSONObject>()
+
+    /** One held notification at a time, the next only once the turn it starts is over. On [exec]. */
+    private fun retryHeld() {
+        val h = host ?: return
+        if (synchronized(held) { held.isEmpty() }) return
+        if (h.busy()) { exec.schedule({ retryHeld() }, HELD_RETRY_MS, TimeUnit.MILLISECONDS); return }
+        val n = synchronized(held) { held.keys.firstOrNull()?.let { held.remove(it) } } ?: return
+        if (System.currentTimeMillis() - n.optLong("when") <= HELD_MAX_MS) deliver(n)
+        if (synchronized(held) { held.isNotEmpty() }) exec.schedule({ retryHeld() }, HELD_RETRY_MS, TimeUnit.MILLISECONDS)
     }
 
     /** `device.notifications`: what arrived recently, newest last — the same shape as the phone's. */
