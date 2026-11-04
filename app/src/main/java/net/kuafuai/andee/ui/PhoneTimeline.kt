@@ -17,7 +17,7 @@ import net.kuafuai.andee.i18n.AppLocale
 object PhoneTimeline {
 
     /** Body-side event kinds, alongside [BrainEvent.Kind]'s names. */
-    enum class Body { THOUGHT, WORK, BUBBLE, BUBBLE_MUTED, IGNORED, MORNING, SCENE, VAULT, TOLD }
+    enum class Body { THOUGHT, WORK, BUBBLE, BUBBLE_MUTED, IGNORED, MORNING, SCENE, VAULT, TOLD, STEPS }
 
     private fun s(c: Context, id: Int, vararg a: Any) = AppLocale.str(c, id, *a)
 

@@ -2958,6 +2958,8 @@ class BodyCoreService : Service() {
             enabled = bc.mode == net.kuafuai.andee.config.VoiceConfig.BRAIN_CODEFLYING,
         )
         marketTools = market
+        net.kuafuai.andee.ui.PhoneWorkLog.attach(this)
+        net.kuafuai.andee.ui.PhoneWorkLog.onRehearse = { on -> if (on) dispatcher.beginTask() else dispatcher.endTask() }
         localBrain = net.kuafuai.andee.brain.LocalBrain(
             cfg = bc,
             host = net.kuafuai.andee.brain.AndroidBrainHost(this, dispatcher, callExtensions, market, peers),
@@ -2966,6 +2968,9 @@ class BodyCoreService : Service() {
             onTurnEnd = ::onTurnEnd,
             onSweepSpent = { tokens -> net.kuafuai.andee.config.Notebook.noteSweep(this, tokens) },
             onQuietFinal = ::onBrainQuietFinal,
+            // The work card in the conversation and the tiny caption under the docked Andee; the folded
+            // 「做了 N 步」 row when the turn ends.
+            onStep = { net.kuafuai.andee.ui.PhoneWorkLog.on(it) },
         )
         peers.tasks.brain = peerBrain
         refreshSceneChip()

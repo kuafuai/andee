@@ -171,6 +171,16 @@ class BodyWsServer(
                         onSweep()
                         JSONObject().put("started", true).put("forced", false)
                     }
+                } else if (method == "debug.worklog") {
+                    // A scripted turn through the step stream ([PhoneWorkLog]), so the work card and the docked
+                    // caption can be looked at without a model or a key. Loopback only, like the two above. Ends
+                    // with the folded 「做了 N 步」 row, as a real turn would.
+                    if (conn.remoteSocketAddress?.address?.isLoopbackAddress != true) {
+                        throw IllegalStateException("debug.worklog is loopback only — use adb forward")
+                    }
+                    val seconds = params?.optInt("seconds", 20) ?: 20
+                    Thread { net.kuafuai.andee.ui.PhoneWorkLog.rehearse(seconds) }.apply { isDaemon = true }.start()
+                    JSONObject().put("started", true).put("seconds", seconds)
                 } else {
                     onCommand(method, params)
                 }

@@ -575,6 +575,15 @@ class FloatingWindowUi(
 
     private val dockRunnable = Runnable { dock() }
 
+    /** After a task: back into the edge at the docked height it had before it came out ([dockCy], unchanged since). */
+    private val dockBackRunnable = Runnable { dock(if (movedWhileWorking) null else restingDockCy()) }
+
+    /** The docked height a ball rests at: where it last docked, or the corner's before it ever has. */
+    private fun restingDockCy(): Int = if (dockCy > 0) dockCy else compactHomeY() + dp(COMPACT_DP) / 2
+
+    /** The user dragged the ball while it worked: it docks back where they left it. Cleared when it comes out. */
+    private var movedWhileWorking = false
+
     // ---- Idle fidget (see [strollStep]) ----
     private val strollRunnable = Runnable { strollStep() }
 
@@ -695,7 +704,8 @@ class FloatingWindowUi(
             retimeStroll()
             armDock()
             true
-        } catch (_: Throwable) {
+        } catch (t: Throwable) {
+            android.util.Log.e("Body", "the ball window could not be shown", t)
             false
         }
     }
@@ -761,7 +771,9 @@ class FloatingWindowUi(
             return true
         }
         val side = dp(COMPACT_DP)
-        ui.removeCallbacks(dockRunnable)
+        ui.removeCallbacks(dockRunnable); ui.removeCallbacks(dockBackRunnable)
+        // The words under the ball give way to the sign; they come back when it is down ([hideSignboard]).
+        setWorkShape(false)
         // A ball half inside the screen edge cannot hold a sign: come out first,
         // to the resting X at the same height, and go back in when it is down.
         slide?.cancel()
@@ -852,11 +864,13 @@ class FloatingWindowUi(
         homeY = p.y
         syncWorking()
         retimeStroll()
-        if (signInterruptedDock) {
+        if (signInterruptedDock && !working) {
             signInterruptedDock = false
             dock()
         } else {
+            signInterruptedDock = false
             armDock()
+            applyWorkShape()
         }
     }
 
@@ -992,7 +1006,10 @@ class FloatingWindowUi(
         val v = root ?: return true
         return try {
             ui.removeCallbacks(strollRunnable)
-            ui.removeCallbacks(dockRunnable)
+            ui.removeCallbacks(dockRunnable); ui.removeCallbacks(dockBackRunnable)
+            PhoneWorkLog.removeListener(workListener)
+            workCaption?.stop()
+            workShape = false
             slide?.cancel()
             // The next window is built as the square; a docked flag left over
             // would treat it as the tab.
@@ -1155,6 +1172,7 @@ class FloatingWindowUi(
             }
             applyPaletteToChrome()
             historyView?.onThemeChanged()
+            historyView?.work?.repaintChrome()
             stageView?.onThemeChanged()
             renderSceneChip()
             // The scrim is now the other palette's, and [paintCard] only pushes it when
@@ -1510,17 +1528,24 @@ class FloatingWindowUi(
         bottomEdge() - dp(COMPACT_DP) - dp(COMPACT_MARGIN_DP) - winYOrigin
 
     /**
-     * The assistant is working: put a busy face on the folded ball, and get out
-     * of the way of the app it is about to drive by going into the edge
-     * ([dock]). It stays there when the task ends; the user pulls it out.
+     * The assistant is working: put a busy face on the folded ball and bring it
+     * out of the edge ([comeOut]), where the user can watch it work — the words
+     * under it ([workCaption]) say what it is doing. When the task ends it goes
+     * back into the edge after [DOCK_AFTER_WORK_MS].
      */
     fun setWorking(on: Boolean) {
         ui.post {
             if (working == on) return@post
             working = on
+            ui.removeCallbacks(dockRunnable); ui.removeCallbacks(dockBackRunnable)
             if (on) {
+                movedWhileWorking = false
                 dropSignboardBeforeDock()
-                dock()
+                comeOut()
+            } else if (root != null && compact && !docked) {
+                // Done: a moment for the last line, then back into the edge — at the height it was docked at
+                // before, not the raised one it worked at, or every task would leave it a little higher.
+                ui.postDelayed(dockBackRunnable, DOCK_AFTER_WORK_MS)
             }
             syncWorking()
             retimeStroll()
@@ -1640,8 +1665,9 @@ class FloatingWindowUi(
 
     /** Start (or restart) the idle countdown to docking. Main thread only. */
     private fun armDock() {
-        ui.removeCallbacks(dockRunnable)
-        if (root != null && compact && !docked && signboard == null) {
+        ui.removeCallbacks(dockRunnable); ui.removeCallbacks(dockBackRunnable)
+        // Not while working: the ball is out on purpose then (see [setWorking]).
+        if (root != null && compact && !docked && signboard == null && !working) {
             ui.postDelayed(dockRunnable, DOCK_AFTER_MS)
         }
     }
@@ -1652,9 +1678,10 @@ class FloatingWindowUi(
      * whole, and holding no sign. Main thread only.
      */
     private fun dock(atCy: Int? = null) {
-        ui.removeCallbacks(dockRunnable)
+        ui.removeCallbacks(dockRunnable); ui.removeCallbacks(dockBackRunnable)
         val p = params ?: return
         if (root == null || !compact || docked || signboard != null || parkedFrom != null) return
+        setWorkShape(false)
         refreshWinYOrigin()
         val side = dp(COMPACT_DP)
         val cy = clampDockCy(atCy ?: (p.y + side / 2))
@@ -1685,10 +1712,18 @@ class FloatingWindowUi(
         val side = dp(COMPACT_DP)
         val w = dockTabW()
         val h = dockTabH()
+        val x = rightEdge() - w
+        val y = dockCy - dockTabUp()
         p.width = w
         p.height = h
-        p.x = rightEdge() - w
-        p.y = dockCy - dockTabUp()
+        val parked = parkedFrom
+        if (parked != null) {
+            // Off screen for an injected gesture: the new shape is where it comes back to (see [unparkForGesture]).
+            parkedFrom = intArrayOf(x, y, w, h)
+        } else {
+            p.x = x
+            p.y = y
+        }
         (area.layoutParams as? FrameLayout.LayoutParams)?.let {
             it.width = side
             it.height = side
@@ -1701,6 +1736,116 @@ class FloatingWindowUi(
         // a drag on the tab would be taken as "back".
         v.systemGestureExclusionRects = listOf(Rect(0, 0, w, h))
         runCatching { wm.updateViewLayout(v, p) }
+    }
+
+    // ---- The work caption under the folded ball ----
+    //
+    // While a turn works the ball is out of the edge ([setWorking] → [comeOut]) and a few lines of tiny type hang
+    // under it ([workCaption]): the status and the newest two lines of what it is thinking and doing. The window
+    // grows to hold them — wider than the ball, down by [WORK_CAPTION_H_DP] — with the ball kept at its top right,
+    // so the ball does not move on screen when the words come or go. Same window, no new overlay.
+
+    /** The caption is wanted now. Main thread only. */
+    private fun captionWanted(): Boolean =
+        root != null && compact && !docked && signboard == null && PhoneWorkLog.active &&
+            !slideRunning() && foldAnim?.isRunning != true
+
+    /** Shown under the ball while a turn works ([PhoneWorkLog]). Built with the window. */
+    private var workCaption: WorkCardView.Tiny? = null
+
+    /** The window is in the caption shape now. Main thread only. */
+    private var workShape = false
+
+    /** How far the window's left edge sits left of the ball's, in the caption shape (0 otherwise): the ball is centred. */
+    private fun workShapeOffset(): Int = if (workShape) ((params?.width ?: 0) - dp(COMPACT_DP)) / 2 else 0
+
+    /** A turn's work changed: take or leave the caption shape, or just repaint the words. */
+    private val workListener: () -> Unit = { applyWorkShape() }
+
+    private fun applyWorkShape() {
+        val want = captionWanted()
+        if (want == workShape) {
+            if (want) workCaption?.repaint()
+            return
+        }
+        setWorkShape(want)
+    }
+
+    /**
+     * Into or out of the caption shape, keeping the ball where it is on screen. While parked off screen for an
+     * injected gesture the new geometry is written into [parkedFrom], the place it comes back to. Main thread only.
+     */
+    private fun setWorkShape(on: Boolean) {
+        if (on == workShape) return
+        val v = root ?: return
+        val p = params ?: return
+        val area = v.ballAreaView ?: return
+        val side = dp(COMPACT_DP)
+        val parked = parkedFrom
+        val oldX = parked?.get(0) ?: p.x
+        val oldY = parked?.get(1) ?: p.y
+        val oldW = parked?.get(2) ?: p.width
+        val ballX = oldX + (if (workShape) (oldW - side) / 2 else 0)
+        workShape = on
+        val dm = context.resources.displayMetrics
+        val w = if (on) maxOf(side, dp(WORK_CAPTION_W_DP)).coerceAtMost(dm.widthPixels) else side
+        // The words start inside the ball area's empty lower band, just under the drawn sphere.
+        val h = if (on) side + dp(WORK_CAPTION_H_DP) - dp(WORK_CAPTION_TUCK_DP) else side
+        // Ball centred over its words; kept on screen if that would push the window past an edge.
+        val x = (ballX - (w - side) / 2).coerceIn(0, (dm.widthPixels - w).coerceAtLeast(0))
+        // Low on the screen the words would run off the bottom: lift the ball just enough to fit them.
+        val y = if (on) minOf(oldY, bottomEdge() - winYOrigin - h - dp(4)) else oldY
+        (area.layoutParams as? FrameLayout.LayoutParams)?.let {
+            it.width = if (on) side else FrameLayout.LayoutParams.MATCH_PARENT
+            it.height = if (on) side else FrameLayout.LayoutParams.MATCH_PARENT
+            it.gravity = if (on) Gravity.TOP or Gravity.CENTER_HORIZONTAL else Gravity.TOP or Gravity.START
+            area.layoutParams = it
+        }
+        workCaption?.let { c ->
+            c.visibility = if (on) View.VISIBLE else View.GONE
+            if (on) c.repaint() else c.stop()
+        }
+        p.width = w
+        p.height = h
+        if (parked != null) {
+            parkedFrom = intArrayOf(x, y, w, h)
+        } else {
+            p.x = x
+            p.y = y
+        }
+        runCatching { wm.updateViewLayout(v, p) }
+    }
+
+    /**
+     * A turn started: if the ball is in the edge, it comes out — the whole ball, at the same height, a thumb's
+     * width in from the edge — and the caption hangs under it once it has arrived.
+     */
+    private fun comeOut() {
+        if (root == null || !compact) return
+        if (!docked) { applyWorkShape(); return }
+        val side = dp(COMPACT_DP)
+        val y0 = dockCy - side / 2
+        val (x, y) = workSpot()
+        // The square with the sphere still on the edge, where the tab showed it, then out.
+        undockTo(rightEdge() - side / 2, y0)
+        slideTo(x, y, DOCK_SLIDE_MS) {
+            homeX = params?.x ?: homeX
+            homeY = y
+            applyWorkShape()
+        }
+    }
+
+    /**
+     * Where a working ball sits, as the square's window (x, y): in from the right edge by [COME_OUT_IN_DP] and up by
+     * [COME_OUT_UP_DP] from the height it docks at (the corner's, before it ever has), never past the top of the
+     * visible area. The one answer for both ways into a working ball — out of the edge ([comeOut]) and a fold
+     * while a task runs ([enterCompact]). Main thread only.
+     */
+    private fun workSpot(): IntArray {
+        val side = dp(COMPACT_DP)
+        val base = restingDockCy() - side / 2
+        val y = maxOf(base - dp(COME_OUT_UP_DP), topEdge() - winYOrigin + dp(8))
+        return intArrayOf(rightEdge() - side - dp(COME_OUT_IN_DP), y)
     }
 
     /**
@@ -1736,6 +1881,7 @@ class FloatingWindowUi(
         area.translationX = 0f
         area.translationY = 0f
         v.systemGestureExclusionRects = emptyList()
+
     }
 
     /** A docked centre kept clear of the status bar and the bottom edge. */
@@ -1768,11 +1914,14 @@ class FloatingWindowUi(
         val side = dp(COMPACT_DP)
         val pad = spherePad()
         val dm = context.resources.displayMetrics
-        p.x = p.x.coerceIn(-pad, dm.widthPixels - side + pad)
+        // In the work-caption shape the ball is at the window's top right; clamp the ball, and keep the words on screen.
+        val off = workShapeOffset()
+        p.x = p.x.coerceIn(-pad - off, dm.widthPixels - side + pad - off)
         if (signboard != null) {
             clampHeld(p)
         } else {
-            p.y = p.y.coerceIn(-pad - winYOrigin, bottomEdge() - side + pad - winYOrigin)
+            val extra = if (workShape) dp(WORK_CAPTION_H_DP) - dp(WORK_CAPTION_TUCK_DP) else 0
+            p.y = p.y.coerceIn(-pad - winYOrigin, bottomEdge() - side - extra + pad - winYOrigin)
         }
     }
 
@@ -1790,8 +1939,9 @@ class FloatingWindowUi(
         runCatching { wm.updateViewLayout(v, p) }
         homeX = p.x
         homeY = p.y
+        if (working) movedWhileWorking = true
         val side = dp(COMPACT_DP)
-        val sphereRight = p.x + side / 2 + (side * SPHERE_RADIUS_FRACTION).toInt()
+        val sphereRight = p.x + workShapeOffset() + side / 2 + (side * SPHERE_RADIUS_FRACTION).toInt()
         if (signboard == null && sphereRight >= rightEdge() - dp(SNAP_GRACE_DP)) {
             dock()
         } else {
@@ -2210,12 +2360,15 @@ class FloatingWindowUi(
         // it goes into the edge at once if it was docked when the card opened or
         // a task is running (the fold is usually the task's first screen call),
         // and after the idle countdown otherwise.
-        val cx = dm.widthPixels - side - dp(COMPACT_MARGIN_DP)
-        val cy = compactHomeY()
+        // A fold while a task works lands where a working ball comes out of the edge ([workSpot]), so the two ways
+        // into a working ball end in the same place.
+        val spot = if (working) workSpot() else null
+        val cx = spot?.get(0) ?: (dm.widthPixels - side - dp(COMPACT_MARGIN_DP))
+        val cy = spot?.get(1) ?: compactHomeY()
         homeX = cx
         homeY = cy
         docked = false
-        val dockNow = dockOnFold || working
+        val dockNow = dockOnFold && !working
         // Back to the height it was docked at, not the corner's.
         val dockAt = if (dockOnFold) dockCy else null
         dockOnFold = false
@@ -2226,7 +2379,7 @@ class FloatingWindowUi(
             applyCompactAppearance()
             syncWorking()
             retimeStroll()
-            ui.post { reseatCompact(); if (dockNow) dock(dockAt) else armDock() }
+            ui.post { reseatCompact(); if (dockNow) dock(dockAt) else { armDock(); applyWorkShape() } }
             return
         }
         // A short retreat replaces the old half-size zoom. Keep the current
@@ -2237,7 +2390,7 @@ class FloatingWindowUi(
             applyCompactAppearance()
             syncWorking()
             retimeStroll()
-            ui.post { reseatCompact(); if (dockNow) dock(dockAt) else armDock() }
+            ui.post { reseatCompact(); if (dockNow) dock(dockAt) else { armDock(); applyWorkShape() } }
         }
     }
 
@@ -2271,7 +2424,8 @@ class FloatingWindowUi(
         val reversing = foldAnim != null
         slide?.cancel()
         cancelFoldAnimation()
-        ui.removeCallbacks(dockRunnable)
+        ui.removeCallbacks(dockRunnable); ui.removeCallbacks(dockBackRunnable)
+        setWorkShape(false)
         // A dock or undock shrink still running would override the card's scale.
         ball?.animate()?.cancel()
         // Docked (or only out of the edge for a sign) when the card opened:
@@ -2707,6 +2861,16 @@ class FloatingWindowUi(
             ),
         )
         root.ballAreaView = ballArea
+        // The caption under the ball while a turn works: bottom right of the window, hidden otherwise.
+        val caption = WorkCardView.Tiny(context).apply { visibility = View.GONE }
+        root.addView(
+            caption,
+            FrameLayout.LayoutParams(dp(WORK_CAPTION_W_DP) - dp(8), dp(WORK_CAPTION_H_DP), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
+                .apply { bottomMargin = dp(2) },
+        )
+        workCaption = caption
+        PhoneWorkLog.removeListener(workListener)
+        PhoneWorkLog.addListener(workListener)
 
         // ---- Scrollback, straight under the ball ----
         val history = HistoryListView(context).apply {
@@ -3197,7 +3361,9 @@ class FloatingWindowUi(
         }
 
         private fun isOnBall(x: Float, y: Float, ballH: Int): Boolean {
-            val cx = width / 2f
+            // The ball area's own centre: it is the window's except in the work-caption shape, where the window
+            // is wider than the ball and the ball sits at its top right.
+            val cx = ballAreaView?.let { it.left + it.width / 2f } ?: (width / 2f)
             // The ball area may sit at the bottom of a taller window (a
             // signboard above it), so its centre is not `ballH / 2` from the
             // window's top — read it from the area's real position.
@@ -3304,7 +3470,7 @@ class FloatingWindowUi(
                     }
                     // Don't let it bounce under a finger that is already on it.
                     ui.removeCallbacks(strollRunnable)
-                    ui.removeCallbacks(dockRunnable)
+                    ui.removeCallbacks(dockRunnable); ui.removeCallbacks(dockBackRunnable)
                     if (!docked && slideRunning()) {
                         // Caught on its way into the edge: stays a whole ball.
                         ball?.animate()?.scaleX(1f)?.scaleY(1f)?.setDuration(DOCK_SLIDE_MS)?.start()
@@ -3587,6 +3753,23 @@ class FloatingWindowUi(
          * and a tab sized for them cut the ears off flat).
          */
         private const val DOCK_TAB_W_FRACTION = 0.48f
+
+        /**
+         * The caption under the folded ball while a turn works: three lines of [WorkCardView.TEXT_SP] type (status
+         * and the newest two), centred under the ball. The window grows to this while it shows.
+         */
+        private const val WORK_CAPTION_W_DP = 160
+        private const val WORK_CAPTION_H_DP = 40
+
+        /** How far the words tuck up into the transparent band under the sphere, so they read as the ball's. */
+        private const val WORK_CAPTION_TUCK_DP = 16
+
+        /** Where a working ball comes out to: this far in from the right edge and up from where it was docked. */
+        private const val COME_OUT_IN_DP = 72
+        private const val COME_OUT_UP_DP = 140
+
+        /** After a turn, how long the ball stays out before it goes back into the edge. */
+        private const val DOCK_AFTER_WORK_MS = 3_000L
         private const val DOCK_TAB_UP_FRACTION = 0.44f
         private const val DOCK_TAB_DOWN_FRACTION = 0.34f
 

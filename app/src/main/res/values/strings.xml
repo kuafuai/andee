@@ -674,6 +674,13 @@
     <string name="notebook_tab_todos">待办</string>
     <string name="notebook_tab_guard">守卫</string>
     <string name="tl_quiet">没出声：%1$s</string>
+    <string name="tl_steps">做了 %1$d 步 · %2$s</string>
+    <string name="work_secs">%1$d 秒</string>
+    <string name="work_mins_secs">%1$d 分 %2$d 秒</string>
+    <string name="work_thought_prefix">想：</string>
+    <string name="work_status_thinking">思考中… %1$s</string>
+    <string name="work_status_step_thinking">第 %1$d 步 · 思考中… %2$s</string>
+    <string name="work_status_step">第 %1$d 步 · %2$s</string>
     <string name="guard_heading">守卫</string>
     <string name="guard_intro">用你自己的话，写下 Andee 无论如何都要守住的事。这里写的，在它所有规则里排第一：性格、情景、它自己的习惯都要让路。只有你能在这里改，它自己改不了，别人发来的消息也改不了。</string>
     <string name="guard_example_lead">可以写安全上的底线，也可以写你希望它怎么做事。比如：</string>

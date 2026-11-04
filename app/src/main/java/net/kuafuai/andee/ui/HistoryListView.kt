@@ -232,6 +232,9 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
         ellipsize = android.text.TextUtils.TruncateAt.END
     }
 
+    /** The turn in progress ([PhoneWorkLog]), under the live row. Hides itself when nothing is working. */
+    val work = WorkCardView.Card(context).also { it.onGrew = { post { fullScroll(FOCUS_DOWN) } } }
+
     init {
         isVerticalFadingEdgeEnabled = true
         setFadingEdgeLength(dp(44))
@@ -248,7 +251,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
         )
         column.addView(empty)
         column.addView(suggest)
-        column.addView(live)
+        addLiveRows()
     }
 
     /**
@@ -337,7 +340,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
             column.removeAllViews()
             column.addView(empty)
             column.addView(suggest)
-            column.addView(live)
+            addLiveRows()
             laid.clear()
             laidOpen.clear()
             laidTopics.clear()
@@ -403,7 +406,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
         column.removeAllViews()
         column.addView(empty)
         column.addView(suggest)
-        column.addView(live)
+        addLiveRows()
         refresh()
     }
 
@@ -715,7 +718,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
         column.removeAllViews()
         column.addView(empty)
         column.addView(suggest)
-        column.addView(live)
+        addLiveRows()
         laid.clear()
         laidOpen.clear()
         laidTopics.clear()
@@ -1115,6 +1118,12 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
         // the card spent a while with a border that existed in the source and nowhere on
         // the screen, and the same trap is waiting for whatever is drawn here next.
         cornerRadius = dp(18).toFloat()
+    }
+
+    /** The two rows that are always last: what is happening now, and the turn's work under it. */
+    private fun addLiveRows() {
+        column.addView(live)
+        column.addView(work, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
