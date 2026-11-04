@@ -2965,6 +2965,7 @@ class BodyCoreService : Service() {
             onFinal = ::onBrainFinal,
             onTurnEnd = ::onTurnEnd,
             onSweepSpent = { tokens -> net.kuafuai.andee.config.Notebook.noteSweep(this, tokens) },
+            onQuietFinal = ::onBrainQuietFinal,
         )
         peers.tasks.brain = peerBrain
         refreshSceneChip()
@@ -3490,6 +3491,19 @@ class BodyCoreService : Service() {
     }
 
     /** The finished answer. See [onBrainProgress] for why this is not inline. */
+    /**
+     * The answer was marked `[quiet]`: it is already a row in the timeline (`没出声：…`), and nothing is spoken.
+     * What is left is what [onBrainFinal] does besides speaking — end the task light, clear the live line, and
+     * put the face back to rest. Loop thread, like [onBrainFinal]; everything it touches posts to the UI.
+     */
+    private fun onBrainQuietFinal() {
+        if (!acceptBrainOutput || exitRequested) return
+        expectFollowUp = false
+        dispatcher.endTask()
+        window.clearSubtitle()
+        window.setState(FloatingWindowUi.State.IDLE)
+    }
+
     private fun onBrainFinal(text: String) {
         // Read first, before anything else can end the turn. This runs inside
         // the turn it is describing — `onFinal` is called from the loop thread

@@ -76,6 +76,13 @@ class LocalBrain(
      * budget the user set for reviews would be misleading.
      */
     private val onSweepSpent: (Int) -> Unit = {},
+
+    /**
+     * The turn ended on an answer the model marked `[quiet]` (LocalPrompt §10): instead of [onFinal], which
+     * speaks, the answer went into the timeline as a [BrainEvent.Kind.QUIET] row. The body only has to put
+     * itself back to rest — end the task light, clear the live line, the idle face. Loop thread.
+     */
+    private val onQuietFinal: () -> Unit = {},
 ) {
 
     private val llm = LlmClient(
@@ -545,6 +552,7 @@ class LocalBrain(
                 workCalls.clear()
             }
             turnAnswer = null
+            turnQuiet = false
             host.turnStarted(kind.name)
             turnTokens = 0
             turnWaitSeconds = 0.0
@@ -795,6 +803,25 @@ class LocalBrain(
     private fun finish(text: String) {
         turnAnswer = text
         onFinal(text)
+    }
+
+    /**
+     * Set once a reply of this turn carries `[quiet]` (LocalPrompt §10) and kept to the end of the turn: from
+     * there on nothing is narrated, and the answer becomes a timeline row instead of being spoken. Loop thread.
+     */
+    private var turnQuiet = false
+
+    /** The quiet ending: the answer as one [BrainEvent.Kind.QUIET] row that opens to the whole of it. */
+    private fun finishQuietly(text: String) {
+        turnAnswer = text
+        val clean = SpeechMood.strip(text).replace("[END]", "").trim()
+        if (clean.isNotEmpty()) {
+            val first = clean.lineSequence().first { it.isNotBlank() }.trim()
+                .let { l -> Regex("^.+?[。！？]|^.+?[.!?](?=\\s|$)").find(l)?.value ?: l }
+                .let { if (it.length > QUIET_HEADLINE) it.take(QUIET_HEADLINE) + "…" else it }
+            emit(BrainEvent(BrainEvent.Kind.QUIET, first, if (first == clean) "" else clean))
+        }
+        onQuietFinal()
     }
 
     /**
@@ -1151,6 +1178,9 @@ class LocalBrain(
             BrainTrace.step(gen, step, reply.content, reply.reasoning, reply.toolCalls.size, reply.promptTokens)
             history += reply.assistantMessage
 
+            // `[quiet]` anywhere in what the model wrote: the rest of this turn says nothing aloud (§10).
+            if (!turnQuiet && SpeechMood.isQuiet(reply.content)) turnQuiet = true
+
             if (reply.toolCalls.isEmpty()) {
                 val answer = reply.content.trim()
                 if (harvest) {
@@ -1165,6 +1195,10 @@ class LocalBrain(
                     // A turn that did something and finished means the user has moved on — or that 继续 just
                     // finished the job. Either way the stopped task no longer needs keeping.
                     if (acted) unfinished = null
+                    if (turnQuiet) {
+                        finishQuietly(answer)
+                        return
+                    }
                     // A silent turn has nobody to answer; whatever it wrote
                     // stays in the history as its own note and that is all.
                     finish(
@@ -1179,7 +1213,7 @@ class LocalBrain(
                 return
             }
 
-            if (reply.content.isNotBlank() && !internal && !quiet) onProgress(reply.content.trim())
+            if (reply.content.isNotBlank() && !internal && !quiet && !turnQuiet) onProgress(reply.content.trim())
 
             val images = mutableListOf<String>()
             for ((ti, tc) in reply.toolCalls.withIndex()) {
@@ -1206,7 +1240,7 @@ class LocalBrain(
                     return
                 }
 
-                if (reply.content.isBlank() && !internal && !quiet) onProgress(narrate(tc.name))
+                if (reply.content.isBlank() && !internal && !quiet && !turnQuiet) onProgress(narrate(tc.name))
                 val t0 = System.nanoTime() / 1_000_000L
                 acted = true
                 val msg = runTool(tc, images, internal, kind.untrusted)
@@ -2015,6 +2049,9 @@ class LocalBrain(
 
     companion object {
         private const val TAG = "Brain"
+
+        /** A quiet answer's row shows its first sentence, cut to this; the row opens to the rest. */
+        private const val QUIET_HEADLINE = 40
 
         // The per-turn step cap moved to [VoiceConfig.maxSteps] / "max_steps"
         // pref so a user who wants longer tasks can raise it from the settings

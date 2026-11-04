@@ -649,6 +649,7 @@
     <string name="notebook_tab_memories">Memories</string>
     <string name="notebook_tab_todos">Todos</string>
     <string name="notebook_tab_guard">Guard</string>
+    <string name="tl_quiet">Kept quiet: %1$s</string>
     <string name="guard_heading">Guard</string>
     <string name="guard_intro">In your own words, write what Andee must hold to no matter what. What you write here comes first among all its rules — its character, a scene, its own habits all give way. Only you can change it here; Andee cannot, and neither can a message someone sends it.</string>
     <string name="guard_example_lead">It can be a line it must not cross, or how you want it to behave. For example:</string>

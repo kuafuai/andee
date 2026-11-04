@@ -38,6 +38,7 @@ object PhoneTimeline {
         val u = e.updated
         return when (e.kind) {
             BrainEvent.Kind.WOKE -> s(c, R.string.tl_woke, x)
+            BrainEvent.Kind.QUIET -> s(c, R.string.tl_quiet, x)
             BrainEvent.Kind.STOPPED -> if (x.isNotBlank()) s(c, R.string.tl_stopped, x) else s(c, R.string.tl_stopped_queue)
             BrainEvent.Kind.NOTIFIED -> s(c, R.string.tl_notified)
             BrainEvent.Kind.FRIEND_TASK -> s(c, R.string.tl_friend_task)

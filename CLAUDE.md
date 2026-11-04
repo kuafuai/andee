@@ -220,6 +220,14 @@ Five things are load-bearing:
 
 Fallbacks all land on the pre-existing behaviour rather than on nothing: no markers at all is the identity, one marker holds for the whole reply, and a `cueTotalMs` that never arrives (stall, error) holds the opening face. `SpeechMoodTest` exists because every way the offset arithmetic can be wrong is invisible on the device — a swallowed space is only audible, and a surviving marker is read aloud as a word nobody notices was not in the answer.
 
+#### `[quiet]`: the model decides when not to speak
+
+Any turn may be quiet, and the model decides which (`LocalPrompt` §10): a `[quiet]` (or `[安静]` / `[静音]`) anywhere in a reply makes the rest of that turn say nothing aloud. `LocalBrain.turnQuiet` latches on the first reply that carries it, stops `onProgress` from then on, and ends the turn through `finishQuietly` instead of `finish`: the answer becomes one `BrainEvent.Kind.QUIET` row in the timeline (「没出声：<first sentence>」, opening to the whole answer) and the body's `onQuietFinal` only puts itself to rest — task light off, live line cleared, idle face — with no TTS, no subtitle, no follow-up mic. `SpeechMood` strips the marker like a face; the Chinese spellings had to be listed, because the lowercase rule that drops unknown English tags would otherwise leave them to be read out.
+
+- **It is a judgment, written down as a rule, not a setting.** The prompt says: quiet when the result is already where they will see it (stage, page, notebook), late at night, or when they said they are busy; aloud whenever the user has just spoken or typed to it, unless they asked for quiet — a ball that says nothing to a direct question looks broken. The two default todos (`MORNING_TODO`, `NIGHTLY_PICTURE`) are the exception that is not left to judgment: their text tells the model to open with `[quiet]` and say nothing aloud (the user asked for them to run quietly); their earlier wordings are rewritten in place (`MORNING_TODO_OLD`, `NIGHTLY_PICTURE_OLD`).
+- **The row is never read back into the model.** The answer stays in the live history, but `scrollback` filters event rows, so after a restart a quiet answer is only in the timeline. Error endings (`explainFailure`, the step and repeat guards) still speak.
+- `QuietTurnTest` drives a scripted model through it.
+
 #### Gestures: hands, props and one-eyed winks (`ui/ball/Pose.kt`)
 
 A `Face` row is a set of continuous dials every look interprets; a wink, a fist under the chin and a star are not dials. So each `Mood` also has a `Pose` (`POSES`), and **only a look with `BallLook.gestures = true` reads it** — today that is `ANDEE`. A look without the flag sees `Pose.NONE` for every mood, which is the whole reason the pig, the imp and the rest are untouched by any of this: five moods were added (`WINK`, `WAVE`, `PROTECT`, `CELEBRATE`, `REST`) and on those looks each is just the plain face on its `FACE` row.

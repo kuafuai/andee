@@ -42,6 +42,11 @@ data class BrainEvent(
         WIKI_SHOWN,
         /** The user stopped it (a tap on the ball). [subject] is what was cut off; [detail] what was waiting and dropped. */
         STOPPED,
+        /**
+         * It answered without speaking (`[quiet]`, LocalPrompt §10): [subject] is the answer's first sentence and
+         * [detail] the whole of it, so the row opens to what it would have said.
+         */
+        QUIET,
     }
 
     companion object {

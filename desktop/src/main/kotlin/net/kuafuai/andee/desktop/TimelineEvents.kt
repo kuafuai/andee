@@ -38,6 +38,7 @@ object TimelineEvents {
         val u = e.updated
         return when (e.kind) {
             BrainEvent.Kind.WOKE -> t("提醒到点：$s", "Reminder due: $s")
+            BrainEvent.Kind.QUIET -> t("没出声：$s", "Kept quiet: $s")
             BrainEvent.Kind.STOPPED -> if (s.isNotBlank()) t("被你叫停了：$s", "You stopped it: $s") else t("被你叫停了，排着的事没做", "You stopped it; what was waiting was dropped")
             BrainEvent.Kind.NOTIFIED -> t("一条通知值得处理，开始做", "A notification was worth acting on")
             BrainEvent.Kind.FRIEND_TASK -> t("另一台设备的 Andee 交来一件事", "Another Andee handed over a task")

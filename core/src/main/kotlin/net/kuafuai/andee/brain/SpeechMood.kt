@@ -133,6 +133,17 @@ object SpeechMood {
      * Three bracket families: ASCII, fullwidth `［］`, and 【】, which a model
      * writing Chinese types about as readily as either.
      */
+    /**
+     * `[quiet]` — not a face but a request: say nothing aloud from here on (LocalPrompt §10). Read by
+     * [isQuiet]; [parse] strips it like a face, including the Chinese spellings, which the lowercase rule in
+     * [droppable] would otherwise leave in the text to be read out.
+     */
+    private val QUIET = setOf("quiet", "silent", "shh", "安静", "静音", "不出声", "别出声")
+
+    /** The model asked for this turn to say nothing aloud. */
+    fun isQuiet(raw: String): Boolean =
+        MARKER.findAll(raw).any { it.groupValues[1].lowercase() in QUIET }
+
     private val MARKER = Regex("[\\[\\uFF3B\\u3010]\\s*([A-Za-z\\u4e00-\\u9fff]{1,12})\\s*[\\]\\uFF3D\\u3011]")
 
     /**
@@ -181,7 +192,7 @@ object SpeechMood {
             // Not a face. Either drop it silently or leave it to be spoken —
             // and "leave it" means leaving the brackets too, so this branch
             // must not touch [cursor] or the whitespace around the match.
-            if (mood == null &&
+            if (mood == null && word.lowercase() !in QUIET &&
                 !droppable(word, raw.getOrNull(m.range.last + 1))
             ) continue
 

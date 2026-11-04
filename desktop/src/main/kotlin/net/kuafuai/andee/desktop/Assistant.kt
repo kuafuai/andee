@@ -320,6 +320,8 @@ object Assistant {
             },
             onTurnEnd = { busy(false) },
             onSweepSpent = { Sweep.spent(it) },
+            // `[quiet]`: the answer is already a timeline row; only rest.
+            onQuietFinal = { BallCaption.clear(); busy(false) },
         )
         brain = b
         builtFor = cfg

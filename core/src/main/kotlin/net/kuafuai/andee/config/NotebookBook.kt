@@ -501,7 +501,7 @@ class NotebookBook(private val store: NotebookStore) {
      * before the morning one existed still gets it, and a wipe (清空小本本, 恢复出厂设置) takes the flags with it.
      * Not added beside an open todo on the same schedule, which is how it would be set by hand.
      *
-     * An earlier wording of the same todo ([NIGHTLY_PICTURE_OLD]) is rewritten in place, so a notebook seeded
+     * An earlier wording of the same todo ([NIGHTLY_PICTURE_OLD], [MORNING_TODO_OLD]) is rewritten in place, so a notebook seeded
      * before the text changed gets the new one without a second todo.
      *
      * Returns what was added, for the caller to arm; empty when there was nothing to add. Throws when the store
@@ -515,6 +515,7 @@ class NotebookBook(private val store: NotebookStore) {
         for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: continue
             if (o.optString("what") in NIGHTLY_PICTURE_OLD) { o.put("what", NIGHTLY_PICTURE); rewrote = true }
+            if (o.optString("what") in MORNING_TODO_OLD) { o.put("what", MORNING_TODO); rewrote = true }
         }
         val meta = b.optJSONObject("meta") ?: JSONObject()
         val pending = todos("pending")
@@ -731,14 +732,15 @@ class NotebookBook(private val store: NotebookStore) {
          * The plan rules that are not in `day_plan`'s own description are here.
          */
         const val MORNING_TODO =
-            "Morning: start the day. First today's plan — day_plan get (today, and yesterday to see what landed, " +
+            "Morning: start the day, quietly — begin your first reply with [quiet] (§10) and say nothing aloud " +
+                "in this turn. First today's plan — day_plan get (today, and yesterday to see what landed, " +
                 "was declined or ignored) and plan_directions list, then day_plan write, or leave the draft if it " +
                 "is still right. Learn from yesterday: do less of what they ignored or declined, carry over what " +
                 "moved. Never invent a goal they did not state; with no directions yet, at most one ask today, to " +
                 "get to know them. Then, if you have a stage (set_stage), put today on it: what you mean to do for " +
                 "them and what you are minding — short, a board, not a report; last night's story and picture step " +
-                "aside. Close with one short line of good morning about the day, no more; in the language of your " +
-                "recent conversation with the user, or the interface language if there has been none."
+                "aside. End with one short line about the day for the timeline; in the language of your recent " +
+                "conversation with the user, or the interface language if there has been none."
 
         /**
          * Model-facing, like every wake-up line, so it is English and names no language for the reply: the
@@ -751,6 +753,55 @@ class NotebookBook(private val store: NotebookStore) {
          * Andee, and it stays there until the morning puts today's plan up (review rule 10 leaves it alone).
          */
         const val NIGHTLY_PICTURE =
+            "Evening look-back, done quietly — begin your first reply with [quiet] (§10) and say nothing aloud in " +
+                "this turn. Go over today (the conversation, what you did, your diary) and from it write a short " +
+                "story of the day — a few sentences, in your own voice, about you and him — and make a picture of " +
+                "\"you and me\" with some mood to it. If you have an image-generation tool (the market may have one), " +
+                "use it for the picture; if not, draw it in HTML. If you have a stage (set_stage), put the picture " +
+                "and the story there, the picture on top — an https image goes in as <img src>; it stays up until " +
+                "morning. If you have no stage, show them with show_html instead. End with a sentence or two about " +
+                "what it shows, for the timeline. Write in the language of your recent conversation with the user; " +
+                "only if there has been none, use the interface language. If nothing much happened today, tell a " +
+                "quiet day rather than inventing one."
+
+        /** Earlier wordings, rewritten to [MORNING_TODO] where a notebook still holds them. */
+        private val MORNING_TODO_OLD = setOf(
+            // 2026-11-04, briefly: whether to speak was left to its judgment.
+            "Morning: start the day. First today's plan — day_plan get (today, and yesterday to see what landed, " +
+                "was declined or ignored) and plan_directions list, then day_plan write, or leave the draft if it " +
+                "is still right. Learn from yesterday: do less of what they ignored or declined, carry over what " +
+                "moved. Never invent a goal they did not state; with no directions yet, at most one ask today, to " +
+                "get to know them. Then, if you have a stage (set_stage), put today on it: what you mean to do for " +
+                "them and what you are minding — short, a board, not a report; last night's story and picture step " +
+                "aside. Close with one short line about the day, no more; in the language of your recent " +
+                "conversation with the user, or the interface language if there has been none. Whether to say it " +
+                "aloud is yours to judge (§10, [quiet]): if what you put up says it all, or they are not likely to " +
+                "want a voice at this hour, keep it quiet.",
+            // Before [quiet] (2026-11-04): it was told to say good morning aloud.
+            "Morning: start the day. First today's plan — day_plan get (today, and yesterday to see what landed, " +
+                "was declined or ignored) and plan_directions list, then day_plan write, or leave the draft if it " +
+                "is still right. Learn from yesterday: do less of what they ignored or declined, carry over what " +
+                "moved. Never invent a goal they did not state; with no directions yet, at most one ask today, to " +
+                "get to know them. Then, if you have a stage (set_stage), put today on it: what you mean to do for " +
+                "them and what you are minding — short, a board, not a report; last night's story and picture step " +
+                "aside. Close with one short line of good morning about the day, no more; in the language of your " +
+                "recent conversation with the user, or the interface language if there has been none.",
+        )
+
+        /** Earlier wordings, rewritten to [NIGHTLY_PICTURE] where a notebook still holds them. */
+        private val NIGHTLY_PICTURE_OLD = setOf(
+            // 2026-11-04, briefly: whether to speak was left to its judgment.
+            "Evening look-back: go over today (the conversation, what you did, your diary) and from it write a short " +
+                "story of the day — a few sentences, in your own voice, about you and him — and make a picture of " +
+                "\"you and me\" with some mood to it. If you have an image-generation tool (the market may have one), " +
+                "use it for the picture; if not, draw it in HTML. If you have a stage (set_stage), put the picture " +
+                "and the story there, the picture on top — an https image goes in as <img src>; it stays up until " +
+                "morning. If you have no stage, show them with show_html instead. Then a sentence or two about what " +
+                "it shows; whether to say it aloud is yours to judge (§10, [quiet]) — the picture is already where " +
+                "they will see it. Write in the language of your recent conversation with the user; only if there " +
+                "has been none, use the interface language. If nothing much happened today, tell a quiet day rather " +
+                "than inventing one.",
+            // Before [quiet] (2026-11-04): it was told to speak.
             "Evening look-back: go over today (the conversation, what you did, your diary) and from it write a short " +
                 "story of the day — a few sentences, in your own voice, about you and him — and make a picture of " +
                 "\"you and me\" with some mood to it. If you have an image-generation tool (the market may have one), " +
@@ -759,10 +810,7 @@ class NotebookBook(private val store: NotebookStore) {
                 "morning. If you have no stage, show them with show_html instead. Then say in a sentence or two what " +
                 "it shows. Write and speak in the language of your recent conversation with the user; only if there " +
                 "has been none, use the interface language. If nothing much happened today, tell a quiet day rather " +
-                "than inventing one."
-
-        /** Earlier wordings, rewritten to [NIGHTLY_PICTURE] where a notebook still holds them. */
-        private val NIGHTLY_PICTURE_OLD = setOf(
+                "than inventing one.",
             "Evening look-back: go over today (the conversation, what you did, your diary) and from it make a " +
                 "picture of \"you and me\" with some mood to it. If you have an image-generation tool (the market " +
                 "may have one), use it; if not, make it a page with show_html — drawn in HTML, that is enough. Put " +
