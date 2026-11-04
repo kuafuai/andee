@@ -828,7 +828,7 @@
     <string name="brain_error_network">连不上后端服务。检查一下这台设备的网络；如果网络没问题，到「设置」→「后端」核对接口地址。</string>
     <string name="brain_no_result">我这轮没拿到结果，你再说一遍试试。</string>
     <string name="brain_repeat_stop">我一直在重复同一个动作（%1$s），停下来了 —— 这条路走不通，换个说法或者你来操作一下。</string>
-    <string name="brain_max_steps">这件事我做了 %1$d 步还没办完，先停下来问你一句：要不要换个路子，或者你来接手？</string>
+    <string name="brain_max_steps">这件事我做了 %1$d 步，到了这次任务的步数上限，还没做完，先停在这儿。说「继续」我就接着往下做；也可以换个说法、换条路试试。要是这类事本来就步骤多，可以打开 Andee 主界面，点右上角的设置图标，把「单次任务最多步数」调大一些。</string>
     <!--
         `narrate()`: the one-line subtitle for a tool the model called without
         saying anything. Chinese and English here are deliberately terse —

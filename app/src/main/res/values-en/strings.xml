@@ -752,7 +752,7 @@
     <string name="brain_error_network">I could not reach the backend. Check this device\'s network; if that is fine, check the endpoint URL in Settings → Backend.</string>
     <string name="brain_no_result">I got nothing back that time — say it again.</string>
     <string name="brain_repeat_stop">I kept doing the same thing over and over (%1$s), so I stopped — that way is blocked. Try saying it differently, or take over.</string>
-    <string name="brain_max_steps">I have spent %1$d steps on this without finishing, so I stopped to ask: shall I try another way, or will you take over?</string>
+    <string name="brain_max_steps">I have taken %1$d steps on this — the most one task is allowed — and it is not done yet, so I stopped here. Say \"go on\" and I will pick it up where I left off, or try asking another way. If tasks like this simply need more steps, open Andee\'s main screen, tap the settings icon at the top right, and raise \"Max steps per task\".</string>
     <string name="narrate_get_screen">Reading the screen…</string>
     <string name="narrate_screenshot">Looking at the screen…</string>
     <string name="narrate_tap">Tapping…</string>
