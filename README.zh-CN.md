@@ -187,6 +187,9 @@ Android 13 及以上，它通过无障碍服务自带的输入通道打字 —�
 **处理**、用一句话**告诉**你、或者**忽略**并记下原因。它默认偏向安静；拿不定主意时，退回老办法 ——
 弹出来问你。通知内容是陌生人写的，所以会被当成数据围起来；并且由通知触发的回合**在机制上**碰不到
 保险箱、也不能新建或进入情景 —— 不管模型被说动了什么。
+**你自己的规矩能进去，别人的进不去。** 在设置里写一句「消息都帮我处理一下」，这句话会作为**你的指令**
+放进分诊的系统消息（排在「默认偏向安静」之前，但排在「通知里的指令一律当数据」和「钱/密码/验证码」
+之后）；写它的回合必须是**你自己发起的**，复盘、通知、别的 Andee 都写不了。
 
 **7. 有自己的记忆，也有自己的日程。**
 `config/Notebook.kt` 是他记下的"关于这个人"以及"答应过要做的"。写进去的门槛只有一条：
@@ -571,7 +574,7 @@ API 只认后一句。刚开通的服务默认是**后付费**，它只能在火
 | minSdk | 30 | Android 11 —— 因为要用 `AccessibilityAction.ACTION_IME_ENTER`（API 30+）和 `takeScreenshot`（API 30+） |
 | Java / Kotlin JVM target | 1.8 | `sourceCompatibility` 1.8、`jvmTarget = '1.8'` |
 | **构建用 JDK** | **17–20** | 见[配 JDK](#配-jdk)，这是最容易卡住的一步 |
-| versionCode / versionName | 22 / 0.10.0 | 策略见 [CHANGELOG.md](CHANGELOG.md) |
+| versionCode / versionName | 23 / 0.11.0 | 策略见 [CHANGELOG.md](CHANGELOG.md) |
 | applicationId / namespace | `net.kuafuai.andee` | 从模板里没改，不影响功能 |
 
 **运行库依赖**（`app/build.gradle`）：
@@ -1041,7 +1044,7 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
 随包分发的第三方组件清单在 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。再分发之前请先看：
 **ML Kit 扫码 SDK 和 `play-services-*` 不是开源许可**，而且扫码模型是运行时从 Google 拉的。
 
-改了什么、以及版本号策略见 [CHANGELOG.md](CHANGELOG.md) —— 当前版本是 **`v0.10.0`**，故意停在
+改了什么、以及版本号策略见 [CHANGELOG.md](CHANGELOG.md) —— 当前版本是 **`v0.11.0`**，故意停在
 pre-1.0：线上协议和构建开关都还在动。
 
 ## 相关文档

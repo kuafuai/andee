@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`22` / `"0.10.0"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`23` / `"0.11.0"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,60 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.11.0] - 2026-11-04
+
+**A turn that shows its work, a turn that can choose to say nothing, and your rule for notifications
+reaching the thing that reads them.**
+
+Three things that were invisible are now visible or controllable: what a turn is doing while it runs, how
+the notification triage decides, and whether an answer is spoken at all.
+
+### Added
+
+- **[quiet] — any turn can do its work without saying it aloud.** A `[quiet]` (or 【安静】/ [静音])
+  anywhere in a reply makes the rest of that turn silent: the answer becomes one timeline row
+  「没出声：<第一句> ▾」 that opens to the whole of it, and nothing is read aloud, no subtitle appears, and
+  the microphone does not open. The model decides per turn, and the rule it judges by is written down:
+  **quiet** when the result is already on the stage, a page or in the notebook, late at night, or when you
+  say you are busy; **aloud** whenever you have just spoken or typed, unless you asked for quiet, and for
+  anything you need to know now. **Both default todos — the 07:30 plan and the 21:00 story-and-picture —
+  now open with `[quiet]`**; earlier wordings already in a notebook are rewritten in place.
+- **A turn shows its work while it runs.** Thinking made no tool calls and no new words, so a turn waiting
+  on the model looked stuck.
+  - **On the Mac**: a live card at the foot of 动态 with a ticking status (第 3 步 · 0:24, 思考中… 0:12)
+    over the newest four lines of what it is thinking and doing; beside the ball, the status and the newest
+    two lines. Reasoning is cut into short lines and released **one every 160 ms**, so it reads as working.
+    When the turn ends the card folds into one row above the answer, 「做了 N 步 · 38 秒 ▾」, which opens to
+    the steps. **A turn with no tool call leaves no row.**
+  - **On the phone**: the same card at the foot of the conversation, and while a turn works **the ball
+    comes out of the right edge** to a spot with three lines of status under it. A fold of the full card
+    mid-task lands on the same spot. Three seconds after the turn the words go and it docks back at the
+    height it rested at; a ball you dragged while it worked docks where you left it.
+- **Your rule for notifications reaches the triage.** The triage is a separate, tool-less call that sees
+  none of the conversation, so 「消息都帮我处理一下」 said to Andee **never reached it** and it kept
+  answering ignore. A new `notify_rule` keeps your words in the notebook and puts them in the triage's
+  system message as the owner's instruction — **ahead of the lean toward silence, behind the rules about
+  instructions inside a notification and money/passwords/codes**. Shown and editable under 消息提醒 in
+  Settings on both bodies. Setting a rule while notifications are off turns them on for chat apps, and
+  says so.
+  - **Only a turn you started may write it.** Not a review, not a notification, not another Andee — a
+    stranger's message that could set it would have bought itself every later message.
+  - **A held notification is now looked at, not dropped.** One arriving while a turn runs is kept (newest
+    per app, at most 30 minutes) and read once the turn is over.
+  - A "tell" leaves a note for the brain, so 「回一下」 right after is about a message it knows about.
+
+### Fixed
+
+- **Reading an app with an infinite-sized element no longer crashes Andee on the Mac.** The system Weather
+  app has an accessibility element whose size is infinite; `JSONSerialization` raises an Objective-C
+  exception on a non-finite number, **which Swift cannot catch**, so the app aborted on `SIGABRT`
+  mid-task. An unbounded element now has no frame (there is nothing on screen to aim at), and every value
+  the bridge returns is made finite and validated before it is written. Verified against Weather: the
+  previous library aborts with the same uncaught exception; the fixed one returns the whole tree.
+- **The step-limit stop says how to go on.** It used to end with "shall I try another way, or will you
+  take over?", leaving no sign that the limit was a setting. It now says the task hit the per-task step
+  limit and is not done, that 「继续」 picks it up where it stopped, and **where to raise 单次任务最多步数**.
 
 ## [0.10.0] - 2026-11-04
 
