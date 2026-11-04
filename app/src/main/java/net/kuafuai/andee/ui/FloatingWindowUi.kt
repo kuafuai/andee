@@ -467,6 +467,36 @@ class FloatingWindowUi(
         return box
     }
 
+    /** The red dot on 小本本: 守卫 is unwritten. Null until the bar is built. */
+    private var notebookDot: View? = null
+
+    /** 守卫 was saved or the notebook wiped: show or hide the dot on 小本本. Any thread. */
+    fun refreshNotebookDot() {
+        ui.post {
+            notebookDot?.visibility =
+                if (net.kuafuai.andee.config.Notebook.guard(context).isEmpty()) View.VISIBLE else View.GONE
+        }
+    }
+
+    /** 小本本 with a red dot in the corner while 守卫 is unwritten — the same shape as [friendsKey]. */
+    private fun notebookKey(): View {
+        val key = barButton(R.drawable.ic_notebook, Glass.PHOTO_INK, "小本本") { listeners.onNotebookClick() }
+        val lp = key.layoutParams as LinearLayout.LayoutParams
+        key.layoutParams = FrameLayout.LayoutParams(lp.width, lp.height)
+        val box = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(lp.width, lp.height).apply { leftMargin = lp.leftMargin }
+            clipChildren = false
+        }
+        box.addView(key)
+        val dot = RedDot.view(context)
+        box.addView(dot, FrameLayout.LayoutParams(dp(7), dp(7), Gravity.TOP or Gravity.END).apply {
+            topMargin = dp(6); rightMargin = dp(6)
+        })
+        notebookDot = dot
+        refreshNotebookDot()
+        return box
+    }
+
     /** The scene chip's ✕, for the same reason — its colour is set at build too. */
     private var sceneChipExit: TextView? = null
 
@@ -2981,7 +3011,7 @@ class FloatingWindowUi(
             barButton(R.drawable.ic_artifacts, Glass.PHOTO_INK, "产物") { listeners.onArtifactsClick() }
         )
         // 产物 · 小本本 · 情景 · 朋友 · 自检 · 设置 — the Mac's sidebar has the same doors in the same order.
-        keys.addView(barButton(R.drawable.ic_notebook, Glass.PHOTO_INK, "小本本") { listeners.onNotebookClick() })
+        keys.addView(notebookKey())
         keys.addView(barButton(R.drawable.ic_scene, Glass.PHOTO_INK, "情景") { listeners.onScenesClick() })
         keys.addView(friendsKey())
         // ✓ and not ■: the stop button used to sit here, and stop is the one

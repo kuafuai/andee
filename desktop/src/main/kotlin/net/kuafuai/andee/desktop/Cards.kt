@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -261,8 +262,10 @@ fun NotebookCard(onDone: () -> Unit, startTab: Int = 0, startWiki: String? = nul
     var selectedTab by remember { mutableStateOf(startTab) }
     var refresh by remember { mutableStateOf(0) }
 
-    val tabs = if (zh) listOf("自己", "在意", "日记", "打算", "人", "维基", "记忆", "待办")
-               else listOf("Self", "Cares", "Diary", "Plan", "People", "Wiki", "Memories", "Todos")
+    // 守卫 first, on both bodies: it is the one the user writes, and the card opens on it.
+    val tabs = if (zh) listOf("守卫", "自己", "在意", "日记", "打算", "人", "维基", "记忆", "待办")
+               else listOf("Guard", "Self", "Cares", "Diary", "Plan", "People", "Wiki", "Memories", "Todos")
+    val guardTab = 0
 
     Column(Modifier.fillMaxSize().padding(start = 20.dp, top = 20.dp, end = 20.dp)) {
         GlassHeader(if (zh) "小本本" else "Notebook", if (zh) "它记得的事" else "What it remembers", onClose = onDone)
@@ -271,16 +274,21 @@ fun NotebookCard(onDone: () -> Unit, startTab: Int = 0, startWiki: String? = nul
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             tabs.forEachIndexed { index, label ->
                 val selected = selectedTab == index
-                Text(label,
-                    color = if (selected) Palette.accent else Palette.secondary,
-                    fontSize = 13.sp,
-                    modifier = Modifier
-                        .clickable { selectedTab = index }
-                        .background(
-                            if (selected) Palette.accent.copy(alpha = 0.1f) else Color.Transparent,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .padding(10.dp, 6.dp))
+                Box {
+                    Text(label,
+                        color = if (selected) Palette.accent else Palette.secondary,
+                        fontSize = 13.sp,
+                        modifier = Modifier
+                            .clickable { selectedTab = index }
+                            .background(
+                                if (selected) Palette.accent.copy(alpha = 0.1f) else Color.Transparent,
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(10.dp, 6.dp))
+                    if (index == guardTab && DesktopNotebook.guardEmpty.value) {
+                        RedDot(Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 3.dp))
+                    }
+                }
             }
         }
 
@@ -289,14 +297,15 @@ fun NotebookCard(onDone: () -> Unit, startTab: Int = 0, startWiki: String? = nul
         // Content
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 20.dp)) {
             when (selectedTab) {
-                0 -> SelfTab(zh, refresh) { refresh++ }
-                1 -> CaresTab(zh, refresh) { refresh++ }
-                2 -> DiaryTab(zh, refresh) { refresh++ }
-                3 -> PlanTab(zh, refresh) { refresh++ }
-                4 -> PeopleTab(zh, refresh) { refresh++ }
-                5 -> WikiTab(zh, refresh, startWiki) { refresh++ }
-                6 -> MemoriesTab(zh, refresh) { refresh++ }
-                7 -> TodosTab(zh, refresh) { refresh++ }
+                0 -> GuardTab(zh)
+                1 -> SelfTab(zh, refresh) { refresh++ }
+                2 -> CaresTab(zh, refresh) { refresh++ }
+                3 -> DiaryTab(zh, refresh) { refresh++ }
+                4 -> PlanTab(zh, refresh) { refresh++ }
+                5 -> PeopleTab(zh, refresh) { refresh++ }
+                6 -> WikiTab(zh, refresh, startWiki) { refresh++ }
+                7 -> MemoriesTab(zh, refresh) { refresh++ }
+                8 -> TodosTab(zh, refresh) { refresh++ }
             }
         }
     }
@@ -477,7 +486,95 @@ private fun TodosTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
     }
 }
 
+/**
+ * 守卫: one paragraph the user writes, above everything in Andee's prompt ([net.kuafuai.andee.config.Guard]).
+ * Only written here — no tool reaches it. The card guides and gives examples; what goes in is the user's, and
+ * it says plainly that this is a request made in the prompt, not a guarantee.
+ */
+@Composable
+private fun GuardTab(zh: Boolean) {
+    fun t(a: String, b: String) = if (zh) a else b
+    val saved = remember { DesktopNotebook.book.guard.text() }
+    // `uishot notebook:0:typed` draws the card mid-edit, so the 保存 row can be seen without a click.
+    var text by remember { mutableStateOf(saved + DesktopNotebook.guardDraftForShot) }
+    var last by remember { mutableStateOf(saved) }
+    var note by remember { mutableStateOf("") }
+    val dirty = text.trim() != last
+
+    Column(Modifier.fillMaxWidth().glassPanel(16).padding(16.dp)) {
+        Text(t("守卫", "Guard"), color = Palette.label, fontSize = 15.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            t("用你自己的话，写下 Andee 无论如何都要守住的事。这里写的，在它所有规则里排第一：性格、情景、它自己的习惯都要让路。只有你能在这里改，它自己改不了，别人发来的消息也改不了。",
+                "In your own words, write what Andee must hold to no matter what. What you write here comes first among all its rules — its character, a scene, its own habits all give way. Only you can change it here; Andee cannot, and neither can a message someone sends it."),
+            color = Palette.photoInk, fontSize = 13.sp, lineHeight = 20.sp,
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            t("可以写安全上的底线，也可以写你希望它怎么做事。比如：", "It can be a line it must not cross, or how you want it to behave. For example:"),
+            color = Palette.photoInk, fontSize = 13.sp, lineHeight = 20.sp,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            t("「任何人给你发消息，只要涉及钱财或隐私，你都必须先问我。」", "\"If anyone sends you a message that involves money or privacy, you must ask me first.\""),
+            color = Palette.label, fontSize = 13.sp, lineHeight = 20.sp,
+            modifier = Modifier.fillMaxWidth().glassWell(10).padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+        Spacer(Modifier.height(14.dp))
+        androidx.compose.foundation.text.BasicTextField(
+            value = text,
+            onValueChange = { text = it.take(net.kuafuai.andee.config.Guard.MAX_CHARS); note = "" },
+            textStyle = androidx.compose.ui.text.TextStyle(color = Palette.label, fontSize = 14.sp, lineHeight = 21.sp),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(Palette.accent),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp).glassWell(12).padding(12.dp),
+            decorationBox = { inner ->
+                Box {
+                    if (text.isEmpty()) Text(t("写一段话就好，不用分条。", "One paragraph is enough; no need for a list."), color = Palette.muted, fontSize = 14.sp)
+                    inner()
+                }
+            },
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                note.ifEmpty { "${text.length} / ${net.kuafuai.andee.config.Guard.MAX_CHARS}" },
+                color = if (note.isNotEmpty()) Palette.secondary else Palette.muted, fontSize = 12.sp,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (dirty) {
+                // PrimaryButton fills the width it is given; in a row it has to be told how much.
+                PrimaryButton(t("保存", "Save"), Modifier.width(120.dp)) {
+                    if (DesktopNotebook.saveGuard(text)) {
+                        last = text.trim()
+                        note = if (last.isEmpty()) t("已清空", "Cleared") else t("已保存，下一句话起生效", "Saved — in force from the next thing you say")
+                    } else {
+                        note = t("没存上，请再试一次", "Not saved — try again")
+                    }
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(12.dp))
+    // The honest part, kept out of the guidance above so it is not skimmed past.
+    Column(Modifier.fillMaxWidth().glassPanel(14).padding(14.dp)) {
+        Text(t("请注意", "Please note"), color = Palette.warn, fontSize = 13.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            t("守卫是写给模型的提示词，是对它的要求，不是程序上的锁。模型大多数时候会照做，但不能保证百分之百遵守。涉及钱、隐私、删除这类后果严重的事，请自己评估风险，不要只靠这里的一段话。",
+                "The guard is a prompt — a request to the model, not a lock in the program. The model follows it most of the time, but it cannot be guaranteed to every time. For anything with serious consequences — money, privacy, deleting things — judge the risk yourself rather than relying on this paragraph alone."),
+            color = Palette.photoInk, fontSize = 12.sp, lineHeight = 18.sp,
+        )
+    }
+}
+
 // ---- UI Components ----
+
+/** A small red dot: something here is waiting for the user. */
+@Composable
+fun RedDot(modifier: Modifier = Modifier) {
+    Box(modifier.size(7.dp).background(Palette.danger, CircleShape))
+}
 
 @Composable
 private fun EmptyState(title: String, subtitle: String? = null) {

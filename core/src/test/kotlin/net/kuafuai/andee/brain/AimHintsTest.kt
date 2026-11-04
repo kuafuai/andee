@@ -62,7 +62,7 @@ class AimHintsTest {
             "locale" -> Locale.ENGLISH
             "maxSteps" -> 10
             "persona", "platformPrompt", "notebookIndex", "scenesIndex", "pagesIndex", "topicsIndex",
-            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "stageIndex", "wikiIndex", "reviewRecord" -> ""
+            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "stageIndex", "wikiIndex", "reviewRecord", "guard" -> ""
             "scrollback" -> emptyList<ScrollRow>()
             "toolLists" -> listOf(JSONArray().put(tool("tap_by_coordinates", "screen.tap")).apply {
                 if (withLocator) put(tool("tap_target", "screen.tap_target"))

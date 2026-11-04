@@ -745,6 +745,8 @@ class BodyCoreService : Service() {
         dogLink = net.kuafuai.andee.dog.DogLink(this)
         dogSense = net.kuafuai.andee.dog.DogSense(this)
         peers = AndroidPeers(this)
+        // 守卫 saved or wiped: the dot on 小本本 follows.
+        net.kuafuai.andee.config.Notebook.onGuardChanged = { window.refreshNotebookDot() }
         peers.onCount = { window.setFriendCount(it) }
         window.setFriendCount(peers.store.all().size)
         window.setMuted(net.kuafuai.andee.config.VoiceConfig.muted(this))

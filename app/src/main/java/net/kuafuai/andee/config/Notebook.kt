@@ -120,6 +120,10 @@ object Notebook {
 
     fun selfhood(context: Context): net.kuafuai.andee.config.Selfhood = book(context).selfhood
     fun people(context: Context): net.kuafuai.andee.config.People = book(context).people
+    fun guard(context: Context): net.kuafuai.andee.config.Guard = book(context).guard
+
+    /** Told after the guard is saved or the book wiped: the red dots on 小本本 and on its 守卫 tab. */
+    @Volatile var onGuardChanged: (() -> Unit)? = null
     fun wiki(context: Context): net.kuafuai.andee.wiki.WikiBook = book(context).wiki
 
     @Volatile
@@ -171,6 +175,7 @@ object Notebook {
         wikiDir(context).listFiles()?.forEach { it.deleteRecursively() }
         // The live store writes into .history/ and archive/ without creating them; its constructor is what does.
         net.kuafuai.andee.wiki.LocalWikiStore(wikiDir(context))
+        onGuardChanged?.invoke()
     }
 
     fun indexForPrompt(context: Context, max: Int = 10): String = book(context).indexForPrompt(max)

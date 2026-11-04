@@ -77,7 +77,7 @@ fun Sidebar(nav: Nav, width: androidx.compose.ui.unit.Dp = 228.dp) {
         NavItem(AndeeIcon.DOCUMENT, t("产物", "Artifacts") + if (artifactCount > 0) "  $artifactCount" else "", here == "artifacts") { nav.go("artifacts") }
         // The same doors, in the same order, as the phone's top bar: 产物 · 小本本 · 情景 · 朋友 · 自检 · 设置.
         // 形象与表情, 装备 and 保险箱 are opened from 设置 on both, so neither body has a door the other lacks.
-        NavItem(AndeeIcon.NOTEBOOK, t("小本本", "Notebook"), here == "notebook") { nav.go("notebook") }
+        NavItem(AndeeIcon.NOTEBOOK, t("小本本", "Notebook"), here == "notebook", dot = DesktopNotebook.guardEmpty.value) { nav.go("notebook") }
         NavItem(AndeeIcon.SPARKLE, t("情景", "Scenes"), here == "scenes") { nav.go("scenes") }
         NavItem(AndeeIcon.FRIENDS, t("朋友", "Friends"), here == "peers", badge = Peers.count.value) { nav.go("peers") }
 
@@ -126,7 +126,7 @@ fun Sidebar(nav: Nav, width: androidx.compose.ui.unit.Dp = 228.dp) {
 }
 
 @Composable
-private fun NavItem(icon: AndeeIcon, label: String, selected: Boolean, badge: Int = 0, onClick: () -> Unit) {
+private fun NavItem(icon: AndeeIcon, label: String, selected: Boolean, badge: Int = 0, dot: Boolean = false, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth()
             .background(if (selected) Palette.glass else Color.Transparent, RoundedCornerShape(10.dp))
@@ -137,7 +137,10 @@ private fun NavItem(icon: AndeeIcon, label: String, selected: Boolean, badge: In
     ) {
         Icon(icon, if (selected) Palette.title else Palette.secondary, 18.dp)
         Spacer(Modifier.width(10.dp))
-        Text(label, color = if (selected) Palette.title else Palette.label, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Text(label, color = if (selected) Palette.title else Palette.label, fontSize = 14.sp)
+        // Something here is waiting for the user (守卫 unwritten): a dot, not a count.
+        if (dot) RedDot(Modifier.padding(start = 4.dp).align(Alignment.Top))
+        Spacer(Modifier.weight(1f))
         // A count at the row's end: how many there are, readable without opening the page.
         if (badge > 0) {
             Box(

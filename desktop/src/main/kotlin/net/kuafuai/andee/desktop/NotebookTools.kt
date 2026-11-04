@@ -37,6 +37,22 @@ object DesktopNotebook {
             .apply { todaysCalls = { drive.todaysCalls() } }
     }
 
+    /**
+     * 守卫 is still unwritten: the red dot on 小本本 in the sidebar and on the tab. A Compose state so both
+     * update the moment the user saves; set from [saveGuard], the only writer.
+     */
+    val guardEmpty by lazy { androidx.compose.runtime.mutableStateOf(book.guard.isEmpty()) }
+
+    /** For the screenshot harness only: text typed into 守卫 but not saved. */
+    @Volatile var guardDraftForShot: String = ""
+
+    /** The notebook card's 保存. False when the notebook refused the write. */
+    fun saveGuard(text: String): Boolean {
+        val ok = book.guard.set(text)
+        guardEmpty.value = book.guard.isEmpty()
+        return ok
+    }
+
     /** 「让它歇着」: unset is on, anything unreadable is off — the phone's `VoiceConfig.driveEnabled`. */
     fun driveEnabled(): Boolean = when (Settings.get("drive").trim()) { "", "on" -> true; else -> false }
 }

@@ -36,7 +36,7 @@ fun AppRoot(nav: Nav) {
                         screen == "notebook" -> NotebookCard(onDone = { nav.back() })
                         // `notebook:<tab>` opens on that tab; only the screenshot harness names one.
                         // A wiki article opened from the timeline: the notebook's wiki tab, on that article.
-                        screen.startsWith("wiki:") -> NotebookCard(onDone = { nav.back() }, startTab = 5, startWiki = screen.removePrefix("wiki:"))
+                        screen.startsWith("wiki:") -> NotebookCard(onDone = { nav.back() }, startTab = 6, startWiki = screen.removePrefix("wiki:"))
                         screen.startsWith("notebook:") -> NotebookCard(onDone = { nav.back() }, startTab = screen.substringAfter(':').toIntOrNull() ?: 0)
                         screen == "vault" -> VaultCard(onDone = { nav.back() })
                         screen == "scenes" -> ScenesCard(onDone = { nav.back() })

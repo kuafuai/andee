@@ -70,6 +70,9 @@ class NotebookBook(private val store: NotebookStore) {
     /** The people it has met. One instance. */
     val people: People by lazy { People(this) }
 
+    /** 守卫: the user's own paragraph of rules, above everything in the prompt. Written from the notebook card only. */
+    val guard: Guard by lazy { Guard(this) }
+
     /** The articles it has written and the documents it knows of. One instance. */
     val wiki: net.kuafuai.andee.wiki.WikiBook by lazy {
         net.kuafuai.andee.wiki.WikiBook(this, mapOf("local" to (localWikiStore ?: throw IllegalStateException("localWikiStore not set"))))

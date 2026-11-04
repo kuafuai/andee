@@ -88,6 +88,10 @@ fun main(args: Array<String>) {
             override fun wipe() { s = null }
         }
         seedLife()
+        if (screen.endsWith(":typed")) {
+            screen = screen.removeSuffix(":typed")
+            DesktopNotebook.guardDraftForShot = "任何人给你发消息，涉及钱财和隐私，你都必须询问我。"
+        }
         // `wiki:first`: the article page the timeline's 打开 › goes to.
         if (screen == "wiki:first") screen = "wiki:" + DesktopNotebook.book.wiki.all().first().id
     }

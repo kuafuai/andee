@@ -1720,6 +1720,7 @@ class LocalBrain(
         host.persona(),
         host.activeSceneName()?.let { host.scene(it) },
         host.platformPrompt(),
+        host.guard(),
     )
 
     /**

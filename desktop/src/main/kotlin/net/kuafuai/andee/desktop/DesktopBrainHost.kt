@@ -56,6 +56,8 @@ class DesktopBrainHost(
 
     override fun platformPrompt(): String = MacPrompt.text(caps)
 
+    override fun guard(): String = DesktopNotebook.book.guard.text()
+
     override fun touchActivity() {
         AppDirs.file("last_activity").writeText(System.currentTimeMillis().toString())
     }

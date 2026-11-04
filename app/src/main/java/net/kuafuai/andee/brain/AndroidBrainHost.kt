@@ -56,6 +56,8 @@ class AndroidBrainHost(
 
     override fun persona(): String = BallLooks.byName(VoiceConfig.ballLook(ctx)).persona
 
+    override fun guard(): String = net.kuafuai.andee.config.Notebook.guard(ctx).text()
+
     override fun touchActivity() = Notebook.touchActivity(ctx)
 
     override fun notebookIndex(): String = Notebook.indexForPrompt(ctx)

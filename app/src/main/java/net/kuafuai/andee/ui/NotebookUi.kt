@@ -52,7 +52,7 @@ class NotebookUi(
      * null hides the box, because a box that sends nowhere is worse than none.
      */
     private val onTellBrain: ((String) -> Unit)? = null,
-    /** Open straight on this wiki article (`wiki_show`) rather than on 自己. */
+    /** Open straight on this wiki article (`wiki_show`) rather than on 守卫. */
     private val startWiki: String? = null,
 ) {
 
@@ -97,6 +97,8 @@ class NotebookUi(
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.CENTER
+            // 守卫 has a text box; the card shrinks for the keyboard rather than sitting under it, as SettingsUi does.
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
         frosted = Glass.frost(context, wm, p)
         val v = build()
@@ -168,6 +170,7 @@ class NotebookUi(
             Tab.WIKI -> if (wikiOpen != null) buildArticle(body) else buildWiki(body)
             Tab.MEMORIES -> buildMemories(body)
             Tab.TODOS -> buildTodos(body)
+            Tab.GUARD -> buildGuard(body)
         }
         scroll.addView(body, matchWrap())
         card.addView(scroll, LinearLayout.LayoutParams(MATCH, 0, 1f))
@@ -235,7 +238,7 @@ class NotebookUi(
         layoutParams = LinearLayout.LayoutParams(dp(32), dp(32))
     }
 
-    /** Eight tabs do not fit a phone's width at a readable size, so the row scrolls sideways. */
+    /** Nine tabs do not fit a phone's width at a readable size, so the row scrolls sideways. */
     private fun tabBar(): View {
         val bar = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -244,14 +247,22 @@ class NotebookUi(
         var selected: View? = null
         TABS.forEachIndexed { i, t ->
             if (i > 0) bar.addView(View(context), LinearLayout.LayoutParams(dp(4), 1))
-            bar.addView(tabButton(i, lctx.getString(t.label)).also { if (i == tab) selected = it })
+            val button = tabButton(i, lctx.getString(t.label))
+            // 守卫 unwritten: a red dot on the tab, as on the top bar's 小本本 key.
+            val v = if (t == Tab.GUARD) withDot(button) else button
+            // The view in the row, not the button inside the dot's frame — its left is 0 within that frame.
+            if (i == tab) selected = v
+            bar.addView(v)
         }
         return android.widget.HorizontalScrollView(context).apply {
             isHorizontalScrollBarEnabled = false
             addView(bar)
             // Picking a tab rebuilds the card, and a new scroll view starts at 0 — which left 记忆 and 待办 cut off at
             // the edge right after they were tapped. Bring the selected one fully into view once it is laid out.
-            post { selected?.let { v -> if (v.right > scrollX + width || v.left < scrollX) scrollTo((v.right - width + dp(8)).coerceAtLeast(0), 0) } }
+            val reveal = { selected?.let { v -> if (v.right > scrollX + width || v.left < scrollX) scrollTo((v.right - width + dp(8)).coerceAtLeast(0), 0) } }
+            post { reveal() }
+            // And again when the card is resized (the keyboard coming up for 守卫's box), which put the row back at 0.
+            addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob -> if (r - l != or - ol || b - t != ob - ot) post { reveal() } }
         }
     }
 
@@ -277,6 +288,115 @@ class NotebookUi(
             }
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
         }
+
+    /** [v] with a small red dot on its top-right corner. */
+    private fun withDot(v: View): View {
+        val lp = v.layoutParams
+        v.layoutParams = android.widget.FrameLayout.LayoutParams(lp.width, lp.height)
+        return android.widget.FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(lp.width, lp.height)
+            addView(v)
+            val dot = RedDot.view(context).apply { visibility = if (Notebook.guard(context).isEmpty()) View.VISIBLE else View.GONE }
+            guardDot = dot
+            addView(dot, android.widget.FrameLayout.LayoutParams(dp(7), dp(7), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(5); rightMargin = dp(5)
+            })
+        }
+    }
+
+    /** The red dot on the 守卫 tab; shown while nothing is written. */
+    private var guardDot: View? = null
+
+    // ---- 守卫 ----
+
+    /**
+     * 守卫: one paragraph the user writes, above everything in Andee's prompt ([net.kuafuai.andee.config.Guard]).
+     * Only written here — no tool reaches it. The card guides and gives one example; what goes in is the user's,
+     * and it says plainly that this is a request made in the prompt, not a guarantee.
+     */
+    private fun buildGuard(body: LinearLayout) {
+        val guard = Notebook.guard(context)
+        var last = guard.text()
+        val p = panel()
+        p.addView(label(lctx.getString(R.string.guard_heading), Glass.Type.TITLE, Glass.TITLE, bold = true), matchWrap())
+        p.addView(label(lctx.getString(R.string.guard_intro), Glass.Type.CAPTION, Glass.PHOTO_INK, top = 8).apply {
+            setLineSpacing(0f, 1.25f)
+        }, matchWrap())
+        p.addView(label(lctx.getString(R.string.guard_example_lead), Glass.Type.CAPTION, Glass.PHOTO_INK, top = 10), matchWrap())
+        p.addView(label(lctx.getString(R.string.guard_example), Glass.Type.CAPTION, Glass.LABEL).apply {
+            background = Glass.well(context, dp(10))
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setLineSpacing(0f, 1.2f)
+        }, matchWrap().apply { topMargin = dp(6) })
+
+        val count = label("", Glass.Type.MICRO, Glass.MUTED).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
+        val save = TextView(context).apply {
+            text = lctx.getString(R.string.guard_save)
+            textSize = Glass.Type.BODY
+            setTextColor(Color.parseColor(Glass.ON_TINT))
+            gravity = Gravity.CENTER
+            background = Glass.tinted(context, dp(20))
+            setPadding(dp(24), dp(10), dp(24), dp(10))
+            Glass.pressable(this)
+            visibility = View.GONE
+        }
+        val box = android.widget.EditText(context).apply {
+            background = Glass.well(context, dp(13))
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setTextColor(Color.parseColor(Glass.TITLE))
+            setHintTextColor(Color.parseColor(Glass.MUTED))
+            textSize = Glass.Type.BODY
+            hint = lctx.getString(R.string.guard_hint)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            isSingleLine = false
+            minLines = 4
+            gravity = Gravity.TOP or Gravity.START
+            filters = arrayOf(android.text.InputFilter.LengthFilter(net.kuafuai.andee.config.Guard.MAX_CHARS))
+            setText(last)
+        }
+        fun paint(note: String = "") {
+            val now = box.text?.toString().orEmpty()
+            count.text = note.ifEmpty { "${now.length} / ${net.kuafuai.andee.config.Guard.MAX_CHARS}" }
+            count.setTextColor(Color.parseColor(if (note.isNotEmpty()) Glass.SECONDARY else Glass.MUTED))
+            save.visibility = if (now.trim() != last) View.VISIBLE else View.GONE
+        }
+        box.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) = paint()
+        })
+        save.setOnClickListener {
+            val now = box.text?.toString().orEmpty()
+            if (guard.set(now)) {
+                last = now.trim()
+                Notebook.onGuardChanged?.invoke()
+                paint(lctx.getString(if (last.isEmpty()) R.string.guard_cleared else R.string.guard_saved))
+                // The tab's dot follows; the text box keeps its focus and contents.
+                guardDot?.visibility = if (last.isEmpty()) View.VISIBLE else View.GONE
+            } else {
+                paint(lctx.getString(R.string.guard_not_saved))
+            }
+        }
+        p.addView(box, matchWrap().apply { topMargin = dp(14) })
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        row.addView(count, LinearLayout.LayoutParams(0, WRAP, 1f))
+        row.addView(save, LinearLayout.LayoutParams(WRAP, WRAP))
+        p.addView(row, matchWrap().apply { topMargin = dp(10) })
+        paint()
+        addRow(body, p)
+
+        // The honest part, kept apart from the guidance so it is not skimmed past.
+        val note = panel()
+        note.addView(label(lctx.getString(R.string.guard_note_title), Glass.Type.CAPTION, Glass.WARN, bold = true), matchWrap())
+        note.addView(label(lctx.getString(R.string.guard_note), Glass.Type.MICRO, Glass.PHOTO_INK, top = 6).apply {
+            setLineSpacing(0f, 1.25f)
+        }, matchWrap())
+        addRow(body, note)
+    }
 
     // ---- 自己 · 在意 · 日记 · 打算 · 人 · 维基 ----
 
@@ -818,7 +938,9 @@ class NotebookUi(
 
     private fun matchWrap() = LinearLayout.LayoutParams(MATCH, WRAP)
 
+    /** 守卫 first, on both bodies: it is the one the user writes, and the card opens on it. */
     private enum class Tab(@androidx.annotation.StringRes val label: Int) {
+        GUARD(R.string.notebook_tab_guard),
         SELF(R.string.notebook_tab_self), CARES(R.string.notebook_tab_cares), DIARY(R.string.notebook_tab_diary),
         PLAN(R.string.notebook_tab_plan), PEOPLE(R.string.notebook_tab_people), WIKI(R.string.notebook_tab_wiki),
         MEMORIES(R.string.notebook_tab_memories), TODOS(R.string.notebook_tab_todos),
