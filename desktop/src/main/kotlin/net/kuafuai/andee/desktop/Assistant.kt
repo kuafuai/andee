@@ -322,6 +322,8 @@ object Assistant {
             onSweepSpent = { Sweep.spent(it) },
             // `[quiet]`: the answer is already a timeline row; only rest.
             onQuietFinal = { BallCaption.clear(); busy(false) },
+            // The live card and the ball's caption; the folded 「做了 N 步」 row when it ends.
+            onStep = { WorkLog.on(it) },
         )
         brain = b
         builtFor = cfg

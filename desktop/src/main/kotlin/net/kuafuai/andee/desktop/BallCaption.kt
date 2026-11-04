@@ -84,10 +84,20 @@ private fun heightFor(n: Int) = (20 + 22 * n.coerceIn(1, 3)).dp
  */
 @Composable
 fun ApplicationScope.BallCaptionWindow(ball: java.awt.Window?, suppressed: Boolean = false) {
-    val lines = BallCaption.lines
+    // While a turn is working: its status (ticking) over the newest two lines of what it is thinking and doing
+    // ([WorkLog]), scrolling as they arrive. Otherwise the plain caption.
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(WorkLog.active) { while (WorkLog.active) { now = System.currentTimeMillis(); delay(500) } }
+    val working = WorkLog.active
+    val workLines = if (working) WorkLog.lines.takeLast(2) else emptyList()
+    val lines = if (working) listOf(WorkLog.status(now)) + workLines.map { it.text.let { t -> if (t.length > 34) t.take(33) + "…" else t } }
+        else BallCaption.lines
+    // A status line keeps one key while its clock ticks; a work line is keyed by its id, so a repeat still rises.
+    val keys = if (working) listOf("status") + workLines.map { "w${it.id}" } else lines
     // Keep the last words on screen while they fade out.
     var shown by remember { mutableStateOf<List<String>>(emptyList()) }
-    if (lines.isNotEmpty()) shown = lines
+    var shownKeys by remember { mutableStateOf<List<String>>(emptyList()) }
+    if (lines.isNotEmpty()) { shown = lines; shownKeys = keys }
     val alpha by animateFloatAsState(if (lines.isEmpty()) 0f else 1f, tween(if (lines.isEmpty()) 600 else 280))
     val visible = ball != null && !suppressed && (lines.isNotEmpty() || alpha > 0.01f)
 
@@ -132,8 +142,8 @@ fun ApplicationScope.BallCaptionWindow(ball: java.awt.Window?, suppressed: Boole
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             shown.forEachIndexed { i, line ->
-                val newest = i == shown.lastIndex
-                key(line) {
+                val newest = i == shown.lastIndex || (working && i == 0)
+                key(shownKeys.getOrElse(i) { line }) {
                     // Each line rises a few dp into place as it arrives.
                     var risen by remember { mutableStateOf(false) }
                     LaunchedEffect(Unit) { risen = true }

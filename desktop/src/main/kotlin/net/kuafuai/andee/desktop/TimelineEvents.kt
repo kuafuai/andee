@@ -16,7 +16,7 @@ import net.kuafuai.andee.brain.BrainEvent
 object TimelineEvents {
 
     /** Body-side event kinds, alongside [BrainEvent.Kind]'s names. */
-    enum class Body { THOUGHT, WORK, BUBBLE, BUBBLE_MUTED, IGNORED, MEETING, VERSION, LOOK, VAULT, PAGE, MORNING, SHELL, SCENE, TOLD }
+    enum class Body { THOUGHT, WORK, BUBBLE, BUBBLE_MUTED, IGNORED, MEETING, VERSION, LOOK, VAULT, PAGE, MORNING, SHELL, SCENE, TOLD, STEPS }
 
     private val zh get() = Strings.lang() == "zh"
     private fun t(z: String, e: String) = if (zh) z else e
@@ -103,6 +103,7 @@ object TimelineEvents {
         Body.LOOK.name -> AndeeIcon.IMAGE
         Body.VAULT.name -> AndeeIcon.LOCK
         Body.SHELL.name -> AndeeIcon.GRID
+        Body.STEPS.name -> AndeeIcon.GRID
         Body.SCENE.name -> AndeeIcon.SPARKLE
         else -> AndeeIcon.NOTEBOOK
     }

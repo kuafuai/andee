@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -295,7 +297,9 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
                 Text(heard, color = Palette.text, fontSize = 13.sp)
             }
         }
-        if (progress.isNotEmpty()) {
+        if (WorkLog.active) {
+            WorkCard(Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp))
+        } else if (progress.isNotEmpty()) {
             Text(progress, color = Palette.secondary, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 4.dp))
         }
 
@@ -616,6 +620,61 @@ private fun EventRow(r: Scrollback.Row, onOpenWiki: (String) -> Unit = {}) {
         }
     }
 }
+
+/**
+ * The turn in progress ([WorkLog]): a ticking status and the newest [WORK_CARD_LINES] lines of what it is
+ * thinking and doing, each rising into place as it arrives, the older ones dimmer. Folds into a
+ * 「做了 N 步 · 38 秒 ▾」 row when the turn ends.
+ */
+@Composable
+internal fun WorkCard(modifier: Modifier = Modifier) {
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); kotlinx.coroutines.delay(250) } }
+    val pulse by androidx.compose.animation.core.rememberInfiniteTransition().animateFloat(
+        0.35f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(700), androidx.compose.animation.core.RepeatMode.Reverse),
+    )
+    val shown = WorkLog.lines.takeLast(WORK_CARD_LINES)
+    Column(
+        modifier.widthIn(max = 560.dp).fillMaxWidth()
+            .background(Palette.glass, RoundedCornerShape(14.dp))
+            .border(1.dp, Palette.glassEdge, RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).graphicsLayer { alpha = pulse }.background(Palette.accent, CircleShape))
+            Spacer(Modifier.width(8.dp))
+            Text(WorkLog.status(now), color = Palette.secondary, fontSize = 12.sp)
+        }
+        if (shown.isNotEmpty()) {
+            Spacer(Modifier.height(5.dp))
+            Column(Modifier.fillMaxWidth().height((WORK_CARD_LINES * 19).dp), verticalArrangement = Arrangement.Bottom) {
+                shown.forEachIndexed { i, l ->
+                    androidx.compose.runtime.key(l.id) {
+                        var risen by remember { mutableStateOf(false) }
+                        LaunchedEffect(Unit) { risen = true }
+                        val rise by androidx.compose.animation.core.animateDpAsState(if (risen) 0.dp else 8.dp, androidx.compose.animation.core.tween(220))
+                        val age = shown.lastIndex - i
+                        val dim by androidx.compose.animation.core.animateFloatAsState(
+                            if (!risen) 0f else listOf(1f, 0.72f, 0.5f, 0.32f)[age.coerceIn(0, 3)],
+                            androidx.compose.animation.core.tween(220),
+                        )
+                        Text(
+                            if (l.kind == WorkLog.Kind.ACTION) "› " + l.text else l.text,
+                            color = if (l.kind == WorkLog.Kind.THOUGHT) Palette.secondary else Palette.label,
+                            fontSize = 12.sp, lineHeight = 19.sp, maxLines = 1,
+                            fontStyle = if (l.kind == WorkLog.Kind.THOUGHT) androidx.compose.ui.text.font.FontStyle.Italic else null,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.offset(y = rise).graphicsLayer { alpha = dim },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Lines the live card shows at once; older ones scroll away. */
+private const val WORK_CARD_LINES = 4
 
 @Composable
 private fun Bubble(r: Scrollback.Row) {

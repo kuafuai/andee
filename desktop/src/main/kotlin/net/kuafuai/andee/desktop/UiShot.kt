@@ -43,6 +43,25 @@ fun main(args: Array<String>) {
     if (args.getOrElse(4) { "" } == "wechat") System.setProperty("andee.shot.wechat", "1")
     if (args.getOrElse(4) { "" } == "empty") Scrollback.wipe() else seed()
     @Suppress("UNUSED_VARIABLE") val unused = 0
+    // `chat … working`: a turn in progress (the live card), above a finished one folded into its row.
+    if (args.getOrElse(4) { "" } == "working") {
+        Scrollback.add(Scrollback.Role.USER, "帮我在微信里给张三说一声明天会议改到下午三点")
+        TimelineEvents.body(TimelineEvents.Body.STEPS, "做了 7 步 · 41 秒",
+            "- 想：先打开微信，找到张三的对话\n- › 打开应用…\n- › 点一下…\n- 想：搜索框在顶部，点它再输入名字\n- › 输入文字…\n- › 点一下…\n- › 发送…")
+        Scrollback.add(Scrollback.Role.ASSISTANT, "已经发给张三了：明天的会改到下午三点。")
+        Scrollback.add(Scrollback.Role.USER, "再帮我查一下明天北京的天气")
+        WorkLog.seedForShot(
+            listOf(
+                WorkLog.Kind.ACTION to "打开浏览器…",
+                WorkLog.Kind.THOUGHT to "页面已经打开，搜索框在中间偏上的位置",
+                WorkLog.Kind.THOUGHT to "先点搜索框，再输入「北京明天天气」",
+                WorkLog.Kind.ACTION to "点一下…",
+                WorkLog.Kind.ACTION to "输入文字…",
+                WorkLog.Kind.THOUGHT to "结果出来了，第一条是中国天气网，看温度那一栏",
+            ),
+            step = 4, secondsAgo = 23,
+        )
+    }
     if (args.getOrElse(4) { "" } == "pending") {
         Scrollback.add(Scrollback.Role.ASSISTANT, "这一版改的是手感和反馈：\n\n" + "金豆出现了，每吃 5 个普通豆随机长出一颗金色豆子，6.5 秒后消失，最后一秒会闪，吃到 3 分。撞死时棋盘会抖一下、蛇头位置炸开一层红粒子。".repeat(4) + "\n\n要是你原本想改的是别的东西，跟我说一句我就接着改。")
         Pages.add("贪吃蛇", "<html>", null)?.let { Assistant.beginEdit(it) }

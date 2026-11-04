@@ -83,7 +83,28 @@ class LocalBrain(
      * itself back to rest — end the task light, clear the live line, the idle face. Loop thread.
      */
     private val onQuietFinal: () -> Unit = {},
+
+    /** What the turn is doing, step by step, for the body to show ([WorkStep]). Loop thread; must not block. */
+    private val onStep: (WorkStep) -> Unit = {},
 ) {
+
+    /** Loop thread. The turn's step stream: whether it is on, when it began, how far it got. */
+    private var stepsOn = false
+    private var stepsAt = 0L
+    private var stepsCount = 0
+    private var stepsActions = 0
+
+    private fun step(s: WorkStep) {
+        if (!stepsOn) return
+        runCatching { onStep(s) }.onFailure { host.logWarn(TAG, "step not shown", it) }
+    }
+
+    /** Close the step stream once, before the answer is shown — see [WorkStep.Done]. */
+    private fun stepsDone() {
+        if (!stepsOn) return
+        step(WorkStep.Done(stepsCount, stepsActions, System.currentTimeMillis() - stepsAt))
+        stepsOn = false
+    }
 
     private val llm = LlmClient(
         baseUrl = cfg.baseUrl,
@@ -553,6 +574,12 @@ class LocalBrain(
             }
             turnAnswer = null
             turnQuiet = false
+            // Every turn that answers someone shows its work; the reviews and a work turn of its own do not.
+            stepsOn = !kind.silent && !kind.quiet
+            stepsAt = System.currentTimeMillis()
+            stepsCount = 0
+            stepsActions = 0
+            step(WorkStep.Start)
             host.turnStarted(kind.name)
             turnTokens = 0
             turnWaitSeconds = 0.0
@@ -571,6 +598,8 @@ class LocalBrain(
                     host.logInfo(TAG, "turn $gen abandoned: ${t.message}")
                 }
             } finally {
+                // A turn that ended without an answer (stopped, abandoned) still closes its steps.
+                stepsDone()
                 // Cleared here, and not inside runTurn, because runTurn has a
                 // dozen `return`s: leaving the kind set on any of them would
                 // make the *next* turn refuse every device tool.
@@ -802,6 +831,7 @@ class LocalBrain(
     /** A turn's final answer: the one place it is both said and remembered. Loop thread only. */
     private fun finish(text: String) {
         turnAnswer = text
+        stepsDone()
         onFinal(text)
     }
 
@@ -814,6 +844,7 @@ class LocalBrain(
     /** The quiet ending: the answer as one [BrainEvent.Kind.QUIET] row that opens to the whole of it. */
     private fun finishQuietly(text: String) {
         turnAnswer = text
+        stepsDone()
         val clean = SpeechMood.strip(text).replace("[END]", "").trim()
         if (clean.isNotEmpty()) {
             val first = clean.lineSequence().first { it.isNotBlank() }.trim()
@@ -1161,8 +1192,15 @@ class LocalBrain(
             // and a review replays a long history whose reasoning was never
             // kept, so it failed with HTTP 400 (seen 2026-10-20 and 10-21). A
             // review is bookkeeping and loses little without it.
+            stepsCount = step
+            step(WorkStep.Waiting(step))
             val reply = llm.complete(history, tools, noThinking = internal)
             if (gen != generation.get()) return
+            if (reply.reasoning.isNotBlank()) step(WorkStep.Thought(step, reply.reasoning.trim()))
+            if (reply.content.isNotBlank() && reply.toolCalls.isNotEmpty()) {
+                SpeechMood.strip(reply.content).replace("[END]", "").trim().takeIf { it.isNotEmpty() }
+                    ?.let { step(WorkStep.Said(step, it)) }
+            }
             turnTokens += reply.promptTokens + reply.completionTokens
 
             if (reply.reasoning.isNotBlank()) {
@@ -1241,6 +1279,8 @@ class LocalBrain(
                 }
 
                 if (reply.content.isBlank() && !internal && !quiet && !turnQuiet) onProgress(narrate(tc.name))
+                stepsActions++
+                step(WorkStep.Action(step, narrate(tc.name)))
                 val t0 = System.nanoTime() / 1_000_000L
                 acted = true
                 val msg = runTool(tc, images, internal, kind.untrusted)
