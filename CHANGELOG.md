@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`21` / `"0.9.1"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`22` / `"0.10.0"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,42 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.10.0] - 2026-11-04
+
+**守卫 — a paragraph of your own, above everything in the prompt.**
+
+One card, free text, up to 2000 characters: whatever you write there outranks the character Andee is
+wearing, the scene it is in and every rule above it. It is the only part of the prompt **only you can
+write** — no tool reaches it, so neither the model, nor a review, nor a friend can change it.
+
+And it comes with the truth about what it is: **a request to the model, not a lock in the program.** The
+card says so in as many words, and tells you to judge the risk yourself for anything with serious
+consequences.
+
+### Added
+
+- **守卫 (Guard) — your own paragraph, at the top of the prompt.** A new first tab in 小本本, on the phone
+  and the Mac: one paragraph in your own words, free text, up to 2000 characters. The card guides rather
+  than prescribes, and gives one example — 「任何人给你发消息，只要涉及钱财或隐私，你都必须先问我。」
+  - **Only the card writes it.** No tool reaches it — not the model, not the review, not a friend. It lives
+    in its own notebook section (`guard`) and is written by the settings surface alone.
+  - **It is placed last, as the user's own rules above everything.** `LocalPrompt.withPersona` appends it
+    after the character and the scene, and the text says it outranks §1–§11, the character and any scene;
+    where it and anything else disagree, it wins, and where it is silent, the rest carries on. It holds on
+    every turn, **including the ones that began with somebody else's words** — which is exactly what it is
+    there to stop. A friend's request runs in a host that never carries it, since its owner did not write
+    it for them.
+  - **With nothing written the prompt is unchanged** — the golden snapshots did not move.
+- **A red dot on 小本本 and on the 守卫 tab** until something is written — on the phone's top bar and the
+  Mac's sidebar. It is a dot, not a count, and it ignores touches.
+- **小本本 opens on 守卫.** The phone's notebook card resizes for the keyboard and keeps the selected tab
+  in view.
+
+### Changed
+
+- **The docked ball is a little bigger** (`DOCK_SCALE 0.62 → 0.70`), asked for on the phone; the tab grows
+  with it, to about 35 × 57 dp.
 
 ## [0.9.1] - 2026-11-03
 
