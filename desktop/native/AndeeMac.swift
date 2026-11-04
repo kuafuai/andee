@@ -20,9 +20,27 @@ import WebKit
 
 private func cstr(_ s: String) -> UnsafeMutablePointer<CChar> { strdup(s) }
 
+/// Every answer to Kotlin goes through here. `JSONSerialization` does not throw on a NaN or an infinity, it
+/// raises an Objective-C exception, which Swift cannot catch — the whole app aborts (seen 2026-11-04: an app's
+/// accessibility element reported an infinite size, and `andee_ax_tree` took Andee down mid-task). So the value
+/// is made finite first, and checked with `isValidJSONObject` before it is written.
 private func json(_ o: Any) -> UnsafeMutablePointer<CChar> {
-    let data = (try? JSONSerialization.data(withJSONObject: o, options: [])) ?? Data("{}".utf8)
+    let clean = finite(o)
+    guard JSONSerialization.isValidJSONObject(clean),
+          let data = try? JSONSerialization.data(withJSONObject: clean, options: []) else { return cstr("{}") }
     return cstr(String(data: data, encoding: .utf8) ?? "{}")
+}
+
+/// [o] with every NaN or infinite number replaced by 0, recursively.
+private func finite(_ o: Any) -> Any {
+    switch o {
+    case let d as [String: Any]: return d.mapValues { finite($0) }
+    case let a as [Any]: return a.map { finite($0) }
+    case let n as NSNumber where CFNumberIsFloatType(n): return n.doubleValue.isFinite ? n : NSNumber(value: 0)
+    case let x as Double: return x.isFinite ? x : 0.0
+    case let x as CGFloat: return x.isFinite ? x : 0.0
+    default: return o
+    }
 }
 
 @_cdecl("andee_free")
@@ -158,6 +176,8 @@ private func frame(_ e: AXUIElement) -> CGRect? {
     var pt = CGPoint.zero, sz = CGSize.zero
     AXValueGetValue(p as! AXValue, .cgPoint, &pt)
     AXValueGetValue(s as! AXValue, .cgSize, &sz)
+    // Some apps report an unbounded element (infinite width or height); it has no place on screen to aim at.
+    guard pt.x.isFinite, pt.y.isFinite, sz.width.isFinite, sz.height.isFinite else { return nil }
     return CGRect(origin: pt, size: sz)
 }
 
