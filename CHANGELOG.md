@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`23` / `"0.11.0"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`24` / `"0.12.0"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,76 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.12.0] - 2026-11-05
+
+**桌宠 — Andee gets a second body, and it is a character rather than a ball.**
+
+A small figure that lives on the desktop and on the phone, wearing one of five looks, each of which is a
+character with its own voice and manner. On the Mac it **replaces** the floating ball rather than standing
+beside it; on the phone it draws in the ball's own window. Both share the same rules, because what they
+share lives in `core`.
+
+### Added
+
+- **A desktop pet (Mac).** One transparent window, the size of her bounding box: no dock icon, no focus
+  stealing, gravity, a hop when you pat her, a line of dialogue above her head, and a look library you can
+  extend with your own picture.
+  - **The window *is* her bounding box**, so the speech bubble is drawn inside it and shares one coordinate
+    space with the body. The first version gave the bubble its own window and it drifted away from her at
+    screen edges — one window, one owner of the geometry.
+  - **Input is read from the physical mouse**, not from Compose pointer events: once she starts following
+    the pointer the window moves too, macOS retargets the pointer, and the event stream carrying the drag
+    ends. A press reacts without moving her; **the hop belongs to the release of a click, not to the press
+    of a drag.**
+  - **She stands where she is put** (a perch), not on the bottom of the screen. A throw clears the perch and
+    she falls to the floor; landing re-perches her.
+  - **She naps rather than sleeping for good.** Nothing but a drag, a task or a greeting used to clear
+    *asleep*, so after three quiet minutes she slept until touched and her idle acts stopped. She now wakes
+    by herself after 40–80 seconds (a yawn, then idle and the acts resume); a click wakes her too.
+- **桌宠 on the phone**, with the Mac's rules. She draws **in the ball's own window** — no new overlay —
+  folded and in the unfolded card alike, mirroring the sphere's scale and drop. Hit test is her pixels;
+  idle acts, a nap she wakes from, a hop on tap.
+  - Docked into the right edge she **peeks round it** (a new peek drawing per look); the dock rules are the
+    ball's, and the tab is sized from the drawing.
+  - **Settings → 形象与表情** picks 小球 / 桌宠 and the pet, with a preview per expression. **A fresh
+    install wears the ball.** The swipe on the ball walks one ring across the ball's looks and the pets.
+  - Phone pictures are a scaled copy (~6.6 MB): 220 px frames read blurry in the card, so stills are 560 px
+    and frames 520 px.
+- **Five characters, each with a voice and a manner** (`PetCharacter`, in `core` so both bodies agree):
+  **Andee**（the plush ball of the brand illustrations — the first preset）, **奶油金 / Cream**,
+  **奶油金·短发 / Cream short**, **大肥鱼 / Chubby fish**, **小猫 / Kitten**. Voice and persona follow the
+  character in force on both bodies (`VoiceConfig.characterVoice` / `characterPersona`). The old cobalt
+  pair is gone, and a saved `blue-*` id reads as its successor rather than breaking.
+
+### Changed
+
+- **The pet is the body, not a companion to it.** On the Mac `Main.kt` shows `PetWindow` **or**
+  `FloatingBall`, never both, and the caption, the prompt card and the bubble follow whichever is the body.
+  The pet takes the ball's whole vocabulary: tap talks, double-tap types, triple stops, long-press opens
+  the window — and wears Andee's state (listening, speaking with the face the model wrote, searching while
+  a task acts, thinking while it waits, holding while a card is up).
+- **A page gets a thin glass title bar** instead of a floating ✕完成 pill. The pill floated over the
+  page's top-right corner, which is where a generated page puts its own things (a score, a button), and its
+  look belonged to neither the page nor the rest of Andee. The bar sits **above** the page — title centred
+  and ellipsised, a ✕ in a small round well — and the page starts below it, so nothing of it is covered. It
+  takes the page's own background colour once loaded, the way Safari's toolbar does. `show_html`'s
+  description no longer asks the model to keep a corner clear.
+
+### Fixed
+
+- **Only a click on her pixels is a click on her.** Because the window is her bounding box, every empty
+  corner of it was answering: the hop fired on any release, and the transparent margin swallowed clicks
+  meant for the app behind it. The hit test now samples the alpha of what is on screen (half resolution,
+  thresholded above the antialiased edge), and the window stops ignoring the mouse only while the cursor is
+  over her — a click beside her head reaches the window underneath.
+- **A page going up no longer docks a full-size ball at the top right.** `show_html` folds the card and
+  docks the ball in the same moment, so the dock ran mid-fold, read the card's `p.y = 0`, and docked at the
+  top right; the fold's end then reset the ball to scale 1 inside the small tab — a full-size ball cut in
+  half over the page. A dock asked for while the card is still folding now waits for the fold to land, and
+  the dock pins `DOCK_SCALE` when the tab is applied in case the shrink was cancelled on the way.
+  Reproduced on the HONOR phone with the previous build (tab at 1087,152, ball at scale 1); with the fix,
+  three runs from a fresh unfolded card each docked at 1087,2267 at the docked scale.
 
 ## [0.11.0] - 2026-11-04
 
