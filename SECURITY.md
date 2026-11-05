@@ -84,34 +84,59 @@ vulnerabilities:
 Read these before deploying on a device you care about. They are design
 boundaries of the current version, not undisclosed bugs.
 
-### 1. The device-side WebSocket server is unauthenticated and binds to all interfaces
+### 1. The device-side control port, when you turn it on, is a token over plaintext
 
-`BodyWsServer` (`app/src/main/java/net/kuafuai/andee/net/BodyWsServer.kt`) is
-started by `ScreenBodyService` and listens on `0.0.0.0:9008`. `onOpen()` accepts
-every incoming connection as a driver without any credential check.
+`BodyWsServer` (`app/src/main/java/net/kuafuai/andee/net/BodyWsServer.kt`) is a
+WebSocket that can do everything the app can: read the screen and SMS, tap, type,
+and have vault credentials typed into a field. It used to start with the service,
+bind `0.0.0.0:9008`, and accept every connection as a driver with no credential —
+so anyone on the same Wi-Fi could drive the device. **That is no longer the
+case.** What changed:
 
-**Impact:** any host that can reach the device's IP address can connect, with no
-credential, and drive it as fully as the app itself can — including reading what
-is on screen and using the credentials the user has saved on the device. Assume
-that means full control of the device, and of anything the user is logged into
-on it.
+- **It is off by default.** `BodyCoreService` starts it only when the user picks a
+  mode under Settings → Advanced → Diagnostics → *Control port 9008*. The setting
+  (`ws_server` in `voice_prefs`) is `off`, `local` or `lan`; unset and
+  unrecognised values both read as `off`. A device nobody configured has no
+  inbound command channel at all.
+- **`local` binds `127.0.0.1`**, for `adb forward`. **`lan` binds `0.0.0.0`**, for
+  a call extension or debugging tool on another machine.
+- **Every connection needs the port token, in every mode.** Loopback alone is not
+  a boundary: any app on the same device can dial `127.0.0.1`. The token is 48
+  hex characters from `SecureRandom`, generated once per device, shown (with a
+  Copy button) under the same setting, and replaced by a factory reset. A client
+  presents it as `Authorization: Bearer <token>` or `?token=<token>`; the
+  handshake is refused before the connection opens if it is missing or wrong, and
+  the comparison is constant-time.
+- **The self-check says the port is open** for as long as it is: a NOTE row in
+  `local`, a WARN row in `lan`, no row when off.
 
-**When you are exposed:** whenever the accessibility service is enabled and the
-device shares a network with other hosts you do not control — café, hotel,
-airport, conference, or a shared corporate LAN.
+**What remains:**
 
-**Mitigations available today:**
+- **In `lan` mode the link is plain `ws://`.** The token travels in clear text on
+  every connection, so anyone who can observe traffic on that network can read it
+  and then drive the device as fully as the app itself can. Assume that means full
+  control of the device, and of anything the user is logged into on it.
+- **The token is per device, not per client.** Anyone who has it — a script, a
+  machine, a person you showed the settings screen to — has the same power, and
+  there is no way to revoke one client without a factory reset, which mints a new
+  token for everyone.
+- **`local` mode is only as strong as the token.** It keeps the port off the
+  network; it does not stop an app on the device that has learned the token.
 
-- keep the device on a network you trust, or one where the port is firewalled
-- drive the device over `adb forward` instead of the LAN, and keep the server
-  unreachable from the network
-- treat a device with this service enabled as a device you would not leave
-  unattended on an untrusted network
+**When you are exposed:** while the port is in `lan` mode and the device shares a
+network with hosts you do not control — café, hotel, airport, conference, or a
+shared corporate LAN.
 
-**The real fix** is to require authentication on every connection, and to make
-the bind address and port configurable with loopback-only as the default. That
-work is tracked as an open issue; contributions are welcome. Until it lands,
-this limitation stands.
+**What to do:**
+
+- leave the port **off** unless a tool you are running needs it, and turn it off
+  again when you are done
+- prefer `local` plus `adb forward` over `lan`
+- use `lan` only on a network you trust, or one where the port is firewalled
+- treat the token as a password for the whole device
+
+**Not done:** TLS on the port, per-client credentials, and a configurable port
+number. Contributions are welcome.
 
 ### 2. The body ↔ hub link is unauthenticated and plaintext
 
@@ -125,7 +150,8 @@ themselves as the hub to issue commands.
 
 **Mitigation:** only point `hub_url` at a host you control, on a network you
 trust. Running in `local` brain mode avoids the link entirely — the model is
-called over HTTPS by the app itself, and no inbound command channel exists.
+called over HTTPS by the app itself, and, with the control port in §1 left off
+(the default), no inbound command channel exists.
 
 ### 3. Prompt injection from screen content
 

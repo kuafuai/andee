@@ -29,6 +29,62 @@ hash into `versionName` at build time would close this hole; it is not implement
 
 ## [Unreleased]
 
+### Security
+
+- **The 9008 control port is off by default, and every connection needs a token.** `BodyWsServer` used to
+  start with the service, bind `0.0.0.0:9008` and accept every connection with no credential — anyone on
+  the same Wi-Fi could drive the device: the screen, SMS, the vault. The local brain, which is the
+  default, never needed it.
+  - New setting **Control port 9008** (控制端口 9008) under Settings → Advanced → Diagnostics: **Off** /
+    **This device** / **LAN**, Off leftmost. Unset and unrecognised values read as off.
+  - **This device** binds `127.0.0.1`, for `adb forward`; **LAN** binds `0.0.0.0`, for a call extension
+    on another machine.
+  - **Every mode needs the port token**, as `Authorization: Bearer <token>` or `?token=<token>`, checked in
+    constant time before the connection opens. Loopback alone is not enough: any app on the same phone
+    can dial `127.0.0.1`. The token is generated once per device, shown with a Copy button under the
+    setting, and replaced by a factory reset.
+  - The service follows the setting from wherever it is changed, without restarting Andee.
+  - The self-check shows the port while it is open: a note in **This device**, a warning in **LAN**.
+  - `tools/body.py` sends the token: `--token`, `ANDEE_TOKEN`, or read from a debug build over `adb`.
+  - **A call extension (e.g. the whatsapp-agent box) must now be updated to send the token**, and the
+    port must be set to **LAN**; until then it is refused at the handshake and its tools report
+    "not connected". A restart that fails to bind the port is retried instead of leaving a dead server.
+  - **Not fixed:** in LAN mode the link is still plain `ws://`, so the token can be read off that network.
+    See `SECURITY.md` §1.
+
+### Added
+
+- **Exit from the notification** ([#16](https://github.com/kuafuai/andee/issues/16)). Andee's ongoing
+  notification has an **Exit** (退出) action — the same teardown as saying 「退出」, with no voice and no ball
+  needed. It is declined while a meeting is recording, like the voice exit. The launcher icon starts it
+  again.
+- **Speaking speed** ([#17](https://github.com/kuafuai/andee/issues/17)). Settings → **Speaking speed**
+  (朗读速度): 1×, 1.5× or 2×. It is a time stretch in the player with the pitch kept, so it applies to
+  Volcengine, Google and the system voice at once; a device that cannot stretch audio plays at 1×.
+- **Reading a file you pick** ([#37](https://github.com/kuafuai/andee/issues/37)). A new `read_file` tool
+  opens the system file picker; you choose exactly one file and the app can read that file and nothing
+  else — **no storage permission**. Text comes back as text (capped), images as an image, PDFs as rendered
+  pages (two at a time), `.docx` as text, marked as data rather than instructions. Long text is read in
+  windows sized to fit what the brain keeps of a tool result. Only a request the user just made can open
+  the picker — not a notification, a friend, a todo, a self-started work turn or another device — and not
+  while the screen is locked. The picker closes when the wait times out or the task is stopped.
+
+### Fixed
+
+- **The wake phrase stops a running task first** ([#21](https://github.com/kuafuai/andee/issues/21)),
+  exactly as a tap on the ball does. It used to open a second turn beside the one still driving the
+  screen.
+- **The ball no longer catches taps meant for the app beside it**
+  ([#34](https://github.com/kuafuai/andee/issues/34)). Its tap radius was 0.32 of the ball area against a
+  sphere drawn at about 0.235 — roughly 11 dp of invisible rim on the folded ball. It is now 0.27, which
+  still leaves a target of about 56 dp.
+- **Tablet layout** ([#36](https://github.com/kuafuai/andee/issues/36)).
+  - The full card's background image is sized to the display's longer side. Nothing re-measured it on
+    rotation, so a card built in landscape left a transparent band in portrait. The card also has its
+    solid fill underneath the image now, so if the image ever falls short the gap is dark.
+  - While typing, the card ends exactly at the top of the field. A 240 dp minimum height used to make it
+    cover the field and the keyboard's top rows on a short landscape screen.
+
 ## [0.11.0] - 2026-11-04
 
 **A turn that shows its work, a turn that can choose to say nothing, and your rule for notifications
