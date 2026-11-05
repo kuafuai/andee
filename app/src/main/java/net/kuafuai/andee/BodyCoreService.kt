@@ -146,6 +146,19 @@ class BodyCoreService : Service() {
 
     private lateinit var dispatcher: CommandDispatcher
     private var wsServer: BodyWsServer? = null
+
+    /** The (mode, token) [wsServer] was started with; null while it is changing. See [reconcileWsServer]. */
+    private var wsServerSpec: Pair<String, String>? = null
+
+    /**
+     * Follows the 9008 setting wherever it is written from — the settings card in this
+     * service, the one `SelfCheckActivity` opens, or a factory reset (`key == null`).
+     * A field, because the prefs file only holds its listeners weakly.
+     */
+    private val wsPrefsListener =
+        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key == "ws_server" || key == "ws_token") ui.post { reconcileWsServer() }
+        }
     private var hubClient: net.kuafuai.andee.net.BodyWsClient? = null
 
     /**
@@ -664,7 +677,7 @@ class BodyCoreService : Service() {
                     // Recognition runs on the ASR executor; stopping a task
                     // and the service belongs on the main thread. Handle this
                     // before card answers or either brain can consume it.
-                    ui.post { exitByVoice() }
+                    ui.post { exitBody() }
                 } else {
                     submitUserTurn(text, "voice")
                 }
@@ -793,7 +806,8 @@ class BodyCoreService : Service() {
                     // brain-visible.
                     val srv = wsServer
                         ?: throw IllegalStateException(
-                            "no local server running — cannot reach call extension"
+                            "no local server running — cannot reach call extension " +
+                                "(the 9008 control port is off: Settings → diagnostics)"
                         )
                     srv.forwardToExtension(method, params)
                 }
@@ -826,6 +840,7 @@ class BodyCoreService : Service() {
             }
         }
         startWsServer()
+        net.kuafuai.andee.config.VoiceConfig.watch(this, wsPrefsListener)
         // Before the brain, so the very first `type_text` finds the keyboard
         // where it expects it. A no-op unless the device is resting on the
         // headless IME — see [settleKeyboardOwner].
@@ -870,6 +885,7 @@ class BodyCoreService : Service() {
         // [promoteForMicrophone]. The caller is the launcher; the extra is how
         // it says so.
         if (intent?.getBooleanExtra(EXTRA_MICROPHONE, false) == true) promoteForMicrophone()
+        if (intent?.action == ACTION_EXIT) ui.post { exitBody() }
         return START_STICKY
     }
 
@@ -1509,7 +1525,17 @@ class BodyCoreService : Service() {
                         !meeting.isActive() && !net.kuafuai.andee.device.CallState.isActive &&
                         !net.kuafuai.andee.audio.Earcon.isSounding()
             },
-            onWake = { ui.post { if (!asr.isActive()) startTurn() } },
+            // Saying the wake phrase mid-task is the spoken shoulder-tap, so it stops
+            // the old task the way a tap on the ball does (issue #21). Without this a
+            // new turn opened while the old one was still driving the screen.
+            onWake = {
+                ui.post {
+                    if (!asr.isActive()) {
+                        if (dispatcher.isTaskActive()) stopEverything()
+                        startTurn()
+                    }
+                }
+            },
         )
         net.kuafuai.andee.wake.WakeWord.start()
     }
@@ -1809,6 +1835,7 @@ class BodyCoreService : Service() {
         if (::dogMotion.isInitialized) dogMotion.shutdown()
         if (::dogLink.isInitialized) dogLink.close()
         stopBrain()
+        net.kuafuai.andee.config.VoiceConfig.unwatch(this, wsPrefsListener)
         stopWsServer()
         net.kuafuai.andee.wake.WakeWord.stop()
         runCatching { unregisterReceiver(screenReceiver) }
@@ -2055,6 +2082,18 @@ class BodyCoreService : Service() {
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setContentIntent(openApp)
+        // A way out that needs no voice and costs the ball nothing (issue #16): the
+        // shade is where people go to turn a persistent service off, and the way
+        // back — the launcher icon — survives it. Same teardown as 「退出」 by voice.
+        val exit = PendingIntent.getService(
+            this,
+            REQ_EXIT,
+            Intent(this, BodyCoreService::class.java).setAction(ACTION_EXIT),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        b.addAction(
+            Notification.Action.Builder(null, AppLocale.str(this, R.string.body_notify_action_exit), exit).build()
+        )
         if (!hasScreen) {
             val fix = PendingIntent.getActivity(
                 this,
@@ -2660,12 +2699,13 @@ class BodyCoreService : Service() {
     }
 
     /**
-     * An explicit voice exit stops the body, not just its window. onDestroy
-     * owns the sockets, microphone, wake listener and every overlay, so reuse
-     * that teardown and leave permissions and saved history intact. Opening
-     * the launcher starts the body again with the existing grants.
+     * An explicit exit — 「退出」 by voice, or 退出 on the ongoing notification —
+     * stops the body, not just its window. onDestroy owns the sockets,
+     * microphone, wake listener and every overlay, so reuse that teardown and
+     * leave permissions and saved history intact. Opening the launcher starts
+     * the body again with the existing grants.
      */
-    private fun exitByVoice() {
+    private fun exitBody() {
         if (exitRequested) return
         // Keep the recorder and its minutes callback alive until the user
         // ends the meeting through the existing stop flow.
@@ -2685,10 +2725,28 @@ class BodyCoreService : Service() {
         stopSelf()
     }
 
+    /**
+     * Starts the 9008 control port only if the user turned it on (Settings → 诊断),
+     * on loopback unless they chose LAN, and always behind [VoiceConfig.wsToken] —
+     * see `VoiceConfig.wsServerMode` for why it is off by default.
+     */
     private fun startWsServer() {
+        if (wsServer != null || exitRequested) return
+        val mode = net.kuafuai.andee.config.VoiceConfig.wsServerMode(this)
+        if (mode == net.kuafuai.andee.config.VoiceConfig.WS_OFF) {
+            wsServerSpec = mode to ""
+            android.util.Log.i("Body", "ws server off (Settings → diagnostics turns it on)")
+            return
+        }
+        val token = net.kuafuai.andee.config.VoiceConfig.wsToken(this)
+        val host = if (mode == net.kuafuai.andee.config.VoiceConfig.WS_LAN) "0.0.0.0" else "127.0.0.1"
         try {
+            var started: BodyWsServer? = null
             val srv = BodyWsServer(
                 port = WS_PORT,
+                bindHost = host,
+                token = token,
+                onServerError = { ex -> ui.post { onWsServerFailed(started, ex) } },
                 registry = callExtensions,
                 onExtensionEvent = { kind, data -> onExtensionEvent(kind, data) },
                 onCommand = { method, params ->
@@ -2704,12 +2762,58 @@ class BodyCoreService : Service() {
                 onSweep = { ui.post { onSweepTimer() } },
                 onSweepForced = { ui.post { localBrain?.runSweep() } },
             )
+            started = srv
             srv.start()
             wsServer = srv
-            android.util.Log.i("Body", "ws server started on 0.0.0.0:$WS_PORT")
+            wsServerSpec = mode to token
+            android.util.Log.i("Body", "ws server started on $host:$WS_PORT (token required)")
         } catch (t: Throwable) {
             android.util.Log.e("Body", "ws server start failed", t)
         }
+    }
+
+    /**
+     * Brings the running server in line with the setting. The old one is stopped
+     * *before* the new one binds, on a worker — `stop()` blocks, and binding the
+     * same port while the old socket is still open fails even with reuse-address.
+     */
+    private fun reconcileWsServer() {
+        // A restart in flight reads the setting when it lands, so a second change
+        // while it runs needs nothing more — and must not bind the port twice.
+        if (wsRestarting || exitRequested) return
+        val mode = net.kuafuai.andee.config.VoiceConfig.wsServerMode(this)
+        val want = mode to
+            if (mode == net.kuafuai.andee.config.VoiceConfig.WS_OFF) "" else net.kuafuai.andee.config.VoiceConfig.wsToken(this)
+        if (want == wsServerSpec) return
+        val old = wsServer
+        wsServer = null
+        wsServerSpec = null
+        wsRestarting = true
+        wsStartRetries = 0
+        Thread {
+            runCatching { old?.stop(500) }
+            ui.post {
+                wsRestarting = false
+                startWsServer()
+            }
+        }.start()
+    }
+
+    private var wsRestarting = false
+    private var wsStartRetries = 0
+
+    /**
+     * The server that [startWsServer] recorded did not come up — usually the port was still
+     * held by the one just stopped. Forget it, so the next reconcile does not take a dead
+     * server for the one it wanted, and try again a few times.
+     */
+    private fun onWsServerFailed(failed: BodyWsServer?, ex: Exception) {
+        if (failed == null || wsServer !== failed) return
+        android.util.Log.w("Body", "ws server failed on :$WS_PORT (${ex.message}), retry ${wsStartRetries + 1}/3")
+        wsServer = null
+        wsServerSpec = null
+        Thread { runCatching { failed.stop(0) } }.start()
+        if (wsStartRetries++ < 3) ui.postDelayed({ startWsServer() }, 1_500L)
     }
 
     /**
@@ -3698,6 +3802,10 @@ class BodyCoreService : Service() {
         private const val REQ_OPEN_APP = 0x0B0D
         private const val REQ_FIX_A11Y = 0x0B0E
         private const val REQ_GRANT_CAPTURE = 0x0B0F
+        private const val REQ_EXIT = 0x0B10
+
+        /** Start-intent action from the notification's 退出 button. See [exitBody]. */
+        private const val ACTION_EXIT = "net.kuafuai.andee.action.EXIT"
 
         /**
          * Begin the body, or hand an already-running one what it was asked for.

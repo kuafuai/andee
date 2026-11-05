@@ -6,6 +6,8 @@ import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
+import android.media.PlaybackParams
+import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -281,6 +283,13 @@ class AudioIO {
     private var streamTrack: AudioTrack? = null
     private var streamPlaySampleRate: Int = 24_000
 
+    /** The speed [startStreamPlayback] asked for; kept because the track may be built later (System TTS). */
+    private var streamPlaySpeedWanted: Float = 1f
+
+    /** The speed the track actually got — 1 when the device refused the stretch. */
+    @Volatile
+    private var streamPlaySpeed: Float = 1f
+
     /** Player thread only, after [startStreamPlayback] zeroes it. */
     @Volatile
     private var streamBytesWritten: Long = 0
@@ -337,8 +346,9 @@ class AudioIO {
     /** Queued by [finishStreamPlayback] to mean "no more audio is coming". */
     private val endOfStream = ByteArray(0)
 
-    fun startStreamPlayback(sampleRate: Int = 24_000) {
+    fun startStreamPlayback(sampleRate: Int = 24_000, speed: Float = 1f) {
         stopStreamPlayback()
+        streamPlaySpeedWanted = speed
         streamBytesWritten = 0
         streamBytesQueued = 0
         playQueue.clear()
@@ -405,6 +415,21 @@ class AudioIO {
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
         streamPlaySampleRate = sampleRate
+        streamPlaySpeed = 1f
+        if (streamPlaySpeedWanted != 1f) {
+            try {
+                // A time stretch, not a faster sample rate: the latter would raise the
+                // pitch and turn the character into a chipmunk.
+                t.playbackParams = PlaybackParams()
+                    .setSpeed(streamPlaySpeedWanted)
+                    .setPitch(1f)
+                    .setAudioFallbackMode(PlaybackParams.AUDIO_FALLBACK_MODE_FAIL)
+                streamPlaySpeed = streamPlaySpeedWanted
+            } catch (e: IllegalArgumentException) {
+                // A device that cannot stretch must still speak, at normal speed.
+                Log.w(TAG, "speech speed $streamPlaySpeedWanted unsupported here, playing at 1x", e)
+            }
+        }
         t.play()
         streamTrack = t
     }
@@ -475,7 +500,8 @@ class AudioIO {
         val totalFrames = streamBytesWritten / bytesPerFrame
         val playedFrames = t.playbackHeadPosition.toLong() and 0xFFFFFFFFL
         val remaining = (totalFrames - playedFrames).coerceAtLeast(0)
-        val remainingMs = remaining * 1000L / streamPlaySampleRate
+        // The head counts source frames, which a stretched track plays through faster.
+        val remainingMs = (remaining * 1000L / streamPlaySampleRate / streamPlaySpeed).toLong()
         try {
             Thread.sleep(remainingMs + 200)
         } catch (_: InterruptedException) {

@@ -121,24 +121,28 @@ The full allocation of responsibility and the disclaimer are in **[../DISCLAIMER
 
 ---
 
-## Known risk: the debug WebSocket port is open to the local network
+## Known risk: the 9008 control port, if you turn it on
 
 **Please read this one to the end before using it.**
 
-On startup the app opens a WebSocket service listening on `0.0.0.0:9008` (`net/BodyWsServer.kt`; the port is the `ScreenBodyService.WS_PORT` constant).
+The app can serve a WebSocket control port on 9008 (`net/BodyWsServer.kt`; the port is the `BodyCoreService.WS_PORT` constant), for `tools/body.py`, debugging clients and call extensions. Whoever is connected can do everything the app can — tap the screen, type, read the UI, read notifications, read SMS and the call log, and have the vault passwords typed into any app's input field.
 
-**The problem is that it authenticates nothing.** `onOpen()` accepts every incoming connection as a legitimate controller. Any host that can reach this device's IP can connect and issue commands — tap the screen, type, read the UI, read notifications, read SMS and the call log, and have the vault passwords typed into any app's input field.
+**It used to be open to the whole network with no credential.** It is now:
 
-**When you get hit:** whenever the accessibility service is on and the device is on a network you do not control — a café, hotel, airport, meeting room, a corporate LAN — the risk is live.
+- **Off by default.** It starts only when you pick a mode in ⚙ → Advanced → Diagnostics → **Control port 9008**. An unset or unrecognised value reads as off.
+- **This device** binds `127.0.0.1` (use it with `adb forward`); **LAN** binds `0.0.0.0` (machines on the same Wi-Fi can connect).
+- **Token-gated in both modes.** Every connection must present the port token shown under the same setting, as `Authorization: Bearer <token>` or `?token=<token>`; without it the handshake is refused before the connection opens. Loopback alone would not be enough — any app on the same phone can dial `127.0.0.1`. The token is generated once per device; a factory reset replaces it.
+- **Visible while open.** The self-check lists the port for as long as it is on — as a warning in LAN mode.
 
-**What you can do about it today:**
-- Only use it on networks you trust, or just block the port at the router / firewall
-- Drive the device over `adb forward` instead of leaving it reachable on the network
-- Treat a device with accessibility enabled as a device you would not leave lying around on a strange network
+**What is still true:** in LAN mode the link is plaintext `ws://`, so the token can be read by anyone able to watch that network, and with it they can drive the device. The token is one per device, not per client.
 
-**The proper fix** (not done yet): verify a shared secret on connect, and make the bind address and port configurable, defaulting to loopback only. That is recorded as a to-do; until it lands, the limitation above stands.
+**What to do:**
+- Leave it off unless a tool you are running needs it, and turn it off when you are done
+- Prefer **This device** plus `adb forward` over **LAN**
+- Use **LAN** only on a network you trust, or one where the port is blocked at the router / firewall
+- Treat the token as a password for the whole device
 
-> A related but lighter second item: the link from the app to the brain hub (`net/BodyWsClient.kt`) is also unauthenticated, and is plaintext `ws://`. So only ever put an address you control in `hub_url`. **Using `local` brain mode avoids that link entirely** — the model request goes out over HTTPS from the app itself, and no inbound command channel exists on the device.
+> A related second item: the link from the app to the brain hub (`net/BodyWsClient.kt`) is unauthenticated, and is plaintext `ws://`. So only ever put an address you control in `hub_url`. **Using `local` brain mode avoids that link entirely** — the model request goes out over HTTPS from the app itself, and with the control port left off (the default) no inbound command channel exists on the device.
 
 ---
 

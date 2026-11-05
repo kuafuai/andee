@@ -226,6 +226,14 @@
         <!-- 三个全屏脸共用 Theme.Body.Stage:纯黑底、无标题栏、无系统转场
              动画。入场/退场由 ui/Stage.kt 自己画,平台那一项闭嘴 —— 见
              values/themes.xml 里关于"关闭时闪一下"的说明。 -->
+        <!-- read_file: hosts the system document picker. No storage permission —
+             the picker grants read access to the one file the user chooses. -->
+        <activity
+            android:name=".device.FilePickActivity"
+            android:theme="@style/Theme.Body.Trampoline"
+            android:exported="false"
+            android:taskAffinity=""
+            android:excludeFromRecents="true" />
         <activity
             android:name=".device.ScanActivity"
             android:theme="@style/Theme.Body.Stage"

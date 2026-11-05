@@ -388,6 +388,7 @@ class SettingsUi(
         nudgeSection(form)
         driveSection(form)
         timelineSection(form)
+        speechSpeedSection(form)
         vaultSection(form)
         maxStepsSection(form)
 
@@ -1105,12 +1106,49 @@ class SettingsUi(
             panel,
             lctx.getString(R.string.settings_grounding_note),
         )
+        wsServerRows(panel)
         readOnly(
             panel,
             lctx.getString(R.string.settings_device_id),
             saved["device_id"].orEmpty().ifEmpty { "—" },
         )
         dangerZone(panel)
+    }
+
+    /**
+     * The 9008 control port. 关 leftmost, because the leftmost option is what an
+     * unrecognised value falls back to and this socket can drive the whole device —
+     * same direction as [VoiceConfig.wsServerMode]. Written on 保存 like every other
+     * picker; the service follows the write by itself, from any door.
+     *
+     * The token is shown here because this card is the one place the owner, and only
+     * the owner, can read it; a client cannot connect without it in any mode.
+     */
+    private fun wsServerRows(panel: LinearLayout) {
+        rowLabel(panel, lctx.getString(R.string.settings_ws_server))
+        segmented(
+            panel,
+            "ws_server",
+            listOf(
+                VoiceConfig.WS_OFF to lctx.getString(R.string.common_off),
+                VoiceConfig.WS_LOCAL to lctx.getString(R.string.settings_ws_server_local),
+                VoiceConfig.WS_LAN to lctx.getString(R.string.settings_ws_server_lan),
+            ),
+        )
+        note(panel, lctx.getString(R.string.settings_ws_server_note))
+        val token = VoiceConfig.wsToken(context)
+        readOnly(panel, lctx.getString(R.string.settings_ws_token), token)
+        val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        lateinit var copy: TextView
+        copy = button(lctx.getString(R.string.common_copy), filled = false) {
+            runCatching {
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("Andee token", token))
+                copy.text = lctx.getString(R.string.common_copied)
+            }
+        }
+        row.addView(copy)
+        panel.addView(row, rowParams(dp(8)))
     }
 
     /**
@@ -1417,6 +1455,22 @@ class SettingsUi(
             "timeline_events",
             listOf("on" to lctx.getString(R.string.tl_show_all), "off" to lctx.getString(R.string.tl_show_talk)),
         )
+    }
+
+    /**
+     * How fast answers are read aloud (issue #17). Its own section rather than a row in the
+     * voice block, because the speed belongs to the player, not to a provider — it applies to
+     * 火山, Google and the system engine alike, and the voice block is not drawn at all under
+     * CodeFlying. 1× leftmost: the default, and what an unknown value reads as.
+     */
+    private fun speechSpeedSection(form: LinearLayout) {
+        val panel = group(form, lctx.getString(R.string.settings_section_speech_speed))
+        segmented(
+            panel,
+            "tts_speed",
+            listOf("1" to "1×", "1.5" to "1.5×", "2" to "2×"),
+        )
+        note(panel, lctx.getString(R.string.settings_speech_speed_note))
     }
 
     private fun nudgeSection(form: LinearLayout) {
