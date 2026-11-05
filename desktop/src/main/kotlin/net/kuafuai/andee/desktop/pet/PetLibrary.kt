@@ -22,6 +22,13 @@ data class PetLook(
     val dir: File? = null,
     /** How tall it stands at scale 100, in dp. A cat-shaped picture and a person need different heights to look the same size. */
     val baseHeight: Int = 200,
+    /**
+     * Who she is, not only how she looks — like a ball look (`BallLook.voice` / `persona`). While the pet is the
+     * body these replace the ball look's ([Pet.voice], [Pet.persona]). Blank = Andee's own: the house voice and
+     * the plain prompt, which is what a picture the user added gets.
+     */
+    val voice: String = "",
+    val persona: String = "",
 ) {
     val custom: Boolean get() = dir != null
 }
@@ -37,16 +44,24 @@ data class PetLook(
 object PetLibrary {
 
     /**
-     * A library of looks, not a cast of characters: no "girl" and "boy" columns — the same Andee,
-     * drawn four ways, named for what you see (hair colour, hair length) so nothing here is a
-     * setting about who the pet *is*. The cobalt pair is the logo's own blue.
+     * Four characters, each a look, a voice and a manner (2026-11-05; the ball's looks work the same way). The
+     * cream girl is plain Andee. The cobalt pair that used to be third and fourth were the same two drawn in blue;
+     * they were replaced by the quiet girl (高冷文静) and the boy in the cream sweater (温柔男友), and a saved
+     * `blue-girl` / `blue-boy` reads as those ([of]).
      */
     val PRESETS = listOf(
+        // Andee itself, the plush ball of the brand illustrations — the house voice and the plain prompt.
+        PetLook("andee", "Andee", "Andee", baseHeight = 120),
         PetLook("girl", "奶油金", "Cream", baseHeight = 210),
-        PetLook("boy", "奶油金·短发", "Cream short", baseHeight = 215),
-        PetLook("blue-girl", "钴蓝", "Cobalt", baseHeight = 210),
-        PetLook("blue-boy", "钴蓝·短发", "Cobalt short", baseHeight = 215),
+        PetLook("boy", "奶油金·短发", "Cream short", baseHeight = 215,
+            voice = "zh_male_yangguangqingnian_uranus_bigtts", persona = PetPersonas.CREAM_SHORT),
+        PetLook("lady", "文静少女", "Quiet girl", baseHeight = 240,
+            voice = "zh_female_gaolengyujie_uranus_bigtts", persona = PetPersonas.LADY),
+        PetLook("beau", "温柔男友", "Gentle boyfriend", baseHeight = 240,
+            voice = "zh_male_wenrouxiaoge_uranus_bigtts", persona = PetPersonas.BEAU),
     )
+
+    private val RENAMED = mapOf("blue-girl" to "lady", "blue-boy" to "beau")
 
     /** Height a picture the user dropped in is rendered at: the girl's, so the first sight is not a giant or a speck. */
     const val CUSTOM_HEIGHT = 200
@@ -55,7 +70,7 @@ object PetLibrary {
     fun all(): List<PetLook> = PRESETS + custom()
 
     /** An id that no longer exists (a removed custom pet, a typo) reads as the first preset. */
-    fun of(id: String): PetLook = all().firstOrNull { it.id == id.trim() } ?: PRESETS.first()
+    fun of(id: String): PetLook = (RENAMED[id.trim()] ?: id.trim()).let { want -> all().firstOrNull { it.id == want } } ?: PRESETS.first()
 
     fun custom(): List<PetLook> = runCatching {
         petsDir().listFiles { f -> f.isFile && f.name.endsWith("-idle.png") }

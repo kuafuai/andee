@@ -720,8 +720,19 @@ meetings, gear, friends) and lists exactly the tools some provider handles. What
   ball steal the first one's state. Both use `ballTaps(ballActions(…))`, the phone's vocabulary: tap stops and
   listens, double-tap stops and types, long-press opens the window; a sideways drag on the chat ball switches
   character.
-- **The desk pet is a third window, and it is a body, not a picture** (`desktop/src/main/kotlin/…/pet/`). It is a
-  **library of looks**, not a cast: four presets (Cream, Cream short, Cobalt, Cobalt short) plus any picture the user
+- **The desk pet replaces the ball when it is on (2026-11-05): one Andee on the desktop, not two.** `Main.kt` shows
+  `PetWindow` *or* `FloatingBall`, never both (a fresh install wears the ball: `pet` unset = off, only `on` shows her; 小球 is the picker's leftmost) (the ball when the pet is off or the native bridge is missing), and hands
+  the pet's window to everything that stood beside the ball (`ballWindow`: caption, prompt card, bubble). The pet takes
+  the ball's whole vocabulary (`BallActions`: tap talks, double-tap types, triple stops, long-press opens the window)
+  and keeps drag and throw; her pat-and-say-a-line game is gone, and so is the bubble inside her window — Andee's own
+  words are the caption's. What she wears is Andee's state (`assistantPose`, from `MacBall.face` / `spokenEmotion`,
+  `WorkLog` and the question/approval cards): LISTEN, SPEAK or the face the model wrote for the line (`emotionPose`),
+  SEARCH while a task acts and THINK while it waits on the model, HOLDING while a card is up; her idle acts and nap run
+  only when that is null. `girl` has a drawing for each (ten added via `tools/pet_sprites.py girl <pose…>`); other
+  looks fall back per pose (`PetPose.fallback`). **Each pet look is a character, like a ball look** (`PetLook.voice` / `persona`, `pet/PetPersonas.kt`): while the pet is the body, `Pet.voice()` / `Pet.persona()` replace the ball look's in `MacVoice` and `DesktopBrainHost.persona` (`Pet.isBody` is set by `Main.kt`, not asked of the bridge — loading the bridge in a test JVM gets it SIGKILLed). 奶油金 is plain Andee; 奶油金·短发 a sunny boy (`yangguangqingnian`); 文静少女 `lady` reserved and bookish (`gaolengyujie`; was a 高冷性感 lady in black until the user found it too suggestive); 温柔男友 `beau` (`wenrouxiaoge`). The two replaced the cobalt pair, and a saved `blue-girl` / `blue-boy` reads as them. A user's picture is plain Andee. Every pose is drawn at the box's full height and the box is as wide as the widest pose (`PetSprites.aspectOf` / `heightShare`): fitting each pose into the idle drawing's shape shrank every wider one, LISTEN by a fifth. Settings merged: one 形象 section picks 桌宠 or 小球, then the pet's
+  look (or, for the ball, the door to 形象与表情). `PetPoseTest` covers the mapping and the fallbacks.
+- **History: the desk pet was first a third window, and it is a body, not a picture** (`desktop/src/main/kotlin/…/pet/`). It is a
+  **library of looks**, not a cast: four presets (now Cream, Cream short, Quiet girl, Gentle boyfriend) plus any picture the user
   installs from the settings card — a shelf of thumbnails, because those names are names for pictures. The cobalt pair
   is the logo's own blue. No girl/boy switch: they are one Andee drawn several ways. `PetLibrary.addCustom` trims,
   scales and stores a user's picture under `~/Library/Application Support/Andee/pets`.

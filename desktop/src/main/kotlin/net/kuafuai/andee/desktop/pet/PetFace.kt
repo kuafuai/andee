@@ -79,7 +79,12 @@ fun PetFace(
             Image(
                 bitmap = frame ?: art,
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize().graphicsLayer {
+                // Its own shape at its own height (PetSprites.heightShare), feet on the floor, centred — never
+                // fitted into a box shaped for another pose. An idle frame is the idle drawing, sized as it.
+                modifier = run {
+                    val h = height * PetSprites.heightShare(look, pose)
+                    Modifier.size(width = h * (art.width.toFloat() / art.height), height = h)
+                }.graphicsLayer {
                     transformOrigin = TransformOrigin(0.5f, 1f)
                     rotationZ = tilt + lean
                     scaleY = still * (1f - 0.16f * squash)

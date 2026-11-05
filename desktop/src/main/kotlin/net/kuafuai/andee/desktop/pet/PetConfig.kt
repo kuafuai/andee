@@ -35,12 +35,11 @@ data class PetConfig(
         const val DEFAULT_SCALE = 100
 
         /**
-         * What is in force. Unset reads as **on**: the pet is the feature, and a switch
-         * nobody finds is the same as not shipping it. Only an exact "off" hides it, the
-         * phone's fail-open rule elsewhere reads the same way.
+         * What is in force. Unset reads as **off**: a fresh install wears Andee's ball, and the pet is
+         * something the user picks in Settings (2026-11-05). Only an exact "on" shows her.
          */
         fun load(): PetConfig = PetConfig(
-            enabled = Settings.get("pet").trim().lowercase() != "off",
+            enabled = Settings.get("pet").trim().lowercase() == "on",
             character = Settings.get("pet_character").ifBlank { PetLibrary.PRESETS.first().id },
             scale = Settings.get("pet_size").toIntOrNull()?.coerceIn(MIN_SCALE, MAX_SCALE) ?: DEFAULT_SCALE,
         )
@@ -55,6 +54,25 @@ data class PetConfig(
 object Pet {
     var config by mutableStateOf(PetConfig.load())
         private set
+
+    /**
+     * Whether the pet is the body now — set by Main.kt, which decides between her and the ball. A flag rather
+     * than asking the bridge here: the brain reads the persona on every turn, and loading the native bridge
+     * from a test JVM gets it killed.
+     */
+    @Volatile var isBody: Boolean = false
+
+    /**
+     * The voice and the manner in force: the pet's while she is the body, else the ball look's. One place, so
+     * the voice, the prompt and what is on screen cannot belong to three different characters.
+     */
+    fun voice(): String =
+        if (isBody) config.look.voice
+        else net.kuafuai.andee.ui.ball.BallLooks.byName(Settings.get("ball").ifEmpty { null }).voice
+
+    fun persona(): String =
+        if (isBody) config.look.persona
+        else net.kuafuai.andee.ui.ball.BallLooks.byName(Settings.get("ball").ifEmpty { null }).persona
 
     fun reload() {
         config = PetConfig.load()

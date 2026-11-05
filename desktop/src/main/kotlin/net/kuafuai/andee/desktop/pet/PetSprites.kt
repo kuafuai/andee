@@ -8,8 +8,12 @@ import java.io.ByteArrayInputStream
 import java.util.concurrent.ConcurrentHashMap
 import javax.imageio.ImageIO
 
-/** One drawing of a character. A pose is a file, not a mood: the sprite is art, the mood is the ball. */
-enum class PetPose(val file: String) {
+/**
+ * One drawing of a character. A pose is a file; which one is shown is decided from Andee's state (`PetMind`).
+ * [fallback] is what a look without this drawing shows instead — only `girl` has the poses the ball's states added
+ * on 2026-11-05, and the others must still say "listening" with something closer than the plain idle.
+ */
+enum class PetPose(val file: String, val fallback: PetPose? = null) {
     IDLE("idle"),
     HAPPY("happy"),
 
@@ -29,6 +33,23 @@ enum class PetPose(val file: String) {
 
     /** Idle act only: eating from a little hotpot. The kind of scene a desktop pet earns its keep with. */
     HOTPOT("hotpot"),
+
+    // The ball's states, since the pet is Andee's body on the Mac (`PetMind` maps a `Mood` onto these).
+    /** The mic is open. The one face that must never read as idle. */
+    LISTEN("listen", THINK),
+    /** Reading the answer out. */
+    SPEAK("speak", HAPPY),
+    /** A task is running and it is acting (between model calls it is [THINK]). */
+    SEARCH("search", THINK),
+    /** A question card is up, waiting for the user. */
+    HOLDING("holding"),
+    CURIOUS("curious", THINK),
+    ANXIOUS("anxious", SAD),
+    WINK("wink", HAPPY),
+    CELEBRATE("celebrate", HAPPY),
+    PROTECT("protect", THINK),
+    /** Fast asleep (as opposed to [SLEEPY], a yawn). */
+    SLEEP("sleep", SLEEPY),
 }
 
 /**
@@ -48,6 +69,7 @@ enum class PetPose(val file: String) {
 object PetSprites {
 
     private val cache = ConcurrentHashMap<String, ImageBitmap>()
+    private val missingLogged = ConcurrentHashMap.newKeySet<String>()
     private val maskCache = ConcurrentHashMap<String, AlphaMask>()
 
     /**
@@ -90,6 +112,7 @@ object PetSprites {
         // A look without an airborne or happy drawing still gets thrown and patted; it just
         // stands there while it happens, which is better than a hole where the pet was.
         decode(look, pose)?.let { return it }
+        pose.fallback?.let { f -> decode(look, f)?.let { return it } }
         return if (pose == PetPose.IDLE) null else decode(look, PetPose.IDLE)
     }
 
@@ -106,7 +129,8 @@ object PetSprites {
             }
         }.onFailure { Log.w(TAG, "cannot read ${look.id}-${pose.file}.png: ${it.message}") }.getOrNull()
         if (bytes == null) {
-            Log.w(TAG, "missing sprite ${look.id}-${pose.file}.png")
+            // Expected for every pose a look has no drawing of (see [PetPose.fallback]): say it once, not per frame.
+            if (missingLogged.add(key)) Log.i(TAG, "no sprite ${look.id}-${pose.file}; using its fallback")
             return null
         }
         val decoded = decode(bytes)
@@ -144,13 +168,30 @@ object PetSprites {
     private val frameCache = ConcurrentHashMap<String, List<ImageBitmap>>()
 
     /**
-     * Width / height of the look's idle drawing: the window is as wide as the character is,
-     * so a standing person is narrow and a sitting animal is square.
+     * How much of the box's height a pose is drawn at. Every drawing stands the full height of the box (each is
+     * trimmed to her body, and she is the same height standing whatever her hands do) — except the airborne
+     * one, a curled-up body, which keeps its size relative to the idle drawing.
      */
-    fun aspectOf(look: PetLook): Float {
-        val art = get(look, PetPose.IDLE) ?: return 1f
-        return if (art.height == 0) 1f else art.width.toFloat() / art.height.toFloat()
+    fun heightShare(look: PetLook, pose: PetPose): Float {
+        if (pose != PetPose.AIR) return 1f
+        val air = decode(look, PetPose.AIR) ?: return 1f
+        val idle = decode(look, PetPose.IDLE) ?: return 1f
+        return (air.height.toFloat() / idle.height).coerceIn(0.3f, 1f)
     }
+
+    /**
+     * The box's width / height: wide enough for the widest pose at its drawn height. It used to be the idle
+     * drawing's own shape, and every pose was fitted into it — so a wider pose shrank: a hand at her ear made
+     * the whole of her a fifth smaller while she listened, and asleep on her side a third.
+     */
+    fun aspectOf(look: PetLook): Float = aspectCache.getOrPut("${look.id}@${look.dir?.path ?: "bundled"}") {
+        PetPose.entries.mapNotNull { p ->
+            decode(look, p)?.let { if (it.height == 0) null else it.width.toFloat() / it.height * heightShare(look, p) }
+        }.maxOrNull() ?: 1f
+    }
+
+    private val aspectCache = ConcurrentHashMap<String, Float>()
+
 
     /**
      * Skia first: the sheets ship as WebP (a ninth of the PNG's size for this flat art), and Skia

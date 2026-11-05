@@ -91,32 +91,28 @@ fun main() {
             onDispose { runCatching { d?.removeAppEventListener(l) } }
         }
 
-        FloatingBall(
-            actions = ballActions(onType = { openChat(typing = true) }, onNoVoice = { askToOpenSettings { openChat("settings") } })
-                .let { a -> BallActions(a.onTap, a.onDoubleTap, a.onTripleTap) { openChat() } },
-            onWindow = { ballWindow = it },
-        )
-        BallCaptionWindow(ballWindow, suppressed = pending != null || ask != null)
+        val bodyActions = ballActions(onType = { openChat(typing = true) }, onNoVoice = { askToOpenSettings { openChat("settings") } })
+            .let { a -> BallActions(a.onTap, a.onDoubleTap, a.onTripleTap) { openChat() } }
+        // One body on the desktop. The desk pet, when it is on, *is* Andee there (2026-11-05): the ball is not
+        // shown, and the caption, the prompt card and the bubble stand beside her through `ballWindow`. The pet
+        // needs the native bridge (her click-through is native: without it her window would swallow the clicks
+        // around her), so without it — or with the pet off — the ball is the body, as before.
+        val petBody = Pet.config.enabled && Bridge.available
+        Pet.isBody = petBody
+        if (Pet.config.enabled && !Bridge.available) Log.w("Pet", "the native bridge is missing, so the ball stands in for the pet")
+        if (petBody) {
+            PetWindow(cfg = Pet.config, actions = bodyActions, holding = pending != null || ask != null, onWindow = { ballWindow = it })
+        } else {
+            FloatingBall(actions = bodyActions, onWindow = { ballWindow = it })
+        }
+        // The ball's window has a transparent band round the sphere, so its caption tucks up into it; the pet's
+        // window ends at her feet (and her shadow), so hers starts a little below them.
+        BallCaptionWindow(ballWindow, suppressed = pending != null || ask != null, gap = if (petBody) 8 else -14)
         PromptWindow(ballWindow, pending, ask)
         // Bubbles stand beside the ball; with the chat window in front they are a scrollback row instead.
         Nudges.ballUp = { ballWindow != null }
         Nudges.chatInFront = { chat && chatWindow?.isActive == true }
         BubbleWindow(ballWindow)
-
-        // The desk pet: its own window, so the ball keeps every gesture it had and the pet can
-        // be switched off without touching any of them. `Pet.config` is Compose state, so the
-        // settings card's save re-reads it here — no restart, and off really means gone.
-        if (Pet.config.enabled) {
-            // The canvas covers a whole display and is therefore transparent to the mouse everywhere
-            // except over the pet; that switch is native. Without the bridge a full-screen window
-            // would swallow every click on the desktop, so the pet is not shown rather than shown
-            // dangerously.
-            if (Bridge.available) {
-                PetWindow(cfg = Pet.config, onOpenChat = { openChat() })
-            } else {
-                Log.w("Pet", "the native bridge is missing, so the pet is not shown")
-            }
-        }
 
         Window(
             onCloseRequest = { chat = false },

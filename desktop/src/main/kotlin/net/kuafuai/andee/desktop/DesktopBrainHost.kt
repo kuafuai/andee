@@ -52,7 +52,7 @@ class DesktopBrainHost(
     override fun activeSceneName(): String? = Settings.get("scene").ifEmpty { null }
         ?.takeIf { DesktopNotebook.book.scene(it) != null }
 
-    override fun persona(): String = net.kuafuai.andee.ui.ball.BallLooks.byName(Settings.get("ball").ifEmpty { null }).persona
+    override fun persona(): String = net.kuafuai.andee.desktop.pet.Pet.persona()
 
     override fun platformPrompt(): String = MacPrompt.text(caps)
 

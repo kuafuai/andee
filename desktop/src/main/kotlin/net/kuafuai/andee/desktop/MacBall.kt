@@ -53,6 +53,23 @@ object MacBall {
     /** The face the model asked for in the reply about to be spoken. */
     @Volatile private var nextEmotion: Mood? = null
 
+    // ---- The same facts as Compose state, for a body that is not a renderer: the desk pet, which is Andee's body
+    // on the Mac when it is on (see `pet/PetRuntime.assistantPose`). Written wherever the facts change. ----
+
+    /** The face the ball would wear now. */
+    var face by mutableStateOf(Mood.CALM)
+        private set
+
+    /** The face the model picked for the line being spoken, or null. */
+    var spokenEmotion by mutableStateOf<Mood?>(null)
+        private set
+
+    /** Bumped when an answer lands (the ball pops) and when it raises a bubble by itself (the ball waves). */
+    var answerTick by mutableStateOf(0)
+        private set
+    var greetTick by mutableStateOf(0)
+        private set
+
     /** Restores the saved look; by name, like the phone's `ball` key. */
     fun restoreLook() = BallLooks.requestByName(Settings.get("ball").ifEmpty { null })
 
@@ -94,7 +111,7 @@ object MacBall {
     fun onTool() { renderers.forEach { it.pulseTool() } }
 
     /** A bubble it raised by itself just went up: wave once so the eye finds it. */
-    fun greet() { renderers.forEach { it.greet() } }
+    fun greet() { greetTick++; renderers.forEach { it.greet() } }
 
     /**
      * An answer came back. The opening face it was written with is held for
@@ -104,6 +121,7 @@ object MacBall {
      */
     fun onAnswer(raw: String) {
         nextEmotion = SpeechMood.parse(raw).cues.firstOrNull()?.mood
+        answerTick++
         renderers.forEach { it.signalOutcome(true) }
     }
 
@@ -117,7 +135,6 @@ object MacBall {
     }
 
     private fun apply() {
-        if (renderers.isEmpty()) return
         val mood = when {
             recording -> Mood.LISTENING
             voice == MacVoice.State.LISTENING -> Mood.LISTENING
@@ -125,6 +142,9 @@ object MacBall {
             busy -> Mood.THINKING
             else -> Mood.CALM
         }
+        face = mood
+        spokenEmotion = emotion
+        if (renderers.isEmpty()) return
         for (r in renderers) {
             r.setState(mood, listening = mood == Mood.LISTENING, emotion = emotion)
             r.setWorking(busy)

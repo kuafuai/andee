@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import net.kuafuai.andee.desktop.Settings
 import net.kuafuai.andee.desktop.Strings
+import net.kuafuai.andee.ui.ball.Mood
 import net.kuafuai.andee.util.Log
 import java.awt.GraphicsEnvironment
 import kotlin.math.roundToInt
@@ -72,8 +73,15 @@ class PetRuntime(
     val idleFrames: List<ImageBitmap> = PetSprites.frames(look)
     var touchedAt = System.currentTimeMillis()
 
+    /**
+     * What Andee is doing, as a pose — listening, speaking, working, waiting for an answer — or null when it is
+     * idle and the pet's own life (the acts, the nap) may run. Set by the window from [assistantPose]. It wins
+     * over everything but being in the air: the pet is Andee's body, not company beside it.
+     */
+    var assistant by mutableStateOf<PetPose?>(null)
+
     /** What is actually drawn right now. */
-    val shown: PetPose get() = if (airborne) PetPose.AIR else pose
+    val shown: PetPose get() = if (airborne) PetPose.AIR else assistant ?: pose
 
     val activeFrame: ImageBitmap?
         get() = if (shown == PetPose.IDLE && previousPose == null) idleFrames.getOrNull(frameIndex) else null
@@ -86,47 +94,10 @@ class PetRuntime(
         wake++
     }
 
-    fun pat() {
-        wake++
-        touchedAt = System.currentTimeMillis()
-        asleep = false
-        val (mood, line) = PetTalk.reaction()
-        say(if (Strings.lang() == "zh") line.zh else line.en, mood)
-        motion.jolt(0.35f)
-        motion.pat()
-    }
-
-    /**
-     * A press reacted to *without* moving her.
-     *
-     * The reaction used to include a hop, and a hop at press time is what made a drag feel wrong:
-     * she jumped out from under the cursor, and the grab point was then measured from where she
-     * used to be. The jump belongs on the release of a click, not on the press of a drag.
-     */
-    fun pressStill() {
-        wake++
-        touchedAt = System.currentTimeMillis()
-        asleep = false
-        val (mood, line) = PetTalk.reaction()
-        say(if (Strings.lang() == "zh") line.zh else line.en, mood)
-    }
-
     /** The hop, for a click that never became a drag. */
     fun hop() {
         motion.pat()
         wake++
-    }
-
-    fun wakeUp() {
-        asleep = false
-        touchedAt = System.currentTimeMillis()
-        val line = PetTalk.waking()
-        say(if (Strings.lang() == "zh") line.zh else line.en, PetPose.HAPPY)
-        motion.pat()
-    }
-
-    fun press() {
-        if (asleep) wakeUp() else pat()
     }
 
     fun grab() {
@@ -232,6 +203,7 @@ class PetRuntime(
             while (true) {
                 delay(5_000)
                 val quiet = System.currentTimeMillis() - touchedAt
+                if (assistant != null) { touchedAt = System.currentTimeMillis(); continue }
                 if (!asleep && bubble == null && pose == PetPose.IDLE && motion.resting && !airborne) {
                     if (quiet > SLEEP_AFTER_MS) {
                         asleep = true
@@ -251,6 +223,28 @@ class PetRuntime(
                 }
             }
         }
+        // Andee became busy: whatever she was doing on her own stops, and a nap ends.
+        LaunchedEffect(assistant) {
+            Log.i(TAG, "body: ${assistant ?: "idle"}")
+            if (assistant == null) return@LaunchedEffect
+            asleep = false
+            bubble = null
+            pose = PetPose.IDLE
+            touchedAt = System.currentTimeMillis()
+        }
+        // An answer landed: a hop (the ball's pop). It raised a bubble by itself: a wave, so the eye finds her.
+        LaunchedEffect(net.kuafuai.andee.desktop.MacBall.answerTick) {
+            if (net.kuafuai.andee.desktop.MacBall.answerTick == 0) return@LaunchedEffect
+            hop()
+        }
+        LaunchedEffect(net.kuafuai.andee.desktop.MacBall.greetTick) {
+            if (net.kuafuai.andee.desktop.MacBall.greetTick == 0) return@LaunchedEffect
+            asleep = false
+            pose = PetPose.HAPPY
+            hop()
+            delay(1_600)
+            if (pose == PetPose.HAPPY) pose = PetPose.IDLE
+        }
         // Crossfade whenever the drawn pose changes.
         LaunchedEffect(shown) {
             if (shown == currentPose) return@LaunchedEffect
@@ -267,6 +261,36 @@ class PetRuntime(
         const val TAG = "Pet"
         const val SLEEP_AFTER_MS = 180_000L
     }
+}
+
+/**
+ * Andee's state as a pose, or null when it is idle. The ball's own decision (`MacBall.face`) mapped onto the
+ * drawings: the mic open is [PetPose.LISTEN]; speaking wears the face the model picked for the line, else
+ * [PetPose.SPEAK]; a task is [PetPose.SEARCH] while it acts and [PetPose.THINK] while it waits on the model; a
+ * question or an approval card up is [PetPose.HOLDING].
+ */
+fun assistantPose(holding: Boolean): PetPose? {
+    if (holding) return PetPose.HOLDING
+    return when (net.kuafuai.andee.desktop.MacBall.face) {
+        Mood.LISTENING -> PetPose.LISTEN
+        Mood.SPEAKING -> net.kuafuai.andee.desktop.MacBall.spokenEmotion?.let(::emotionPose) ?: PetPose.SPEAK
+        Mood.THINKING -> if (net.kuafuai.andee.desktop.WorkLog.active && !net.kuafuai.andee.desktop.WorkLog.waiting) PetPose.SEARCH else PetPose.THINK
+        else -> null
+    }
+}
+
+/** The face the model wrote for a line (`[happy]`, `[生气]` …, see `SpeechMood`), as a drawing. */
+internal fun emotionPose(m: Mood): PetPose = when (m) {
+    Mood.HAPPY, Mood.WAVE -> PetPose.HAPPY
+    Mood.CURIOUS -> PetPose.CURIOUS
+    Mood.TENSE -> PetPose.ANGRY
+    Mood.ANXIOUS -> PetPose.ANXIOUS
+    Mood.CONCERNED, Mood.FAILED -> PetPose.SAD
+    Mood.WINK -> PetPose.WINK
+    Mood.PROTECT -> PetPose.PROTECT
+    Mood.CELEBRATE, Mood.SUCCESS -> PetPose.CELEBRATE
+    Mood.REST, Mood.SLEEPING -> PetPose.SLEEPY
+    else -> PetPose.SPEAK
 }
 
 /** One runtime per config, kept across recompositions and across the windows that draw it. */

@@ -83,7 +83,7 @@ private fun heightFor(n: Int) = (20 + 22 * n.coerceIn(1, 3)).dp
  * the ball's size; it exists only while there is something to say and fades in and out.
  */
 @Composable
-fun ApplicationScope.BallCaptionWindow(ball: java.awt.Window?, suppressed: Boolean = false) {
+fun ApplicationScope.BallCaptionWindow(ball: java.awt.Window?, suppressed: Boolean = false, gap: Int = -14) {
     // While a turn is working: its status (ticking) over the newest two lines of what it is thinking and doing
     // ([WorkLog]), scrolling as they arrive. Otherwise the plain caption.
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -115,11 +115,12 @@ fun ApplicationScope.BallCaptionWindow(ball: java.awt.Window?, suppressed: Boole
         focusable = false,
     ) {
         val w = window
-        LaunchedEffect(visible) {
+        LaunchedEffect(visible, ball, gap) {
             if (!visible) return@LaunchedEffect
+            ball?.let { followMoves(w, it, gap) }
             var floated = false
             while (true) {
-                ball?.let { place(w, it) }
+                ball?.let { place(w, it, gap) }
                 if (!floated && w.isShowing) floated = net.kuafuai.andee.desktop.mac.Bridge.floatWindow(CAPTION_TITLE)
                 delay(80)
             }
@@ -183,4 +184,18 @@ internal fun place(w: java.awt.Window, ball: java.awt.Window, gap: Int = -14) {
     val below = ball.y + ball.height + gap
     val y = if (below + w.height < screen.y + screen.height - 8) below else ball.y - w.height - gap
     if (w.x != x || w.y != y) w.setLocation(x, y)
+}
+
+/**
+ * Re-place [w] the moment [ball] moves, until the calling effect ends. The 80 ms poll alone trailed a dragged
+ * pet visibly; the poll stays for size changes. The effect is keyed on the ball, because the body's window is
+ * replaced when the user switches between the ball and the pet, and a loop holding the old one followed a window
+ * that was gone.
+ */
+internal fun kotlinx.coroutines.CoroutineScope.followMoves(w: java.awt.Window, ball: java.awt.Window, gap: Int = -14) {
+    val l = object : java.awt.event.ComponentAdapter() {
+        override fun componentMoved(e: java.awt.event.ComponentEvent?) { if (w.isShowing) place(w, ball, gap) }
+    }
+    ball.addComponentListener(l)
+    coroutineContext[kotlinx.coroutines.Job]?.invokeOnCompletion { java.awt.EventQueue.invokeLater { ball.removeComponentListener(l) } }
 }

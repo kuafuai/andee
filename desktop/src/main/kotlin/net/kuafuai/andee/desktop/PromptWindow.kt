@@ -55,8 +55,9 @@ fun ApplicationScope.PromptWindow(ball: java.awt.Window?, pending: ApprovalGate.
         focusable = true,
     ) {
         val w = window
-        LaunchedEffect(up, pending, ask) {
+        LaunchedEffect(up, pending, ask, ball) {
             if (!up) return@LaunchedEffect
+            ball?.let { followMoves(w, it, gap = 8) }
             var floated = false
             var raised = false
             // Re-placed while it is up: the card grows when the confirm box opens, and the ball can be dragged.

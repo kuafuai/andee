@@ -77,8 +77,8 @@ object MacVoice {
         asrUid = Settings.uid(),
         ttsEndpoint = codeFlying?.ttsEndpoint ?: Settings.get("tts_endpoint").ifEmpty { "wss://openspeech.bytedance.com/api/v3/tts/bidirection" },
         ttsResourceId = Settings.get("tts_resource_id").ifEmpty { "seed-tts-2.0" },
-        // The voice is the character's: read from the look the ball is wearing, per utterance, as the phone does.
-        ttsSpeaker = net.kuafuai.andee.ui.ball.BallLooks.byName(Settings.get("ball").ifEmpty { null }).voice
+        // The voice is the character's: the pet's while she is the body, else the ball look's — per utterance.
+        ttsSpeaker = net.kuafuai.andee.desktop.pet.Pet.voice()
             .ifEmpty { "zh_female_vv_uranus_bigtts" },
         ttsSampleRate = Settings.get("tts_sample_rate").toIntOrNull()?.takeIf { it in 8_000..48_000 } ?: 24_000,
         voiceProvider = if (codeFlying != null) VoiceSettings.VOICE_HUOSHAN else Settings.voiceProvider(),

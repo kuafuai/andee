@@ -302,8 +302,9 @@ fun ApplicationScope.BubbleWindow(ball: java.awt.Window?) {
         focusable = false,
     ) {
         val w = window
-        LaunchedEffect(up) {
+        LaunchedEffect(up, ball) {
             if (!up) return@LaunchedEffect
+            ball?.let { followMoves(w, it, gap = 6) }
             var floated = false
             while (true) {
                 ball?.let { place(w, it, gap = 6) }

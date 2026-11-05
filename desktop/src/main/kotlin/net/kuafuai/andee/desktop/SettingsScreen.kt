@@ -176,28 +176,57 @@ fun SettingsScreen(
             ) { Palette.setNight(it == "night") }
 
         }
-        // ---- 形象与表情: a door, like the phone's — the card is where looks are tried and picked ----
-        Section(st("settings_section_expr")) {
-            Note(st("settings_expr_note"))
-            Row(Modifier.padding(top = 8.dp)) { Pill(st("settings_expr_open")) { onOpenExpressions() } }
-
-        }
-        // ---- 桌宠: Andee 在桌面上的一副身体。It stands on the desktop beside the ball, which stays
-        // the control surface; this one is only a presence, so it gets the gestures that cannot be
-        // mistaken for a control — drag, throw, double-click. ----
+        // ---- 形象: what Andee is on the desktop. One section since 2026-11-05: the desk pet *is* Andee's body
+        // when it is picked (the ball is not shown), so choosing between them and choosing the look are one
+        // decision. 小球 keeps the ball and its door to 形象与表情. ----
+        val bodyIsPet = v["pet"].orEmpty().ifEmpty { if (Pet.config.enabled) "on" else "off" } == "on"
         Section(
-            t("桌宠", "Desk pet"),
+            t("形象", "Look"),
             note = t(
-                "Andee 在桌面上的一副身体：拖得动、甩出去会掉下来、点一下逗她、双击打开对话。球还是那个球，她不接管任何操作。",
-                "Andee's body on your desktop: drag it, throw it and it falls, click to pat it, double-click for the " +
-                    "conversation. The ball is still the ball; the pet takes over no controls.",
+                "Andee 在桌面上的样子。桌宠：站在桌面上，点一下说话、双击打字、三下停下、长按打开窗口，拖得动、甩出去会掉下来，听、说、干活时换不同的姿势。小球：原来那个球。",
+                "How Andee appears on your desktop. Desk pet: stands on the desktop — click to talk, double-click to type, " +
+                    "triple-click to stop, long-press for the window; drag or throw her; she changes pose as she listens, " +
+                    "speaks and works. Ball: the original ball.",
             ),
         ) {
             SegmentedPicker(
-                listOf("off" to st("common_off"), "on" to st("common_on")),
-                v["pet"].orEmpty().ifEmpty { if (Pet.config.enabled) "on" else "off" },
+                listOf("off" to t("小球", "Ball"), "on" to t("桌宠", "Desk pet")),
+                if (bodyIsPet) "on" else "off",
             ) { v["pet"] = it }
-            RowLabel(t("形象", "Look"))
+            if (!bodyIsPet) {
+                // The ball's looks, picked right here like the pet's (a tap saves it, as swiping the ball does),
+                // with the ball itself drawn beside them; every expression is one door further.
+                RowLabel(t("样子", "Character"))
+                var ballLook by remember { mutableStateOf(Settings.get("ball").ifEmpty { net.kuafuai.andee.ui.ball.BallLooks.active.name }) }
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    BallPreview(net.kuafuai.andee.ui.ball.Mood.CALM, 96.dp)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                        net.kuafuai.andee.ui.ball.BallLooks.ALL.chunked(3).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                for (look in row) {
+                                    val on = look.name == ballLook
+                                    Text(
+                                        Strings.get("ball_look_${look.name}"),
+                                        color = if (on) Palette.accent else Palette.label, fontSize = 13.sp, maxLines = 1,
+                                        modifier = Modifier
+                                            .background(if (on) Palette.accentSoft else Palette.panel, RoundedCornerShape(10.dp))
+                                            .border(if (on) 2.dp else 1.dp, if (on) Palette.accent else Palette.hairline, RoundedCornerShape(10.dp))
+                                            .clickable { MacBall.pickLook(look.name); ballLook = look.name; v["ball"] = look.name }
+                                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                Row(Modifier.padding(top = 8.dp)) { Pill(t("看全部表情", "All expressions")) { onOpenExpressions() } }
+            }
+            if (bodyIsPet) {
+            RowLabel(t("样子", "Character"))
             // A shelf, not a dropdown: each look is drawn as itself. "奶油金" and "钴蓝·短发" are names
             // for pictures, and a name is not a picture — and there is no girl/boy switch here,
             // because the pet is one Andee drawn several ways, not a cast.
@@ -288,12 +317,19 @@ fun SettingsScreen(
             ) {
                 PetFace(height = 110.dp, look = PetLibrary.of(picked), pose = PetPose.IDLE)
                 Note(
-                    t(
-                        "她不是球换的皮：球负责听、说和情绪，她只负责陪。关掉桌宠不会影响任何功能。",
-                        "She is not a reskin of the ball: the ball listens, speaks and carries the mood, the pet is only " +
-                            "company. Turning the pet off affects no feature.",
+                    // Each look is a character: its voice and manner come with it, and the user is owed knowing that.
+                    when (PetLibrary.of(picked).id) {
+                        "boy" -> t("阳光少年：男声，爽快直接。", "A sunny boy: a young man's voice, quick and direct.")
+                        "lady" -> t("文静少女：清冷女声，话少、细致，偶尔流露一点温柔。", "A quiet girl: a cool voice, few words, careful, warm underneath.")
+                        "beau" -> t("温柔男友：温柔男声，细心体贴，会记得你说过的事。", "A gentle boyfriend: a soft voice, attentive, remembers what you said.")
+                        "andee" -> t("Andee 本尊：它自己的声音和脾气。", "Andee itself: its own voice and manner.")
+                        else -> t("就是 Andee：她自己的声音和脾气。", "Plain Andee: her own voice and manner.")
+                    } + t(
+                        "在听、在说、在干活、等你回答，各有各的姿势。",
+                        " Listening, speaking, working and waiting for you each have their own pose.",
                     ),
                 )
+            }
             }
         }
         // ---- 复盘: the review switch (the notebook itself is the sidebar card) ----

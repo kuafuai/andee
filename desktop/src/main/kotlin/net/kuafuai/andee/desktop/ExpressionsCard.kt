@@ -101,7 +101,7 @@ private fun moodLabel(m: Mood, zh: Boolean): String = if (zh) when (m) {
 
 /** A second ball, decoupled from the corner one so poking an expression touches only this card. */
 @Composable
-private fun BallPreview(mood: Mood, size: Dp) {
+internal fun BallPreview(mood: Mood, size: Dp) {
     val px = with(LocalDensity.current) { size.roundToPx() }
     val renderer = remember(px) { BallRenderer(px, px) }
     val bitmap = remember(px) { Bitmap().apply { allocPixels(ImageInfo(px, px, ColorType.BGRA_8888, ColorAlphaType.PREMUL)) } }
