@@ -49,11 +49,28 @@ fun ApplicationScope.PetWindow(cfg: PetConfig, onOpenChat: () -> Unit) {
         focusable = false,
     ) {
         val w = window
+        // The window is her bounding box plus the bubble, and a box has empty corners: without this
+        // a click beside her head would be swallowed by our window and lost to the app behind.
+        // Clicks are handled from the global pointer state, so the window itself has nothing to
+        // receive — it only needs to stop ignoring the mouse where she actually is.
+        LaunchedEffect(runtime, space) {
+            var interactive: Boolean? = null
+            while (true) {
+                delay(12)
+                val (cx, cy) = cursor() ?: continue
+                val hit = onHer(runtime, cx, cy, widthDp, cfg.height) || runtime.motion.held
+                if (hit != interactive) {
+                    Bridge.setClickThrough("Andee Pet", !hit)
+                    interactive = hit
+                }
+            }
+        }
         LaunchedEffect(runtime, space) {
             var wasDown = false
             var down = false
             var downStreak = 0
             var lastRaw = false
+            var pressedOnHer = false
             var lastPress = 0L
             var dragging = false
             var grabX = 0f
@@ -80,8 +97,8 @@ fun ApplicationScope.PetWindow(cfg: PetConfig, onOpenChat: () -> Unit) {
                 if (downStreak >= 2) down = raw
                 if (down && !wasDown) {
                     val now = System.currentTimeMillis()
-                    val onHer = x >= runtime.motion.x - widthDp / 2f && x <= runtime.motion.x + widthDp / 2f &&
-                        y >= runtime.motion.y - cfg.height && y <= runtime.motion.y
+                    val onHer = onHer(runtime, x, y, widthDp, cfg.height)
+                    pressedOnHer = onHer
                     if (onHer) {
                         if (now - lastPress < 320) onOpenChat() else runtime.pressStill()
                         lastPress = now
@@ -109,7 +126,8 @@ fun ApplicationScope.PetWindow(cfg: PetConfig, onOpenChat: () -> Unit) {
                     }
                 }
                 if (!down && wasDown) {
-                    if (dragging) runtime.release(vx, vy) else runtime.hop()
+                    if (dragging) runtime.release(vx, vy) else if (pressedOnHer) runtime.hop()
+                    pressedOnHer = false
                     dragging = false
                     grabFeetX = 0f
                 }
@@ -165,6 +183,23 @@ fun ApplicationScope.PetWindow(cfg: PetConfig, onOpenChat: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Whether the pointer is on a drawn pixel of her, not merely inside the window.
+ *
+ * Sampled from the same bitmap that is on screen (see [PetSprites.mask]) so the empty corners of her
+ * bounding box — beside the head, between the legs — pass the click through to whatever is behind.
+ */
+private fun onHer(runtime: PetRuntime, x: Float, y: Float, widthDp: Float, height: Int): Boolean {
+    val boxLeft = runtime.motion.x - widthDp / 2f
+    val boxTop = runtime.motion.y - height
+    if (x < boxLeft || x > boxLeft + widthDp || y < boxTop || y > boxTop + height) return false
+    val pose = if (runtime.airborne) PetPose.AIR else runtime.pose
+    val mask = PetSprites.mask(runtime.look, pose) ?: return true
+    val px = (x - boxLeft) / widthDp * mask.w
+    val py = (y - boxTop) / height * mask.h
+    return mask.at(px, py)
 }
 
 private fun cursor(): Pair<Float, Float>? =

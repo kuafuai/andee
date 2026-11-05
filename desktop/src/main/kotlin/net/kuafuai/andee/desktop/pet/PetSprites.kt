@@ -1,6 +1,7 @@
 package net.kuafuai.andee.desktop.pet
 
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import net.kuafuai.andee.util.Log
 import java.io.ByteArrayInputStream
@@ -47,6 +48,43 @@ enum class PetPose(val file: String) {
 object PetSprites {
 
     private val cache = ConcurrentHashMap<String, ImageBitmap>()
+    private val maskCache = ConcurrentHashMap<String, AlphaMask>()
+
+    /**
+     * Which pixels of a drawing are actually her.
+     *
+     * The window is her bounding box, and a box has empty corners: clicking the air beside her head
+     * or between her legs would pat her, which feels like the desktop is answering instead of her.
+     * The mask is sampled from the same bitmap that is on screen, at half resolution — the question
+     * is "is this pixel her or the wallpaper", and half a pixel of error is not a question.
+     */
+    class AlphaMask(val w: Int, val h: Int, private val solid: BooleanArray) {
+        fun at(px: Float, py: Float): Boolean {
+            if (px < 0f || py < 0f || px >= w || py >= h) return false
+            return solid[py.toInt() * w + px.toInt()]
+        }
+    }
+
+    fun mask(look: PetLook, pose: PetPose): AlphaMask? {
+        val key = "mask-${look.id}-${pose.file}@${look.dir?.path ?: "bundled"}"
+        maskCache[key]?.let { return it }
+        val bitmap = get(look, pose) ?: return null
+        val w = (bitmap.width / 2).coerceAtLeast(1)
+        val h = (bitmap.height / 2).coerceAtLeast(1)
+        // `toPixelMap` rather than `readPixels`: the latter is backend-specific and came back with a
+        // zeroed buffer here, which silently made every pixel "not her" and swallowed no clicks.
+        val pixels = bitmap.toPixelMap()
+        val solid = BooleanArray(w * h)
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                // Anything below a third is the antialiased edge of a hair, not a place to click.
+                solid[y * w + x] = pixels[x * 2, y * 2].alpha > 0.31f
+            }
+        }
+        val mask = AlphaMask(w, h, solid)
+        maskCache[key] = mask
+        return mask
+    }
 
     fun get(look: PetLook, pose: PetPose): ImageBitmap? {
         // A look without an airborne or happy drawing still gets thrown and patted; it just
