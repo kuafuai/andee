@@ -96,6 +96,8 @@ class PetRuntime(
 
     /** The hop, for a click that never became a drag. */
     fun hop() {
+        asleep = false
+        touchedAt = System.currentTimeMillis()
         motion.pat()
         wake++
     }
@@ -194,21 +196,38 @@ class PetRuntime(
             if (bubble == null) return@LaunchedEffect
             delay(3600)
             bubble = null
-            pose = if (asleep) PetPose.SLEEPY else PetPose.IDLE
+            pose = if (asleep) PetPose.SLEEP else PetPose.IDLE
         }
         // Something happens on its own every so often, and after three quiet minutes she sleeps.
         LaunchedEffect(look) {
             var lastAct = PetPose.IDLE
             var sinceWake = System.currentTimeMillis()
+            var napEnds = 0L
             while (true) {
                 delay(5_000)
                 val quiet = System.currentTimeMillis() - touchedAt
                 if (assistant != null) { touchedAt = System.currentTimeMillis(); continue }
+                // She naps, she does not stay asleep (the ball's rule): up again after a while, with a yawn, and the
+                // idle acts resume. Only a nap she fell into here ends here; nothing else sets asleep.
+                if (asleep) {
+                    if (napEnds == 0L) napEnds = System.currentTimeMillis() + NAP_MIN_MS + kotlin.random.Random.nextLong(NAP_SPAN_MS)
+                    if (System.currentTimeMillis() > napEnds && bubble == null) {
+                        asleep = false
+                        napEnds = 0L
+                        touchedAt = System.currentTimeMillis()
+                        sinceWake = System.currentTimeMillis()
+                        pose = PetPose.SLEEPY
+                        delay(1_800)
+                        if (pose == PetPose.SLEEPY) pose = PetPose.IDLE
+                    }
+                    continue
+                }
+                napEnds = 0L
                 if (!asleep && bubble == null && pose == PetPose.IDLE && motion.resting && !airborne) {
                     if (quiet > SLEEP_AFTER_MS) {
                         asleep = true
                         val line = PetTalk.napping()
-                        say(if (Strings.lang() == "zh") line.zh else line.en, PetPose.SLEEPY)
+                        say(if (Strings.lang() == "zh") line.zh else line.en, PetPose.SLEEP)
                     } else if (System.currentTimeMillis() - sinceWake > 7_000 + kotlin.random.Random.nextLong(7_000)) {
                         val acts = listOf(PetPose.THINK, PetPose.HAPPY, PetPose.SLEEPY, PetPose.TEA, PetPose.HOTPOT)
                             .filter { it != lastAct }
@@ -260,6 +279,10 @@ class PetRuntime(
     companion object {
         const val TAG = "Pet"
         const val SLEEP_AFTER_MS = 180_000L
+
+        /** How long a nap lasts: 40-80 s, then she wakes by herself. */
+        const val NAP_MIN_MS = 40_000L
+        const val NAP_SPAN_MS = 40_000L
     }
 }
 
