@@ -226,6 +226,7 @@ class HtmlActivity : StageActivity() {
      */
     private fun swapTo(file: java.io.File, title: String, closed: () -> Unit) {
         titleText = title
+        pageBar?.setTitle(title)
         onClose = closed
         htmlFile = file
         val html = runCatching { file.readText() }.getOrNull() ?: return
@@ -267,6 +268,7 @@ class HtmlActivity : StageActivity() {
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) {
                     revealStage()
+                    tintBar(view)
                 }
 
                 override fun onReceivedError(
@@ -291,7 +293,8 @@ class HtmlActivity : StageActivity() {
                     return true
                 }
             }
-            layoutParams = matchParent()
+            // Below the title bar from the first frame; the insets listener adds the status bar on top of this.
+            layoutParams = matchParent().apply { topMargin = dpI(PageBar.HEIGHT_DP) }
             setBackgroundColor(BACKDROP)
         }
 
@@ -316,50 +319,39 @@ class HtmlActivity : StageActivity() {
         }
         web?.loadDataWithBaseURL(BASE_URL, html, "text/html", "utf-8", null)
 
-        // Close pill — always reachable, floats above the content. Top-right,
-        // where a close control is expected and where the page is least likely
-        // to have put anything: generated pages open with a title and end with
-        // their controls, so a pill pinned to the bottom lands on the buttons.
-        val close = closePill(this) { leave() }.apply {
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.END or Gravity.TOP
-            ).apply {
-                topMargin = dpI(12)
-                marginEnd = dpI(12)
-            }
-        }
+        // The title bar: a thin pane of glass across the top with the page's name and a close, and the page
+        // starts under it instead of behind it. It used to be a floating ✕完成 pill, which sat on the page's own
+        // corner (a score, a button) — the corner is where generated pages put things. The bar runs under the
+        // status bar (the window is edge-to-edge) and its content sits below the status inset; it takes on the
+        // page's own background once that is known ([tintBar]), the way Safari's toolbar does, so it reads as
+        // part of the page and not as our chrome laid over it.
+        val bar = PageBar(this, titleText) { leave() }
+        pageBar = bar
+        bar.layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP)
 
-        // **The pill has to clear the status bar, and it did not.** This window
-        // is edge-to-edge — its frame is the whole display, which is why the
-        // page's own 100vh starts at y=0 — so `topMargin = 12dp` puts the pill
-        // *under* the clock and the battery, in the strip the status bar owns.
-        // Measured on the 1600x2560 tablet: a tap dead centre on the pill was
-        // swallowed by the status bar and the page would only close with the
-        // back gesture. That matters more than it looks — the pill is the
-        // affordance the tool description promises the model ("keep roughly
-        // 110x44 clear there"), and before `ui.show_html` stopped blocking,
-        // failing to reach it meant the brain sat in a five-minute wait.
+        // **The bar has to clear the status bar.** This window is edge-to-edge — its frame is the whole display —
+        // so the top inset is added to the bar's own padding and the page is pushed down by the bar's whole height.
+        // (The old pill lost its taps to the status bar on the tablet for exactly this reason.)
         stage.setOnApplyWindowInsetsListener { _, insets ->
             val top = insets.getInsets(
                 android.view.WindowInsets.Type.systemBars() or
                     android.view.WindowInsets.Type.displayCutout(),
             ).top
-            val lp = close.layoutParams as FrameLayout.LayoutParams
-            val want = dpI(12) + top
+            bar.setTopInset(top)
+            val lp = web?.layoutParams as? FrameLayout.LayoutParams
+            val want = top + dpI(PageBar.HEIGHT_DP)
             // Guarded like `FloatingWindowUi.insetTopBar`: writing layoutParams
             // asks for a layout pass, and this runs inside one.
-            if (lp.topMargin != want) {
+            if (lp != null && lp.topMargin != want) {
                 lp.topMargin = want
-                close.layoutParams = lp
+                web?.layoutParams = lp
             }
             insets
         }
 
         stage.addView(web)
         stage.addView(spinner)
-        stage.addView(close)
+        stage.addView(bar)
     }
 
     /**
@@ -368,6 +360,17 @@ class HtmlActivity : StageActivity() {
      * that fades on its own clock is a spinner the user sees pop into an
      * already-full-size page.
      */
+    private var pageBar: PageBar? = null
+
+    /** Ask the page what its own background is, and give the bar that tint. A page with none keeps the bar's default. */
+    private fun tintBar(view: WebView) {
+        view.evaluateJavascript(
+            "(function(){function c(e){if(!e)return'';var v=getComputedStyle(e).backgroundColor;" +
+                "return(v&&v!=='rgba(0, 0, 0, 0)'&&v!=='transparent')?v:''}" +
+                "return c(document.body)||c(document.documentElement)})()",
+        ) { raw -> pageBar?.tintFrom(raw.trim('"')) }
+    }
+
     override fun onStageRevealing() {
         spinner?.animate()?.alpha(0f)?.setDuration(160)
             ?.withEndAction { spinner?.visibility = android.view.View.GONE }?.start()

@@ -575,6 +575,10 @@ class FloatingWindowUi(
 
     private val dockRunnable = Runnable { dock() }
 
+    /** A dock was asked for while the card was folding; [enterCompact] runs it once the ball has landed. */
+    private var dockWhenFolded = false
+    private var dockWhenFoldedAt: Int? = null
+
     /** After a task: back into the edge at the docked height it had before it came out ([dockCy], unchanged since). */
     private val dockBackRunnable = Runnable { dock(if (movedWhileWorking) null else restingDockCy()) }
 
@@ -1681,6 +1685,13 @@ class FloatingWindowUi(
         ui.removeCallbacks(dockRunnable); ui.removeCallbacks(dockBackRunnable)
         val p = params ?: return
         if (root == null || !compact || docked || signboard != null || parkedFrom != null) return
+        // Mid-fold the window is still the full card (p.y = 0) and the fold's end resets the ball's scale: docking
+        // now picked the top of the screen and left a full-size ball in a small tab. Wait for the fold to land.
+        if (foldAnim?.isRunning == true) {
+            dockWhenFolded = true
+            if (atCy != null) dockWhenFoldedAt = atCy
+            return
+        }
         setWorkShape(false)
         refreshWinYOrigin()
         val side = dp(COMPACT_DP)
@@ -1692,6 +1703,10 @@ class FloatingWindowUi(
             if (compact && signboard == null && !docked) {
                 dockCy = cy
                 docked = true
+                // The shrink may have been cancelled on the way (a fold, a rebuild): the tab is sized for this scale.
+                ball?.animate()?.cancel()
+                ball?.scaleX = DOCK_SCALE
+                ball?.scaleY = DOCK_SCALE
                 applyDockedGeometry()
                 // Only now, with the window at the edge: grabbing it mid-slide
                 // would be paws on nothing.
@@ -2379,7 +2394,14 @@ class FloatingWindowUi(
             applyCompactAppearance()
             syncWorking()
             retimeStroll()
-            ui.post { reseatCompact(); if (dockNow) dock(dockAt) else { armDock(); applyWorkShape() } }
+            ui.post {
+                reseatCompact()
+                // A dock asked for while the fold ran (a page going up) is honoured now that the ball has landed.
+                val late = dockWhenFolded && !working
+                val lateAt = dockWhenFoldedAt
+                dockWhenFolded = false; dockWhenFoldedAt = null
+                if (dockNow) dock(dockAt) else if (late) dock(lateAt) else { armDock(); applyWorkShape() }
+            }
             return
         }
         // A short retreat replaces the old half-size zoom. Keep the current
@@ -2390,7 +2412,14 @@ class FloatingWindowUi(
             applyCompactAppearance()
             syncWorking()
             retimeStroll()
-            ui.post { reseatCompact(); if (dockNow) dock(dockAt) else { armDock(); applyWorkShape() } }
+            ui.post {
+                reseatCompact()
+                // A dock asked for while the fold ran (a page going up) is honoured now that the ball has landed.
+                val late = dockWhenFolded && !working
+                val lateAt = dockWhenFoldedAt
+                dockWhenFolded = false; dockWhenFoldedAt = null
+                if (dockNow) dock(dockAt) else if (late) dock(lateAt) else { armDock(); applyWorkShape() }
+            }
         }
     }
 
@@ -2425,6 +2454,7 @@ class FloatingWindowUi(
         slide?.cancel()
         cancelFoldAnimation()
         ui.removeCallbacks(dockRunnable); ui.removeCallbacks(dockBackRunnable)
+        dockWhenFolded = false; dockWhenFoldedAt = null
         setWorkShape(false)
         // A dock or undock shrink still running would override the card's scale.
         ball?.animate()?.cancel()

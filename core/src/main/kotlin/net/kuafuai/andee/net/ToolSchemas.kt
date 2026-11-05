@@ -884,7 +884,7 @@ object ToolSchemas {
         the user sees a viewfinder and a 正在看 line, and the corners flash
         every time you actually take a frame — they can tell when you looked.
 
-        They can also close it themselves, with the ✕完成 pill. If a look
+        They can also close it themselves, with the ✕ in the bar at the top. If a look
         comes back saying the user just closed the camera, that is a real
         answer, not a glitch: do NOT call this again to retry. Ask them first
         and wait for a yes.
@@ -1048,8 +1048,9 @@ object ToolSchemas {
 
         <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 
-        And a ✕完成 pill floats over the top-right corner so the user can
-        always leave — keep roughly 110×44px clear there.
+        The device puts a thin bar above the page with its `title` and a ✕, and
+        the page starts below it — nothing of yours is covered, so there is no
+        corner to keep clear. Give it a short title.
 
         Everything else — colour, type size, layout — is yours to pick.
     """.trimIndent(),
