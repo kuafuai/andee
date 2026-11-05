@@ -54,7 +54,7 @@ class AndroidBrainHost(
 
     override fun activeSceneName(): String? = VoiceConfig.activeScene(ctx)
 
-    override fun persona(): String = BallLooks.byName(VoiceConfig.ballLook(ctx)).persona
+    override fun persona(): String = VoiceConfig.characterPersona(ctx)
 
     override fun guard(): String = net.kuafuai.andee.config.Notebook.guard(ctx).text()
 

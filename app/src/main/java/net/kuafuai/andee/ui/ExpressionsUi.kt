@@ -53,6 +53,12 @@ class ExpressionsUi(
 
     private var root: View? = null
     private var preview: EmotionBallTextureView? = null
+    private var petPreview: PhonePetView? = null
+    private var lookRow: LinearLayout? = null
+    private val bodyChips = ArrayList<TextView>()
+
+    /** The body being looked at: the ball, or the desk pet (`pet = on`). Saved on tap, like a look. */
+    private var petBody = false
     private var caption: TextView? = null
     private var frosted = false
     private var lctx: Context = context
@@ -84,6 +90,7 @@ class ExpressionsUi(
         val v = root ?: return
         root = null
         preview = null
+        petPreview = null
         Glass.exit(v) {
             runCatching { wm.removeView(v) }
             onDismiss()
@@ -117,6 +124,10 @@ class ExpressionsUi(
         val ball = EmotionBallTextureView(context)
         preview = ball
         stage.addView(ball, FrameLayout.LayoutParams(side, side, Gravity.CENTER))
+        // The pet, drawn by the same view the folded body uses; shown instead of the ball when 桌宠 is picked.
+        val pv = PhonePetView(context).apply { visibility = View.GONE }
+        petPreview = pv
+        stage.addView(pv, FrameLayout.LayoutParams(side, side, Gravity.CENTER))
         card.addView(
             stage,
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, side + dp(8)).apply {
@@ -132,15 +143,29 @@ class ExpressionsUi(
         }
         card.addView(caption)
 
-        // ---- Who ----
-        card.addView(heading(lctx.getString(R.string.expr_section_look)))
+        // ---- Which body: the ball, or the desk pet ----
+        val zh = VoiceConfig.uiLanguage(context) == "zh"
+        petBody = VoiceConfig.petOn(context)
+        card.addView(heading(if (zh) "身体" else "Body"))
         card.addView(chipRow {
-            for (look in BallLooks.ALL) {
-                val chip = chip(look.label(lctx)) { pickLook(look.name) }
-                lookChips.add(chip)
+            // 小球 leftmost: it is what an unset preference reads as.
+            for ((on, label) in listOf(false to (if (zh) "小球" else "Ball"), true to (if (zh) "桌宠" else "Desk pet"))) {
+                val chip = chip(label) { pickBody(on) }
+                chip.tag = on
+                bodyChips.add(chip)
                 addView(chip, chipParams())
             }
         })
+
+        // ---- Who ----
+        card.addView(heading(lctx.getString(R.string.expr_section_look)))
+        val looks = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        lookRow = looks
+        card.addView(HorizontalScrollView(context).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(looks)
+        })
+        fillLooks()
 
         // ---- How it feels ----
         card.addView(heading(lctx.getString(R.string.expr_section_mood)))
@@ -207,6 +232,42 @@ class ExpressionsUi(
 
     // ---- Behaviour ----
 
+    /** The look chips: the ball's six, or the pets. */
+    private fun fillLooks() {
+        val row = lookRow ?: return
+        row.removeAllViews()
+        lookChips.clear()
+        val zh = VoiceConfig.uiLanguage(context) == "zh"
+        if (petBody) {
+            for (c in net.kuafuai.andee.pet.PetCharacters.PRESETS) {
+                val chip = chip(if (zh) c.zh else c.en) { pickPet(c.id) }
+                chip.tag = c.id
+                lookChips.add(chip)
+                row.addView(chip, chipParams())
+            }
+        } else {
+            for (look in BallLooks.ALL) {
+                val chip = chip(look.label(lctx)) { pickLook(look.name) }
+                chip.tag = look.name
+                lookChips.add(chip)
+                row.addView(chip, chipParams())
+            }
+        }
+    }
+
+    private fun pickBody(on: Boolean) {
+        if (on == petBody) return
+        petBody = on
+        VoiceConfig.setPet(context, on = on)
+        fillLooks()
+        refresh()
+    }
+
+    private fun pickPet(id: String) {
+        VoiceConfig.setPet(context, character = id)
+        refresh()
+    }
+
     private fun pickLook(name: String) {
         // The same write the swipe makes (FloatingWindowUi.stepBallLook): the look is
         // saved the instant it is chosen, so the corner ball follows and a restart
@@ -224,11 +285,24 @@ class ExpressionsUi(
 
     /** Push the card's choices onto its ball and repaint the chips. */
     private fun refresh() {
+        for (chip in bodyChips) light(chip, chip.tag == petBody)
+        for ((m, chip) in moodChips) light(chip, m == pickedMood)
+        preview?.visibility = if (petBody) View.INVISIBLE else View.VISIBLE
+        petPreview?.visibility = if (petBody) View.VISIBLE else View.GONE
+        if (petBody) {
+            val id = VoiceConfig.petCharacter(context)
+            val zh = VoiceConfig.uiLanguage(context) == "zh"
+            petPreview?.look = id
+            petPreview?.setStatePose(net.kuafuai.andee.pet.PetMind.previewPose(pickedMood))
+            for (chip in lookChips) light(chip, chip.tag == id)
+            // Who this is, not only how it looks: its voice and manner come with it.
+            caption?.text = net.kuafuai.andee.pet.PetCharacters.blurb(id, zh)
+            return
+        }
         preview?.setMood(pickedMood)
         preview?.setListening(pickedMood == Mood.LISTENING)
         val look = BallLooks.requestedLook
-        lookChips.forEachIndexed { i, chip -> light(chip, BallLooks.ALL[i] === look) }
-        for ((m, chip) in moodChips) light(chip, m == pickedMood)
+        for (chip in lookChips) light(chip, chip.tag == look.name)
         caption?.text = lctx.getString(
             R.string.expr_caption,
             look.label(lctx),

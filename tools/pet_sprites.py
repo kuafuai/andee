@@ -159,6 +159,14 @@ POSES = {
         "Change only the pose and expression: careful and protective — holding a small round cobalt-blue shield "
         "with a white star in front of the chest with both hands, serious determined little frown, tail curled close. "
     ),
+    # The phone docks the pet into the screen's right edge (2026-11-05): the app draws this with its right part
+    # cut off by the edge, so it has to read as holding on round a corner, not as a body sliced in half.
+    "peek": (
+        "Change only the pose and expression: peeking round a corner — the body pressed against an invisible "
+        "vertical wall on the RIGHT side of the picture, leaning out to the LEFT round its edge, both hands gripping "
+        "the wall's edge at the right, head tilted out to the left looking at the viewer with a curious playful "
+        "smile. "
+    ),
     "sleep": (    # SLEEPING — fast asleep, not just sleepy
         "Change only the pose and expression: fast asleep while standing, eyes closed, head drooped to one side, "
         "a small bubble from the nose, hands loosely together, tail curled around the feet. "
@@ -214,14 +222,34 @@ ANDEE_STYLE = (
     "warm peach rim glow, kawaii, readable at small sizes, no outlines. "
 )
 # The pose texts were written for a figure with legs and a tail; the ball has neither.
-NO_LEGS = {"andee": "It is a round ball with two little paws and no legs, feet, knees or tail: wherever the text below "
+NO_LEGS = {"cat": "It is a small kitten on four paws: wherever the text below mentions hands, arms, a phone, a cup, chopsticks or a shield, show it with the paws, the tail, the ears and the face, holding a prop in its front paws when there is one. ", "andee": "It is a round ball with two little paws and no legs, feet, knees or tail: wherever the text below "
            "mentions those, show the feeling with the body's tilt, the paws, the eyes and the horns instead. "}
 BRAND = os.path.join(ROOT, "images", "brand", "illustrations")
 
-LOOKS = {"andee": ANDEE, "girl": GIRL, "boy": BOY, "blue-girl": BLUE_GIRL, "blue-boy": BLUE_BOY, "lady": LADY, "beau": BEAU}
+# 大肥鱼 (2026-11-05): a chubby little whale-girl maid, after the meme the user pointed at — drawn as our own
+# character from a description, not from those pictures, so it is not a copy of somebody else's art.
+FISH = (
+    "Chibi anime girl mascot for an AI companion named Andee, about 2.5 heads tall, full body, standing, facing the "
+    "viewer, a little chubby and round. Long wavy deep navy-blue hair fading to light sky-blue at the ends, a big "
+    "curled ahoge, soft round cheeks with pink blush, huge round sky-blue eyes with white glints, a small shy pout. "
+    "Two small dark-blue whale-fin ears with pale undersides sticking out sideways from the hair, a small light-blue "
+    "ribbon on one side, and a chubby dark-blue whale tail with a pale belly stripe curling out behind. A cute "
+    "navy-and-white maid outfit: a frilly white maid headband, a navy long-sleeved dress with white frilly cuffs and "
+    "collar, a navy bow, a white apron with a tiny whale embroidered on it, and a small round glowing cobalt-blue "
+    "core brooch. "
+)
+# 小猫 (2026-11-05, replacing the gentle boyfriend): a round little kitten, with Andee's horns and core.
+CAT = (
+    "An adorable chubby little kitten mascot for an AI companion named Andee, full body, sitting upright, facing the "
+    "viewer. Fluffy cream-white fur with soft orange-ginger patches on the ears, back and tail, a big round head, huge "
+    "round amber eyes with big white glints, a tiny pink nose, a small happy 'w' mouth, soft pink blush, little pink "
+    "paw pads, a long fluffy tail curling round. Two tiny rounded horns with coral tips between the ears, a small "
+    "coral collar with a little round glowing cobalt-blue core charm. "
+)
+LOOKS = {"cat": CAT, "fish": FISH, "andee": ANDEE, "girl": GIRL, "boy": BOY, "blue-girl": BLUE_GIRL, "blue-boy": BLUE_BOY, "lady": LADY, "beau": BEAU}
 
 # 缩到多高(px)。资源是 2x 的,运行时高度取 PetLook.baseHeight。
-HEIGHT = {"andee": 700, "girl": 820, "boy": 820, "blue-girl": 820, "blue-boy": 820, "lady": 820, "beau": 820}
+HEIGHT = {"cat": 760, "fish": 820, "andee": 700, "girl": 820, "boy": 820, "blue-girl": 820, "blue-boy": 820, "lady": 820, "beau": 820}
 
 # 裁边后保留的空隙:占长边的比例。窗口紧贴身体,空隙越大挡住的点击越多。
 PAD = 0.008

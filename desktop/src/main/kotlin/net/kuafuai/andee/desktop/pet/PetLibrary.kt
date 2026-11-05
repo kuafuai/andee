@@ -49,19 +49,10 @@ object PetLibrary {
      * they were replaced by the quiet girl (高冷文静) and the boy in the cream sweater (温柔男友), and a saved
      * `blue-girl` / `blue-boy` reads as those ([of]).
      */
-    val PRESETS = listOf(
-        // Andee itself, the plush ball of the brand illustrations — the house voice and the plain prompt.
-        PetLook("andee", "Andee", "Andee", baseHeight = 120),
-        PetLook("girl", "奶油金", "Cream", baseHeight = 210),
-        PetLook("boy", "奶油金·短发", "Cream short", baseHeight = 215,
-            voice = "zh_male_yangguangqingnian_uranus_bigtts", persona = PetPersonas.CREAM_SHORT),
-        PetLook("lady", "文静少女", "Quiet girl", baseHeight = 240,
-            voice = "zh_female_gaolengyujie_uranus_bigtts", persona = PetPersonas.LADY),
-        PetLook("beau", "温柔男友", "Gentle boyfriend", baseHeight = 240,
-            voice = "zh_male_wenrouxiaoge_uranus_bigtts", persona = PetPersonas.BEAU),
-    )
-
-    private val RENAMED = mapOf("blue-girl" to "lady", "blue-boy" to "beau")
+    /** The shared presets (`PetCharacters`, core), with their pictures in this jar. */
+    val PRESETS = net.kuafuai.andee.pet.PetCharacters.PRESETS.map {
+        PetLook(it.id, it.zh, it.en, baseHeight = it.baseHeight, voice = it.voice, persona = it.persona)
+    }
 
     /** Height a picture the user dropped in is rendered at: the girl's, so the first sight is not a giant or a speck. */
     const val CUSTOM_HEIGHT = 200
@@ -70,7 +61,7 @@ object PetLibrary {
     fun all(): List<PetLook> = PRESETS + custom()
 
     /** An id that no longer exists (a removed custom pet, a typo) reads as the first preset. */
-    fun of(id: String): PetLook = (RENAMED[id.trim()] ?: id.trim()).let { want -> all().firstOrNull { it.id == want } } ?: PRESETS.first()
+    fun of(id: String): PetLook = net.kuafuai.andee.pet.PetCharacters.canonical(id).let { want -> all().firstOrNull { it.id == want } } ?: PRESETS.first()
 
     fun custom(): List<PetLook> = runCatching {
         petsDir().listFiles { f -> f.isFile && f.name.endsWith("-idle.png") }

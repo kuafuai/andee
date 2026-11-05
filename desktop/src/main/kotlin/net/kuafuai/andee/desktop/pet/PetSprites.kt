@@ -8,49 +8,7 @@ import java.io.ByteArrayInputStream
 import java.util.concurrent.ConcurrentHashMap
 import javax.imageio.ImageIO
 
-/**
- * One drawing of a character. A pose is a file; which one is shown is decided from Andee's state (`PetMind`).
- * [fallback] is what a look without this drawing shows instead — only `girl` has the poses the ball's states added
- * on 2026-11-05, and the others must still say "listening" with something closer than the plain idle.
- */
-enum class PetPose(val file: String, val fallback: PetPose? = null) {
-    IDLE("idle"),
-    HAPPY("happy"),
-
-    /** Thrown or falling: hair and scarf up, knees tucked. Falls back to [IDLE] when a look has no such drawing. */
-    AIR("air"),
-
-    // The faces a pat can land on (see PetTalk). Each is a drawing of its own rather than a
-    // transform of the idle one: a squashed PNG cannot frown, and the point of a pat is that
-    // the pet answers with a face.
-    ANGRY("angry"),
-    SAD("sad"),
-    SLEEPY("sleepy"),
-    THINK("think"),
-
-    /** Idle act only: holding a bubble-tea cup. A prop, not a reaction — it has no line of dialogue. */
-    TEA("tea"),
-
-    /** Idle act only: eating from a little hotpot. The kind of scene a desktop pet earns its keep with. */
-    HOTPOT("hotpot"),
-
-    // The ball's states, since the pet is Andee's body on the Mac (`PetMind` maps a `Mood` onto these).
-    /** The mic is open. The one face that must never read as idle. */
-    LISTEN("listen", THINK),
-    /** Reading the answer out. */
-    SPEAK("speak", HAPPY),
-    /** A task is running and it is acting (between model calls it is [THINK]). */
-    SEARCH("search", THINK),
-    /** A question card is up, waiting for the user. */
-    HOLDING("holding"),
-    CURIOUS("curious", THINK),
-    ANXIOUS("anxious", SAD),
-    WINK("wink", HAPPY),
-    CELEBRATE("celebrate", HAPPY),
-    PROTECT("protect", THINK),
-    /** Fast asleep (as opposed to [SLEEPY], a yawn). */
-    SLEEP("sleep", SLEEPY),
-}
+typealias PetPose = net.kuafuai.andee.pet.PetPose
 
 /**
  * The sprite sheet, decoded once and kept.

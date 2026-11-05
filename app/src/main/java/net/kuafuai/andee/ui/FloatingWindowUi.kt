@@ -319,6 +319,17 @@ class FloatingWindowUi(
     private var root: BallHostFrame? = null
     private var params: WindowManager.LayoutParams? = null
     private var ball: EmotionBallTextureView? = null
+
+    /**
+     * The desk pet, when the user picked it as the body (`pet = on`): drawn in the ball's area in place of the sphere
+     * while folded, and docked into the right edge as a peek ([PhonePetView]). The unfolded card keeps the sphere,
+     * as the Mac's conversation keeps its ball. Main thread only.
+     */
+    private var pet: PhonePetView? = null
+    private var petBody = false
+    private var petLook = net.kuafuai.andee.pet.PetCharacters.PRESETS.first().id
+    private var emotionNow: Mood? = null
+    private var holdingNow = false
     private var topBarView: View? = null
     private var historyView: HistoryListView? = null
 
@@ -1088,6 +1099,8 @@ class FloatingWindowUi(
             }
             // Real state driving disables demo cycling.
             ball?.setDemoCycle(false)
+            if (s != State.SPEAKING) emotionNow = null
+            syncPetPose()
             retimeStroll()
         }
     }
@@ -1101,8 +1114,63 @@ class FloatingWindowUi(
      * other state transition lands after it rather than racing it.
      */
     fun setEmotion(m: Mood?) {
-        ui.post { ball?.setEmotion(m) }
+        ui.post { ball?.setEmotion(m); emotionNow = m; syncPetPose() }
     }
+
+    /**
+     * The body: the ball, or the desk pet wearing [look]. Called by the service from the saved `pet` /
+     * `pet_character` at start and whenever either changes. Any thread.
+     */
+    fun setPetBody(on: Boolean, look: String) {
+        ui.post {
+            if (on == petBody && look == petLook) return@post
+            petBody = on
+            petLook = look
+            pet?.look = look
+            syncPet()
+            // The tab is sized for the body that is wearing it.
+            if (docked) applyDockedGeometry()
+        }
+    }
+
+    /** Show the pet in place of the sphere, folded and in the full card alike. Main thread only. */
+    private fun syncPet() {
+        val pv = pet ?: return
+        val showPet = petBody
+        pv.visibility = if (showPet) View.VISIBLE else View.GONE
+        pv.docked = showPet && compact && docked
+        pv.inCard = !compact
+        ball?.visibility = if (showPet) View.INVISIBLE else View.VISIBLE
+        syncPetPose()
+    }
+
+    /** Andee's state as the pet's pose — the Mac's rule (`PetMind.statePose`). Main thread only. */
+    private fun syncPetPose() {
+        val pv = pet ?: return
+        val face = when (lastState) {
+            State.RECORDING -> Mood.LISTENING
+            State.THINKING -> Mood.THINKING
+            State.SPEAKING -> Mood.SPEAKING
+            else -> if (working) Mood.THINKING else Mood.CALM
+        }
+        pv.setStatePose(
+            net.kuafuai.andee.pet.PetMind.statePose(
+                face = face,
+                spoken = emotionNow,
+                acting = PhoneWorkLog.active && !PhoneWorkLog.waiting,
+                holding = holdingNow,
+            ),
+        )
+    }
+
+    /**
+     * How far the work caption rises into the ball's square. The sphere leaves empty air at the square's foot, so the
+     * caption tucks up into it; the pet stands on that foot, so hers starts below it.
+     */
+    private fun captionTuck(): Int = if (petShown() && compact) 0 else dp(WORK_CAPTION_TUCK_DP)
+
+    /** Whether the pet, not the sphere, is what the window shows. */
+    private fun petShown(): Boolean = petBody && pet != null
 
     /**
      * The agent ran a tool against the device. Shows as a nod plus the
@@ -1280,10 +1348,28 @@ class FloatingWindowUi(
      * label on a control, not something anybody said, and it clears itself.
      */
     private fun stepBallLook(delta: Int) {
-        val next = BallLooks.step(delta)
-        VoiceConfig.save(context, mapOf("ball" to next.name))
-        ball?.trigger(Action.POP)
-        setSubtitle(next.label(context), SubtitleKind.FINAL)
+        // One ring across both bodies: the ball's looks, then the pets. Swiping past the last ball look lands on the
+        // first pet and makes the pet the body, and the other way round — the same writes the 形象与表情 card makes.
+        val balls = BallLooks.ALL
+        val pets = net.kuafuai.andee.pet.PetCharacters.PRESETS
+        val here = if (petBody) balls.size + pets.indexOfFirst { it.id == petLook }.coerceAtLeast(0)
+        else balls.indexOfFirst { it.name == BallLooks.requestedLook.name }.coerceAtLeast(0)
+        val next = Math.floorMod(here + delta, balls.size + pets.size)
+        val zh = VoiceConfig.uiLanguage(context) == "zh"
+        if (next < balls.size) {
+            val look = balls[next]
+            BallLooks.requestByName(look.name)
+            VoiceConfig.save(context, mapOf("ball" to look.name))
+            if (petBody) VoiceConfig.setPet(context, on = false)
+            ball?.trigger(Action.POP)
+            setSubtitle(look.label(context), SubtitleKind.FINAL)
+        } else {
+            val pet = pets[next - balls.size]
+            VoiceConfig.setPet(context, on = true, character = pet.id)
+            this.pet?.poke()
+            // Named as a pet: "Andee" is both a ball look and a pet.
+            setSubtitle((if (zh) "桌宠 · " else "Desk pet · ") + (if (zh) pet.zh else pet.en), SubtitleKind.FINAL)
+        }
     }
 
     /**
@@ -1448,6 +1534,7 @@ class FloatingWindowUi(
             this.compact = compact
             syncCover()
             if (compact) enterCompact() else exitCompact()
+            syncPet()
             applyWindow()
         }
     }
@@ -1577,6 +1664,7 @@ class FloatingWindowUi(
      */
     private fun syncWorking() {
         ball?.setWorking(compact && working)
+        syncPetPose()
     }
 
     /** True while a dock/home slide animation is in flight. Main thread only. */
@@ -1627,6 +1715,8 @@ class FloatingWindowUi(
     fun setHolding(on: Boolean) {
         ui.post {
             ball?.setHolding(on)
+            holdingNow = on
+            syncPetPose()
             if (on) {
                 // Stand still while asking: a ball that fidgets through its own
                 // question doesn't look like it cares about the answer.
@@ -1657,13 +1747,19 @@ class FloatingWindowUi(
     // edge, which is the screen's.
 
     /** Width of the docked tab: the part of the clinging ball that leans out past the edge. */
-    private fun dockTabW(): Int = (dp(COMPACT_DP) * DOCK_SCALE * DOCK_TAB_W_FRACTION).toInt()
+    private fun dockTabW(): Int =
+        if (petBody) pet?.peekWidth()?.toInt() ?: dp(36)
+        else (dp(COMPACT_DP) * DOCK_SCALE * DOCK_TAB_W_FRACTION).toInt()
 
     /** How much of the docked tab is above the ball's centre: the tallest ears of any look. */
-    private fun dockTabUp(): Int = (dp(COMPACT_DP) * DOCK_SCALE * DOCK_TAB_UP_FRACTION).toInt()
+    private fun dockTabUp(): Int =
+        if (petBody) ((pet?.peekHeight() ?: dp(76).toFloat()) / 2).toInt()
+        else (dp(COMPACT_DP) * DOCK_SCALE * DOCK_TAB_UP_FRACTION).toInt()
 
     /** And below it: the lower paw, plus room for the slip. */
-    private fun dockTabDown(): Int = (dp(COMPACT_DP) * DOCK_SCALE * DOCK_TAB_DOWN_FRACTION).toInt()
+    private fun dockTabDown(): Int =
+        if (petBody) ((pet?.peekHeight() ?: dp(76).toFloat()) / 2).toInt()
+        else (dp(COMPACT_DP) * DOCK_SCALE * DOCK_TAB_DOWN_FRACTION).toInt()
 
     private fun dockTabH(): Int = dockTabUp() + dockTabDown()
 
@@ -1711,6 +1807,7 @@ class FloatingWindowUi(
                 // Only now, with the window at the edge: grabbing it mid-slide
                 // would be paws on nothing.
                 ball?.setSideLedge(true)
+                pet?.docked = petShown() && compact
             }
         }
     }
@@ -1805,7 +1902,7 @@ class FloatingWindowUi(
         val dm = context.resources.displayMetrics
         val w = if (on) maxOf(side, dp(WORK_CAPTION_W_DP)).coerceAtMost(dm.widthPixels) else side
         // The words start inside the ball area's empty lower band, just under the drawn sphere.
-        val h = if (on) side + dp(WORK_CAPTION_H_DP) - dp(WORK_CAPTION_TUCK_DP) else side
+        val h = if (on) side + dp(WORK_CAPTION_H_DP) - captionTuck() else side
         // Ball centred over its words; kept on screen if that would push the window past an edge.
         val x = (ballX - (w - side) / 2).coerceIn(0, (dm.widthPixels - w).coerceAtLeast(0))
         // Low on the screen the words would run off the bottom: lift the ball just enough to fit them.
@@ -1874,6 +1971,7 @@ class FloatingWindowUi(
         squareBallArea()
         // Lets go of the edge and grows back; the cling stands the body up as it eases off.
         ball?.setSideLedge(false)
+        pet?.docked = false
         ball?.animate()?.scaleX(1f)?.scaleY(1f)?.setDuration(DOCK_SLIDE_MS)?.start()
         val side = dp(COMPACT_DP)
         p.width = side
@@ -1935,7 +2033,7 @@ class FloatingWindowUi(
         if (signboard != null) {
             clampHeld(p)
         } else {
-            val extra = if (workShape) dp(WORK_CAPTION_H_DP) - dp(WORK_CAPTION_TUCK_DP) else 0
+            val extra = if (workShape) dp(WORK_CAPTION_H_DP) - captionTuck() else 0
             p.y = p.y.coerceIn(-pad - winYOrigin, bottomEdge() - side - extra + pad - winYOrigin)
         }
     }
@@ -2466,6 +2564,7 @@ class FloatingWindowUi(
             docked = false
             squareBallArea()
             ball?.setSideLedge(false)
+            pet?.docked = false
         }
         // Same eviction as the fold, in the other direction: the card grows
         // and the signboard's compact geometry (ball at the window's bottom)
@@ -2882,6 +2981,16 @@ class FloatingWindowUi(
                 FrameLayout.LayoutParams.MATCH_PARENT,
             ),
         )
+        val pv = PhonePetView(context).apply { look = petLook; visibility = View.GONE; follow = b }
+        pet = pv
+        ballArea.addView(
+            pv,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        ui.post { syncPet() }
 
         root.addView(
             ballArea,
@@ -3391,6 +3500,10 @@ class FloatingWindowUi(
         }
 
         private fun isOnBall(x: Float, y: Float, ballH: Int): Boolean {
+            if (petShown()) {
+                val area = ballAreaView ?: return false
+                return pet?.hitFromParent(x - area.left - area.translationX, y - area.top - area.translationY) ?: false
+            }
             // The ball area's own centre: it is the window's except in the work-caption shape, where the window
             // is wider than the ball and the ball sits at its top right.
             val cx = ballAreaView?.let { it.left + it.width / 2f } ?: (width / 2f)
@@ -3572,7 +3685,7 @@ class FloatingWindowUi(
                     swiping = false
                     if (wasDrag) settleAfterDrag() else armDock()
                     retimeStroll()
-                    if (wasTap) registerTap()
+                    if (wasTap) { registerTap(); if (petShown()) pet?.poke() }
                     // Right means forward, the way a stack of cards is dealt.
                     if (abs(flick) > slop * SWIPE_COMMIT) {
                         stepBallLook(if (flick > 0) 1 else -1)

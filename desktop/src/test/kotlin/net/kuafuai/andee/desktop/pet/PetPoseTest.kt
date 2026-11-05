@@ -1,5 +1,6 @@
 package net.kuafuai.andee.desktop.pet
 
+import net.kuafuai.andee.pet.PetMind.emotionPose
 import net.kuafuai.andee.ui.ball.Mood
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -20,7 +21,7 @@ class PetPoseTest {
     @Test fun theBallsPosesFallBackToTheOriginalNine() {
         val original = setOf(PetPose.IDLE, PetPose.HAPPY, PetPose.AIR, PetPose.ANGRY, PetPose.SAD, PetPose.SLEEPY,
             PetPose.THINK, PetPose.TEA, PetPose.HOTPOT)
-        for (p in PetPose.values()) if (p !in original && p != PetPose.HOLDING) {
+        for (p in PetPose.values()) if (p !in original && p != PetPose.HOLDING && p != PetPose.PEEK) {
             val f = p.fallback ?: throw AssertionError("$p has no fallback")
             assert(f in original) { "$p falls back to $f, which only girl may have" }
         }

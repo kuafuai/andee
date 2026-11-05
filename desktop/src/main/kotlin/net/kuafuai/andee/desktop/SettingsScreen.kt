@@ -318,13 +318,7 @@ fun SettingsScreen(
                 PetFace(height = 110.dp, look = PetLibrary.of(picked), pose = PetPose.IDLE)
                 Note(
                     // Each look is a character: its voice and manner come with it, and the user is owed knowing that.
-                    when (PetLibrary.of(picked).id) {
-                        "boy" -> t("阳光少年：男声，爽快直接。", "A sunny boy: a young man's voice, quick and direct.")
-                        "lady" -> t("文静少女：清冷女声，话少、细致，偶尔流露一点温柔。", "A quiet girl: a cool voice, few words, careful, warm underneath.")
-                        "beau" -> t("温柔男友：温柔男声，细心体贴，会记得你说过的事。", "A gentle boyfriend: a soft voice, attentive, remembers what you said.")
-                        "andee" -> t("Andee 本尊：它自己的声音和脾气。", "Andee itself: its own voice and manner.")
-                        else -> t("就是 Andee：她自己的声音和脾气。", "Plain Andee: her own voice and manner.")
-                    } + t(
+                    net.kuafuai.andee.pet.PetCharacters.blurb(PetLibrary.of(picked).id, Strings.lang() == "zh") + t(
                         "在听、在说、在干活、等你回答，各有各的姿势。",
                         " Listening, speaking, working and waiting for you each have their own pose.",
                     ),

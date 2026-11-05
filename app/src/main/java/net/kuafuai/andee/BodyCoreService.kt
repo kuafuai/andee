@@ -615,6 +615,15 @@ class BodyCoreService : Service() {
             window.setCompact(false)
         }
         net.kuafuai.andee.config.VoiceConfig.onSceneChanged = ::onSceneChanged
+        // The folded body: the ball or the desk pet (Settings → 形象与表情), and which pet.
+        val syncBody = {
+            window.setPetBody(
+                net.kuafuai.andee.config.VoiceConfig.petOn(this),
+                net.kuafuai.andee.config.VoiceConfig.petCharacter(this),
+            )
+        }
+        syncBody()
+        net.kuafuai.andee.config.VoiceConfig.onPetChanged = syncBody
 
         // After the card: same window type, so insertion order is z-order and
         // the glow needs to sit on top of the ball, not under it.
@@ -1836,6 +1845,7 @@ class BodyCoreService : Service() {
         scenesUi?.hide()
         scenesUi = null
         net.kuafuai.andee.config.VoiceConfig.onSceneChanged = null
+        net.kuafuai.andee.config.VoiceConfig.onPetChanged = null
         // Before the windows go: this one has to put the keyboard back, and a
         // service that dies mid-typing would otherwise leave the tablet with
         // its keyboard on the user's IME — where every future `type_text`

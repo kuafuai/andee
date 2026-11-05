@@ -35,7 +35,7 @@ object VoiceConfig {
          *
          * Not a settings row anymore: the voice is a property of the character
          * ([net.kuafuai.andee.ui.ball.BallLook.voice]) and this is only the
-         * fallback for the looks that shipped without one. See [lookSpeaker].
+         * fallback for the looks that shipped without one. See [characterVoice].
          */
         const val TTS_SPEAKER = "zh_female_vv_uranus_bigtts"
 
@@ -593,11 +593,10 @@ object VoiceConfig {
                     ?.takeIf { it.isNotEmpty() }
                     ?: DEFAULT_TTS_ENDPOINT,
                 ttsResourceId = p.getString("tts_resource_id", DEFAULT_TTS_RESOURCE)!!,
-                // The voice follows the ball's look; [TTS_SPEAKER] is the
-                // fallback for looks that don't name one. The same speaker
-                // string is what the Google path maps to a Gemini voice, so
-                // this stays the one place a voice is decided.
-                ttsSpeaker = lookSpeaker(p),
+                // The voice follows the character in force — the pet's while she is the body, else the ball's
+                // look; [TTS_SPEAKER] is the fallback for one that doesn't name a voice. The same speaker string
+                // is what the Google path maps to a Gemini voice, so this stays the one place a voice is decided.
+                ttsSpeaker = characterVoice(context).ifEmpty { TTS_SPEAKER },
                 ttsSampleRate = p.getInt("tts_sample_rate", DEFAULT_TTS_SAMPLE_RATE),
                 voiceProvider = voiceProvider(context),
                 // Every one of these is saved-value-else-build-default, and the
@@ -827,12 +826,55 @@ object VoiceConfig {
          * row, because the control is the ball itself.
          *
          * It is read from more than the ball now: the look carries the voice and
-         * the manner as well as the drawing, so [lookSpeaker] and `LocalBrain`
+         * the manner as well as the drawing, so [characterVoice] and `LocalBrain`
          * both resolve it through [net.kuafuai.andee.ui.ball.BallLooks.byName].
          */
         fun ballLook(context: Context): String =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .getString("ball", "").orEmpty().trim()
+
+        /**
+         * Whether the desk pet is the folded body instead of the ball. **Off unless the user picked it** — a fresh
+         * install wears the ball, as on the Mac; only an exact `on` shows her. 小球 is the picker's leftmost.
+         */
+        fun petOn(context: Context): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("pet", "").orEmpty().trim() == "on"
+
+        /** Which pet (`net.kuafuai.andee.pet.PetCharacters`); unknown or unset reads as the first, Andee. */
+        fun petCharacter(context: Context): String {
+            val id = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("pet_character", "").orEmpty()
+            return (net.kuafuai.andee.pet.PetCharacters.byId(id) ?: net.kuafuai.andee.pet.PetCharacters.PRESETS.first()).id
+        }
+
+        /** Written at once (the redraw is the confirmation), then the service is told so the folded body follows. */
+        fun setPet(context: Context, on: Boolean? = null, character: String? = null) {
+            val e = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            if (on != null) e.putString("pet", if (on) "on" else "off")
+            if (character != null) e.putString("pet_character", character)
+            e.apply()
+            onPetChanged?.invoke()
+        }
+
+        /** Set by the service: the body (ball or pet, and which pet) changed. Writer's thread. */
+        @Volatile
+        var onPetChanged: (() -> Unit)? = null
+
+        /**
+         * The character in force — the pet's while she is the body, else the ball look's. Its voice is
+         * the speaker [load] resolves and its persona the brain's (`AndroidBrainHost.persona`), so the voice, the manner
+         * and what is on screen cannot belong to three different characters.
+         */
+        // The whole voice story in one line: **the voice is the character's**. A character either names one or it
+        // does not; the user has no voice row to fill in, so there is no precedence to get wrong. [TTS_SPEAKER]
+        // survives only as the fallback. Resolved here rather than in `TtsController` because [load] is read by the
+        // ASR path, the meeting recorder and the start log as well.
+        fun characterVoice(context: Context): String =
+            if (petOn(context)) net.kuafuai.andee.pet.PetCharacters.byId(petCharacter(context))?.voice.orEmpty()
+            else net.kuafuai.andee.ui.ball.BallLooks.byName(ballLook(context)).voice
+
+        fun characterPersona(context: Context): String =
+            if (petOn(context)) net.kuafuai.andee.pet.PetCharacters.byId(petCharacter(context))?.persona.orEmpty()
+            else net.kuafuai.andee.ui.ball.BallLooks.byName(ballLook(context)).persona
 
         /**
          * Whether the wake phrase is still listened for with the screen off.
@@ -963,27 +1005,6 @@ object VoiceConfig {
         @Volatile
         var onSceneChanged: ((String?, String?, Boolean) -> Unit)? = null
 
-        /**
-         * The 火山 speaker for the ball's current look, falling back to
-         * [TTS_SPEAKER].
-         *
-         * The whole voice story in one line: **the voice is the character's**.
-         * A look either names one or it does not; the user has no voice row to
-         * fill in, so there is no precedence to get wrong and no override to
-         * silently block a character's voice. [TTS_SPEAKER] survives only as the
-         * fallback for looks that shipped without an opinion.
-         *
-         * Lived at [load]'s own file rather than in `TtsController` for the same
-         * reason the settings card used to need a "voice in use" row: [load] is
-         * read by the ASR path, the meeting recorder and the start log as well,
-         * and a speaker resolved at the call site would have `HuoshanTts`
-         * logging one voice while `BodyCoreService` logged another.
-         */
-        private fun lookSpeaker(
-            p: android.content.SharedPreferences,
-        ): String = net.kuafuai.andee.ui.ball.BallLooks
-            .byName(p.getString("ball", "").orEmpty().trim()).voice
-            .ifEmpty { TTS_SPEAKER }
 
         // api_key used to be absent here, because it was compiled in and a saved
         // pref would have shadowed the constant with no way to see it from the
@@ -992,7 +1013,7 @@ object VoiceConfig {
         // Same class of credential as llm_api_key, which was always editable
         // because a DeepSeek key is the user's own. (tts_speaker was once
         // editable too, and is gone: the voice follows the ball's look, not a
-        // row — see [lookSpeaker].)
+        // row — see [characterVoice].)
         private val ALLOWED_KEYS = setOf(
             // Answers read aloud or not — the card's 朗读 / 静音 key, the Mac header's twin.
             "mute",

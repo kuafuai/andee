@@ -229,7 +229,7 @@ class PetRuntime(
                         val line = PetTalk.napping()
                         say(if (Strings.lang() == "zh") line.zh else line.en, PetPose.SLEEP)
                     } else if (System.currentTimeMillis() - sinceWake > 7_000 + kotlin.random.Random.nextLong(7_000)) {
-                        val acts = listOf(PetPose.THINK, PetPose.HAPPY, PetPose.SLEEPY, PetPose.TEA, PetPose.HOTPOT)
+                        val acts = net.kuafuai.andee.pet.PetMind.IDLE_ACTS
                             .filter { it != lastAct }
                         val act = acts.random()
                         lastAct = act
@@ -278,43 +278,19 @@ class PetRuntime(
 
     companion object {
         const val TAG = "Pet"
-        const val SLEEP_AFTER_MS = 180_000L
-
-        /** How long a nap lasts: 40-80 s, then she wakes by herself. */
-        const val NAP_MIN_MS = 40_000L
-        const val NAP_SPAN_MS = 40_000L
+        const val SLEEP_AFTER_MS = net.kuafuai.andee.pet.PetMind.SLEEP_AFTER_MS
+        const val NAP_MIN_MS = net.kuafuai.andee.pet.PetMind.NAP_MIN_MS
+        const val NAP_SPAN_MS = net.kuafuai.andee.pet.PetMind.NAP_SPAN_MS
     }
 }
 
-/**
- * Andee's state as a pose, or null when it is idle. The ball's own decision (`MacBall.face`) mapped onto the
- * drawings: the mic open is [PetPose.LISTEN]; speaking wears the face the model picked for the line, else
- * [PetPose.SPEAK]; a task is [PetPose.SEARCH] while it acts and [PetPose.THINK] while it waits on the model; a
- * question or an approval card up is [PetPose.HOLDING].
- */
-fun assistantPose(holding: Boolean): PetPose? {
-    if (holding) return PetPose.HOLDING
-    return when (net.kuafuai.andee.desktop.MacBall.face) {
-        Mood.LISTENING -> PetPose.LISTEN
-        Mood.SPEAKING -> net.kuafuai.andee.desktop.MacBall.spokenEmotion?.let(::emotionPose) ?: PetPose.SPEAK
-        Mood.THINKING -> if (net.kuafuai.andee.desktop.WorkLog.active && !net.kuafuai.andee.desktop.WorkLog.waiting) PetPose.SEARCH else PetPose.THINK
-        else -> null
-    }
-}
-
-/** The face the model wrote for a line (`[happy]`, `[生气]` …, see `SpeechMood`), as a drawing. */
-internal fun emotionPose(m: Mood): PetPose = when (m) {
-    Mood.HAPPY, Mood.WAVE -> PetPose.HAPPY
-    Mood.CURIOUS -> PetPose.CURIOUS
-    Mood.TENSE -> PetPose.ANGRY
-    Mood.ANXIOUS -> PetPose.ANXIOUS
-    Mood.CONCERNED, Mood.FAILED -> PetPose.SAD
-    Mood.WINK -> PetPose.WINK
-    Mood.PROTECT -> PetPose.PROTECT
-    Mood.CELEBRATE, Mood.SUCCESS -> PetPose.CELEBRATE
-    Mood.REST, Mood.SLEEPING -> PetPose.SLEEPY
-    else -> PetPose.SPEAK
-}
+/** Andee's state as a pose on the Mac, or null when idle — the shared rule ([PetMind.statePose]) fed from `MacBall`. */
+fun assistantPose(holding: Boolean): PetPose? = net.kuafuai.andee.pet.PetMind.statePose(
+    face = net.kuafuai.andee.desktop.MacBall.face,
+    spoken = net.kuafuai.andee.desktop.MacBall.spokenEmotion,
+    acting = net.kuafuai.andee.desktop.WorkLog.active && !net.kuafuai.andee.desktop.WorkLog.waiting,
+    holding = holding,
+)
 
 /** One runtime per config, kept across recompositions and across the windows that draw it. */
 @Composable

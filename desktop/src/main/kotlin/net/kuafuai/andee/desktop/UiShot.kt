@@ -310,13 +310,13 @@ private fun PetShot() {
             val cells = listOf(
                 Triple("girl", PetPose.IDLE, "Cream"),
                 Triple("boy", PetPose.IDLE, "Cream short"),
-                Triple("lady", PetPose.IDLE, "Quiet girl"),
-                Triple("beau", PetPose.IDLE, "Gentle boyfriend"),
-                Triple("lady", PetPose.HAPPY, "pat"),
-                Triple("lady", PetPose.AIR, "thrown"),
-                Triple("lady", PetPose.ANGRY, "angry"),
-                Triple("lady", PetPose.SLEEPY, "sleepy"),
-                Triple("lady", PetPose.TEA, "tea"),
+                Triple("fish", PetPose.IDLE, "Chubby fish"),
+                Triple("cat", PetPose.IDLE, "Kitten"),
+                Triple("fish", PetPose.HAPPY, "pat"),
+                Triple("fish", PetPose.AIR, "thrown"),
+                Triple("fish", PetPose.ANGRY, "angry"),
+                Triple("fish", PetPose.SLEEPY, "sleepy"),
+                Triple("fish", PetPose.TEA, "tea"),
                 Triple("girl", PetPose.HOTPOT, "hotpot"),
             )
             for ((lookId, pose, label) in cells) {
