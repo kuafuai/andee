@@ -1,0 +1,3 @@
+# Golden snapshots are compared byte for byte against strings the test builds with LF.
+# Without this, core.autocrlf=true on Windows checks them out as CRLF and all four fail.
+app/src/test/resources/golden/** text eol=lf
