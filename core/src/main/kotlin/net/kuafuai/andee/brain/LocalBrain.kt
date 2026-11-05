@@ -1365,6 +1365,17 @@ class LocalBrain(
                 )
             }
 
+            // A file picker that pops up on its own is a request nobody made. Only a turn the user just
+            // started may open it (issue #37) — not a work turn, a todo coming due at 3 a.m., or a job
+            // another device handed over (which is how a Mac's own work turn would reach this phone).
+            if (method == "device.file.read" && currentKind != TurnKind.USER) {
+                return toolMessage(
+                    tc.id,
+                    "Only a request the user makes right here can open the file picker — nobody is waiting to " +
+                        "choose a file on this turn. Say what you wanted to read and ask them to send it.",
+                )
+            }
+
             // The wait budget. Watching somebody else's twenty-minute job by waiting and looking is the
             // most expensive thing this loop can do — every look carries a screenshot and the whole tool
             // list — and it fills the history until the conversation itself is what breaks. So the device

@@ -978,7 +978,13 @@ class FloatingWindowUi(
             if (typingGeometry == null) {
                 typingGeometry = intArrayOf(p.x, p.y, p.width, p.height)
             }
-            p.height = maxOf(dp(MIN_TYPING_CARD_DP), typingTop)
+            // Exactly the field's top edge and never more. There used to be a
+            // 240 dp floor so the card would not shrink to a sliver, but on a
+            // short landscape screen the field sits higher than that and the
+            // floor made the card reach down over the field and the keyboard's
+            // top rows (issue #36). The ball is measured against the display
+            // (see [refitCardAreas]), so a short window only clips it.
+            p.height = typingTop
             // The real field is up now, right under this edge: the pill would be a second, dead copy of it.
             inputPill?.visibility = View.INVISIBLE
             runCatching { wm.updateViewLayout(v, p) }
@@ -2770,7 +2776,11 @@ class FloatingWindowUi(
             // the card came out as the raw photo at full brightness — measured
             // on the tablet at mean luma 0.40 where the design says 0.13, with
             // the pale ball barely legible on top of it.
-            v.background = null
+            //
+            // The root still gets the solid card fill, *under* the image: it is
+            // invisible wherever the image is, and wherever the image ever stops
+            // short it is a dark card rather than a hole onto the app behind.
+            v.setBackgroundColor(Color.parseColor(Glass.CARD_SOLID))
             val s = Backdrop.scrim()
             if (scrimShown != s) {
                 bg!!.foreground = ColorDrawable(s)
@@ -2825,6 +2835,12 @@ class FloatingWindowUi(
         // backdrop is merely *clipped* by the shorter window, so the top of the
         // card is pixel-for-pixel the same in both states.
         //
+        // The display's **longer** side, not its current height: nothing
+        // re-measures this view when the screen rotates, so a card built in
+        // landscape kept a landscape-short image in portrait and the band
+        // below it was a transparent hole onto the app behind (issue #36).
+        // Taller than needed only crops more of a blurred photo.
+        //
         // The decode and the blur are kicked off here rather than lazily on the
         // first unfold. The window is built folded, so the work happens while
         // this view is still GONE and the answer is normally in hand long before
@@ -2838,7 +2854,7 @@ class FloatingWindowUi(
             0,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                wm.currentWindowMetrics.bounds.height(),
+                wm.currentWindowMetrics.bounds.let { maxOf(it.width(), it.height()) },
                 Gravity.TOP,
             ),
         )
@@ -3398,15 +3414,19 @@ class FloatingWindowUi(
             // signboard above it), so its centre is not `ballH / 2` from the
             // window's top — read it from the area's real position.
             val cy = (ballAreaView?.top ?: 0) + ballH / 2f + (ball?.translationY ?: 0f)
-            // Matches the visible sphere: camera z=4.9 + fov=42 makes the ball
-            // fill ~55% of the shorter dimension, times whatever view scale the
-            // ball is drawn at. Add a small margin so grazing taps still count.
+            // Matches the visible sphere: a body of radius ~0.87 seen from camera
+            // z=4.9 through fov=42 is drawn at ~0.235 of the shorter side, times
+            // whatever view scale the ball is drawn at. HIT_RADIUS adds a small
+            // margin so grazing taps still count — it was 0.32, about 11 dp of
+            // invisible rim on the folded ball, so a tap aimed at the app beside
+            // the ball started listening instead (issue #34). 0.27 still leaves the
+            // folded ball a ~56 dp target, above the 48 dp minimum.
             // Compact mode differs only in that scale (1f, no subtitle to make
             // room for) — it used to claim the whole window because a disc was
             // painted there, and without the disc that would be an invisible
             // square in the corner eating the user's taps.
             val scale = if (compact) 1f else BALL_SCALE
-            val r = min(width, ballH) * 0.32f * scale
+            val r = min(width, ballH) * HIT_RADIUS * scale
             val dx = x - cx
             val dy = y - cy
             return dx * dx + dy * dy <= r * r
@@ -3643,6 +3663,9 @@ class FloatingWindowUi(
         // 0.8 since 2026-10-23: the user asked for a smaller ball on both shapes of the card.
         private const val BALL_SCALE = 0.8f
 
+        /** Tap radius as a fraction of the ball area's shorter side; the sphere is drawn at ~0.235. See `isOnBall`. */
+        private const val HIT_RADIUS = 0.27f
+
         /**
          * How much more sideways than vertical a drag on the ball must be
          * before it counts as a look-change swipe rather than a drag of the
@@ -3717,16 +3740,6 @@ class FloatingWindowUi(
          */
         private const val BALL_NUDGE_DP = 26
 
-        /**
-         * Floor for the card's height while a typing field is up — see
-         * [setTypingTop].
-         *
-         * Reached only on a device whose keyboard eats most of the screen: the
-         * card is meant to keep its ball and some of its scrollback visible
-         * above the field, and a card clipped to nothing would be the "it
-         * vanished" behaviour this replaced.
-         */
-        private const val MIN_TYPING_CARD_DP = 240
 
         /**
          * Compact window side and its inset from the screen corner. The sphere
