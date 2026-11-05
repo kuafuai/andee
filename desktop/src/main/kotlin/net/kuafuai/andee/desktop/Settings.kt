@@ -38,6 +38,8 @@ object Settings {
         "google_api_key", "google_project", "google_location", "google_asr_model", "google_tts_model", "google_base_url",
         "google_language", "tts_sample_rate", "grounding", "show_hub", "hub_url", "device_name", "theme", "peers",
         "nudge", "nudge_muted", "locator_model", "drive", "timeline_events",
+        // The desk pet: on/off, which character, how tall, and where it was left.
+        "pet", "pet_character", "pet_size", "pet_pos",
     )
 
     /**

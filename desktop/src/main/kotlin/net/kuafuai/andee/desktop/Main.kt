@@ -15,6 +15,10 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import net.kuafuai.andee.desktop.mac.Bridge
+import net.kuafuai.andee.desktop.pet.Pet
+import net.kuafuai.andee.desktop.pet.PetWindow
+import net.kuafuai.andee.util.Log
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -98,6 +102,21 @@ fun main() {
         Nudges.ballUp = { ballWindow != null }
         Nudges.chatInFront = { chat && chatWindow?.isActive == true }
         BubbleWindow(ballWindow)
+
+        // The desk pet: its own window, so the ball keeps every gesture it had and the pet can
+        // be switched off without touching any of them. `Pet.config` is Compose state, so the
+        // settings card's save re-reads it here — no restart, and off really means gone.
+        if (Pet.config.enabled) {
+            // The canvas covers a whole display and is therefore transparent to the mouse everywhere
+            // except over the pet; that switch is native. Without the bridge a full-screen window
+            // would swallow every click on the desktop, so the pet is not shown rather than shown
+            // dangerously.
+            if (Bridge.available) {
+                PetWindow(cfg = Pet.config, onOpenChat = { openChat() })
+            } else {
+                Log.w("Pet", "the native bridge is missing, so the pet is not shown")
+            }
+        }
 
         Window(
             onCloseRequest = { chat = false },

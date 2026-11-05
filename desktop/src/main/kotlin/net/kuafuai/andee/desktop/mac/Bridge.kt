@@ -40,6 +40,8 @@ object Bridge {
         fun andee_screenshot(path: String, maxSide: Int): Int
         fun andee_open(target: String): Int
         fun andee_float_window(title: String): Int
+        fun andee_set_ignore_mouse(title: String, ignore: Int): Int
+        fun andee_mouse_down(): Int
         fun andee_set_own_alpha(alpha: Double): Int
         fun andee_notif_latest_id(): Long
         fun andee_own_window_at(x: Double, y: Double): Int
@@ -109,6 +111,18 @@ object Bridge {
     fun open(target: String) = need().andee_open(target) == 1
     /** See andee_float_window: above every app, on every Space. False if the bridge or the window is missing. */
     fun floatWindow(title: String) = lib?.andee_float_window(title) == 1
+
+    /**
+     * Let clicks through this window (or stop letting them through).
+     *
+     * The pet canvas covers a whole screen, so it has to be transparent to the mouse except over the
+     * pet — otherwise a full-screen transparent window would swallow every click on the desktop.
+     */
+    /** True while a physical mouse button is down. */
+    fun mouseDown(): Boolean = lib?.andee_mouse_down() == 1
+
+    fun setClickThrough(title: String, ignore: Boolean): Boolean =
+        lib?.andee_set_ignore_mouse(title, if (ignore) 1 else 0) == 1
     /** Every Andee window to [alpha] (0 = stepped aside for a click). */
     fun setOwnAlpha(alpha: Double) = lib?.andee_set_own_alpha(alpha) == 1
 

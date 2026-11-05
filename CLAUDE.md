@@ -719,7 +719,70 @@ meetings, gear, friends) and lists exactly the tools some provider handles. What
   ball steal the first one's state. Both use `ballTaps(ballActions(…))`, the phone's vocabulary: tap stops and
   listens, double-tap stops and types, long-press opens the window; a sideways drag on the chat ball switches
   character.
+- **The desk pet is a third window, and it is a body, not a picture** (`desktop/src/main/kotlin/…/pet/`). It is a
+  **library of looks**, not a cast: four presets (Cream, Cream short, Cobalt, Cobalt short) plus any picture the user
+  installs from the settings card — a shelf of thumbnails, because those names are names for pictures. The cobalt pair
+  is the logo's own blue. No girl/boy switch: they are one Andee drawn several ways. `PetLibrary.addCustom` trims,
+  scales and stores a user's picture under `~/Library/Application Support/Andee/pets`.
+  It takes over **none** of the ball's gestures: drag, throw, pat, double-click for the conversation. A click *is* an
+  interaction — she picks one of five faces (`PetTalk`: happy / angry / sad / sleepy / think), hops, and says one short
+  line in a bubble of its own window; every 7-14 s she also does something on her own (look up, smile, doze, sip a
+  bubble tea — `PetPose.TEA`), and after three quiet minutes she falls asleep and says so. Poses change with a 90-150 ms
+  crossfade, never a cut, and the idle breath is sampled at 60 fps (measured: the same CPU as 8 fps — the cost of this
+  window is compositing, not repainting).
+  **Latency is a feature here, so it is measured**: the tap reacts on `onPress` (a trackpad click is down-then-up and
+  waiting for the up added the whole press), the frame loop's first frame after waking used to have `dt = 0` and threw a
+  frame away, and the first pat after launch cost 84-117 ms until the parked bubble window and its font/bitmap were
+  warmed off-screen — it is 27-37 ms now. The speech bubble is a **parked window** moved into place, not a window that
+  appears: mapping one on the tap frame was most of that 100 ms.
+  **A frozen app taught the window rules, so they are not style**: a second always-painting window
+  parked off-screen (a "warm" bubble, to save 50 ms on the first line) plus window geometry changing while
+  that layer painted wedged the event thread inside Skiko's `MetalRedrawer.performDraw` — thread dump:
+  `BLOCKED` on the redrawer's monitor while holding `AWTTreeLock`, with the whole app unclickable. So: the
+  bubble is **hidden when empty**, never parked; window moves are **coalesced to one per frame** (the pointer
+  only records the position, the frame loop moves the window); and one gesture detector (`awaitEachGesture`)
+  owns press, drag, flick and double-click, because two detectors fought over the same down event and a
+  `detectTapGestures` that consumes the down silently kills `detectDragGestures` — "the pet cannot be dragged".
+  **The idle loop is real frame animation, computed not generated** (`tools/pet_anim.py`): the RGBA
+  master is warped by a mesh whose horizontal amplitude grows with height squared (feet planted), whose
+  phase lags 0.45 of a turn up the body (hair a beat behind the shoulders), plus 0.8% vertical breathing
+  — 20 frames at 20 fps, exactly aligned because one master produced them, which is the thing a generated
+  3x3 sheet could never do. Shipped as a WebP sequence (`pet/anim/<look>-idle-N.webp`, ~1.1 MB a look)
+  because Skia draws bitmaps and Compose has no `<video>`; **the VP9-alpha WebM is encoded too and archived
+  in `tools/pet-anim/webm/`** for a browser or Electron host, but the Mac app never loads it (playing video
+  there would mean a ~100 MB JavaCV/FFmpeg dependency). Amplitudes are at the rubbery edge on purpose:
+  1.2% sway, 0.8% breath — larger reads as a warped picture, not as breathing.
+  **The physics is its own file** (`PetMotion`, plain Kotlin, 14 unit tests — gravity 2600 dp/s², restitution 0.55,
+  walls 0.65, ground friction so a sideways throw skids instead of stopping dead, a pat lands without bouncing while a
+  throw bounces, and it sleeps when settled rather than asking for frames all afternoon; it also heals a body restored
+  above a floor instead of hanging it there). It lives on **every** display: `PetSpace` is the set of work areas, the
+  floor is asked at the pet's own x — a union *bounding box* would leave a hole between two screens of different heights
+  — and only the outer edges of the arrangement are walls.
+  **The window is the pet's bounding box and `setLocation` moves it every frame** — that is the only way a pet can leave
+  its corner on a desktop, and it is why the sprites must be trimmed to the body: every transparent pixel of the window
+  is a click taken from the app underneath. One mover only (`moveWindow`), deduped and on the AWT thread: two writers
+  per frame (pointer + physics loop) was the flicker, and a pose that flapped between two drawings on each micro-bounce
+  of a hop was the other ("she flashes when she jumps").
+  **The art is generated, not drawn**: prompts, poses, trim/resize rules live in `tools/pet_sprites.py`, and the sheets
+  ship as **WebP** decoded through Skia (a ninth of the PNG size; `ImageIO` stays as the fallback for a user's PNG).
+  A 3x3 generated sheet sliced into frames was tried and **rejected**: cells out of one generation cannot be aligned
+  without warping the body, and the frames at cell resolution looked worse than the full-resolution stills — so props
+  come back as single full-res drawings (`tea`) and the motion is procedural. It is **deliberately not blue by default**
+  — the ball already owns cobalt, and a blue-haired girl in a white dress is somebody else's mascot; the cobalt looks
+  are a choice in the shelf. Settings: `pet`, `pet_character`, `pet_size` (a *percentage* of the look's own height),
+  `pet_pos` (the feet).
 - **Notifications come from `usernoted`'s SQLite store, and where it is depends on the macOS version** (`notifCandidates` in `AndeeMac.swift`): macOS 15 keeps it in `~/Library/Group Containers/group.com.apple.usernoted/db2`, earlier systems under `confstr(_CS_DARWIN_USER_DIR)` + `com.apple.notificationcenter/db2` (never derive that from `$TMPDIR` — the JVM replaces it). Only the first was tried, and a store that was not there was reported as missing Full Disk Access, so the user granted it and was told the same thing forever. `andee_notif_latest_id` now answers -2 for "no store anywhere" (`State.NOT_FOUND`, no permission button) and -1 for "exists but refuses us" (`NO_ACCESS`), and reads in process through `libsqlite3` (read-only, busy timeout, since `usernoted` is writing the WAL) instead of forking `/usr/bin/sqlite3`, which swallowed the reason.
+- **The native bridge builds with the Command Line Tools, no Xcode.** It used to need the macOS 14
+  SDK for one call — `SCScreenshotManager.captureImage`, the one-shot capture — which meant a machine
+  without a full Xcode could not compile `desktop/native/AndeeMac.swift` at all (`cannot find
+  'SCScreenshotManager' in scope`), and the app shipped without screen tools. That one call is now a
+  `SCStream` started, read once and stopped: same filter, same configuration, same picture, available
+  since 12.3. Verified end to end on 2026-11-05 by calling `andee_screenshot` through `dlopen` and
+  getting a 1280×827 PNG back. (Tried first: a downloaded Swift 5.10 toolchain + macOS 14.5 SDK. It
+  compiles, then the linker dies on the SDK's `.tbd` files — `unsupported tapi file type
+  '!tapi-tbd'` — because `ld` also comes from Xcode. Replacing the API was cheaper than replacing the
+  linker, and it makes the bridge buildable everywhere.) `Bridge.available` is logged with the pet's
+  window line as `bridge=true`, which is the one fact to check after a rebuild.
 - **`type_text` pastes even when the front app reports no focused element** (`MacScreen.typeBlind`). Mac WeChat answers `focused: false` to accessibility, and refusing there sent the model to the shell (`osascript` + ⌘V), which a notification's turn may not use — so a message Andee could read, it could not answer. The blind path sends ⌘V only (no ⌘A: with focus unknown, select-all may take the chat history), refuses when Andee's own window is active, and returns `unverified` with a note to check the screenshot and not to reach for the shell. Verified in WeChat's 文件传输助手 by reading the box back with ⌘A ⌘C. The pasteboard is still not restored afterwards — that was a deliberate choice (see `andee_set_pasteboard`).
 - **A click on an inactive app only activates it, so every click brings its app forward first** (`MacScreen.click` → `andee_activate_at`; keystrokes → `andee_activate_target`). Measured 2026-10-28 in Chrome with Finder in front: one click left focus on the page (`AXWebArea`), the second focused the text box. In the trace that turned into a sidebar click that "did nothing" and a `type_text` that pasted into the page and reported success — the task stalled on a box the model concluded it "cannot type into". Not verified end-to-end after the fix (the test window was the user's live Chrome).
 - **The main page is 动态 (Timeline), not a chat.** Besides what was said, it shows what happened as one quiet line each: a todo waking it, the review, topics folded, its writes to its own record (diary, self, wiki, a person, a care, a memory, a todo, the plan), a heartbeat's thought and its work turns, bubbles, notifications it let pass and why, meetings, the camera, a vault fill, shell commands. Two sources end in one place: the brain emits `BrainEvent` through `BrainHost.event` (core), and the body adds its own (`TimelineEvents`); both write `Scrollback.Role.EVENT` rows. **The phone does the same** (`ui/PhoneTimeline.kt` → `ChatHistory.Role.EVENT`, drawn by `HistoryListView.buildEventRow`; 全部 / 只看对话 is the key at the ball's lower left, mirroring 朗读), and `AndroidBrainHost.scrollback` filters those rows the same way. A notification stopped at a gate (a task running, the hourly cap) also leaves a row on both, since otherwise it looks like the device did not react. **A review is one row** (`BrainEvent.Kind.REVIEWED` with `items`; `LocalBrain.reviewItems` gathers its writes) and a review that wrote nothing shows nothing; a write that changed nothing (`unchanged` in the tool result) is no event, and a rewrite of something already there says 更新 / 改写 (`BrainEvent.updated`, from `overwrote` / `replaced`). A harvest straight after a sweep only summarises (`HARVEST_SUMMARY_ONLY`), because going through the review rules again wrote everything twice. The Mac's "this silence was already reviewed" is on disk (`last_sweep_attempt`), like the phone's `Notebook.lastSweepAt` — in memory it was forgotten by every restart and the same stretch was reviewed again. **Those rows are never given back to the brain** (`DesktopBrainHost.scrollback` filters them) — a review summary must not return as something said — and they fold with the topic they sit inside. A heartbeat that decided to sleep writes nothing. 全部 / 只看对话 in the header hides them (`timeline_events`).

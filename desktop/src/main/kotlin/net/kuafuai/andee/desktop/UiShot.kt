@@ -1,15 +1,26 @@
 package net.kuafuai.andee.desktop
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import net.kuafuai.andee.desktop.pet.PetFace
+import net.kuafuai.andee.desktop.pet.PetLibrary
+import net.kuafuai.andee.desktop.pet.PetPose
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.system.exitProcess
@@ -21,7 +32,7 @@ import kotlin.system.exitProcess
  * directory seeded with a short conversation and two topics, so nothing of the user's
  * is read or shown.
  *
- * screen: chat | settings | notebook | scenes | vault | selfcheck | expressions | artifacts | topic:1 | ask | bubble | confirm
+ * screen: chat | settings | notebook | scenes | vault | selfcheck | expressions | artifacts | topic:1 | ask | bubble | confirm | pet
  */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
@@ -148,6 +159,9 @@ fun main(args: Array<String>) {
         when {
             askCard != null -> AskShot(askCard)
             screen == "bubble" -> BubbleShot()
+            // `pet`: every character and both poses, on a wallpaper-ish ground, so the sprites'
+            // transparency, margins and relative aspect are checked without the app running.
+            screen == "pet" -> PetShot()
             // `approval`: a shell approval for a very long command (a whole file in a heredoc), the case that
             // used to push the buttons off the screen.
             screen == "approval" -> Box(Modifier.background(Color(0xFFB9C0C8)).padding(24.dp)) {
@@ -270,4 +284,52 @@ private fun seedGear() {
     g.note("Claude Code", "命令行写代码", "改代码、跑测试、看 diff", "yes", null, null)
     g.note("Google Chrome", "浏览器", "打开网页、登录的网站", "yes", null, null)
     g.edit("微信", "聊天", "读消息、代你回复（需要我同意）")
+}
+
+
+/**
+ * Every look and every face, on a wallpaper-ish ground.
+ *
+ * Why this screen exists: the sprites are transparent PNGs whose margins and aspect decide the
+ * window's size and click area, none of which is visible in a file listing; and a pet's faces
+ * are only convincing next to each other. Drawing them through [PetFace] — the same function
+ * the live window uses — checks the assets, each look's aspect, the airborne drawing and the
+ * mood set in one image.
+ */
+@Composable
+private fun PetShot() {
+    Box(
+        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF93A8C6), Color(0xFF37455B)))),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            val cells = listOf(
+                Triple("girl", PetPose.IDLE, "Cream"),
+                Triple("boy", PetPose.IDLE, "Cream short"),
+                Triple("blue-girl", PetPose.IDLE, "Cobalt"),
+                Triple("blue-boy", PetPose.IDLE, "Cobalt short"),
+                Triple("blue-girl", PetPose.HAPPY, "pat"),
+                Triple("blue-girl", PetPose.AIR, "thrown"),
+                Triple("blue-girl", PetPose.ANGRY, "angry"),
+                Triple("blue-girl", PetPose.SLEEPY, "sleepy"),
+                Triple("blue-girl", PetPose.TEA, "tea"),
+                Triple("girl", PetPose.HOTPOT, "hotpot"),
+            )
+            for ((lookId, pose, label) in cells) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    PetFace(
+                        height = 200.dp,
+                        look = PetLibrary.of(lookId),
+                        pose = pose,
+                        lift = if (pose == PetPose.AIR) 0.8f else 0f,
+                    )
+                    Text(label, color = Color.White.copy(alpha = 0.92f), fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+            }
+        }
+    }
 }

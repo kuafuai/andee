@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.heightIn
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +32,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.kuafuai.andee.config.BrainConfig
+import net.kuafuai.andee.desktop.pet.Pet
+import net.kuafuai.andee.desktop.pet.PetConfig
+import net.kuafuai.andee.desktop.pet.PetFace
+import net.kuafuai.andee.desktop.pet.PetLibrary
+import net.kuafuai.andee.desktop.pet.PetPose
+import net.kuafuai.andee.desktop.pet.pickCustomPet
 
 /** A string from the phone's own resources (generated into strings_*.properties), so the wording is the phone's. */
 private fun st(key: String, vararg a: Any): String = Strings.get("s_$key").let { if (a.isEmpty()) it else String.format(Strings.locale(), it, *a) }
@@ -171,6 +181,120 @@ fun SettingsScreen(
             Note(st("settings_expr_note"))
             Row(Modifier.padding(top = 8.dp)) { Pill(st("settings_expr_open")) { onOpenExpressions() } }
 
+        }
+        // ---- 桌宠: Andee 在桌面上的一副身体。It stands on the desktop beside the ball, which stays
+        // the control surface; this one is only a presence, so it gets the gestures that cannot be
+        // mistaken for a control — drag, throw, double-click. ----
+        Section(
+            t("桌宠", "Desk pet"),
+            note = t(
+                "Andee 在桌面上的一副身体：拖得动、甩出去会掉下来、点一下逗她、双击打开对话。球还是那个球，她不接管任何操作。",
+                "Andee's body on your desktop: drag it, throw it and it falls, click to pat it, double-click for the " +
+                    "conversation. The ball is still the ball; the pet takes over no controls.",
+            ),
+        ) {
+            SegmentedPicker(
+                listOf("off" to st("common_off"), "on" to st("common_on")),
+                v["pet"].orEmpty().ifEmpty { if (Pet.config.enabled) "on" else "off" },
+            ) { v["pet"] = it }
+            RowLabel(t("形象", "Look"))
+            // A shelf, not a dropdown: each look is drawn as itself. "奶油金" and "钴蓝·短发" are names
+            // for pictures, and a name is not a picture — and there is no girl/boy switch here,
+            // because the pet is one Andee drawn several ways, not a cast.
+            var petsChanged by remember { mutableStateOf(0) }
+            val looks = remember(petsChanged) { PetLibrary.all() }
+            val picked = v["pet_character"].orEmpty().ifEmpty { PetLibrary.PRESETS.first().id }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                for (look in looks) {
+                    val selected = look.id == picked
+                    Column(
+                        Modifier.width(66.dp).clickable { v["pet_character"] = look.id },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(
+                            Modifier.size(66.dp)
+                                .background(if (selected) Palette.accentSoft else Palette.panel, RoundedCornerShape(14.dp))
+                                .border(
+                                    if (selected) 2.dp else 1.dp,
+                                    if (selected) Palette.accent else Palette.hairline,
+                                    RoundedCornerShape(14.dp),
+                                ),
+                            contentAlignment = Alignment.BottomCenter,
+                        ) {
+                            PetFace(height = 58.dp, look = look, pose = PetPose.IDLE)
+                        }
+                        Text(
+                            t(look.zh, look.en),
+                            color = if (selected) Palette.accent else Palette.secondary,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+                Column(
+                    Modifier.width(66.dp).clickable {
+                        pickCustomPet { look ->
+                            if (look != null) {
+                                v["pet_character"] = look.id
+                                petsChanged++
+                            }
+                        }
+                    },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        Modifier.size(66.dp)
+                            .background(Palette.panel, RoundedCornerShape(14.dp))
+                            .border(1.dp, Palette.hairline, RoundedCornerShape(14.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("+", color = Palette.secondary, fontSize = 22.sp)
+                    }
+                    Text(
+                        t("加图片", "Add"),
+                        color = Palette.secondary,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+            val pickedLook = looks.firstOrNull { it.id == picked }
+            if (pickedLook != null && pickedLook.custom) {
+                Row(Modifier.padding(top = 8.dp)) {
+                    Pill(t("移除这张", "Remove")) {
+                        PetLibrary.removeCustom(pickedLook)
+                        v["pet_character"] = PetLibrary.PRESETS.first().id
+                        petsChanged++
+                    }
+                }
+            }
+            RowLabel(t("大小", "Size"))
+            // A percentage of the character's own height, not a pixel size: 大 has to mean
+            // "bigger than what I am looking at" for a preset and for a photo alike.
+            SegmentedPicker(
+                listOf("80" to t("小", "Small"), "100" to t("中", "Medium"), "125" to t("大", "Large")),
+                v["pet_size"].orEmpty().ifEmpty { PetConfig.DEFAULT_SCALE.toString() },
+            ) { v["pet_size"] = it }
+            // The pick, drawn by the same function the desktop window uses. Without it the picker
+            // is a word: two looks and a picture have to be seen to be chosen.
+            Row(
+                Modifier.fillMaxWidth().padding(top = 12.dp),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                PetFace(height = 110.dp, look = PetLibrary.of(picked), pose = PetPose.IDLE)
+                Note(
+                    t(
+                        "她不是球换的皮：球负责听、说和情绪，她只负责陪。关掉桌宠不会影响任何功能。",
+                        "She is not a reskin of the ball: the ball listens, speaks and carries the mood, the pet is only " +
+                            "company. Turning the pet off affects no feature.",
+                    ),
+                )
+            }
         }
         // ---- 复盘: the review switch (the notebook itself is the sidebar card) ----
         Section(st("settings_section_notebook")) {
@@ -353,6 +477,9 @@ fun SettingsScreen(
                 Settings.save(v.toMap().minus("lang") + ("codeflying_key" to v["codeflying_key"].orEmpty().trim().takeIf { it != CodeFlyingBuild.key }.orEmpty()))
                 DesktopNotebook.book.notifyRule.set(notifyRule)
                 v["ball"]?.let { MacBall.pickLook(it) }
+                // The pet window reads Pet.config: reload after the file is written, or the
+                // card would save a new cat and keep showing the old one until a restart.
+                Pet.reload()
                 Thread { Assistant.ensure() }.start()
                 onDone()
             }

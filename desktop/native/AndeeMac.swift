@@ -12,6 +12,7 @@ import ApplicationServices
 import AVFoundation
 import CoreLocation
 import CoreGraphics
+import CoreImage
 import Foundation
 import ScreenCaptureKit
 import WebKit
@@ -454,6 +455,55 @@ public func andee_key(_ keyCode: Int32, _ flags: Int32) {
  * this process — the ball and the cards are never in the picture.
  * Returns 1 on success.
  */
+
+/**
+ * One frame from a ScreenCaptureKit stream.
+ *
+ * `SCScreenshotManager.captureImage` is the one-shot convenience and it is macOS 14-only, which
+ * meant this bridge could not be compiled with the Command Line Tools' 13 SDK — a machine without
+ * a full Xcode could not build the native half at all. A stream that is started, read once and
+ * stopped does the same job on 12.3+.
+ */
+@available(macOS 12.3, *)
+private func oneFrame(filter: SCContentFilter, configuration: SCStreamConfiguration) async throws -> CGImage {
+    final class Sink: NSObject, SCStreamOutput {
+        private let ready = DispatchSemaphore(value: 0)
+        private let lock = NSLock()
+        private var image: CGImage?
+
+        func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+            guard type == .screen else { return }
+            lock.lock()
+            let taken = image != nil
+            lock.unlock()
+            if taken { return }
+            guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+            let ci = CIImage(cvImageBuffer: buffer)
+            guard let cg = CIContext().createCGImage(ci, from: ci.extent) else { return }
+            lock.lock()
+            if image == nil { image = cg }
+            lock.unlock()
+            ready.signal()
+        }
+
+        func wait(_ milliseconds: Int) -> CGImage? {
+            _ = ready.wait(timeout: .now() + .milliseconds(milliseconds))
+            lock.lock()
+            defer { lock.unlock() }
+            return image
+        }
+    }
+
+    let sink = Sink()
+    let stream = SCStream(filter: filter, configuration: configuration, delegate: nil)
+    try stream.addStreamOutput(sink, type: .screen, sampleHandlerQueue: DispatchQueue(label: "andee.shot"))
+    try await stream.startCapture()
+    let image = sink.wait(2500)
+    try? await stream.stopCapture()
+    guard let image else { throw NSError(domain: "andee.screenshot", code: 1, userInfo: [NSLocalizedDescriptionKey: "no frame in 2.5 s"]) }
+    return image
+}
+
 @_cdecl("andee_screenshot")
 public func andee_screenshot(_ path: UnsafePointer<CChar>, _ maxSide: Int32) -> Int32 {
     let out = URL(fileURLWithPath: String(cString: path))
@@ -474,7 +524,7 @@ public func andee_screenshot(_ path: UnsafePointer<CChar>, _ maxSide: Int32) -> 
             if maxSide > 0 && longSide > Double(maxSide) { let k = Double(maxSide) / longSide; w *= k; h *= k }
             cfg.width = Int(w); cfg.height = Int(h)
             cfg.showsCursor = false
-            let img = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: cfg)
+            let img = try await oneFrame(filter: filter, configuration: cfg)
             let rep = NSBitmapImageRep(cgImage: img)
             if let png = rep.representation(using: .png, properties: [:]) { try png.write(to: out); box.ok = 1 }
         } catch {
@@ -516,6 +566,32 @@ public func andee_float_window(_ title: UnsafePointer<CChar>) -> Int32 {
         w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         w.hidesOnDeactivate = false
         w.hasShadow = false
+    }
+    return NSApp == nil ? 0 : 1
+}
+
+/// Let clicks through a window of ours, or stop letting them through.
+///
+/// The full-canvas pet needs this: the window covers the whole screen so the pet can be drawn
+/// anywhere without moving a window, and it must be transparent to the mouse everywhere except the
+/// pet herself. Returns 1 when this process has a window with that title.
+/// Whether a physical mouse button is down right now (bit 0 = left).
+///
+/// The pet drags off this and the cursor position, not off the window's event stream: the moment she
+/// follows the pointer the window moves too, macOS retargets the pointer, and the stream dies
+/// mid-drag. Button state and cursor position are global facts and cannot be retargeted.
+@_cdecl("andee_mouse_down")
+public func andee_mouse_down() -> Int32 {
+    Int32(NSEvent.pressedMouseButtons & 1)
+}
+
+@_cdecl("andee_set_ignore_mouse")
+public func andee_set_ignore_mouse(_ title: UnsafePointer<CChar>, _ ignore: Int32) -> Int32 {
+    let t = String(cString: title)
+    let on = ignore != 0
+    DispatchQueue.main.async {
+        guard let w = NSApp?.windows.first(where: { $0.title == t }) else { return }
+        w.ignoresMouseEvents = on
     }
     return NSApp == nil ? 0 : 1
 }
