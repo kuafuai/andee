@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`24` / `"0.12.0"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`25` / `"0.12.1"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,43 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.12.1] - 2026-11-06
+
+**大肥鱼 was somebody else's mascot. The slot now uses our own.**
+
+The whale girl was drawn after DeepSeek's logo — another company's mascot turned into a person. She is
+replaced by **Andee娘**, the plush ball from the brand illustrations as a cat-eared girl: its periwinkle
+felt and peach rim glow, its two tiny horns in front of fluffy cat ears, paw-pad mittens, a cat tail, and
+the core worn like a bell.
+
+### Changed
+
+- **Andee娘 replaces 大肥鱼 as a pet look.** Same slot, same idea applied to our own character instead of
+  someone else's: periwinkle felt with the peach rim glow, tiny horns in front of cat ears, a puffy plush
+  hoodie with paw-pad mittens, a cat tail, the core worn like a bell. The fins, the whale tail and the maid
+  dress are gone, along with every fish drawing on both bodies (72 files out, 72 in).
+  - **Nobody's saved choice is lost.** The new id is `andee-girl`, and a saved `fish` — plus the
+    `lady` / `blue-girl` that already pointed at it — reads as her. The Mac's look shelf now canonicalises
+    the saved value before highlighting it; before this, a renamed id highlighted nothing at all.
+  - **Same voice and the same manner** (a sweet, soft, slightly shy female voice, earnest about the work).
+    The fish-and-snacks lines are gone; in their place are rare cat touches, kept rarer than the kitten
+    look's so the two do not read as each other.
+
+### Fixed
+
+- **Every pose edit came back as the reference image on a painted room.** `tools/pet_sprites.py` had a
+  semicolon inside one pose prompt, and `curl -F` reads a `;` in a field value as the start of a **field
+  attribute** — it then drops the rest of that value **with no warning**. So the prompt, including the
+  request for a transparent background, was silently cut in half. The prompt now goes out through
+  `--form-string`, which takes its value literally.
+
+### Documentation
+
+- The three previous releases' notes (v0.10.0, v0.11.0, v0.12.0) each stated a `versionCode` one lower
+  than it was, and all three published Release pages were corrected. The tags were never wrong — their
+  annotation bodies were written from the real change — and no package needed rebuilding: the number in
+  the APK was always right, only the description of it was not.
 
 ## [0.12.0] - 2026-11-05
 
