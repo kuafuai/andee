@@ -222,21 +222,24 @@ ANDEE_STYLE = (
     "warm peach rim glow, kawaii, readable at small sizes, no outlines. "
 )
 # The pose texts were written for a figure with legs and a tail; the ball has neither.
-NO_LEGS = {"cat": "It is a small kitten on four paws: wherever the text below mentions hands, arms, a phone, a cup, chopsticks or a shield, show it with the paws, the tail, the ears and the face, holding a prop in its front paws when there is one. ", "andee": "It is a round ball with two little paws and no legs, feet, knees or tail: wherever the text below "
+NO_LEGS = {"andee-girl": "Keep her cat ears, her cat tail, her tiny horns and her paw mittens; show feelings with the ears and tail too. ", "cat": "It is a small kitten on four paws: wherever the text below mentions hands, arms, a phone, a cup, chopsticks or a shield, show it with the paws, the tail, the ears and the face, holding a prop in its front paws when there is one. ", "andee": "It is a round ball with two little paws and no legs, feet, knees or tail: wherever the text below "
            "mentions those, show the feeling with the body's tilt, the paws, the eyes and the horns instead. "}
 BRAND = os.path.join(ROOT, "images", "brand", "illustrations")
 
-# 大肥鱼 (2026-11-05): a chubby little whale-girl maid, after the meme the user pointed at — drawn as our own
-# character from a description, not from those pictures, so it is not a copy of somebody else's art.
-FISH = (
-    "Chibi anime girl mascot for an AI companion named Andee, about 2.5 heads tall, full body, standing, facing the "
-    "viewer, a little chubby and round. Long wavy deep navy-blue hair fading to light sky-blue at the ends, a big "
-    "curled ahoge, soft round cheeks with pink blush, huge round sky-blue eyes with white glints, a small shy pout. "
-    "Two small dark-blue whale-fin ears with pale undersides sticking out sideways from the hair, a small light-blue "
-    "ribbon on one side, and a chubby dark-blue whale tail with a pale belly stripe curling out behind. A cute "
-    "navy-and-white maid outfit: a frilly white maid headband, a navy long-sleeved dress with white frilly cuffs and "
-    "collar, a navy bow, a white apron with a tiny whale embroidered on it, and a small round glowing cobalt-blue "
-    "core brooch. "
+# Andee娘 (2026-11-06, replacing 大肥鱼): the plush ball itself, turned into a girl — the way 大肥鱼 was a whale logo
+# turned into one, but from our own mascot (`images/brand/illustrations/`) and nobody else's. Everything in her comes
+# off the ball: the fuzzy periwinkle-blue felt, the two blue horns, the glossy eyes with two glints, the round mitten
+# paws, the peach rim glow, the coral motion marks. No fins, no tail, no maid dress — those were the whale's.
+ANDEE_GIRL = (
+    "Super cute chibi anime catgirl mascot for an AI companion named Andee, about 2.3 heads tall, full body, standing, "
+    "facing the viewer, small and round. Soft fluffy periwinkle-blue hair, a short rounded bob with a puffy fringe and "
+    "a little ahoge, a warm peach glow along its edge. Two big fluffy periwinkle-blue cat ears with pale peach inner "
+    "fur on top of her head, and two tiny rounded periwinkle-blue horns peeking out at the hairline in front of them. "
+    "Huge round sparkling deep-blue eyes, each with two bright white glints, rosy peach blush, a tiny cat mouth 'ω' "
+    "smile, a sweet shy look. A puffy oversized periwinkle-blue plush hoodie dress with peach trim, long sleeves "
+    "ending in round paw mittens with little pink paw pads, a peach ribbon collar with a small round glowing "
+    "cobalt-blue core charm hanging like a bell. A fluffy periwinkle-blue cat tail with a peach tip curling up behind "
+    "her. White knee socks and round soft blue shoes. Adorable, kawaii, moe. "
 )
 # 小猫 (2026-11-05, replacing the gentle boyfriend): a round little kitten, with Andee's horns and core.
 CAT = (
@@ -246,10 +249,10 @@ CAT = (
     "paw pads, a long fluffy tail curling round. Two tiny rounded horns with coral tips between the ears, a small "
     "coral collar with a little round glowing cobalt-blue core charm. "
 )
-LOOKS = {"cat": CAT, "fish": FISH, "andee": ANDEE, "girl": GIRL, "boy": BOY, "blue-girl": BLUE_GIRL, "blue-boy": BLUE_BOY, "lady": LADY, "beau": BEAU}
+LOOKS = {"cat": CAT, "andee-girl": ANDEE_GIRL, "andee": ANDEE, "girl": GIRL, "boy": BOY, "blue-girl": BLUE_GIRL, "blue-boy": BLUE_BOY, "lady": LADY, "beau": BEAU}
 
 # 缩到多高(px)。资源是 2x 的,运行时高度取 PetLook.baseHeight。
-HEIGHT = {"cat": 760, "fish": 820, "andee": 700, "girl": 820, "boy": 820, "blue-girl": 820, "blue-boy": 820, "lady": 820, "beau": 820}
+HEIGHT = {"cat": 760, "andee-girl": 820, "andee": 700, "girl": 820, "boy": 820, "blue-girl": 820, "blue-boy": 820, "lady": 820, "beau": 820}
 
 # 裁边后保留的空隙:占长边的比例。窗口紧贴身体,空隙越大挡住的点击越多。
 PAD = 0.008
@@ -293,7 +296,7 @@ def generate(look, pose):
             Image.open(os.path.join(BRAND, f"{name}.webp")).convert("RGBA").save(png)
             refs += ["-F", f"image[]=@{png};type=image/png"]
         args = ["-F", "model=" + MODEL] + refs + ["-F", "size=1024x1024", "-F", "background=transparent",
-                "-F", "output_format=png", "-F", "prompt=" + desc + "Calm and content, a gentle closed-mouth smile, "
+                "-F", "output_format=png", "--form-string", "prompt=" + desc + "Calm and content, a gentle closed-mouth smile, "
                 "both paws resting low at the sides of the body, looking at the viewer. " + ANDEE_STYLE + FRAME]
         return post(API + "/images/edits", args)
     if pose == "idle":
@@ -301,9 +304,11 @@ def generate(look, pose):
         return post(API + "/images/generations",
                     ["-H", "Content-Type: application/json", "--data-binary", json.dumps(body)])
     ref = reference(look)
+    # --form-string, not -F: curl reads a ';' inside an -F value as the start of a field attribute and silently drops
+    # the rest of the prompt (one pose text with a semicolon came back as the reference on a painted backdrop).
     args = ["-F", "model=" + MODEL, "-F", f"image=@{ref};type=image/png", "-F", "size=1024x1536",
             "-F", "background=transparent", "-F", "output_format=png",
-            "-F", "prompt=" + KEEP + NO_LEGS.get(look, "") + POSES[pose] + STYLE_OF.get(look, STYLE) + FRAME]
+            "--form-string", "prompt=" + KEEP + NO_LEGS.get(look, "") + POSES[pose] + STYLE_OF.get(look, STYLE) + FRAME]
     return post(API + "/images/edits", args)
 
 

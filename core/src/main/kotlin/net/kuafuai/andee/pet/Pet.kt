@@ -71,20 +71,20 @@ object PetCharacters {
     /**
      * Five characters (2026-11-05). Andee itself — the plush ball of the brand illustrations — is first and is the
      * default; the cream girl is plain Andee drawn as a girl. The cobalt pair that used to be here were the same two
-     * drawn in blue, and the quiet girl after them was replaced by the chubby fish; a saved `blue-girl` / `lady` reads as the fish and `blue-boy` / `beau` (the gentle boyfriend, replaced by the kitten) as the kitten ([byId]).
+     * drawn in blue, and the quiet girl after them was replaced by 大肥鱼, a whale girl, and she on 2026-11-06 by Andee娘 — the plush ball itself as a girl; a saved `blue-girl` / `lady` / `fish` reads as Andee娘 and `blue-boy` / `beau` (the gentle boyfriend, replaced by the kitten) as the kitten ([byId]).
      */
     val PRESETS = listOf(
         PetCharacter("andee", "Andee", "Andee", baseHeight = 120),
         PetCharacter("girl", "奶油金", "Cream", baseHeight = 210),
         PetCharacter("boy", "奶油金·短发", "Cream short", baseHeight = 215,
             voice = "zh_male_yangguangqingnian_uranus_bigtts", persona = PetPersonas.CREAM_SHORT),
-        PetCharacter("fish", "大肥鱼", "Chubby fish", baseHeight = 200,
-            voice = "zh_female_tianmeixiaoyuan_uranus_bigtts", persona = PetPersonas.FISH),
+        PetCharacter("andee-girl", "Andee娘", "Andee girl", baseHeight = 200,
+            voice = "zh_female_tianmeixiaoyuan_uranus_bigtts", persona = PetPersonas.ANDEE_GIRL),
         PetCharacter("cat", "小猫", "Kitten", baseHeight = 150,
             voice = "zh_female_roumeinvyou_uranus_bigtts", persona = PetPersonas.CAT),
     )
 
-    private val RENAMED = mapOf("blue-girl" to "fish", "blue-boy" to "cat", "lady" to "fish", "beau" to "cat")
+    private val RENAMED = mapOf("blue-girl" to "andee-girl", "blue-boy" to "cat", "lady" to "andee-girl", "beau" to "cat", "fish" to "andee-girl")
 
     /** The id a saved value means now (a renamed preset reads as its successor). */
     fun canonical(id: String): String = RENAMED[id.trim()] ?: id.trim()
@@ -96,7 +96,7 @@ object PetCharacters {
     fun blurb(id: String, zh: Boolean): String = when (canonical(id)) {
         "andee" -> if (zh) "Andee 本尊：它自己的声音和脾气。" else "Andee itself: its own voice and manner."
         "boy" -> if (zh) "阳光少年：男声，爽快直接。" else "A sunny boy: a young man's voice, quick and direct."
-        "fish" -> if (zh) "大肥鱼：甜甜的女声，软软的、有点害羞，干活很认真，总惦记着吃。" else "A chubby little whale maid: a sweet voice, shy, earnest, always a little hungry."
+        "andee-girl" -> if (zh) "Andee娘：毛绒小球变成的猫耳女孩，甜甜的女声，软乎乎的，有点害羞，干活很认真。" else "Andee girl: the plush ball as a cat-eared girl — a sweet voice, soft, a little shy, earnest about the work."
         "cat" -> if (zh) "小猫：和小球的小猫同一个声音，有点傲娇，偶尔喵一声，其实很黏你。" else "A kitten: the ball kitten's voice, a bit proud, the odd meow, fond of you underneath."
         else -> if (zh) "就是 Andee：她自己的声音和脾气。" else "Plain Andee: her own voice and manner."
     }

@@ -15,7 +15,7 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "desktop", "src", "main", "resources", "pet")
 OUT = os.path.join(ROOT, "app", "src", "main", "assets", "pet")
-LOOKS = ["andee", "girl", "boy", "fish", "cat"]
+LOOKS = ["andee", "girl", "boy", "andee-girl", "cat"]
 STILL_H = 560
 FRAME_H = 520
 FRAMES = 12  # every other frame of the Mac's 20 is a smooth enough breath at the phone's size; see PhonePetView

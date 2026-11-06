@@ -232,7 +232,7 @@ fun SettingsScreen(
             // because the pet is one Andee drawn several ways, not a cast.
             var petsChanged by remember { mutableStateOf(0) }
             val looks = remember(petsChanged) { PetLibrary.all() }
-            val picked = v["pet_character"].orEmpty().ifEmpty { PetLibrary.PRESETS.first().id }
+            val picked = net.kuafuai.andee.pet.PetCharacters.canonical(v["pet_character"].orEmpty().ifEmpty { PetLibrary.PRESETS.first().id })
             Row(
                 Modifier.fillMaxWidth().padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
