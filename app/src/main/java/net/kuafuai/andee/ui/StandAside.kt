@@ -1,4 +1,5 @@
 package net.kuafuai.andee.ui
+import android.os.Build
 
 import android.view.View
 import android.view.WindowManager
@@ -28,6 +29,16 @@ object StandAside {
     private val entries = CopyOnWriteArrayList<Entry>()
     private val saved = mutableListOf<Saved>()
 
+    // `WindowManager.LayoutParams.blurBehindRadius` is API 31; even reading it
+    // on an older platform is a NoSuchFieldError. Blur itself is already gone
+    // below S (see Glass.frost), so the saved value is simply zero there.
+    private fun blurRadius(p: WindowManager.LayoutParams): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) p.blurBehindRadius else 0
+
+    private fun setBlurRadius(p: WindowManager.LayoutParams, value: Int) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) p.blurBehindRadius = value
+    }
+
     /** Set by the service: fold the main card (true) or put it back as it was (false). */
     @Volatile var host: ((aside: Boolean) -> Unit)? = null
 
@@ -47,17 +58,17 @@ object StandAside {
             for (e in entries) {
                 val v = e.view() ?: continue
                 val p = v.layoutParams as? WindowManager.LayoutParams ?: continue
-                saved += Saved(v, p.flags, p.alpha, p.blurBehindRadius)
+                saved += Saved(v, p.flags, p.alpha, blurRadius(p))
                 p.alpha = 0f
                 p.flags = (p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) and
                     WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv()
-                p.blurBehindRadius = 0
+                setBlurRadius(p, 0)
                 runCatching { e.wm.updateViewLayout(v, p) }
             }
         } else {
             for (s in saved) {
                 val p = s.view.layoutParams as? WindowManager.LayoutParams ?: continue
-                p.flags = s.flags; p.alpha = s.alpha; p.blurBehindRadius = s.blur
+                p.flags = s.flags; p.alpha = s.alpha; setBlurRadius(p, s.blur)
                 val wm = entries.firstOrNull { it.view() === s.view }?.wm ?: continue   // closed meanwhile
                 runCatching { wm.updateViewLayout(s.view, p) }
             }

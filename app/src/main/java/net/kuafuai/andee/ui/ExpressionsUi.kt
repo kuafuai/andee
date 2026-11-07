@@ -1,4 +1,5 @@
 package net.kuafuai.andee.ui
+import net.kuafuai.andee.compat.WindowMetricsCompat
 
 import net.kuafuai.andee.ui.ball.label
 import android.annotation.SuppressLint
@@ -202,7 +203,7 @@ class ExpressionsUi(
             View.MeasureSpec.makeMeasureSpec(cardWidth() - dp(44), View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
         )
-        val screenH = wm.currentWindowMetrics.bounds.height()
+        val screenH = WindowMetricsCompat.bounds(wm).height()
         val gridH = minOf(wrap.measuredHeight, (screenH * 0.34f).toInt())
         card.addView(
             grid,
@@ -362,7 +363,7 @@ class ExpressionsUi(
     }
 
     private fun cardWidth(): Int =
-        minOf(dp(460), (wm.currentWindowMetrics.bounds.width() * 0.94f).toInt())
+        minOf(dp(460), (WindowMetricsCompat.bounds(wm).width() * 0.94f).toInt())
 
     private fun dp(v: Int): Int = Glass.dp(context, v)
 

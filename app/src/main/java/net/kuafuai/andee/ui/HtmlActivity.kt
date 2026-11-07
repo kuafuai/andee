@@ -1,4 +1,5 @@
 package net.kuafuai.andee.ui
+import android.os.Build
 
 import android.annotation.SuppressLint
 import android.graphics.Color
@@ -333,10 +334,15 @@ class HtmlActivity : StageActivity() {
         // so the top inset is added to the bar's own padding and the page is pushed down by the bar's whole height.
         // (The old pill lost its taps to the status bar on the tablet for exactly this reason.)
         stage.setOnApplyWindowInsetsListener { _, insets ->
-            val top = insets.getInsets(
-                android.view.WindowInsets.Type.systemBars() or
-                    android.view.WindowInsets.Type.displayCutout(),
-            ).top
+            val top = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                insets.getInsets(
+                    android.view.WindowInsets.Type.systemBars() or
+                        android.view.WindowInsets.Type.displayCutout(),
+                ).top
+            } else {
+                @Suppress("DEPRECATION")
+                insets.systemWindowInsetTop
+            }
             bar.setTopInset(top)
             val lp = web?.layoutParams as? FrameLayout.LayoutParams
             val want = top + dpI(PageBar.HEIGHT_DP)

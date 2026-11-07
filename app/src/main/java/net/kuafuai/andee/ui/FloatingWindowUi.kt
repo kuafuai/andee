@@ -1,4 +1,6 @@
 package net.kuafuai.andee.ui
+import android.os.Build
+import net.kuafuai.andee.compat.WindowMetricsCompat
 
 import net.kuafuai.andee.ui.ball.label
 import android.animation.ValueAnimator
@@ -660,9 +662,13 @@ class FloatingWindowUi(
             // is exactly the "not fullscreen" look. Fit nothing so the card runs
             // from the display's top to its bottom; the toolbar steps around the
             // status bar itself in [insetTopBar].
-            fitInsetsTypes = 0
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            // `fitInsetsTypes` is API 30 and the cutout field is API 28. On
+            // older systems the overlay already spans the whole display.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) fitInsetsTypes = 0
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            }
         }
         // The folded ball's resting spot. [enterCompact] is the other place this
         // is set, and it is the one that usually runs — but show() adds the
@@ -1846,7 +1852,10 @@ class FloatingWindowUi(
         area.translationY = (dockTabUp() - side / 2).toFloat()
         // The right edge is where the system's back gesture starts; without this
         // a drag on the tab would be taken as "back".
-        v.systemGestureExclusionRects = listOf(Rect(0, 0, w, h))
+        // API 29. Below it there is no gesture-nav exclusion to ask for.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            v.systemGestureExclusionRects = listOf(Rect(0, 0, w, h))
+        }
         runCatching { wm.updateViewLayout(v, p) }
     }
 
@@ -1993,7 +2002,9 @@ class FloatingWindowUi(
         }
         area.translationX = 0f
         area.translationY = 0f
-        v.systemGestureExclusionRects = emptyList()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            v.systemGestureExclusionRects = emptyList()
+        }
 
     }
 
@@ -2068,34 +2079,16 @@ class FloatingWindowUi(
      * layered *above* TYPE_APPLICATION_OVERLAY, while `FLAG_LAYOUT_NO_LIMITS`
      * lets us lay out underneath it.
      */
-    private fun bottomEdge(): Int {
-        val m = wm.currentWindowMetrics
-        val inset = m.windowInsets
-            .getInsetsIgnoringVisibility(
-                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
-            ).bottom
-        return m.bounds.bottom - inset
-    }
+    private fun bottomEdge(): Int =
+        WindowMetricsCompat.bounds(wm).bottom - WindowMetricsCompat.insets(wm).bottom
 
     /** Y of the top of the visible area: below the status bar and any cutout. */
-    private fun topEdge(): Int {
-        val m = wm.currentWindowMetrics
-        val inset = m.windowInsets
-            .getInsetsIgnoringVisibility(
-                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
-            ).top
-        return m.bounds.top + inset
-    }
+    private fun topEdge(): Int =
+        WindowMetricsCompat.bounds(wm).top + WindowMetricsCompat.insets(wm).top
 
     /** X of the right edge of the visible area — where the ball docks. */
-    private fun rightEdge(): Int {
-        val m = wm.currentWindowMetrics
-        val inset = m.windowInsets
-            .getInsetsIgnoringVisibility(
-                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
-            ).right
-        return m.bounds.right - inset
-    }
+    private fun rightEdge(): Int =
+        WindowMetricsCompat.bounds(wm).right - WindowMetricsCompat.insets(wm).right
 
     /**
      * Animated rather than teleported: a ball that jumps has not said anything
@@ -2275,7 +2268,7 @@ class FloatingWindowUi(
         // — and it has to, being the part that scrolls. Measured: with the band
         // taken from the window instead, the ball dropped from a 344 px radius
         // to 213 and every pixel of the card's upper half moved.
-        val bandH = if (typingTop > 0) wm.currentWindowMetrics.bounds.height() else h
+        val bandH = if (typingTop > 0) WindowMetricsCompat.bounds(wm).height() else h
         val ballH = (bandH * BALL_AREA_FRACTION).toInt()
         setBallAreaHeight(ballH)
         // The tips bar is measured, not reserved by a guessed constant: it is one
@@ -2830,9 +2823,14 @@ class FloatingWindowUi(
         val bar = topBarView ?: return
         val lp = bar.layoutParams as? FrameLayout.LayoutParams ?: return
         val insets = bar.rootWindowInsets ?: return
-        val want = dp(10) + insets.getInsetsIgnoringVisibility(
-            WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
-        ).top
+        val want = dp(10) + if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            insets.getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            ).top
+        } else {
+            @Suppress("DEPRECATION")
+            insets.systemWindowInsetTop
+        }
         if (lp.topMargin == want) return
         lp.topMargin = want
         bar.layoutParams = lp
@@ -2937,7 +2935,7 @@ class FloatingWindowUi(
             0,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                wm.currentWindowMetrics.bounds.height(),
+                WindowMetricsCompat.bounds(wm).height(),
                 Gravity.TOP,
             ),
         )
@@ -3548,7 +3546,7 @@ class FloatingWindowUi(
             if (e.actionMasked == MotionEvent.ACTION_DOWN) {
                 // Use display coordinates: a resized card's bottom can sit
                 // beside the input field, far above the phone's navigation edge.
-                val screenBottom = wm.maximumWindowMetrics.bounds.bottom
+                val screenBottom = WindowMetricsCompat.maxBounds(wm).bottom
                 homeSwipeTracking = !compact && signboard == null && typingTop == 0 &&
                     foldAnim?.isRunning != true &&
                     HomeSwipeRegion.contains(e.rawY, screenBottom, dp(HOME_SWIPE_STRIP_DP))
@@ -3569,7 +3567,7 @@ class FloatingWindowUi(
                     super.dispatchTouchEvent(cancel)
                     cancel.recycle()
                     homeSwipeCommitted = true
-                    android.util.Log.i("AndeeNavigation", "home swipe startY=$homeSwipeStartY rawY=${e.rawY} screenBottom=${wm.maximumWindowMetrics.bounds.bottom}")
+                    android.util.Log.i("AndeeNavigation", "home swipe startY=$homeSwipeStartY rawY=${e.rawY} screenBottom=${WindowMetricsCompat.maxBounds(wm).bottom}")
                     listeners.onHomeSwipe()
                 }
             }

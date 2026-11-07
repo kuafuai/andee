@@ -1,4 +1,5 @@
 package net.kuafuai.andee.ui
+import android.graphics.BitmapFactory
 
 import android.Manifest
 import android.app.Activity
@@ -581,21 +582,51 @@ class TextInputActivity : Activity() {
      * `ImageDecoder` applies the EXIF rotation, so a portrait photo arrives
      * upright.
      */
+
+    /**
+     * `ImageDecoder` is API 28. On 8.1 the same job is two passes with
+     * BitmapFactory — bounds first, so a 12-megapixel original is never held
+     * whole, then a sampled decode scaled to the long side. EXIF rotation is
+     * lost on that path; that is the honest cost of an OS without ImageDecoder.
+     */
+    private fun decodePhoto(uri: Uri): Bitmap {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return ImageDecoder.decodeBitmap(ImageDecoder.createSource(contentResolver, uri)) { d, info, _ ->
+                d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                val w = info.size.width
+                val h = info.size.height
+                val long = maxOf(w, h)
+                if (long > PHOTO_LONG_SIDE) {
+                    val s = PHOTO_LONG_SIDE.toFloat() / long
+                    d.setTargetSize((w * s).roundToInt().coerceAtLeast(1), (h * s).roundToInt().coerceAtLeast(1))
+                }
+            }
+        }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > PHOTO_LONG_SIDE * 2) sample *= 2
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        val raw = contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+            ?: throw IllegalStateException("cannot decode $uri")
+        val s = PHOTO_LONG_SIDE.toFloat() / maxOf(raw.width, raw.height)
+        if (s >= 1f) return raw
+        val scaled = Bitmap.createScaledBitmap(
+            raw,
+            (raw.width * s).roundToInt().coerceAtLeast(1),
+            (raw.height * s).roundToInt().coerceAtLeast(1),
+            true,
+        )
+        if (scaled !== raw) raw.recycle()
+        return scaled
+    }
+
     private fun load(uri: Uri, deleteAfter: File?) {
         decoding++
         val thumbPx = dp(THUMB_DP)
         worker.execute {
             val result = runCatching {
-                val bmp = ImageDecoder.decodeBitmap(ImageDecoder.createSource(contentResolver, uri)) { d, info, _ ->
-                    d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                    val w = info.size.width
-                    val h = info.size.height
-                    val long = maxOf(w, h)
-                    if (long > PHOTO_LONG_SIDE) {
-                        val s = PHOTO_LONG_SIDE.toFloat() / long
-                        d.setTargetSize((w * s).roundToInt().coerceAtLeast(1), (h * s).roundToInt().coerceAtLeast(1))
-                    }
-                }
+                val bmp = decodePhoto(uri)
                 val out = ByteArrayOutputStream()
                 bmp.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
                 val thumb = ThumbnailUtils.extractThumbnail(bmp, thumbPx, thumbPx)
@@ -713,7 +744,9 @@ class TextInputActivity : Activity() {
     }
 
     private fun hideKeyboard() {
-        runCatching { field.windowInsetsController?.hide(android.view.WindowInsets.Type.ime()) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            runCatching { field.windowInsetsController?.hide(android.view.WindowInsets.Type.ime()) }
+        }
         runCatching {
             (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
                 .hideSoftInputFromWindow(field.windowToken, 0)

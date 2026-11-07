@@ -961,4 +961,6 @@
     <string name="window_input_hint">Type to it…</string>
     <string name="window_voice_on">Voice on</string>
     <string name="window_muted">Muted</string>
+    <string name="check_title_platform">Android version too old</string>
+    <string name="check_detail_platform_old">This device runs Android %1$s (API %2$d), below Android 11. Screen capture, visual tap targeting and window blur need newer system APIs and are unavailable. Chat, voice, notebook and settings still work. Upgrade to Android 11 or later to restore them.</string>
 </resources>

@@ -232,9 +232,12 @@ object SelfCheck {
     fun run(context: Context, probe: Boolean = true): List<Finding> {
         val online = isOnline(context)
         val a11yIme = imeChannelOpen()
-        // listOfNotNull rather than listOf: one row only exists on API 33+ — see
-        // [postNotifications], which is where the reasoning lives.
+        // listOfNotNull rather than listOf: two rows exist only on certain API
+        // levels — [platformVersion] below 30, [postNotifications] from 33.
         return listOfNotNull(
+            // First, because it explains every other degraded screen tool on an
+            // old device. Amber, not red: the assistant still installs and talks.
+            platformVersion(),
             // Overlay first, ahead of the service itself. Both are hard gates,
             // but they fail in opposite directions: no accessibility service and
             // the app is visibly inert (nothing to run), no overlay grant and
@@ -1209,6 +1212,27 @@ object SelfCheck {
                 else -> R.string.check_detail_disk_ok
             },
             detailArgs = if (mb < 0) emptyList() else listOf(mb),
+        )
+    }
+
+    /**
+     * The one row that exists only on an old device.
+     *
+     * The package is deliberately installable down to API 27, but the screen
+     * tools are built on `AccessibilityService.takeScreenshot` (API 30) and
+     * the window geometry that arrived with it. Those paths are guarded, so
+     * nothing crashes — they simply have no picture to aim with. Amber rather
+     * than red because chat, voice, the notebook and settings all still work,
+     * and [Fix.Nothing] because no Settings screen can grant an OS upgrade.
+     */
+    private fun platformVersion(): Finding? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return null
+        return Finding(
+            id = "platform_version",
+            title = R.string.check_title_platform,
+            level = Level.WARN,
+            detail = R.string.check_detail_platform_old,
+            detailArgs = listOf(Build.VERSION.RELEASE, Build.VERSION.SDK_INT),
         )
     }
 

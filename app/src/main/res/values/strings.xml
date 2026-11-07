@@ -1042,4 +1042,6 @@
     <string name="window_input_hint">打字跟它说…</string>
     <string name="window_voice_on">朗读</string>
     <string name="window_muted">静音</string>
+    <string name="check_title_platform">系统版本偏低</string>
+    <string name="check_detail_platform_old">当前是 Android %1$s（API %2$d），低于 Android 11。屏幕截图、看图点击、窗口毛玻璃等依赖新系统接口的功能不可用；聊天、语音、笔记和设置仍可正常使用。升级到 Android 11 及以上即可恢复。</string>
 </resources>

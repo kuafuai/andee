@@ -1951,6 +1951,8 @@ class BodyCoreService : Service() {
      */
     private fun promoteWhileInUse(withCapture: Boolean) {
         val type = whileInUseType(withCapture) ?: return
+        // The 3-argument overload is API 29; below it there is no type to claim.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
         runCatching {
             startForeground(NOTIFY_BODY, buildNotification(), type)
         }.onFailure {

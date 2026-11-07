@@ -1,4 +1,5 @@
 package net.kuafuai.andee.ui
+import net.kuafuai.andee.compat.WindowMetricsCompat
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -105,10 +106,10 @@ class VaultUi(
     }
 
     private fun cardWidth(): Int =
-        minOf(dp(500), (wm.currentWindowMetrics.bounds.width() * 0.94f).toInt())
+        minOf(dp(500), (WindowMetricsCompat.bounds(wm).width() * 0.94f).toInt())
 
     private fun cardHeight(): Int =
-        minOf(dp(600), (wm.currentWindowMetrics.bounds.height() * 0.86f).toInt())
+        minOf(dp(600), (WindowMetricsCompat.bounds(wm).height() * 0.86f).toInt())
 
     // ---- build ----
 

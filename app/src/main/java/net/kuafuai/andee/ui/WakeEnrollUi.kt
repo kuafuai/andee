@@ -1,4 +1,5 @@
 package net.kuafuai.andee.ui
+import net.kuafuai.andee.compat.WindowMetricsCompat
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -282,7 +283,7 @@ class WakeEnrollUi(
     }
 
     private fun cardWidth(): Int =
-        minOf(dp(420), (wm.currentWindowMetrics.bounds.width() * 0.92f).toInt())
+        minOf(dp(420), (WindowMetricsCompat.bounds(wm).width() * 0.92f).toInt())
 
     private fun dp(v: Int): Int =
         (v * context.resources.displayMetrics.density).toInt()
