@@ -1,4 +1,5 @@
 package net.kuafuai.andee.config
+import android.os.Build
 
 import android.app.AlarmManager
 import android.app.NotificationChannel
@@ -83,9 +84,12 @@ object Scheduler {
     fun am(context: Context): AlarmManager =
         context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-    fun exactAllowed(context: Context): Boolean = runCatching {
-        am(context).canScheduleExactAlarms()
-    }.getOrDefault(false)
+    // The permission to ask about only exists from API 31. Before that exact
+    // alarms were unrestricted, so the honest answer is *true* — answering
+    // false sent every reminder on an old device down the inexact path.
+    fun exactAllowed(context: Context): Boolean =
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) true
+        else runCatching { am(context).canScheduleExactAlarms() }.getOrDefault(false)
 
     // ------------------------------------------------------------------
     // todos

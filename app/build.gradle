@@ -128,7 +128,13 @@ android {
 
     defaultConfig {
         applicationId "net.kuafuai.andee"
-        minSdk 30
+        // 27 (Android 8.1) is an *install* floor, not a feature floor. The
+        // screen tools are built on AccessibilityService.takeScreenshot (API 30),
+        // so on 27–29 the app installs, talks and runs, but cannot capture the
+        // screen. SelfCheck.platformVersion says so as an amber WARN instead of
+        // the installer refusing the whole package — see compat/WindowMetricsCompat
+        // and the SDK_INT guards in ScreenController / the window UIs.
+        minSdk 27
         targetSdk 34
         versionCode 25
         versionName "0.12.1"

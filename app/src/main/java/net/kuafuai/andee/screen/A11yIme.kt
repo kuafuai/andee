@@ -1,4 +1,5 @@
 package net.kuafuai.andee.screen
+import android.annotation.SuppressLint
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.InputMethod
@@ -38,6 +39,7 @@ import android.view.inputmethod.EditorInfo
  * is not there, because "not there" is an ordinary answer: nothing is focused
  * yet, the editor is self-drawn, the platform is too old.
  */
+@SuppressLint("NewApi")   // all API 33 paths are behind connection()'s SDK_INT guard
 object A11yIme {
 
     const val VIA = "a11y_ime"

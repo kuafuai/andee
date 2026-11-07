@@ -1,4 +1,5 @@
 package net.kuafuai.andee.ui
+import net.kuafuai.andee.compat.WindowMetricsCompat
 
 import android.annotation.SuppressLint
 import android.content.ContentValues
@@ -58,7 +59,7 @@ class WeChatQrUi(private val context: Context) {
     @SuppressLint("SetTextI18n")
     private fun build(frosted: Boolean): View {
         val lctx = AppLocale.wrap(context)
-        val width = minOf(dp(360), (wm.currentWindowMetrics.bounds.width() * 0.86f).toInt())
+        val width = minOf(dp(360), (WindowMetricsCompat.bounds(wm).width() * 0.86f).toInt())
         val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL

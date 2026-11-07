@@ -1,4 +1,5 @@
 package net.kuafuai.andee.ui
+import android.os.Build
 
 import android.content.Context
 import android.graphics.Canvas
@@ -112,9 +113,13 @@ class TapMarkerUi(private val context: Context) {
             // p.x/p.y are display pixels (the gesture's own), so the window must not
             // be offset by the system bars: by default an API 30+ window fits them,
             // and the mark was drawn a status bar's height below the real tap.
-            fitInsetsTypes = 0
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            // `fitInsetsTypes` is API 30 and the cutout field is API 28. On
+            // older systems the overlay already spans the whole display.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) fitInsetsTypes = 0
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            }
         }
         return try {
             v.hideFromAccessibility()

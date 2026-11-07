@@ -1,4 +1,5 @@
 package net.kuafuai.andee.screen
+import net.kuafuai.andee.compat.WindowMetricsCompat
 
 import android.app.Activity
 import android.content.Context
@@ -95,8 +96,7 @@ class ScreenCapture(private val context: Context) {
             }
         }, Handler(Looper.getMainLooper()))
 
-        val bounds = context.getSystemService(WindowManager::class.java)
-            .currentWindowMetrics.bounds
+        val bounds = WindowMetricsCompat.bounds(context.getSystemService(WindowManager::class.java))
         val w = bounds.width()
         val h = bounds.height()
         val dpi = context.resources.displayMetrics.densityDpi

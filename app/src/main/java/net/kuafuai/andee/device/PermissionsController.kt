@@ -54,7 +54,8 @@ class PermissionsController(private val context: Context) {
 
     private val catalog = listOf(
         Perm("location", "android.permission.ACCESS_FINE_LOCATION", null, R.string.dev_perm_feature_location),
-        Perm("steps", "android.permission.ACTIVITY_RECOGNITION", null, R.string.dev_perm_feature_steps),
+        Perm("steps", "android.permission.ACTIVITY_RECOGNITION", null, R.string.dev_perm_feature_steps,
+            api = Build.VERSION_CODES.Q),
         Perm("contacts", "android.permission.READ_CONTACTS", null, R.string.dev_perm_feature_contacts),
         Perm("call_phone", "android.permission.CALL_PHONE", null, R.string.dev_perm_feature_call_phone),
         Perm("call_log", "android.permission.READ_CALL_LOG", null, R.string.dev_perm_feature_call_log),

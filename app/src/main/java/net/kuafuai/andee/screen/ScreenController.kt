@@ -1,4 +1,7 @@
 package net.kuafuai.andee.screen
+import android.annotation.SuppressLint
+import android.os.Build
+import net.kuafuai.andee.compat.WindowMetricsCompat
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
@@ -1346,7 +1349,12 @@ class ScreenController(
         if (wait > 0) runCatching { Thread.sleep(wait) }
     }
 
+    @SuppressLint("NewApi")   // guarded by the SDK_INT check on the first line
     private fun <T> captureFrame(transform: (Bitmap) -> T): T? {
+        // AccessibilityService.takeScreenshot is API 30. Below that the screen
+        // tools have no pixels to aim with; returning null is the same answer
+        // a refused capture gives, and the checklist explains why.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
         // Two attempts, because this call is allowed to fail transiently:
         // takeScreenshot is rate-limited by the system (roughly one per
         // [CAPTURE_GAP_MS]) and answers ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT
@@ -2066,9 +2074,13 @@ class ScreenController(
                     ?: throw IllegalStateException("no input focus (tap into an input field first)")
             }
             try {
-                val performed = target.performAction(
-                    AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id
-                )
+                val performed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    target.performAction(
+                        AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id
+                    )
+                } else {
+                    false   // the field itself does not exist before API 30
+                }
                 // A WebView's editor often reports the action but does not act on
                 // it. [A11yIme.editorAction] asks the editor's own EditorInfo what
                 // it is (Send / Search / Next) and fires that, which is what its
@@ -2127,7 +2139,11 @@ class ScreenController(
      *   then crops it, and a crop carrying the full screen's grid lines and
      *   cell labels would put two contradictory grids on one image.
      */
+    @SuppressLint("NewApi")   // guarded by the SDK_INT check on the first line
     fun screenshot(reason: String = "tool", grid: Boolean = true): JSONObject {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            throw IllegalStateException("screenshot requires Android 11 (API 30) or newer")
+        }
         // Only a screenshot the brain ASKED for clears the fling streak. Every
         // internal capture (tap_after, fling_after, miss_shot) goes through
         // here too, and counting those would make the streak unbuildable.
@@ -3535,7 +3551,7 @@ class ScreenController(
     companion object {
         /** Full display size in the current rotation, system bars included — the space gestures and screenshots use. */
         fun displaySize(ctx: android.content.Context): android.graphics.Point {
-            val b = ctx.getSystemService(android.view.WindowManager::class.java).maximumWindowMetrics.bounds
+            val b = WindowMetricsCompat.maxBounds(ctx.getSystemService(android.view.WindowManager::class.java))
             return android.graphics.Point(b.width(), b.height())
         }
 

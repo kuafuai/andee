@@ -1,4 +1,5 @@
 package net.kuafuai.andee.ui
+import net.kuafuai.andee.compat.WindowMetricsCompat
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
@@ -473,13 +474,9 @@ object Glass {
      * as "display minus a gutter" spends its gutter on the bars — invisible on
      * a landscape tablet, flush against both bars on a portrait phone.
      */
-    fun usableSize(context: Context): Pair<Int, Int> {
-        val m = (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).currentWindowMetrics
-        val i = m.windowInsets.getInsetsIgnoringVisibility(
-            WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
-        )
-        return (m.bounds.width() - i.left - i.right) to (m.bounds.height() - i.top - i.bottom)
-    }
+    fun usableSize(context: Context): Pair<Int, Int> = WindowMetricsCompat.usableSize(
+        context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    )
 
     /**
      * Ask the compositor to blur behind this window. Returns whether it agreed.

@@ -1,4 +1,5 @@
 package net.kuafuai.andee.ui
+import net.kuafuai.andee.compat.WindowMetricsCompat
 
 import android.annotation.SuppressLint
 import android.content.ClipData
@@ -136,10 +137,10 @@ class NotebookUi(
     }
 
     private fun cardWidth(): Int =
-        minOf(dp(560), (wm.currentWindowMetrics.bounds.width() * 0.96f).toInt())
+        minOf(dp(560), (WindowMetricsCompat.bounds(wm).width() * 0.96f).toInt())
 
     private fun cardHeight(): Int =
-        minOf(dp(720), (wm.currentWindowMetrics.bounds.height() * 0.90f).toInt())
+        minOf(dp(720), (WindowMetricsCompat.bounds(wm).height() * 0.90f).toInt())
 
     // ---- build ----
 
