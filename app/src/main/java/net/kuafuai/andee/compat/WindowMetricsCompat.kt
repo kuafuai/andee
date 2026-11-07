@@ -63,11 +63,18 @@ object WindowMetricsCompat {
 
     /**
      * `getMetrics` describes the area an app window is given; `getRealMetrics`
-     * describes the whole display. Their difference *is* the navigation bar,
-     * on the side it happens to be on — which is more reliable on these ROMs
-     * than reading a hardcoded `navigation_bar_height` that may not be in use.
-     * The status bar has no such difference, so it comes from the framework's
-     * own dimension.
+     * describes the whole display. Their difference is **both** system bars,
+     * not just the navigation one: the app area excludes the status bar as
+     * well, so `real.height - app.height` already carries it. Subtracting the
+     * status bar a second time here put the bottom inset a status bar too low
+     * — the ball rested that far above the navigation bar, and every card was
+     * that much shorter.
+     *
+     * Which side the navigation bar sits on is not in the difference either:
+     * it is empty width when the bar is at the bottom and empty height when it
+     * is on a side, so whichever axis differs is the one that holds it. The
+     * width difference is still assumed to be the *right* bar, which is where
+     * every ROM this was measured on puts it in landscape.
      */
     @Suppress("DEPRECATION")
     private fun legacyInsets(wm: WindowManager): Insets {
@@ -79,7 +86,10 @@ object WindowMetricsCompat {
         val statusId = res.getIdentifier("status_bar_height", "dimen", "android")
         val top = if (statusId > 0) res.getDimensionPixelSize(statusId) else 0
         val side = (real.widthPixels - app.widthPixels).coerceAtLeast(0)
-        val bottom = (real.heightPixels - app.heightPixels).coerceAtLeast(0)
+        // The height difference counts the status bar too — take it out, or the
+        // two fields below describe three bars' worth of inset for a phone with
+        // two of them.
+        val bottom = (real.heightPixels - app.heightPixels - top).coerceAtLeast(0)
         return Insets(left = 0, top = top, right = side, bottom = bottom)
     }
 }
