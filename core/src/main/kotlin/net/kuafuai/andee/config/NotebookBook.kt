@@ -481,6 +481,20 @@ class NotebookBook(private val store: NotebookStore) {
                 append(" · ").append(t.what.take(120)).append('\n')
             }
         }
+        // Two records of one person are the failure the people card exists to avoid, and the review is the one
+        // turn with time to look at them. The device only says they look alike; whether they are is the review's.
+        val dupes = people.likelyDuplicates()
+        if (dupes.isNotEmpty()) {
+            if (isNotEmpty()) append('\n')
+            append("People who may be on record twice (").append(dupes.size).append(" groups):\n")
+            dupes.take(10).forEach { g ->
+                append("- ").append(g.joinToString(" | ") { p ->
+                    p.id + " " + p.name + (if (p.aliases.isNotEmpty()) " (" + p.aliases.joinToString("/") + ")" else "") +
+                        (if (p.channels.isNotEmpty()) " on " + p.channels.joinToString(", ") { c -> c.handle + (if (c.chat.isNotBlank()) "@" + c.chat else "") } else "") +
+                        (if (p.isOwner) " [the user]" else "")
+                }).append('\n')
+            }
+        }
     }.trimEnd()
 
     // ------------------------------------------------------------------

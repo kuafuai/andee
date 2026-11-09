@@ -35,7 +35,7 @@ data class BrainEvent(
         REVIEWED,
         /** A finished stretch of conversation was put away as a topic. */
         FOLDED,
-        DIARY, SELF, WIKI, PERSON, CARE, MEMORY, TODO, PLAN,
+        DIARY, SELF, WIKI, PERSON, PERSON_MERGED, CARE, MEMORY, TODO, PLAN,
         /** It read a wiki article — usually to show it to the user. [ref] opens it. */
         WIKI_READ,
         /** It opened a wiki article for the user to read. [ref] opens it again. */
@@ -78,6 +78,7 @@ data class BrainEvent(
                 } else null
                 "note.person" -> when (action) {
                     "upsert" -> if (ok("saved")) BrainEvent(Kind.PERSON, args.optString("name"), args.optString("impression")) else null
+                    "merge" -> if (r?.optBoolean("merged") == true) BrainEvent(Kind.PERSON_MERGED, "${r.optString("from_name")} → ${r.optString("into_name")}", args.optString("reason")) else null
                     else -> null
                 }
                 "note.cares" -> when (action) {

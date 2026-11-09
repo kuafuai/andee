@@ -68,6 +68,9 @@ class NotebookUi(
     /** The wiki article being read in the 维基 tab, or null for the list. */
     private var wikiOpen: String? = null
 
+    /** The person the user is merging away: the list then asks which record they are the same person as. */
+    private var mergeFrom: String? = null
+
     /** What reading [wikiOpen] came back with; null while it is still being read. */
     private var wikiArticle: Result<net.kuafuai.andee.wiki.Article>? = null
 
@@ -612,20 +615,66 @@ class NotebookUi(
         },
     )
 
+    /**
+     * Unconfirmed records are listed too, marked: the device writes them, and a record the user cannot see is one
+     * they cannot merge, confirm or delete. Merging is two taps — 合并 on the record that goes, then the one it is —
+     * with no confirmation, because 撤销 under 最近合并 takes it back for [People.UNDO_MS].
+     */
     private fun buildPeople(body: LinearLayout) {
-        val people = Notebook.people(context).all().filter { it.status == "active" }
+        val book = Notebook.people(context)
+        val people = book.all().filter { it.status == "active" || it.status == "unconfirmed" }
         if (people.isEmpty()) {
             body.addView(emptyState(lctx.getString(R.string.notebook_empty_people), lctx.getString(R.string.notebook_empty_people_hint)))
             return
         }
+        val from = mergeFrom?.let { id -> people.firstOrNull { it.id == id } }
+        if (from != null) {
+            val bar = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            bar.addView(label(lctx.getString(R.string.notebook_people_merge_pick, from.name), Glass.Type.CAPTION, Glass.SECONDARY), LinearLayout.LayoutParams(0, WRAP, 1f))
+            bar.addView(link(lctx.getString(R.string.common_cancel)) { mergeFrom = null; rebuild() })
+            addRow(body, bar)
+        }
         for (person in people) {
+            val picking = from != null && person.id != from.id && !(from.isOwner)
             val p = panel()
-            p.addView(label(person.name, Glass.Type.TITLE, Glass.TITLE, bold = true), matchWrap())
+            if (picking) {
+                p.isClickable = true
+                Glass.pressable(p)
+                p.setOnClickListener {
+                    book.merge(from!!.id, person.id, lctx.getString(R.string.notebook_people_merge_reason))
+                    mergeFrom = null
+                    rebuild()
+                }
+            }
+            val top = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            val title = person.name + if (person.status == "unconfirmed") "  · " + lctx.getString(R.string.notebook_people_unconfirmed) else ""
+            top.addView(label(title, Glass.Type.TITLE, Glass.TITLE, bold = true), LinearLayout.LayoutParams(0, WRAP, 1f))
+            if (from == null && !person.isOwner) {
+                top.addView(link(lctx.getString(R.string.notebook_people_merge)) { mergeFrom = person.id; rebuild() })
+            }
+            p.addView(top, matchWrap())
+            val also = person.aliases + person.channels.map { c -> c.handle + if (c.chat.isNotBlank()) "@" + c.chat else "" }
+            val shown = also.distinct().filter { it != person.name }
+            if (shown.isNotEmpty()) p.addView(label(shown.joinToString(" · "), Glass.Type.MICRO, Glass.MUTED, top = 2), matchWrap())
             if (person.relation.isNotBlank()) p.addView(label(person.relation, Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap())
             person.impressions.firstOrNull()?.let {
                 p.addView(md(it.text, Glass.PHOTO_INK, Glass.Type.CAPTION), matchWrap().apply { topMargin = dp(8) })
             }
             addRow(body, p)
+        }
+        val undoable = book.merges().filter { it.undoable }.take(5)
+        if (from == null && undoable.isNotEmpty()) {
+            body.addView(label(lctx.getString(R.string.notebook_people_merges), Glass.Type.CAPTION, Glass.MUTED, top = 8), matchWrap().apply { bottomMargin = dp(6) })
+            for (m in undoable) {
+                val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                val into = book.get(m.into)?.name.orEmpty()
+                row.addView(label("${m.fromName} → $into · ${m.reason}", Glass.Type.CAPTION, Glass.SECONDARY).apply {
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }, LinearLayout.LayoutParams(0, WRAP, 1f))
+                row.addView(link(lctx.getString(R.string.notebook_people_unmerge)) { book.unmerge(m.from); rebuild() })
+                addRow(body, row)
+            }
         }
     }
 

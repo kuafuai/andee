@@ -50,6 +50,7 @@ object TimelineEvents {
             BrainEvent.Kind.WIKI_READ -> t("翻出了维基：$s", "Opened a wiki article: $s")
             BrainEvent.Kind.WIKI_SHOWN -> t("给你看了维基：$s", "Showed you a wiki article: $s")
             BrainEvent.Kind.PERSON -> t("记下了一个人：$s", "Noted a person: $s")
+            BrainEvent.Kind.PERSON_MERGED -> t("合并成一个人：$s", "Merged into one person: $s")
             BrainEvent.Kind.CARE -> when (e.detail) {
                 "+" -> t("开始在意：$s", "Now cares about: $s")
                 "done" -> t("一件在意的事做完了", "A care is done")
@@ -95,7 +96,7 @@ object TimelineEvents {
         BrainEvent.Kind.FRIEND_TASK.name -> AndeeIcon.FRIENDS
         BrainEvent.Kind.REVIEWED.name, BrainEvent.Kind.FOLDED.name -> AndeeIcon.CHECK_CIRCLE
         BrainEvent.Kind.WIKI.name, BrainEvent.Kind.WIKI_READ.name, BrainEvent.Kind.WIKI_SHOWN.name, Body.PAGE.name -> AndeeIcon.DOCUMENT
-        BrainEvent.Kind.PERSON.name -> AndeeIcon.FACE
+        BrainEvent.Kind.PERSON.name, BrainEvent.Kind.PERSON_MERGED.name -> AndeeIcon.FACE
         BrainEvent.Kind.CARE.name, Body.WORK.name, Body.THOUGHT.name -> AndeeIcon.SPARKLE
         Body.BUBBLE.name, Body.BUBBLE_MUTED.name -> AndeeIcon.CHAT
         Body.MEETING.name -> AndeeIcon.MIC

@@ -645,6 +645,7 @@
     <string name="tl_wiki_read">翻出了维基：%1$s</string>
     <string name="tl_wiki_shown">给你看了维基：%1$s</string>
     <string name="tl_person">记下了一个人：%1$s</string>
+    <string name="tl_person_merged">合并成一个人：%1$s</string>
     <string name="tl_care_add">开始在意：%1$s</string>
     <string name="tl_care_done">一件在意的事做完了</string>
     <string name="tl_care_drop">放下了一件在意的事</string>
@@ -722,6 +723,12 @@
     <string name="notebook_empty_plan_hint">Andee 会在早上思考今天的打算</string>
     <string name="notebook_empty_people">还没有记录的人</string>
     <string name="notebook_empty_people_hint">Andee 会记住你提到的重要的人</string>
+    <string name="notebook_people_merge">合并</string>
+    <string name="notebook_people_merge_pick">「%1$s」是下面哪个人？点一下就合并成一个</string>
+    <string name="notebook_people_merge_reason">用户在小本本里合并的</string>
+    <string name="notebook_people_merges">最近合并</string>
+    <string name="notebook_people_unmerge">撤销</string>
+    <string name="notebook_people_unconfirmed">未确认</string>
     <string name="notebook_empty_wiki">维基还是空的</string>
     <string name="notebook_empty_wiki_hint">问 Andee 知识性的问题，它会保存到维基</string>
     <string name="notebook_self_heading">我是谁</string>

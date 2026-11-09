@@ -621,6 +621,7 @@
     <string name="tl_wiki_read">Opened a wiki article: %1$s</string>
     <string name="tl_wiki_shown">Showed you a wiki article: %1$s</string>
     <string name="tl_person">Noted a person: %1$s</string>
+    <string name="tl_person_merged">Merged into one person: %1$s</string>
     <string name="tl_care_add">Now cares about: %1$s</string>
     <string name="tl_care_done">A care is done</string>
     <string name="tl_care_drop">Let a care go</string>
@@ -698,6 +699,12 @@
     <string name="notebook_empty_plan_hint">Andee will think about today in the morning</string>
     <string name="notebook_empty_people">No people yet</string>
     <string name="notebook_empty_people_hint">Andee will remember important people you mention</string>
+    <string name="notebook_people_merge">Merge</string>
+    <string name="notebook_people_merge_pick">Which of these is “%1$s”? Tap one to merge them</string>
+    <string name="notebook_people_merge_reason">merged by the user in the notebook</string>
+    <string name="notebook_people_merges">Recent merges</string>
+    <string name="notebook_people_unmerge">Undo</string>
+    <string name="notebook_people_unconfirmed">unconfirmed</string>
     <string name="notebook_empty_wiki">Wiki is empty</string>
     <string name="notebook_empty_wiki_hint">Ask Andee knowledge questions</string>
     <string name="notebook_self_heading">Who I am</string>

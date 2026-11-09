@@ -2004,8 +2004,14 @@ object ToolSchemas {
         imported from the user's contacts. This is not a customer list: no stage, no score. What you think of them, what
         they said and did, what is owed each way, what you want to ask.
 
-        - `find` (query: name, alias or a handle) — read before you write: records are matched by channel, never merged.
-        - `upsert` (name, channel {kind, handle}, met_how, relation, impression + source, weight 1–5, aliases)
+        - `find` (query: name, alias or a handle) — read before you write.
+        - `upsert` (name, channel {kind, handle, chat}, met_how, relation, impression + source, weight 1–5, aliases).
+          One record per person. If someone on record may be the same person, nothing is written and you get them back
+          as `possible_same`: write again with their `id` if it is them, or with `new: true` if it is someone else.
+          A group nickname is a name *in that group*: give `chat` (the group's name) with it, so 「小王」 in one group is
+          not taken for 「小王」 in another. Leave `chat` empty for a private-chat name, an email or a phone number.
+        - `merge` (id, into, reason) — two records turned out to be one person: `id` goes into `into` and stops existing
+          (its old id still finds them). Merge only when you are sure, and say why; the user can take it back.
         - `log` (id, dir in|out, channel, gist, outcome) — what passed between you; `out` counts toward the day's reach.
         - `owe` / `settle` — what you owe them and what they said they would do (`dir` i_owe | they_owe, `due` epoch ms).
         - `ask` / `asked` — things you want to ask them, and ticking one off.
@@ -2018,12 +2024,15 @@ object ToolSchemas {
     """.trimIndent(),
             required = listOf("action"),
             props = mapOf(
-                "action" to propEnum("What to do", listOf("find", "upsert", "log", "owe", "settle", "ask", "asked", "may_reach")),
-                "id" to prop("string", "The person's id (from find)."),
+                "action" to propEnum("What to do", listOf("find", "upsert", "merge", "log", "owe", "settle", "ask", "asked", "may_reach")),
+                "id" to prop("string", "The person's id (from find). For merge: the record that goes away."),
+                "into" to prop("string", "For merge: the record that stays."),
+                "reason" to prop("string", "For merge: why they are the same person."),
+                "new" to prop("boolean", "For upsert: this is someone else than the possible_same you were shown."),
                 "query" to prop("string", "For find."),
                 "name" to prop("string", "For upsert."),
                 "aliases" to prop("array", "Other names they go by."),
-                "channel" to prop("object", "{kind: wechat|email|…, handle: how to find them there}"),
+                "channel" to prop("object", "{kind: wechat|email|…, handle: how to find them there, chat: the group the handle is a nickname in, if any}"),
                 "met_how" to prop("string", "How you met, one line."),
                 "relation" to prop("string", "What you make of them. Yours; the user may change it."),
                 "impression" to prop("string", "Something they said or did that shows what they are like."),

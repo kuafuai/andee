@@ -245,6 +245,10 @@ private fun seedLife() {
     b.selfhood.addCare("curiosity", "Discord 社区的运营节奏", "我不懂海外社区怎么做", "我自己想弄明白", 72.0, 0L)
     b.selfhood.writeDiary("今天群里有三个人问同一个安装问题，我有点在意：说明写得不够清楚，不是他们的错。\n\n我原以为周末会更热闹，结果反而最安静——这个判断错了。明天想先把**常见问题**整理成一页，再决定要不要在群里置顶。", emptyList())
     b.people.upsert("老王", null, net.kuafuai.andee.config.People.Channel("wechat", "王小明"), "交流群里认识的", "最早的一批用户，愿意帮忙测新版", "他说更喜欢*先看视频*再看文档" to "10-27 群聊", 4, null, null)
+    b.people.upsert("小王", null, net.kuafuai.andee.config.People.Channel("wechat", "小王", "B群"), "B群里问报价的", null, null, null, null, asNew = true)
+    b.people.unconfirmed("阿杰", net.kuafuai.andee.config.People.Channel("wechat", "阿杰"), "私聊问了安装")
+    val gone = b.people.upsert("王总", null, net.kuafuai.andee.config.People.Channel("wechat", "王总", "C群"), null, null, null, null, null, asNew = true)
+    b.people.find("老王").firstOrNull()?.let { b.people.merge(gone, it.id, "C群里的王总就是老王，他自己说的") }
     b.wiki.write(null, "交流群运营方案", "plan", "# 交流群运营方案（草稿）\n\n> 基于 10-28 前两周的群聊观察，**推断为主**。\n\n## 现状\n\n| 指标 | 值 | 来源 |\n|---|---|---|\n| 成员 | 312 | 群资料页 |\n| 日均发言 | 约 40 条 | 我数的 |\n\n## 下一步\n\n1. 写一页常见问题\n2. 每周五发一次更新\n   - 附 `changelog` 链接\n\n---\n\n参考：[发布页](https://github.com/kuafuai/andee/releases)", "群聊观察 + 我推断的", "first draft", null, null).getOrThrow()
     DesktopNotebook.drive.addThought("周末群里反而安静，我想知道是不是大家都在用、没遇到问题。")
     DesktopNotebook.drive.recordWork("c1", "Andee 交流群", "acted", "把常见问题的草稿写进了维基，等他看过再决定要不要置顶。", listOf("call_1"))

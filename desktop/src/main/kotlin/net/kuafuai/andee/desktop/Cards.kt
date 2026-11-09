@@ -403,17 +403,51 @@ private fun PlanTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
 
 @Composable
 private fun PeopleTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
-    val people = DesktopNotebook.book.people.all().filter { it.status == "active" }
-    
+    // Same as the phone's (NotebookUi.buildPeople): unconfirmed records listed and marked, merge in two taps with no
+    // confirmation, because 撤销 under 最近合并 takes it back.
+    val book = DesktopNotebook.book.people
+    val people = book.all().filter { it.status == "active" || it.status == "unconfirmed" }
+    var mergeFrom by remember { mutableStateOf<String?>(null) }
+
     if (people.isEmpty()) {
         EmptyState(if (zh) "还没有记录的人" else "No people yet",
             if (zh) "Andee 会记住你提到的重要的人" else "Andee will remember important people you mention")
         return
     }
-    
+    val from = mergeFrom?.let { id -> people.firstOrNull { it.id == id } }
+    if (from != null) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (zh) "「${from.name}」是下面哪个人？点一下就合并成一个" else "Which of these is “${from.name}”? Click one to merge them",
+                color = Palette.secondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            Text(if (zh) "取消" else "Cancel", color = Palette.accent, fontSize = 12.sp,
+                modifier = Modifier.clickable { mergeFrom = null }.padding(6.dp))
+        }
+        Spacer(Modifier.height(10.dp))
+    }
     for (person in people) {
-        PersonCard(person, onRefresh)
+        val pick = if (from != null && person.id != from.id) {
+            {
+                book.merge(from.id, person.id, if (zh) "用户在小本本里合并的" else "merged by the user in the notebook")
+                mergeFrom = null
+                onRefresh()
+            }
+        } else null
+        PersonCard(person, zh, onMerge = if (from == null && !person.isOwner) ({ mergeFrom = person.id }) else null, onPick = pick)
         Spacer(Modifier.height(12.dp))
+    }
+    val undoable = book.merges().filter { it.undoable }.take(5)
+    if (from == null && undoable.isNotEmpty()) {
+        Text(if (zh) "最近合并" else "Recent merges", color = Palette.muted, fontSize = 12.sp)
+        Spacer(Modifier.height(6.dp))
+        for (m in undoable) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${m.fromName} → ${book.get(m.into)?.name.orEmpty()} · ${m.reason}", color = Palette.secondary, fontSize = 12.sp,
+                    maxLines = 2, modifier = Modifier.weight(1f))
+                Text(if (zh) "撤销" else "Undo", color = Palette.accent, fontSize = 12.sp,
+                    modifier = Modifier.clickable { book.unmerge(m.from); onRefresh() }.padding(6.dp))
+            }
+            Spacer(Modifier.height(6.dp))
+        }
     }
 }
 
@@ -614,9 +648,29 @@ private fun CareCard(care: net.kuafuai.andee.config.Selfhood.Care, zh: Boolean, 
 }
 
 @Composable  
-private fun PersonCard(person: net.kuafuai.andee.config.People.Person, onRefresh: () -> Unit) {
-    Column(Modifier.fillMaxWidth().glassPanel(14).padding(14.dp)) {
-        Text(person.name, color = Palette.label, fontSize = 15.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
+private fun PersonCard(
+    person: net.kuafuai.andee.config.People.Person,
+    zh: Boolean,
+    onMerge: (() -> Unit)?,
+    onPick: (() -> Unit)?,
+) {
+    val base = Modifier.fillMaxWidth().glassPanel(14)
+    Column((if (onPick != null) base.clickable(onClick = onPick) else base).padding(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(person.name + if (person.status == "unconfirmed") (if (zh) "  · 未确认" else "  · unconfirmed") else "",
+                color = Palette.label, fontSize = 15.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                modifier = Modifier.weight(1f))
+            if (onMerge != null) {
+                Text(if (zh) "合并" else "Merge", color = Palette.accent, fontSize = 12.sp,
+                    modifier = Modifier.clickable(onClick = onMerge).padding(6.dp))
+            }
+        }
+        val also = (person.aliases + person.channels.map { c -> c.handle + if (c.chat.isNotBlank()) "@" + c.chat else "" })
+            .distinct().filter { it != person.name }
+        if (also.isNotEmpty()) {
+            Spacer(Modifier.height(2.dp))
+            Text(also.joinToString(" · "), color = Palette.muted, fontSize = 11.sp)
+        }
         if (person.relation.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
             Text(person.relation, color = Palette.secondary, fontSize = 12.sp)

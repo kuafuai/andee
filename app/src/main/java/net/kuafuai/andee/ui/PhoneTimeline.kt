@@ -50,6 +50,7 @@ object PhoneTimeline {
             BrainEvent.Kind.WIKI_READ -> s(c, R.string.tl_wiki_read, x)
             BrainEvent.Kind.WIKI_SHOWN -> s(c, R.string.tl_wiki_shown, x)
             BrainEvent.Kind.PERSON -> s(c, R.string.tl_person, x)
+            BrainEvent.Kind.PERSON_MERGED -> s(c, R.string.tl_person_merged, x)
             BrainEvent.Kind.CARE -> when (e.detail) {
                 "+" -> s(c, R.string.tl_care_add, x)
                 "done" -> s(c, R.string.tl_care_done)
