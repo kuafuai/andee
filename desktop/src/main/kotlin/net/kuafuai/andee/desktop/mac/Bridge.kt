@@ -53,6 +53,8 @@ object Bridge {
         fun andee_location(): Pointer
         fun andee_notif_since(afterId: Long): Pointer
         fun andee_notif_watch(cb: NotifCallback): Int
+        fun andee_notif_keep_awake(): Int
+        fun andee_notif_let_sleep()
     }
 
     private val lib: Lib? by lazy {
@@ -150,6 +152,18 @@ object Bridge {
     fun notifSince(afterId: Long): JSONObject = JSONObject(str(need().andee_notif_since(afterId)))
     /** Keep a strong reference to [cb]: JNA does not, and a collected callback is a crash. */
     fun notifWatch(cb: NotifCallback): Boolean = lib?.andee_notif_watch(cb) == 1
+
+    /**
+     * Stop macOS throttling this app while it watches the notification store.
+     *
+     * The watch is a dispatch source on the store's files, and App Nap is exactly the thing that slows
+     * one down when nobody has touched the machine — which is also the only time notifications matter.
+     * Deliberately allows idle system sleep: this must not keep a closed laptop awake.
+     */
+    fun notifKeepAwake(): Boolean = lib?.andee_notif_keep_awake() == 1
+
+    /** Give the exemption back, e.g. when the user turns the notification reader off. */
+    fun notifLetSleep() { lib?.andee_notif_let_sleep() }
 
     /** macOS virtual key codes the tools use. */
     object Keys {

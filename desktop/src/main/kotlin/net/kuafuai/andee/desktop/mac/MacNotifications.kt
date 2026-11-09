@@ -42,6 +42,17 @@ object MacNotifications {
     private const val SETTLE_MS = 10_000L
     private const val PER_HOUR = 40
 
+    /**
+     * The fallback read, every minute, whatever the file watcher says.
+     *
+     * The watcher is the reason a notification is noticed within seconds, and it is also a single point of
+     * failure: a dispatch source that never fires (App Nap, a coalesced event, a store that moved) means the
+     * message is not *late*, it is invisible — the app has no way to tell "nothing new" from "nobody told me".
+     * A read is one read-only SQLite query against a store this small; a minute of latency is a bad experience
+     * and an unbounded one is a bug.
+     */
+    private const val POLL_MS = 60_000L
+
     /** How often a held notification asks whether the turn is over, and how old it may get before it is not worth it. */
     private const val HELD_RETRY_MS = 3_000L
     private const val HELD_MAX_MS = 30 * 60 * 1000L
@@ -95,7 +106,32 @@ object MacNotifications {
         lastId = Bridge.notifLatestId()
         state = stateFor(lastId)
         Log.i(TAG, "notification store: $state (from record $lastId)")
+        watchStarted()
     }
+
+    /**
+     * The store is readable and the watcher is armed: stop macOS from throttling us, and start the read
+     * that does not depend on the watcher firing at all.
+     *
+     * Idempotent — [recheck] can arrive after a start that already did this.
+     */
+    private fun watchStarted() {
+        if (state != State.WATCHING) return
+        Bridge.notifKeepAwake()
+        if (polling) return
+        polling = true
+        exec.scheduleWithFixedDelay({ poll() }, POLL_MS, POLL_MS, TimeUnit.MILLISECONDS)
+        Log.i(TAG, "fallback read armed: every ${POLL_MS / 1000}s")
+    }
+
+    /** One read on the timer. On [exec], so it can never overlap the watcher's read. */
+    private fun poll() {
+        if (state != State.WATCHING) return
+        if (readScheduled) return // a read is already on its way; it will find this one too
+        readNew()
+    }
+
+    @Volatile private var polling = false
 
     /**
      * Decides [state] again, for the self-check card's 重新检测.
@@ -112,6 +148,7 @@ object MacNotifications {
         if (state == State.WATCHING) return
         state = stateFor(id)
         Log.i(TAG, "notification store re-checked: $state (from record $lastId)")
+        watchStarted()
     }
 
     /**
@@ -133,6 +170,7 @@ object MacNotifications {
         if (lastId < 0) return false
         val items = runCatching { Bridge.notifSince(lastId).optJSONArray("items") }.getOrNull() ?: return false
         if (items.length() == 0) return false
+        Log.i(TAG, "read ${items.length()} new record(s)")
         for (i in 0 until items.length()) {
             val r = items.getJSONObject(i)
             lastId = maxOf(lastId, r.optLong("id"))
@@ -172,6 +210,10 @@ object MacNotifications {
     }
 
     private fun deliver(n: JSONObject) {
+        // Wall clock against the notification's own delivered date: the number "why did this take so long"
+        // is really asking for. Every row on the timeline is written after this point, so without it a
+        // notification that waited ten minutes and one that waited ten seconds looked the same.
+        Log.i(TAG, "reached triage ${System.currentTimeMillis() - n.optLong("when")}ms after posting (${n.optString("app")})")
         val h = host ?: return
         if (h.busy()) {
             // Held, not dropped: looked at as soon as the turn is over (newest per app), so a rule asking for every

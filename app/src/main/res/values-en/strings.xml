@@ -645,6 +645,7 @@
     <string name="tl_morning">Thought out today\'s plan this morning</string>
     <string name="tl_held">A notification from %1$s came in while busy; kept for later</string>
     <string name="tl_capped">A notification from %1$s came in past the hourly limit; kept for later</string>
+    <string name="tl_listener_lost">Notification access dropped — I cannot see new messages until it is granted again</string>
     <string name="tl_diary_updated">Rewrote today\'s diary</string>
     <string name="tl_memory_updated">Updated a memory: %1$s</string>
     <string name="tl_plan_today_updated">Revised today\'s plan</string>

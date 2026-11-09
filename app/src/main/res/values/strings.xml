@@ -669,6 +669,7 @@
     <string name="tl_morning">早上想好了今天的打算</string>
     <string name="tl_held">收到 %1$s 的通知，正在忙，先放着</string>
     <string name="tl_capped">收到 %1$s 的通知，这个小时看得太多了，先放着</string>
+    <string name="tl_listener_lost">通知监听断了，重新连上之前新消息我看不到（自检里可以重新授权）</string>
     <string name="tl_diary_updated">改写了今天的日记</string>
     <string name="tl_memory_updated">更新了记忆：%1$s</string>
     <string name="tl_plan_today_updated">改了今天的打算</string>

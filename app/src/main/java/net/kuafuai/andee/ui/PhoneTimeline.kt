@@ -89,4 +89,14 @@ object PhoneTimeline {
     fun told(c: Context, app: String, line: String, original: String) = body(Body.TOLD, s(c, R.string.tl_told, app, line), original)
     fun held(c: Context, app: String, text: String) = body(Body.IGNORED, s(c, R.string.tl_held, app), text)
     fun capped(c: Context, app: String, text: String) = body(Body.IGNORED, s(c, R.string.tl_capped, app), text)
+
+    /**
+     * The notification listener is gone and a rebind did not bring it back.
+     *
+     * Not a filter and not a failure to decide — nothing arrived at all. It is
+     * on the timeline because it is otherwise the most confusing state the
+     * device can be in: every other row exists to explain a message it *did*
+     * something with, and here the honest news is that it can see nothing.
+     */
+    fun lostListener(c: Context) = body(Body.IGNORED, s(c, R.string.tl_listener_lost))
 }

@@ -688,6 +688,37 @@ private func notifQuery(_ dir: String, _ sql: String) -> [[String: Any]]? {
     return rows
 }
 
+/// Hold an App Nap exemption for as long as the notification store is being watched.
+///
+/// **The file watcher is the only thing that makes a notification visible**, and macOS is entitled to
+/// throttle a background app's dispatch sources and timers once nobody has touched the machine for a
+/// while. Measured on this Mac: a 飞书 message at 17:01 reached triage at 17:12:03, with the settle that
+/// follows a read accounting for exactly ten seconds of it — so the read itself, not the processing,
+/// was what the eleven minutes went into.
+///
+/// `userInitiatedAllowingIdleSystemSleep` and **not** `idleSystemSleepDisabled`: the first only says
+/// "do not throttle me", the second also refuses to let the Mac sleep, which on a laptop left open
+/// overnight is several hours of battery for a feature that is merely idle. Idempotent; the token is
+/// held once for the process.
+@_cdecl("andee_notif_keep_awake")
+public func andee_notif_keep_awake() -> Int32 {
+    if notifActivity != nil { return 1 }
+    notifActivity = ProcessInfo.processInfo.beginActivity(
+        options: [.userInitiatedAllowingIdleSystemSleep, .suddenTerminationDisabled, .automaticTerminationDisabled],
+        reason: "watching the notification store"
+    )
+    return notifActivity == nil ? 0 : 1
+}
+
+@_cdecl("andee_notif_let_sleep")
+public func andee_notif_let_sleep() {
+    if let t = notifActivity {
+        ProcessInfo.processInfo.endActivity(t)
+        notifActivity = nil
+    }
+}
+private var notifActivity: NSObjectProtocol?
+
 /// Can the store be read at all: the newest record id, -1 when it exists and refuses us (Full Disk Access),
 /// -2 when there is no store at any place this Mac's macOS is known to keep it.
 @_cdecl("andee_notif_latest_id")

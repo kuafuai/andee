@@ -7,6 +7,10 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- ConnectivityManager.getNetworkCapabilities needs this (not implied by INTERNET). -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Normal permission, granted at install, no prompt. Held only for the ten-second notification settle
+         (NotificationRelayService.KeepAwake): `Handler.postDelayed` counts uptime, which stops in Doze, so
+         without this a message on a locked phone waited for the screen to come on. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- App list: query-all is required on API 30+ to see other packages. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
