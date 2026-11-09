@@ -3826,6 +3826,12 @@ class BodyCoreService : Service() {
                 // An empty sentence is not a notice. Ask instead of saying
                 // nothing out loud and calling it handled.
                 if (verdict.line.isEmpty()) return false
+                // Someone who wrote to the user in private is someone they deal with: on record, by the device.
+                // Already off the main thread here (the relay's own worker).
+                val src = net.kuafuai.andee.brain.Source.fromNotification(n)
+                if (net.kuafuai.andee.brain.Source.worthRecording(src, startsTurn = false)) {
+                    net.kuafuai.andee.brain.Source.recordSpeaker(net.kuafuai.andee.config.Notebook.people(this), src)
+                }
                 ui.post { tellAboutNotification(n, verdict.line) }
             }
 
@@ -3938,7 +3944,20 @@ class BodyCoreService : Service() {
         // `notified`, not `submit`: this is not the user speaking, so it must
         // not reset the quiet-hour timer, it must queue behind a running turn
         // rather than cancel it, and it must run with the vault closed.
-        brain?.notified(notificationLookQuery(n, byUser))
+        //
+        // With the source: who wrote it and where, as the device read it, so the turn — and any turn it waits
+        // behind — answers the right person. Recording them touches the notebook, so not on the main thread.
+        if (brain != null) {
+            val query = notificationLookQuery(n, byUser)
+            Thread({
+                val src = net.kuafuai.andee.brain.Source.fromNotification(n).let { s ->
+                    if (net.kuafuai.andee.brain.Source.worthRecording(s, startsTurn = true)) {
+                        net.kuafuai.andee.brain.Source.recordSpeaker(net.kuafuai.andee.config.Notebook.people(this), s)
+                    } else s
+                }
+                brain.notified(query, src)
+            }, "NotifySource").start()
+        }
     }
 
     /**

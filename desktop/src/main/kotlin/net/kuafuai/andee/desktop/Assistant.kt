@@ -564,9 +564,9 @@ object Assistant {
             onFinal(clean)
             if (!muted) net.kuafuai.andee.desktop.voice.MacVoice.speak(line)
         }
-        override fun act(text: String) {
+        override fun act(text: String, source: net.kuafuai.andee.brain.Source) {
             busy(true)
-            ensure().notified(text)
+            ensure().notified(text, source)
         }
     }
 

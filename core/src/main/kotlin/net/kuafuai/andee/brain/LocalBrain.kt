@@ -177,6 +177,13 @@ class LocalBrain(
     private val pendingWakes = ArrayDeque<Queued>()
 
     /**
+     * Where the running turn came from, or null for one the user started here. Set in [launch], cleared with
+     * [currentKind] in its `finally`; the loop thread is the only writer.
+     */
+    @Volatile var turnSource: Source? = null
+        private set
+
+    /**
      * A turn waiting its turn. [onAnswer] rides with it for the same reason the
      * kind does: a task another device handed us must still send its answer back
      * when it happened to arrive while something else was running.
@@ -187,6 +194,8 @@ class LocalBrain(
         val onAnswer: ((String?) -> Unit)? = null,
         /** [TurnKind.WORK] only: the territory it was given, applied when it actually runs. */
         val territory: String? = null,
+        /** Where it came from ([Source]), so a turn that waited still knows who asked. */
+        val source: Source? = null,
     )
 
     /**
@@ -404,7 +413,7 @@ class LocalBrain(
      * evening on their behalf. And it runs as [TurnKind.NOTIFY], which is what
      * closes the vault for the duration.
      */
-    fun notified(text: String) {
+    fun notified(text: String, source: Source? = null) {
         val t = text.trim()
         if (t.isEmpty()) return
         if (cfg.apiKey.isEmpty()) return // nothing triaged it either; see NotificationTriage
@@ -413,10 +422,10 @@ class LocalBrain(
             if (stoppedSince(epoch, t, TurnKind.NOTIFY)) return@execute
             if (busy.get()) {
                 host.logInfo(TAG, "notification queued behind a running turn: ${t.take(60)}")
-                pendingWakes.addLast(Queued(t, TurnKind.NOTIFY))
+                pendingWakes.addLast(Queued(t, TurnKind.NOTIFY, source = source))
                 return@execute
             }
-            launch(t, TurnKind.NOTIFY)
+            launch(t, TurnKind.NOTIFY, source = source)
         }
     }
 
@@ -551,11 +560,13 @@ class LocalBrain(
         images: List<String> = emptyList(),
         onAnswer: ((String?) -> Unit)? = null,
         territory: String? = null,
+        source: Source? = null,
     ) {
         val gen = generation.incrementAndGet()
         loop.execute {
             busy.set(true)
             currentKind = kind
+            turnSource = source
             runningWhat = describe(text, kind)
             aimMisses = 0
             reviewItems = if (kind.silent) mutableListOf() else null
@@ -604,6 +615,7 @@ class LocalBrain(
                 // dozen `return`s: leaving the kind set on any of them would
                 // make the *next* turn refuse every device tool.
                 currentKind = TurnKind.USER
+                turnSource = null
                 // The same place, for the same reason, and one more: the trace's
                 // idea of "the turn in flight" has to end with the turn even
                 // when the turn recorded almost nothing. `submit`'s missing-key
@@ -690,7 +702,7 @@ class LocalBrain(
         // A queued todo paused (or closed) by the turn it waited behind is skipped; the next one runs instead.
         while (todoWithdrawn(next.text)) next = pendingWakes.removeFirstOrNull() ?: return
         host.logInfo(TAG, "running a queued ${next.kind} turn: ${next.text.take(60)}")
-        launch(next.text, next.kind, onAnswer = next.onAnswer, territory = next.territory)
+        launch(next.text, next.kind, onAnswer = next.onAnswer, territory = next.territory, source = next.source)
     }
 
     /**
@@ -1159,6 +1171,8 @@ class LocalBrain(
                         } else {
                             "\n\n(other Andees you can ask with ask_friend; list_friends has detail)\n$friends"
                         } +
+                        // Who this turn came from, as the device recorded it. See [Source].
+                        (turnSource?.let { "\n\n" + it.forPrompt() } ?: "") +
                         // A task cut off at the step limit, so 继续 has something to continue. See [Unfinished].
                         unfinishedNote(),
                 )
