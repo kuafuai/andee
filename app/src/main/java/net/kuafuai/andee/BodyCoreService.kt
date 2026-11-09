@@ -3190,11 +3190,15 @@ class BodyCoreService : Service() {
             task: String, report: String, done: Boolean,
         ) {
             val brain = localBrain ?: return
+            // A task waiting on this friend gets its answer, and its record rides on the turn (Tasks.friendAnswered).
+            val book = net.kuafuai.andee.config.Notebook.notebook(this@BodyCoreService)
+            val ready = runCatching { book.tasks.friendAnswered(from.name, report) }.getOrDefault(emptyList())
+            val extra = ready.joinToString("") { "\n\nThis report answers something you are in the middle of:\n" + book.tasks.forPrompt(it) }
             waitForQuiet {
                 acceptBrainOutput = true
                 // A friend's report is somebody else's words, and runs as such: no vault, no scenes, no handing on.
                 brain.wake(
-                    net.kuafuai.andee.peer.PeerTasks.answerText(from, trust, task, report, done),
+                    net.kuafuai.andee.peer.PeerTasks.answerText(from, trust, task, report, done) + extra,
                     untrusted = trust != net.kuafuai.andee.peer.PeerStore.Trust.OWN,
                 )
             }
@@ -3808,6 +3812,7 @@ class BodyCoreService : Service() {
                 n, net.kuafuai.andee.config.VoiceConfig.uiLanguage(this), scene,
                 rule = net.kuafuai.andee.config.Notebook.notifyRule(this).text(),
                 guard = net.kuafuai.andee.config.Notebook.guard(this).text(),
+                awaited = net.kuafuai.andee.brain.NotifyTasks.awaited(net.kuafuai.andee.config.Notebook.notebook(this), n),
             ) ?: return false
         when (verdict.action) {
             net.kuafuai.andee.brain.NotificationTriage.Action.IGNORE -> {
@@ -3828,10 +3833,7 @@ class BodyCoreService : Service() {
                 if (verdict.line.isEmpty()) return false
                 // Someone who wrote to the user in private is someone they deal with: on record, by the device.
                 // Already off the main thread here (the relay's own worker).
-                val src = net.kuafuai.andee.brain.Source.fromNotification(n)
-                if (net.kuafuai.andee.brain.Source.worthRecording(src, startsTurn = false)) {
-                    net.kuafuai.andee.brain.Source.recordSpeaker(net.kuafuai.andee.config.Notebook.people(this), src)
-                }
+                net.kuafuai.andee.brain.NotifyTasks.told(net.kuafuai.andee.config.Notebook.notebook(this), n)
                 ui.post { tellAboutNotification(n, verdict.line) }
             }
 
@@ -3949,13 +3951,11 @@ class BodyCoreService : Service() {
         // behind — answers the right person. Recording them touches the notebook, so not on the main thread.
         if (brain != null) {
             val query = notificationLookQuery(n, byUser)
+            // And if it answers something a task was waiting for, that task's record rides along (NotifyTasks).
             Thread({
-                val src = net.kuafuai.andee.brain.Source.fromNotification(n).let { s ->
-                    if (net.kuafuai.andee.brain.Source.worthRecording(s, startsTurn = true)) {
-                        net.kuafuai.andee.brain.Source.recordSpeaker(net.kuafuai.andee.config.Notebook.people(this), s)
-                    } else s
-                }
-                brain.notified(query, src)
+                val turn = net.kuafuai.andee.brain.NotifyTasks.turn(net.kuafuai.andee.config.Notebook.notebook(this), n)
+                net.kuafuai.andee.brain.NotifyTasks.answeredEvents(turn).forEach { net.kuafuai.andee.ui.PhoneTimeline.brain(this, it) }
+                brain.notified(query + turn.extra, turn.source)
             }, "NotifySource").start()
         }
     }

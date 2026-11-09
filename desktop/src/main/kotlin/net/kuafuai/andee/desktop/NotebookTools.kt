@@ -33,7 +33,7 @@ object DesktopNotebook {
     /** For [LifeTools.callId]: the tool call id (set at call time); a diary page may point at today's work turns' calls. */
     @Volatile var callBeingRun: String = ""
     val life by lazy {
-        net.kuafuai.andee.config.LifeTools(book.selfhood, book.people, book.wiki, callId = { callBeingRun })
+        net.kuafuai.andee.config.LifeTools(book.selfhood, book.people, book.wiki, callId = { callBeingRun }, tasks = book.tasks)
             .apply { todaysCalls = { drive.todaysCalls() } }
     }
 
@@ -169,6 +169,9 @@ class NotebookTools(private val onSceneChanged: (String?) -> Unit) {
             ).handle(p)
 
             in net.kuafuai.andee.config.LifeTools.METHODS -> DesktopNotebook.life.handle(method, p).also { r ->
+                // A task's time wait is a todo; the timer is the body's to set, and to take down when the task closes.
+                r.optString("arm_todo").takeIf { it.isNotEmpty() }?.let { id -> book.todoById(id)?.let(DesktopScheduler::arm) }
+                r.optJSONArray("cancel_todos")?.let { a -> for (i in 0 until a.length()) DesktopScheduler.cancel(a.optString(i)) }
                 // wiki_write show=true: open what was just written — not from a quiet turn, where nobody asked to see it.
                 if (method == "note.wiki_write" && p.optBoolean("show") && !silent && r.optBoolean("written")) {
                     r.optJSONObject("meta")?.optString("id")?.takeIf { it.isNotEmpty() }?.let { Assistant.openScreen("wiki:$it"); r.put("shown", true) }

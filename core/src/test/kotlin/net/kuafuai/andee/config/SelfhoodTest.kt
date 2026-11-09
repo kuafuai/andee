@@ -43,15 +43,11 @@ class SelfhoodTest {
         assertEquals(person, me.top(1).single().first.id)                         // ...and now the friend is the most overdue
     }
 
-    @Test fun aPromiseCountsDownToItsDueTimeAndKeepsGrowingAfter() {
-        val id = add("promise", "给老王方案", due = now + 48 * h)
-        assertEquals(0.0, me.overdue(me.care(id)!!), 0.01)
-        now += 24 * h
-        assertEquals(0.5, me.overdue(me.care(id)!!), 0.05)
-        now += 24 * h
-        assertEquals(1.0, me.overdue(me.care(id)!!), 0.05)
-        now += 24 * h
-        assertTrue(me.overdue(me.care(id)!!) > 1.4)
+    @Test fun aPromiseIsATaskNowNotACare() {
+        // Promises moved to Tasks, where the countdown lives (TasksTest). A care is what you keep coming back to.
+        val r = me.addCare("promise", "给老王方案", "答应的", "他 11-08 说的", null, now + 48 * h)
+        assertTrue(r!!.contains("task"))
+        assertTrue(me.cares().none { it.what == "给老王方案" })
     }
 
     @Test fun actingResetsLookingAndNothingOnlyHalfway() {

@@ -263,8 +263,8 @@ fun NotebookCard(onDone: () -> Unit, startTab: Int = 0, startWiki: String? = nul
     var refresh by remember { mutableStateOf(0) }
 
     // 守卫 first, on both bodies: it is the one the user writes, and the card opens on it.
-    val tabs = if (zh) listOf("守卫", "自己", "在意", "日记", "打算", "人", "维基", "记忆", "待办")
-               else listOf("Guard", "Self", "Cares", "Diary", "Plan", "People", "Wiki", "Memories", "Todos")
+    val tabs = if (zh) listOf("守卫", "自己", "在意", "日记", "打算", "人", "维基", "记忆", "在办")
+               else listOf("Guard", "Self", "Cares", "Diary", "Plan", "People", "Wiki", "Memories", "Doing")
     val guardTab = 0
 
     Column(Modifier.fillMaxSize().padding(start = 20.dp, top = 20.dp, end = 20.dp)) {
@@ -500,14 +500,47 @@ private fun MemoriesTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
 
 @Composable
 private fun TodosTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
+    // 在办, as on the phone (NotebookUi.buildTodos): the tasks first — a thing with an end — then 定时, the alarms.
+    fun t(a: String, b: String) = if (zh) a else b
+    val tasks = DesktopNotebook.book.tasks
+    val open = tasks.active().sortedWith(compareBy<net.kuafuai.andee.config.Tasks.Task> { if (it.status == "ready") 0 else 1 }.thenByDescending { it.touchedAt })
     val todos = DesktopNotebook.book.todos("pending").filter { it.status in listOf("active", "paused") }
         .sortedBy { if (it.nextRunAt > 0) it.nextRunAt else Long.MAX_VALUE }
-    
-    if (todos.isEmpty()) {
-        EmptyState(if (zh) "没有待办" else "Nothing pending")
+
+    if (todos.isEmpty() && open.isEmpty()) {
+        EmptyState(t("没有在办的事", "Nothing in progress"))
         return
     }
-    
+    if (open.isNotEmpty()) {
+        Text(t("在办的事", "In progress"), color = Palette.muted, fontSize = 12.sp)
+        Spacer(Modifier.height(6.dp))
+    }
+    for (task in open) {
+        Row(Modifier.fillMaxWidth().glassPanel(14).padding(12.dp), verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(task.what, color = Palette.label, fontSize = 13.sp)
+                val st = when (task.status) { "ready" -> t("回话到了", "answer came"); "waiting" -> t("在等回话", "waiting for an answer"); else -> t("进行中", "under way") }
+                val bits = mutableListOf("${task.id} · $st")
+                if (task.deliverTo.kind != "user") bits += t("办完交给 ${task.deliverTo.short()}", "for ${task.deliverTo.short()}")
+                task.waits.filter { it.open }.takeIf { it.isNotEmpty() }?.let { w -> bits += t("在等 ", "waiting on ") + w.joinToString(", ") { it.short() } }
+                Text(bits.joinToString(" · "), color = Palette.muted, fontSize = 11.sp)
+                task.waits.lastOrNull { !it.open }?.let { Text("「${it.answer.take(80)}」", color = Palette.secondary, fontSize = 12.sp) }
+                if (task.next.isNotBlank()) Text(t("下一步：", "Next: ") + task.next, color = Palette.secondary, fontSize = 12.sp)
+            }
+            Text("✕", color = Palette.secondary, fontSize = 13.sp, modifier = Modifier.clickable {
+                tasks.close(task.id, "dropped", t("用户在小本本里放下了", "let go by the user in the notebook"))
+                    .onSuccess { c -> c.cancel.forEach(DesktopScheduler::cancel) }
+                onRefresh()
+            }.padding(6.dp))
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+    if (open.isNotEmpty() && todos.isNotEmpty()) {
+        Spacer(Modifier.height(4.dp))
+        Text(t("定时", "Timed"), color = Palette.muted, fontSize = 12.sp)
+        Spacer(Modifier.height(6.dp))
+    }
+
     for (t in todos) {
         Row(Modifier.fillMaxWidth().glassPanel(14).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

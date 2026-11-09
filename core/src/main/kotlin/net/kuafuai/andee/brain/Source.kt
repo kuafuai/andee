@@ -67,8 +67,36 @@ data class Source(
         append(")")
     }
 
+    fun toJson(): JSONObject = JSONObject().put("kind", kind).put("app", app).put("pkg", pkg).put("channel", channel)
+        .put("conversation", conversation).put("sender", sender).put("quote", quote).put("at", at)
+        .apply { group?.let { put("group", it) }; personId?.let { put("person", it) } }
+
+    /** One line, for an index or a card: who and where, without the instructions [forPrompt] carries. */
+    fun short(): String = when {
+        kind == "user" -> "the user"
+        kind == "self" -> "yourself"
+        kind == "review" -> "a review"
+        kind == "friend" -> "friend ${sender.ifBlank { "?" }}"
+        group == true -> "${sender.ifBlank { "?" }}@$conversation"
+        group == false -> sender.ifBlank { conversation }
+        sender.isNotBlank() -> sender
+        else -> app.ifBlank { kind }
+    }
+
     companion object {
         const val QUOTE_MAX = 120
+
+        fun fromJson(o: JSONObject?): Source? = o?.let {
+            Source(
+                kind = it.optString("kind"), app = it.optString("app"), pkg = it.optString("pkg"), channel = it.optString("channel"),
+                conversation = it.optString("conversation"), group = if (it.has("group")) it.optBoolean("group") else null,
+                sender = it.optString("sender"), quote = it.optString("quote"), at = it.optLong("at"),
+                personId = it.optString("person").ifEmpty { null },
+            )
+        }
+
+        /** A turn nobody outside started: the user's own, a todo, a friend, a work turn, a review. */
+        fun ofTurn(kind: String): Source = Source(kind = kind)
 
         /** `张三: 在吗` / `张三：在吗` — how a chat app writes the sender into a group notification's text. */
         private val TAGS = Regex("""^(?:\[[^\]]{1,8}]\s*)+""")

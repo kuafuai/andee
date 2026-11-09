@@ -33,7 +33,8 @@ import java.util.Locale
  * **日记** (the last week of diary pages), **打算** (today's plan), **人** (who it
  * knows), **维基** (its articles — tap one to read it from the file, now),
  * **记忆** ([net.kuafuai.andee.config.Memory] by type, tap to read the content),
- * **待办** (active and paused [net.kuafuai.andee.config.Todo]s, soonest first).
+ * **在办** (what it took on and has not finished — [net.kuafuai.andee.config.Tasks] — then the timed
+ * [net.kuafuai.andee.config.Todo]s, soonest first).
  * What the model wrote is Markdown and is drawn as such ([MarkdownView]).
  *
  * No editing: the brain writes these, not the person. Delete (memories and
@@ -876,17 +877,58 @@ class NotebookUi(
     }
 
     @SuppressLint("SetTextI18n")
+    /**
+     * 在办: the tasks first (a thing with an end), then 定时 (an alarm clock). One tab because the user asks one
+     * question of it — "what is it still going to do?" — and the alarms a task sets for itself show up in both.
+     */
     private fun buildTodos(body: LinearLayout) {
+        val tasks = Notebook.tasks(context)
+        val open = tasks.active().sortedWith(compareBy<net.kuafuai.andee.config.Tasks.Task> { if (it.status == "ready") 0 else 1 }.thenByDescending { it.touchedAt })
         val active = Notebook.todos(context, "active")
-        if (active.isEmpty()) {
+        if (active.isEmpty() && open.isEmpty()) {
             body.addView(emptyState(lctx.getString(R.string.notebook_empty_todos)))
             return
         }
-
-        val sorted = active.sortedBy { it.nextRunAt }
-        for (t in sorted) {
-            body.addView(todoRow(t), matchWrap().apply { bottomMargin = dp(10) })
+        if (open.isNotEmpty()) {
+            body.addView(label(lctx.getString(R.string.notebook_tasks_head), Glass.Type.CAPTION, Glass.MUTED), matchWrap().apply { bottomMargin = dp(6) })
+            for (t in open) body.addView(taskRow(tasks, t), matchWrap().apply { bottomMargin = dp(10) })
         }
+        if (active.isNotEmpty()) {
+            if (open.isNotEmpty()) {
+                body.addView(label(lctx.getString(R.string.notebook_timed_head), Glass.Type.CAPTION, Glass.MUTED, top = 8), matchWrap().apply { bottomMargin = dp(6) })
+            }
+            for (t in active.sortedBy { it.nextRunAt }) {
+                body.addView(todoRow(t), matchWrap().apply { bottomMargin = dp(10) })
+            }
+        }
+    }
+
+    /** One task: what, for whom, what it waits on, what is next. ✕ lets it go — the user's call, said in the record. */
+    private fun taskRow(tasks: net.kuafuai.andee.config.Tasks, t: net.kuafuai.andee.config.Tasks.Task): View {
+        val row = panel()
+        val title = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        title.addView(label(t.what, Glass.Type.BODY, Glass.TITLE), LinearLayout.LayoutParams(0, WRAP, 1f))
+        title.addView(deleteButton {
+            tasks.close(t.id, "dropped", lctx.getString(R.string.notebook_task_dropped_by_user)).onSuccess { c ->
+                c.cancel.forEach { Scheduler.cancelTodo(context, it) }
+            }
+            rebuild()
+        })
+        row.addView(title, matchWrap())
+        val st = lctx.getString(
+            when (t.status) {
+                "ready" -> R.string.notebook_task_ready
+                "waiting" -> R.string.notebook_task_waiting
+                else -> R.string.notebook_task_open
+            },
+        )
+        val bits = mutableListOf(t.id + " · " + st)
+        if (t.deliverTo.kind != "user") bits += lctx.getString(R.string.notebook_task_for, t.deliverTo.short())
+        t.waits.filter { it.open }.takeIf { it.isNotEmpty() }?.let { w -> bits += lctx.getString(R.string.notebook_task_on, w.joinToString(", ") { it.short() }) }
+        row.addView(label(bits.joinToString(" · "), Glass.Type.MICRO, Glass.MUTED, top = 4), matchWrap())
+        t.waits.lastOrNull { !it.open }?.let { row.addView(label("「" + it.answer.take(80) + "」", Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap()) }
+        if (t.next.isNotBlank()) row.addView(label(lctx.getString(R.string.notebook_task_next, t.next), Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap())
+        return row
     }
 
     @SuppressLint("SetTextI18n")

@@ -249,6 +249,16 @@ private fun seedLife() {
     b.people.unconfirmed("阿杰", net.kuafuai.andee.config.People.Channel("wechat", "阿杰"), "私聊问了安装")
     val gone = b.people.upsert("王总", null, net.kuafuai.andee.config.People.Channel("wechat", "王总", "C群"), null, null, null, null, null, asNew = true)
     b.people.find("老王").firstOrNull()?.let { b.people.merge(gone, it.id, "C群里的王总就是老王，他自己说的") }
+    // 在办: one answered, one waiting on someone, one of the user's own.
+    val ask = net.kuafuai.andee.brain.Source(kind = "notify", app = "微信", channel = "wechat", conversation = "B群", group = true, sender = "小王", quote = "这个报价多少？")
+    b.tasks.open("小王问新版报价", "等老板回话再回 B群", 0L, ask, untrusted = true).getOrNull()?.let { t ->
+        b.tasks.wait(t.id, net.kuafuai.andee.config.Tasks.Wait(kind = "person", name = "老板", channel = "wechat", chat = "C群", asked = "报价多少"))
+        b.tasks.answered(net.kuafuai.andee.brain.Source(kind = "notify", channel = "wechat", conversation = "C群", group = true, sender = "老板", quote = "按上次的价，八折"))
+    }
+    b.tasks.open("帮阿杰查安装失败的原因", "等他发日志", 0L, net.kuafuai.andee.brain.Source(kind = "notify", app = "微信", channel = "wechat", conversation = "阿杰", group = false, sender = "阿杰"), untrusted = true).getOrNull()?.let { t ->
+        b.tasks.wait(t.id, net.kuafuai.andee.config.Tasks.Wait(kind = "person", name = "阿杰", channel = "wechat", asked = "把日志发我"))
+    }
+    b.tasks.open("周五前把发布清单整理好", "先列出改动", System.currentTimeMillis() + 3 * 86_400_000L, net.kuafuai.andee.brain.Source(kind = "user"), untrusted = false)
     b.wiki.write(null, "交流群运营方案", "plan", "# 交流群运营方案（草稿）\n\n> 基于 10-28 前两周的群聊观察，**推断为主**。\n\n## 现状\n\n| 指标 | 值 | 来源 |\n|---|---|---|\n| 成员 | 312 | 群资料页 |\n| 日均发言 | 约 40 条 | 我数的 |\n\n## 下一步\n\n1. 写一页常见问题\n2. 每周五发一次更新\n   - 附 `changelog` 链接\n\n---\n\n参考：[发布页](https://github.com/kuafuai/andee/releases)", "群聊观察 + 我推断的", "first draft", null, null).getOrThrow()
     DesktopNotebook.drive.addThought("周末群里反而安静，我想知道是不是大家都在用、没遇到问题。")
     DesktopNotebook.drive.recordWork("c1", "Andee 交流群", "acted", "把常见问题的草稿写进了维基，等他看过再决定要不要置顶。", listOf("call_1"))

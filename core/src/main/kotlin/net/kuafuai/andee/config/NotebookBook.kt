@@ -70,6 +70,12 @@ class NotebookBook(private val store: NotebookStore) {
     /** The people it has met. One instance. */
     val people: People by lazy { People(this) }
 
+    /**
+     * Things it took on and has not finished ([Tasks]). Promises and owed items moved here from cares and people;
+     * the move runs once, the first time anything asks.
+     */
+    val tasks: Tasks by lazy { Tasks(this).also { it.migrate(selfhood, people) } }
+
     /** 守卫: the user's own paragraph of rules, above everything in the prompt. Written from the notebook card only. */
     val guard: Guard by lazy { Guard(this) }
 
@@ -553,6 +559,17 @@ class NotebookBook(private val store: NotebookStore) {
         write(b)
         if (added.isNotEmpty()) Log.i(TAG, "notebook: seeded ${added.size} default todo(s)")
         return added
+    }
+
+    /** A once-per-notebook flag (a migration, a seed). */
+    @Synchronized
+    fun metaFlag(flag: String): Boolean = book().optJSONObject("meta")?.optBoolean(flag) == true
+
+    @Synchronized
+    fun setMetaFlag(flag: String) {
+        val b = JSONObject(book().toString())
+        b.put("meta", (b.optJSONObject("meta") ?: JSONObject()).put(flag, true))
+        write(b)
     }
 
     /** Tests only: forget one meta flag, as a notebook written by an older build would not have it. */

@@ -42,7 +42,7 @@ object SelfWork {
 
     /** The device's verdict on a finished work turn about [careId]. Its own care's write-back does not count. */
     fun effect(calls: List<LocalBrain.WorkCall>, careId: String): Selfhood.Effect {
-        val real = calls.filter { it.effective && !(it.method == "note.cares" && it.action == "update") }
+        val real = calls.filter { it.effective && !(it.method == "note.cares" && it.action == "update") && !(it.method == "note.task" && it.action == "step") }
         return when {
             real.any { !isRead(it) } -> Selfhood.Effect.ACTED
             real.isNotEmpty() -> Selfhood.Effect.LOOKED
@@ -51,7 +51,23 @@ object SelfWork {
     }
 
     /** Whether the turn wrote the care's own note back itself (so the device does not overwrite it). */
-    private fun wroteBack(calls: List<LocalBrain.WorkCall>) = calls.any { it.effective && it.method == "note.cares" && it.action == "update" }
+    private fun wroteBack(calls: List<LocalBrain.WorkCall>) =
+        calls.any { it.effective && ((it.method == "note.cares" && it.action == "update") || (it.method == "note.task" && it.action == "step")) }
+
+    /** The opening for a task ([net.kuafuai.andee.config.Tasks]) the heartbeat got up for: its whole record, and what is expected. */
+    private fun taskOpening(care: Selfhood.Care, record: String, why: String): String = buildString {
+        append("[You woke yourself for something you are in the middle of: ").append(care.what).append(" (task ").append(care.id).append(").")
+        if (why.isNotBlank()) append("\nWhy you decided to get up for it now: ").append(why)
+        append("]\n\n").append(record).append("\n\n")
+        append(
+            "Nobody asked for this turn; it is your own business, with every tool you have when someone asks you for " +
+                "something. Do the next real piece of it: deliver an answer that came in, chase someone who has not " +
+                "answered if that is worth doing, or let it go with task drop and a reason. The rules you were given still " +
+                "hold for what goes out to people, spending and deleting. Before you finish, task step id=${care.id} with " +
+                "one sentence on where it stands (or task done once it is delivered). Your closing words go to your own " +
+                "record, not to anyone's ears.",
+        )
+    }
 
     /** The opening message, built by the device (§8). In English, like every instruction to the model; it answers in the user's language. */
     fun opening(care: Selfhood.Care, ratio: Double, why: String, now: Long = System.currentTimeMillis()): String = buildString {
@@ -95,7 +111,10 @@ object SelfWork {
         onBooked: (Selfhood.Effect, String?) -> Unit = { _, _ -> },
     ) {
         drive.markWork()
-        brain.work(opening(care, ratio, why), care.kind) { r ->
+        val task = if (care.kind == net.kuafuai.andee.config.Tasks.KIND) self.task(care.id) else null
+        val text = if (task != null) taskOpening(care, task.second, why) else opening(care, ratio, why)
+        // A task a stranger's words started is worked on with that stranger's standing, whoever wakes for it.
+        brain.work(text, care.kind, untrusted = task?.first == true) { r ->
             val effect = effect(r.calls, care.id)
             val summary = r.summary?.trim()?.takeIf { it.isNotEmpty() }
             self.settle(care.id, effect, if (wroteBack(r.calls)) null else summary)

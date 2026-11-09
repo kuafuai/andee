@@ -47,6 +47,11 @@ data class BrainEvent(
          * [detail] the whole of it, so the row opens to what it would have said.
          */
         QUIET,
+        /**
+         * Things it took on ([net.kuafuai.andee.config.Tasks]): [subject] is what, [detail] who or why. The id leads the subject.
+         * ANSWERED is the device's — someone a task was waiting on wrote back — the rest come from `task` calls.
+         */
+        TASK_OPENED, TASK_WAITING, TASK_ANSWERED, TASK_DONE, TASK_DROPPED,
     }
 
     companion object {
@@ -80,6 +85,19 @@ data class BrainEvent(
                     "upsert" -> if (ok("saved")) BrainEvent(Kind.PERSON, args.optString("name"), args.optString("impression")) else null
                     "merge" -> if (r?.optBoolean("merged") == true) BrainEvent(Kind.PERSON_MERGED, "${r.optString("from_name")} → ${r.optString("into_name")}", args.optString("reason")) else null
                     else -> null
+                }
+                "note.task" -> {
+                    val id = r?.optString("id").orEmpty()
+                    // The id leads the subject rather than riding in [ref], which is what a row opens (a wiki article).
+                    val what = listOf(id, r?.optString("what").orEmpty()).filter { it.isNotBlank() }.joinToString(" · ")
+                    when (action) {
+                        "open" -> if (r?.optBoolean("opened") == true) BrainEvent(Kind.TASK_OPENED, what, r.optString("for")) else null
+                        "wait" -> if (r?.optBoolean("waiting") == true) BrainEvent(Kind.TASK_WAITING, what,
+                            if (args.optString("on") == "time") args.optLong("at").toString() else args.optString("name") + (args.optString("chat").takeIf { it.isNotBlank() }?.let { "@$it" } ?: "")) else null
+                        "done" -> if (r?.optBoolean("done") == true) BrainEvent(Kind.TASK_DONE, what, args.optString("result")) else null
+                        "drop" -> if (r?.optBoolean("dropped") == true) BrainEvent(Kind.TASK_DROPPED, what, args.optString("why")) else null
+                        else -> null
+                    }
                 }
                 "note.cares" -> when (action) {
                     "add" -> if (ok("added")) BrainEvent(Kind.CARE, args.optString("what"), "+") else null

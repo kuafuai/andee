@@ -120,6 +120,12 @@ object Notebook {
 
     fun selfhood(context: Context): net.kuafuai.andee.config.Selfhood = book(context).selfhood
     fun people(context: Context): net.kuafuai.andee.config.People = book(context).people
+
+    /** Things it took on and has not finished. */
+    fun tasks(context: Context): net.kuafuai.andee.config.Tasks = book(context).tasks
+
+    /** The whole notebook, for core code that takes one ([net.kuafuai.andee.brain.NotifyTasks]). */
+    fun notebook(context: Context): NotebookBook = book(context)
     fun guard(context: Context): net.kuafuai.andee.config.Guard = book(context).guard
     fun notifyRule(context: Context): net.kuafuai.andee.config.NotifyRule = book(context).notifyRule
 
@@ -142,7 +148,7 @@ object Notebook {
 
     /** `self_note`, `cares`, `diary`, `person`, `people`, `wiki_*` — the same handler the Mac uses. */
     fun life(context: Context): net.kuafuai.andee.config.LifeTools = life ?: synchronized(this) {
-        life ?: net.kuafuai.andee.config.LifeTools(selfhood(context), people(context), wiki(context), callId = { callBeingRun })
+        life ?: net.kuafuai.andee.config.LifeTools(selfhood(context), people(context), wiki(context), callId = { callBeingRun }, tasks = book(context).tasks)
             .apply { todaysCalls = { drive(context).todaysCalls() } }
             .also { life = it }
     }

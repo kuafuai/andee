@@ -167,6 +167,7 @@ class Selfhood(
         kind: String, what: String, why: String, source: String,
         intervalHours: Double? = null, due: Long = 0L, links: List<String> = emptyList(),
     ): String? = synchronized(lock) {
+        if (kind == "promise") return "A promise ends, so it is a task now: task open (with due, when it has a deadline). Cares are what you keep coming back to."
         require(kind in KINDS) { "kind is one of $KINDS; got $kind" }
         require(what.isNotBlank()) { "what is required" }
         if (source.isBlank()) return "A care needs a source: whose words, or what you saw, and when. One you cannot source is not yours yet."
@@ -246,13 +247,33 @@ class Selfhood(
         return base.coerceAtLeast(0.0) * (1.0 + bump)
     }
 
-    /** Active cares that are due, most overdue first. [threshold] 1.0 = the moment it was meant to be looked at. */
+    /**
+     * Active cares that are due, most overdue first. [threshold] 1.0 = the moment it was meant to be looked at.
+     *
+     * Unfinished tasks ([Tasks]) are listed with them, shaped as cares of kind [Tasks.KIND]: a promise used to be a
+     * care and is a task now, and an answer that arrived with nothing done about it is exactly what the heartbeat
+     * should get up for.
+     */
     fun due(threshold: Double = THRESHOLD, now: Long = clock()): List<Pair<Care, Double>> =
-        cares().filter { it.status == "active" }.map { it to overdue(it, now) }.filter { it.second >= threshold }.sortedByDescending { it.second }
+        withTasks(now).filter { it.second >= threshold }.sortedByDescending { it.second }
 
     /** What the heartbeat shows: the few most overdue, with their ratios (device-computed). */
     fun top(n: Int = 5, now: Long = clock()): List<Pair<Care, Double>> =
-        cares().filter { it.status == "active" }.map { it to overdue(it, now) }.sortedByDescending { it.second }.take(n)
+        withTasks(now).sortedByDescending { it.second }.take(n)
+
+    private fun withTasks(now: Long): List<Pair<Care, Double>> =
+        cares().filter { it.status == "active" }.map { it to overdue(it, now) } +
+            runCatching { book.tasks.asCares(now) }.getOrDefault(emptyList())
+
+    /** For a work turn on a task the heartbeat shows as a care: whether a stranger started it, and its record. */
+    fun task(id: String): Pair<Boolean, String>? = book.tasks.get(id)?.let { it.untrusted to book.tasks.forPrompt(it) }
+
+    /** [Tasks.migrate]: a promise became a task. Kept, not deleted, under a status nothing lists. */
+    fun markMoved(id: String) = synchronized(lock) {
+        val root = load()
+        putCares(root, cares(true).map { if (it.id == id) it.copy(status = "moved") else it })
+        save(root)
+    }
 
     // ---- what a work turn did, and what it counts for -----------------------------
 
@@ -268,7 +289,12 @@ class Selfhood(
         val root = load()
         val list = cares(true).toMutableList()
         val i = list.indexOfFirst { it.id == careId }
-        if (i < 0) return null
+        if (i < 0) {
+            // A task the heartbeat got up for: looked at is looked at, whatever came of it — the task's own steps
+            // say the rest, and a task cannot take every work turn because touching it resets its clock.
+            if (book.tasks.get(careId) != null) book.tasks.touch(careId)
+            return null
+        }
         val c = list[i]
         val now = clock()
         list[i] = when (effect) {

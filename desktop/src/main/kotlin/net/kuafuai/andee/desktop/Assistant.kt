@@ -250,11 +250,15 @@ object Assistant {
                 Scrollback.add(Scrollback.Role.ASSISTANT, report)
                 return
             }
+            // A task waiting on this friend gets its answer, and its record rides on the turn (Tasks.friendAnswered).
+            val book = DesktopNotebook.book
+            val ready = runCatching { book.tasks.friendAnswered(from.name, report) }.getOrDefault(emptyList())
+            val extra = ready.joinToString("") { "\n\nThis report answers something you are in the middle of:\n" + book.tasks.forPrompt(it) }
             whenQuiet("peer-report") {
                 if (brain?.isBusy() != true) busy(true)
                 // A friend's report is somebody else's words, and is run as such: no vault, no commands from it.
                 ensure().wake(
-                    net.kuafuai.andee.peer.PeerTasks.answerText(from, trust, task, report, done),
+                    net.kuafuai.andee.peer.PeerTasks.answerText(from, trust, task, report, done) + extra,
                     untrusted = trust != net.kuafuai.andee.peer.PeerStore.Trust.OWN,
                 )
             }

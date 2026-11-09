@@ -51,6 +51,11 @@ object TimelineEvents {
             BrainEvent.Kind.WIKI_SHOWN -> t("给你看了维基：$s", "Showed you a wiki article: $s")
             BrainEvent.Kind.PERSON -> t("记下了一个人：$s", "Noted a person: $s")
             BrainEvent.Kind.PERSON_MERGED -> t("合并成一个人：$s", "Merged into one person: $s")
+            BrainEvent.Kind.TASK_OPENED -> t("接下了一件事：$s", "Took on: $s")
+            BrainEvent.Kind.TASK_WAITING -> t("在等 ${e.detail} 回话：$s", "Waiting on ${e.detail}: $s")
+            BrainEvent.Kind.TASK_ANSWERED -> t("等的回话到了：$s", "The answer came: $s")
+            BrainEvent.Kind.TASK_DONE -> t("办完了：$s", "Done: $s")
+            BrainEvent.Kind.TASK_DROPPED -> t("放下了一件事：$s", "Let go: $s")
             BrainEvent.Kind.CARE -> when (e.detail) {
                 "+" -> t("开始在意：$s", "Now cares about: $s")
                 "done" -> t("一件在意的事做完了", "A care is done")
@@ -94,7 +99,9 @@ object TimelineEvents {
         Body.TOLD.name -> AndeeIcon.CHAT
         BrainEvent.Kind.WOKE.name, BrainEvent.Kind.NOTIFIED.name, Body.IGNORED.name -> AndeeIcon.ALERT_CIRCLE
         BrainEvent.Kind.FRIEND_TASK.name -> AndeeIcon.FRIENDS
-        BrainEvent.Kind.REVIEWED.name, BrainEvent.Kind.FOLDED.name -> AndeeIcon.CHECK_CIRCLE
+        BrainEvent.Kind.REVIEWED.name, BrainEvent.Kind.FOLDED.name, BrainEvent.Kind.TASK_DONE.name -> AndeeIcon.CHECK_CIRCLE
+        BrainEvent.Kind.TASK_OPENED.name, BrainEvent.Kind.TASK_WAITING.name, BrainEvent.Kind.TASK_ANSWERED.name,
+        BrainEvent.Kind.TASK_DROPPED.name -> AndeeIcon.NOTEBOOK
         BrainEvent.Kind.WIKI.name, BrainEvent.Kind.WIKI_READ.name, BrainEvent.Kind.WIKI_SHOWN.name, Body.PAGE.name -> AndeeIcon.DOCUMENT
         BrainEvent.Kind.PERSON.name, BrainEvent.Kind.PERSON_MERGED.name -> AndeeIcon.FACE
         BrainEvent.Kind.CARE.name, Body.WORK.name, Body.THOUGHT.name -> AndeeIcon.SPARKLE

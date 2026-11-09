@@ -20,6 +20,8 @@ class LifeTools(
     private val wiki: WikiBook,
     /** The tool-call id of the call being answered, recorded on what it writes so "I wrote this" can be pointed at. */
     private val callId: () -> String = { "" },
+    /** Things taken on and not finished (`task`). Null in a body that has none. */
+    private val tasks: Tasks? = null,
 ) {
 
     fun handles(method: String) = method in METHODS
@@ -31,6 +33,7 @@ class LifeTools(
             "note.cares" -> cares(a)
             "note.diary" -> diary(a)
             "note.person" -> person(a)
+            "note.task" -> task(a)
             "note.people" -> peopleList(a)
             "note.wiki_search" -> wikiSearch(a)
             "note.wiki_read" -> wikiRead(a)
@@ -159,13 +162,91 @@ class LifeTools(
                 val r = people.log(a.optString("id"), a.optString("dir", "out"), a.optString("channel", "wechat"), a.optString("gist"), a.optString("outcome"))
                 return if (r == null) JSONObject().put("logged", true) else JSONObject().put("logged", false).put("reason", r)
             }
-            "owe" -> return JSONObject().put("id", people.owe(a.optString("id"), a.optString("dir", "i_owe"), a.optString("what"), a.optLong("due")))
+            "owe" -> return JSONObject().put("id", people.owe(a.optString("id"), a.optString("dir", "i_owe"), a.optString("what"), a.optLong("due"),
+                from = net.kuafuai.andee.brain.Source.fromJson(a.optJSONObject(TASK_SOURCE)), untrusted = a.optBoolean(TASK_UNTRUSTED)))
+                .put("note", "This is a task now (task get / task done); it shows on the person's record too.")
             "settle" -> return JSONObject().put("settled", people.settle(a.optString("id"), a.optString("owe_id"), a.optString("status", "done")))
             "ask" -> return JSONObject().put("noted", people.ask(a.optString("id"), a.optString("text")))
             "asked" -> { people.asked(a.optString("id"), a.optString("text")); return JSONObject().put("ok", true) }
             "may_reach" -> {
                 val why = people.mayReach(a.optString("id"))
                 return JSONObject().put("may", why == null).apply { if (why != null) put("reason", why) }
+            }
+            else -> throw IllegalArgumentException("unknown action $action")
+        }
+    }
+
+    // ---- tasks ---------------------------------------------------------------------------
+
+    /**
+     * `task`. The fields starting with `_` are the device's ([TASK_SOURCE], [TASK_UNTRUSTED], [TASK_SENT]): the brain
+     * fills them from the turn and strips anything the model put there, so where a task came from and how far it can
+     * be trusted are never the model's to say.
+     */
+    private fun task(a: JSONObject): JSONObject {
+        val book = tasks ?: return JSONObject().put("ok", false).put("reason", "this device keeps no tasks")
+        val untrusted = a.optBoolean(TASK_UNTRUSTED)
+        val src = net.kuafuai.andee.brain.Source.fromJson(a.optJSONObject(TASK_SOURCE)) ?: net.kuafuai.andee.brain.Source(kind = "user")
+        fun fail(why: String?) = JSONObject().put("ok", false).put("reason", why ?: "failed")
+        fun changed(c: Tasks.Change, key: String) = JSONObject().put(key, true).put("id", c.task.id).put("what", c.task.what)
+            .put("status", c.task.status)
+            .apply { c.arm?.let { put("arm_todo", it.id) }; if (c.cancel.isNotEmpty()) put("cancel_todos", JSONArray(c.cancel)) }
+        val id = a.optString("id")
+        return when (val action = a.optString("action", "list")) {
+            "list" -> JSONObject().put("tasks", JSONArray().apply {
+                val all = if (a.optString("status") == "closed") book.all().filter { !it.active } else book.active()
+                all.takeLast(20).forEach { put(book.line(it)) }
+            })
+            "get" -> book.get(id)?.let { JSONObject().put("task", book.forPrompt(it)) } ?: fail("no task $id")
+            "open" -> {
+                val deliver = a.optJSONObject("deliver_to")
+                if (deliver != null && untrusted) {
+                    return fail("This turn started from somebody else's words, so it cannot send a result anywhere but back to them. Leave deliver_to out.")
+                }
+                val to = deliver?.let {
+                    net.kuafuai.andee.brain.Source(
+                        kind = "person", app = it.optString("app"), channel = Tasks.channelOfName(it.optString("app")),
+                        conversation = it.optString("chat").ifBlank { it.optString("name") }, group = it.optString("chat").isNotBlank(),
+                        sender = it.optString("name"),
+                    )
+                }
+                val due = a.optLong("due").takeIf { it > 0 } ?: 0L
+                book.open(a.optString("what"), a.optString("next"), due, src, untrusted, to)
+                    .fold({ JSONObject().put("opened", true).put("id", it.id).put("what", it.what).put("for", it.deliverTo.short())
+                        .put("note", "Where it came from was recorded by the device. When you ask someone and wait, task wait; when it is done, task done.") },
+                        { fail(it.message) })
+            }
+            "wait" -> {
+                val on = a.optString("on", "person")
+                val t = book.get(id) ?: return fail("no task $id")
+                val w = when (on) {
+                    "time" -> Tasks.Wait(kind = "time", due = a.optLong("at"))
+                    "friend" -> Tasks.Wait(kind = "friend", name = a.optString("name"), asked = a.optString("asked"))
+                    else -> Tasks.Wait(
+                        kind = "person", name = a.optString("name"), chat = a.optString("chat"), asked = a.optString("asked"),
+                        channel = Tasks.channelOfName(a.optString("app")).ifBlank { t.from.channel.takeIf { t.from.kind == "notify" }.orEmpty() },
+                        person = people.find(a.optString("name")).singleOrNull()?.id,
+                    )
+                }
+                book.wait(id, w).fold({ changed(it, "waiting").put("note", "When they answer, the device will recognise it and bring this task back with their words.") }, { fail(it.message) })
+            }
+            "step" -> book.step(id, a.optString("text"), a.optString("next").takeIf { a.has("next") })
+                .fold({ changed(it, "stepped") }, { fail(it.message) })
+            "done" -> {
+                val t = book.get(id) ?: return fail("no task $id")
+                // Done means delivered. To the user, the answer of this turn is the delivery; to anyone else, something
+                // has to have gone out on this turn — typed and sent, a message, a friend asked.
+                val elsewhere = t.deliverTo.kind != "user" && t.deliverTo.kind != "self" && t.deliverTo.kind != "review"
+                if (elsewhere && !a.optBoolean(TASK_SENT)) {
+                    return fail("Nothing was sent on this turn, and ${t.id} is for ${t.deliverTo.short()}. Deliver it first (reply to them), then mark it done — or task step if it is not finished.")
+                }
+                book.close(id, "done", a.optString("result")).fold({ changed(it, "done") }, { fail(it.message) })
+            }
+            "drop" -> {
+                val t = book.get(id) ?: return fail("no task $id")
+                if (untrusted && !t.untrusted) return fail("This turn started from somebody else's words; it cannot drop something the user handed you. Tell the user instead.")
+                if (a.optString("why").isBlank()) return fail("say why you are letting it go")
+                book.close(id, "dropped", a.optString("why")).fold({ changed(it, "dropped") }, { fail(it.message) })
             }
             else -> throw IllegalArgumentException("unknown action $action")
         }
@@ -245,8 +326,14 @@ class LifeTools(
 
     companion object {
         const val MAX_READ = 20_000
+
+        /** Device-filled fields on a `task` call; see [task]. Anything the model sends under these names is replaced. */
+        const val TASK_SOURCE = "_source"
+        const val TASK_UNTRUSTED = "_untrusted"
+        const val TASK_SENT = "_sent"
+        val DEVICE_FIELDS = setOf(TASK_SOURCE, TASK_UNTRUSTED, TASK_SENT)
         val METHODS = setOf(
-            "note.self", "note.cares", "note.diary", "note.person", "note.people",
+            "note.self", "note.cares", "note.diary", "note.person", "note.people", "note.task",
             "note.wiki_search", "note.wiki_read", "note.wiki_write", "note.wiki_status", "note.wiki_link", "note.wiki_share", "note.wiki_know",
         )
     }

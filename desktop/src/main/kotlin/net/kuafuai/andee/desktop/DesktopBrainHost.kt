@@ -90,6 +90,8 @@ class DesktopBrainHost(
     override fun selfIndex(): String =
         DesktopNotebook.book.selfhood.indexForPrompt(ownerName = DesktopNotebook.book.people.ownerName())
 
+    override fun tasksIndex(): String = DesktopNotebook.book.tasks.indexForPrompt()
+
     override fun wikiIndex(): String = DesktopNotebook.book.wiki.indexForPrompt()
 
     override fun friendsIndex(): String = Peers.tasks.indexForPrompt()

@@ -197,6 +197,7 @@ object MacNotifications {
                 n, h.langTag(), h.scene(),
                 rule = net.kuafuai.andee.desktop.DesktopNotebook.book.notifyRule.text(),
                 guard = net.kuafuai.andee.desktop.DesktopNotebook.book.guard.text(),
+                awaited = net.kuafuai.andee.brain.NotifyTasks.awaited(net.kuafuai.andee.desktop.DesktopNotebook.book, n),
             )
         when (verdict?.action) {
             null -> {
@@ -212,19 +213,14 @@ object MacNotifications {
             NotificationTriage.Action.TELL -> if (verdict.line.isNotBlank()) {
                 // Same rule as the phone (BodyCoreService.handleNotification): a private message worth telling the
                 // user about is from someone they deal with, so the device puts them on record.
-                val src = net.kuafuai.andee.brain.Source.fromNotification(n)
-                if (net.kuafuai.andee.brain.Source.worthRecording(src, startsTurn = false)) {
-                    net.kuafuai.andee.brain.Source.recordSpeaker(net.kuafuai.andee.desktop.DesktopNotebook.book.people, src)
-                }
+                net.kuafuai.andee.brain.NotifyTasks.told(net.kuafuai.andee.desktop.DesktopNotebook.book, n)
                 h.tell(n, verdict.line)
             }
             NotificationTriage.Action.ACT -> {
-                val src = net.kuafuai.andee.brain.Source.fromNotification(n).let { s ->
-                    if (net.kuafuai.andee.brain.Source.worthRecording(s, startsTurn = true)) {
-                        net.kuafuai.andee.brain.Source.recordSpeaker(net.kuafuai.andee.desktop.DesktopNotebook.book.people, s)
-                    } else s
-                }
-                h.act(lookQuery(n), src)
+                // Who it came from, on record; and if it answers a task, that task rides along (NotifyTasks).
+                val turn = net.kuafuai.andee.brain.NotifyTasks.turn(net.kuafuai.andee.desktop.DesktopNotebook.book, n)
+                net.kuafuai.andee.brain.NotifyTasks.answeredEvents(turn).forEach { net.kuafuai.andee.desktop.TimelineEvents.brain(it) }
+                h.act(lookQuery(n) + turn.extra, turn.source)
             }
         }
     }

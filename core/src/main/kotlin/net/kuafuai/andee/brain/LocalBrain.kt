@@ -183,6 +183,50 @@ class LocalBrain(
     @Volatile var turnSource: Source? = null
         private set
 
+    /** A turn that runs with a stranger's standing although its kind would not ([work] on such a task). Loop thread. */
+    private var turnUntrusted = false
+
+    /**
+     * Whether this turn has sent something to somebody: typed and then sent (a tap or submit after typing), a text
+     * message, a friend asked, a shell command. The device's evidence for `task done` on a task for someone else, and
+     * for the end-of-turn reminder to write down what is now pending. Loop thread only.
+     */
+    private var turnSent = false
+    private var turnTyped = false
+
+    /** The turn touched a task (any `task` call), so it has already thought about what is pending. */
+    private var turnTasked = false
+
+    /** The end-of-turn reminder fires once a turn. */
+    private var turnReminded = false
+
+    /** What [turnSent] and [turnTyped] are made of; see there. */
+    private fun noteSent(method: String) {
+        when {
+            method == "screen.type" -> turnTyped = true
+            turnTyped && (method == "screen.submit_input" || method.startsWith("screen.tap") || method == "screen.global") -> turnSent = true
+            method == "device.sms.send" || method == "peer.ask" || method == "shell.run" -> turnSent = true
+        }
+    }
+
+    /** What a `task` / `person` call is told about the turn, by the device. See [net.kuafuai.andee.config.LifeTools.task]. */
+    private fun deviceFields(args: JSONObject, untrusted: Boolean) {
+        net.kuafuai.andee.config.LifeTools.DEVICE_FIELDS.forEach { args.remove(it) }
+        val src = turnSource ?: Source.ofTurn(
+            when (currentKind) {
+                TurnKind.USER -> "user"
+                TurnKind.WAKE -> "todo"
+                TurnKind.PEER -> "friend"
+                TurnKind.WORK -> "self"
+                TurnKind.SWEEP, TurnKind.HARVEST -> "review"
+                TurnKind.NOTIFY -> "notify"
+            },
+        )
+        args.put(net.kuafuai.andee.config.LifeTools.TASK_SOURCE, src.toJson())
+        args.put(net.kuafuai.andee.config.LifeTools.TASK_UNTRUSTED, untrusted)
+        args.put(net.kuafuai.andee.config.LifeTools.TASK_SENT, turnSent)
+    }
+
     /**
      * A turn waiting its turn. [onAnswer] rides with it for the same reason the
      * kind does: a task another device handed us must still send its answer back
@@ -196,6 +240,8 @@ class LocalBrain(
         val territory: String? = null,
         /** Where it came from ([Source]), so a turn that waited still knows who asked. */
         val source: Source? = null,
+        /** A work turn on a task a stranger's words started runs with that stranger's standing. See [turnUntrusted]. */
+        val untrusted: Boolean = false,
     )
 
     /**
@@ -561,12 +607,18 @@ class LocalBrain(
         onAnswer: ((String?) -> Unit)? = null,
         territory: String? = null,
         source: Source? = null,
+        untrusted: Boolean = false,
     ) {
         val gen = generation.incrementAndGet()
         loop.execute {
             busy.set(true)
             currentKind = kind
             turnSource = source
+            turnUntrusted = untrusted
+            turnSent = false
+            turnTyped = false
+            turnTasked = false
+            turnReminded = false
             runningWhat = describe(text, kind)
             aimMisses = 0
             reviewItems = if (kind.silent) mutableListOf() else null
@@ -616,6 +668,7 @@ class LocalBrain(
                 // make the *next* turn refuse every device tool.
                 currentKind = TurnKind.USER
                 turnSource = null
+                turnUntrusted = false
                 // The same place, for the same reason, and one more: the trace's
                 // idea of "the turn in flight" has to end with the turn even
                 // when the turn recorded almost nothing. `submit`'s missing-key
@@ -702,7 +755,7 @@ class LocalBrain(
         // A queued todo paused (or closed) by the turn it waited behind is skipped; the next one runs instead.
         while (todoWithdrawn(next.text)) next = pendingWakes.removeFirstOrNull() ?: return
         host.logInfo(TAG, "running a queued ${next.kind} turn: ${next.text.take(60)}")
-        launch(next.text, next.kind, onAnswer = next.onAnswer, territory = next.territory, source = next.source)
+        launch(next.text, next.kind, onAnswer = next.onAnswer, territory = next.territory, source = next.source, untrusted = next.untrusted)
     }
 
     /**
@@ -746,19 +799,19 @@ class LocalBrain(
      *
      * [territory] names the tool set it may use (see [BrainHost.workTools]); null = the default set.
      */
-    fun work(text: String, territory: String?, onDone: (WorkResult) -> Unit) {
+    fun work(text: String, territory: String?, untrusted: Boolean = false, onDone: (WorkResult) -> Unit) {
         val t = text.trim()
         if (t.isEmpty()) return
         val epoch = stopEpoch.get()
         loop.execute {
             if (stoppedSince(epoch, t, TurnKind.WORK)) return@execute onDone(WorkResult(null, emptyList()))
-            val job = Queued(t, TurnKind.WORK, { onDone(workResult()) }, territory)
+            val job = Queued(t, TurnKind.WORK, { onDone(workResult()) }, territory, untrusted = untrusted)
             if (busy.get()) {
                 host.logInfo(TAG, "work queued behind a running turn: ${t.take(60)}")
                 pendingWakes.addLast(job)
                 return@execute
             }
-            launch(t, TurnKind.WORK, onAnswer = job.onAnswer, territory = territory)
+            launch(t, TurnKind.WORK, onAnswer = job.onAnswer, territory = territory, untrusted = untrusted)
         }
     }
 
@@ -1067,6 +1120,9 @@ class LocalBrain(
             // place that must never move. Empty until there is something worth a line.
             val gear = host.gearIndex()
             val friends = host.friendsIndex()
+            // What it is in the middle of (`Tasks`): one line each, answers that arrived first. Same position and
+            // reason as the plan line — it changes every time something is taken on, waited for or delivered.
+            val tasks = host.tasksIndex()
             // Photos with no words: there is no sentence of the user's to take
             // the language from, so the bracketed fallback comes back for it.
             val wordless = userText.isEmpty()
@@ -1171,6 +1227,11 @@ class LocalBrain(
                         } else {
                             "\n\n(other Andees you can ask with ask_friend; list_friends has detail)\n$friends"
                         } +
+                        if (tasks.isEmpty()) {
+                            ""
+                        } else {
+                            "\n\n(things you are in the middle of — task get for detail; an answer that arrived is at the top)\n$tasks"
+                        } +
                         // Who this turn came from, as the device recorded it. See [Source].
                         (turnSource?.let { "\n\n" + it.forPrompt() } ?: "") +
                         // A task cut off at the step limit, so 继续 has something to continue. See [Unfinished].
@@ -1234,6 +1295,14 @@ class LocalBrain(
             if (!turnQuiet && SpeechMood.isQuiet(reply.content)) turnQuiet = true
 
             if (reply.toolCalls.isEmpty()) {
+                // It sent something to somebody and wrote nothing down about what is pending: once, before the turn
+                // ends, ask. A turn that asked the leader and ended is exactly how "who asked" got lost; the model
+                // decides whether anything is pending, the device only makes sure the question was asked.
+                if (!harvest && !quiet && !internal && turnSent && !turnTasked && !turnReminded) {
+                    turnReminded = true
+                    history += JSONObject().put("role", "user").put("content", TASK_REMINDER)
+                    continue
+                }
                 val answer = reply.content.trim()
                 if (harvest) {
                     // A harvest turn's prose is not an answer to anybody: it is
@@ -1297,7 +1366,7 @@ class LocalBrain(
                 step(WorkStep.Action(step, narrate(tc.name)))
                 val t0 = System.nanoTime() / 1_000_000L
                 acted = true
-                val msg = runTool(tc, images, internal, kind.untrusted)
+                val msg = runTool(tc, images, internal, kind.untrusted || turnUntrusted)
                 BrainTrace.tool(
                     gen, tc.name, host.methodOf(tc.name), tc.argumentsRaw,
                     msg.optString("content"), System.nanoTime() / 1_000_000L - t0,
@@ -1390,7 +1459,14 @@ class LocalBrain(
                 turnWaitSeconds += ask
             }
 
+            // Where a task came from, how far it is trusted and whether this turn delivered anything: the device's
+            // to say, never the model's. Whatever the model put under those names is replaced.
+            if (method == "note.task" || method == "note.person") {
+                deviceFields(args, untrusted)
+                if (method == "note.task") turnTasked = true
+            }
             val result = dispatchWithTimeout(method, args, tc.id, silent, untrusted)
+            if (landed(result)) noteSent(method)
             if (currentKind == TurnKind.WORK) workCalls += WorkCall(method, args.optString("action"), tc.id, landed(result))
             BrainEvent.fromTool(method, args, result)?.let(::emit)
             if (AimHints.isTap(method) && result is JSONObject) {
@@ -2117,6 +2193,14 @@ class LocalBrain(
         private const val MAX_HISTORY = 60
 
         /** The keys a handler uses to say its write did or did not happen (`LifeTools`, the notebook). */
+        /** See the end-of-turn check in [runTurn]. Not the user's words, and it says so. */
+        const val TASK_REMINDER =
+            "(device note, not from the user: this turn sent something to somebody, and nothing is written down about " +
+                "what is pending. If you are now waiting for someone's answer, or this is not finished, record it before " +
+                "you stop — task open, then task wait — or it will be lost when this turn ends. If it is finished and " +
+                "nothing is pending, leave tasks alone. Then give your final answer again, in full: the one above was " +
+                "not delivered.)"
+
         private val NOT_DONE_KEYS = listOf("written", "added", "changed", "saved", "noted", "linked", "shared", "logged", "settled", "ok", "performed")
 
 
@@ -2169,8 +2253,8 @@ class LocalBrain(
          */
         private const val REVIEW_RULES = """0. Before writing anything, look at what your notebook already holds (listed at the end). If an entry already covers it, update that one — never add a near-duplicate under a new name. A todo already set for the same thing is not set again. And one todo is one thing: never number several unrelated things into one todo.
 1. A preference / a taboo / a worry / a change in circumstances he said out loud this time → remember(type=user)
-2. Something you promised but have not yet recorded → remember(type=feedback) + todo
-3. Something dropped half-way (asked but not booked, said he would think about it and nobody followed up) → todo, to arrange one follow-up
+2. Something you took on or promised that is not finished and not yet a task (task list shows what is) → task open, with the wait it is in if any (task wait). A promise to do something at a time is a task with a due, not a memory.
+3. Something dropped half-way (asked but not booked, said he would think about it and nobody followed up) → task open for it, or a todo for one follow-up
 4. Something you actually got done for him this time, a route you walked through → remember(type=way), with the task name as name.
    Record only what still holds once the interface changes: which route you took, which route is dead, what you needed from the user on the way, how you could tell it worked.
    No coordinates, not this time's verification code, not this time's order number.

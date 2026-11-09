@@ -1586,6 +1586,11 @@ class CommandDispatcher(
             ).handle(params)
 
             in net.kuafuai.andee.config.LifeTools.METHODS -> Notebook.life(appContext).handle(method, params).also { r ->
+                // A task's time wait is a todo; the alarm is the body's to set, and to take down when the task closes.
+                r.optString("arm_todo").takeIf { it.isNotEmpty() }?.let { id ->
+                    Notebook.todoById(appContext, id)?.let { net.kuafuai.andee.config.Scheduler.armTodo(appContext, it) }
+                }
+                r.optJSONArray("cancel_todos")?.let { a -> for (i in 0 until a.length()) net.kuafuai.andee.config.Scheduler.cancelTodo(appContext, a.optString(i)) }
                 // wiki_write show=true: open what was just written — not from a quiet turn, where nobody asked to see it.
                 if (method == "note.wiki_write" && params?.optBoolean("show") == true && !silent && r.optBoolean("written")) {
                     r.optJSONObject("meta")?.optString("id")?.takeIf { it.isNotEmpty() }?.let { showWiki(it); r.put("shown", true) }

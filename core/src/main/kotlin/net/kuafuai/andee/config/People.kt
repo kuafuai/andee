@@ -81,9 +81,34 @@ class People(
 
     // ---- reading -------------------------------------------------------------------
 
+    /**
+     * Everyone on record. What is owed each way is not stored on the person any more: it is the tasks ([Tasks])
+     * that involve them — including through a record merged into theirs — shown here as [Person.owed].
+     */
     fun all(): List<Person> = synchronized(lock) {
+        val root = load()
+        val a = root.optJSONArray("people") ?: return emptyList()
+        val folded = HashMap<String, MutableSet<String>>()
+        root.optJSONArray("merged")?.let { m ->
+            for (i in 0 until m.length()) m.optJSONObject(i)?.let { folded.getOrPut(it.optString("into")) { HashSet() } += it.optString("from") }
+        }
+        val tasks = runCatching { book.tasks.all() }.getOrDefault(emptyList())
+        (0 until a.length()).mapNotNull { a.optJSONObject(it) }.map(::toPerson).map { p ->
+            if (tasks.isEmpty()) p else p.copy(owed = p.owed + book.tasks.owedFor(setOf(p.id) + (folded[p.id] ?: emptySet<String>())))
+        }
+    }
+
+    /** [Tasks.migrate]: what used to be stored as owed, straight from storage. */
+    internal fun legacyOwed(): List<Pair<Person, Owed>> = synchronized(lock) {
         val a = load().optJSONArray("people") ?: return emptyList()
-        (0 until a.length()).mapNotNull { a.optJSONObject(it) }.map(::toPerson)
+        (0 until a.length()).mapNotNull { a.optJSONObject(it) }.map(::toPerson).flatMap { p -> p.owed.filter { it.status == "open" }.map { p to it } }
+    }
+
+    internal fun clearLegacyOwed() = synchronized(lock) {
+        val root = load()
+        val a = root.optJSONArray("people") ?: return@synchronized
+        for (i in 0 until a.length()) a.optJSONObject(i)?.put("owed", JSONArray())
+        save(root)
     }
 
     /**
@@ -240,20 +265,26 @@ class People(
         null
     }
 
-    fun owe(id: String, dir: String, what: String, due: Long): String = synchronized(lock) {
+    /**
+     * Something owed to or by this person — a task now ([Tasks]): `i_owe` is a task for them, `they_owe` a task
+     * waiting on them. Kept under this name so the `person` tool's `owe` still works. Returns the task id.
+     */
+    fun owe(id: String, dir: String, what: String, due: Long, from: net.kuafuai.andee.brain.Source? = null, untrusted: Boolean = false): String {
         require(dir == "i_owe" || dir == "they_owe") { "dir is i_owe or they_owe" }
         val p = get(id) ?: return "error: no person with id $id"
-        val o = Owed("o" + clock().toString(36) + p.owed.size, dir, what.trim().take(MAX_TEXT), due, "open")
-        put(p.copy(owed = p.owed + o))
-        o.id
+        val them = net.kuafuai.andee.brain.Source(kind = "person", sender = p.name, personId = p.id)
+        val src = from ?: net.kuafuai.andee.brain.Source(kind = "self")
+        val t = book.tasks.open(what, "", due, src, untrusted, deliverTo = if (dir == "i_owe") them else src, origin = "owed")
+            .getOrElse { return "error: ${it.message}" }
+        if (dir == "they_owe") book.tasks.wait(t.id, Tasks.Wait(kind = "person", name = p.name, person = p.id, asked = what))
+        return t.id
     }
 
-    fun settle(personId: String, oweId: String, status: String): Boolean = synchronized(lock) {
+    /** [owe]'s other half: the task is done or dropped. */
+    fun settle(personId: String, oweId: String, status: String): Boolean {
         require(status in setOf("done", "dropped")) { "status is done or dropped" }
-        val p = get(personId) ?: return false
-        if (p.owed.none { it.id == oweId }) return false
-        put(p.copy(owed = p.owed.map { if (it.id == oweId) it.copy(status = status) else it }))
-        true
+        get(personId) ?: return false
+        return book.tasks.close(oweId, status, "settled from the person's record").isSuccess
     }
 
     fun ask(id: String, text: String): Boolean = synchronized(lock) {
