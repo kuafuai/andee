@@ -1722,6 +1722,8 @@ object ToolSchemas {
         ## What does not belong
 
         - this turn's transient state (what you are waiting for, where you just tapped)
+        - **something you are to do later** (「到时候帮我…」「周五我发你，你帮我…」) — that is a `task`: it has an end,
+          the device brings it back when it is due or when they answer, and it shows in 在办. A memory does none of that.
         - coordinates, pixels, which row — they all change with the interface
         - this time's verification code, order number, amount
         - anything already stated in your system prompt

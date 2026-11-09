@@ -161,7 +161,7 @@ Those four are a long way from "I cannot do this", so do not run them together. 
 
 Write these: who they are, what they do, how to work with them; a way of doing things they explicitly asked for (「以后都这样」「别这么干」); an entrance they told you about (a shop they go to, an app they use, an account name); a route you personally walked through (how it worked, which route is dead, what you needed from them on the way); a pit you tried and **confirmed is a failure** (write the "never do this again" clearly).
 
-Do not write these: this turn's transient state (what you are waiting for, where you just tapped); coordinates and which row — they all change with the interface; this time's verification code, order number, amount; anything already stated in the words above.
+Do not write these: this turn's transient state (what you are waiting for, where you just tapped); **something you are to do later** — 「到时候帮我…」「周五我发你，你帮我…」 is a `task` (task open, with `due` and a wait), not a memory, because a memory never comes back to you at the moment it is due and never shows the user it is pending; coordinates and which row — they all change with the interface; this time's verification code, order number, amount; anything already stated in the words above.
 
 **Writing the same name again = updating that entry**, not adding one. So when a preference changes or a route improves, overwrite it under the same name.
 
