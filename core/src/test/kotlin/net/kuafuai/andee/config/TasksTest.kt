@@ -184,4 +184,13 @@ class TasksTest {
         assertTrue(lines.first(), lines.first().startsWith("$a ready"))
         assertNotNull(lines.firstOrNull { it.startsWith(b) })
     }
+
+    @Test fun waitingOnTheUserByAnyNameIsAUserWaitNotSomeoneToMatch() {
+        val id = call(JSONObject().put("action", "open").put("what", "等他发快递单号"), Source(kind = "user"), untrusted = false).getString("id")
+        assertTrue(call(JSONObject().put("action", "wait").put("id", id).put("on", "person").put("name", "他").put("asked", "单号"), Source(kind = "user"), untrusted = false).optBoolean("waiting"))
+        val w = tasks.get(id)!!.waits.single()
+        assertEquals("user", w.kind)
+        assertEquals("the user", w.short())
+        assertTrue(tasks.awaiting(Source.fromNotification(n("private", "他", "单号是 123"))).isEmpty())
+    }
 }

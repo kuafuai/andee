@@ -2061,9 +2061,9 @@ object ToolSchemas {
         - `open` (what, next, due?) — take it on. **Where it came from is recorded by the device** from this turn: who
           asked, in which conversation, in what words; the result goes back there unless you give `deliver_to`
           {app, chat, name} (the user's own turns only).
-        - `wait` (id, on: person | friend | time) — what it now waits for. person: `name` as they are shown, `chat` the
-          group's name (empty for a private chat), `app`, `asked` what you asked. friend: `name` of the other Andee.
-          time: `at` epoch ms to come back. **When that person answers, the device recognises it** and brings this task
+        - `wait` (id, on: person | user | friend | time) — what it now waits for. person: someone else, `name` as they
+          are shown, `chat` the group's name (empty for a private chat), `app`, `asked` what you asked. user: the user is
+          to come back with something (they will tell you). friend: `name` of the other Andee. time: `at` epoch ms. **When that person answers, the device recognises it** and brings this task
           back to you with their words; you do not have to remember to look.
         - `step` (id, text, next?) — what happened, and what comes next.
         - `done` (id, result) — delivered. For someone other than the user, something must have gone out to them on
@@ -2083,7 +2083,7 @@ object ToolSchemas {
                 "next" to prop("string", "For open / step: the next thing to do."),
                 "due" to prop("integer", "For open: when it is due, epoch ms, if it has a deadline."),
                 "deliver_to" to prop("object", "For open, the user's turns only: {app, chat, name} — where the result goes if not back to who asked."),
-                "on" to propEnum("For wait", listOf("person", "friend", "time")),
+                "on" to propEnum("For wait", listOf("person", "user", "friend", "time")),
                 "name" to prop("string", "For wait: who, as they are shown there."),
                 "chat" to prop("string", "For wait on a person: the group's name; empty for a private chat."),
                 "app" to prop("string", "For wait on a person: wechat, qq, …"),

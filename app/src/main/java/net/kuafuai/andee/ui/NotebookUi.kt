@@ -929,7 +929,7 @@ class NotebookUi(
         )
         val bits = mutableListOf(t.id + " · " + st)
         if (t.deliverTo.kind != "user") bits += lctx.getString(R.string.notebook_task_for, t.deliverTo.short())
-        t.waits.filter { it.open }.takeIf { it.isNotEmpty() }?.let { w -> bits += lctx.getString(R.string.notebook_task_on, w.joinToString(", ") { it.short() }) }
+        t.waits.filter { it.open }.takeIf { it.isNotEmpty() }?.let { w -> bits += lctx.getString(R.string.notebook_task_on, w.joinToString(", ") { if (it.kind == "user") lctx.getString(R.string.notebook_task_you) else it.short() }) }
         row.addView(label(bits.joinToString(" · "), Glass.Type.MICRO, Glass.MUTED, top = 4), matchWrap())
         t.waits.lastOrNull { !it.open }?.let { row.addView(label("「" + it.answer.take(80) + "」", Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap()) }
         if (t.next.isNotBlank()) row.addView(label(lctx.getString(R.string.notebook_task_next, t.next), Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap())

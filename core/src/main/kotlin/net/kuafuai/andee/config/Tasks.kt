@@ -30,6 +30,7 @@ class Tasks(
     /**
      * Something a task is waiting for. [kind] `person`: someone in a conversation ([name] in [chat], blank chat = a
      * private chat; blank name = anyone in that chat). `friend`: another Andee's report. `time`: come back at [due].
+     * `user`: the user is to come back with something — nothing to match, they will say it to Andee directly.
      */
     data class Wait(
         val kind: String,
@@ -51,6 +52,7 @@ class Tasks(
         fun short(): String = when (kind) {
             "time" -> "until " + stamp(due)
             "friend" -> "friend $name"
+            "user" -> "the user"
             else -> (name.ifBlank { "anyone" }) + (if (chat.isNotBlank()) "@$chat" else "")
         }
     }
@@ -141,7 +143,7 @@ class Tasks(
         val now = clock()
         var wait = w.copy(at = now, asked = w.asked.trim().take(MAX_TEXT), name = w.name.trim(), chat = w.chat.trim())
         if (wait.kind == "time" && wait.due <= now) throw IllegalArgumentException("a time wait needs a moment in the future (epoch ms)")
-        if (wait.kind != "time" && wait.name.isBlank() && wait.chat.isBlank()) {
+        if (wait.kind != "time" && wait.kind != "user" && wait.name.isBlank() && wait.chat.isBlank()) {
             throw IllegalArgumentException("say who you are waiting for (name), or in which group (chat)")
         }
         var arm: Todo? = null

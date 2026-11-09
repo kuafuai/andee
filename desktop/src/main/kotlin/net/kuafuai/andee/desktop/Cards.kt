@@ -523,7 +523,7 @@ private fun TodosTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
                 val st = when (task.status) { "ready" -> t("回话到了", "answer came"); "waiting" -> t("在等回话", "waiting for an answer"); else -> t("进行中", "under way") }
                 val bits = mutableListOf("${task.id} · $st")
                 if (task.deliverTo.kind != "user") bits += t("办完交给 ${task.deliverTo.short()}", "for ${task.deliverTo.short()}")
-                task.waits.filter { it.open }.takeIf { it.isNotEmpty() }?.let { w -> bits += t("在等 ", "waiting on ") + w.joinToString(", ") { it.short() } }
+                task.waits.filter { it.open }.takeIf { it.isNotEmpty() }?.let { w -> bits += t("在等 ", "waiting on ") + w.joinToString(", ") { if (it.kind == "user") t("你", "you") else it.short() } }
                 Text(bits.joinToString(" · "), color = Palette.muted, fontSize = 11.sp)
                 task.waits.lastOrNull { !it.open }?.let { Text("「${it.answer.take(80)}」", color = Palette.secondary, fontSize = 12.sp) }
                 if (task.next.isNotBlank()) Text(t("下一步：", "Next: ") + task.next, color = Palette.secondary, fontSize = 12.sp)

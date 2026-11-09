@@ -219,9 +219,15 @@ class LifeTools(
             "wait" -> {
                 val on = a.optString("on", "person")
                 val t = book.get(id) ?: return fail("no task $id")
-                val w = when (on) {
-                    "time" -> Tasks.Wait(kind = "time", due = a.optLong("at"))
-                    "friend" -> Tasks.Wait(kind = "friend", name = a.optString("name"), asked = a.optString("asked"))
+                // The model says "waiting on 他" meaning the user (measured on the phone, 11-09): a person wait the
+                // device would try to match against notifications forever. The user, by any name, is `user`.
+                val nm = a.optString("name").trim()
+                val isUser = on == "user" || (on == "person" && a.optString("chat").isBlank() &&
+                    (nm.lowercase() in USER_WORDS || (nm.isNotEmpty() && nm == people.ownerName())))
+                val w = when {
+                    isUser -> Tasks.Wait(kind = "user", asked = a.optString("asked"))
+                    on == "time" -> Tasks.Wait(kind = "time", due = a.optLong("at"))
+                    on == "friend" -> Tasks.Wait(kind = "friend", name = a.optString("name"), asked = a.optString("asked"))
                     else -> Tasks.Wait(
                         kind = "person", name = a.optString("name"), chat = a.optString("chat"), asked = a.optString("asked"),
                         channel = Tasks.channelOfName(a.optString("app")).ifBlank { t.from.channel.takeIf { t.from.kind == "notify" }.orEmpty() },
@@ -332,6 +338,9 @@ class LifeTools(
         const val TASK_UNTRUSTED = "_untrusted"
         const val TASK_SENT = "_sent"
         val DEVICE_FIELDS = setOf(TASK_SOURCE, TASK_UNTRUSTED, TASK_SENT)
+
+        /** What the model calls the user when it means them, in a wait. */
+        private val USER_WORDS = setOf("他", "她", "ta", "用户", "主人", "我", "user", "the user", "owner", "him", "her", "me")
         val METHODS = setOf(
             "note.self", "note.cares", "note.diary", "note.person", "note.people", "note.task",
             "note.wiki_search", "note.wiki_read", "note.wiki_write", "note.wiki_status", "note.wiki_link", "note.wiki_share", "note.wiki_know",
