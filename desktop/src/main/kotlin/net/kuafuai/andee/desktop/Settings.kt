@@ -77,7 +77,17 @@ object Settings {
         val tmp = File(file.parentFile, "${file.name}.tmp")
         tmp.outputStream().use { p.store(it.writer(Charsets.UTF_8), "Andee settings") }
         tmp.renameTo(file)
+        val changed = values.keys.filter { it in KEYS }.toSet()
+        if (changed.isNotEmpty()) listeners.forEach { runCatching { it(changed) } }
     }
+
+    /**
+     * Told which keys a [save] wrote, after it wrote them. For the few things that must react to a setting
+     * rather than read it on use — the notification reader holds an App Nap exemption only while `notify` is on.
+     */
+    private val listeners = java.util.concurrent.CopyOnWriteArrayList<(Set<String>) -> Unit>()
+
+    fun onSaved(l: (Set<String>) -> Unit) { listeners += l }
 
     /** A stable per-install id, generated once — the phone's `uid`. */
     fun uid(): String = synchronized(lock) {

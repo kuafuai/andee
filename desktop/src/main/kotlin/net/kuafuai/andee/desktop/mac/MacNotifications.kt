@@ -115,13 +115,30 @@ object MacNotifications {
      *
      * Idempotent — [recheck] can arrive after a start that already did this.
      */
-    private fun watchStarted() {
-        if (state != State.WATCHING) return
-        Bridge.notifKeepAwake()
-        if (polling) return
-        polling = true
-        exec.scheduleWithFixedDelay({ poll() }, POLL_MS, POLL_MS, TimeUnit.MILLISECONDS)
-        Log.i(TAG, "fallback read armed: every ${POLL_MS / 1000}s")
+    private fun watchStarted() = exec.execute { applyScope() }
+
+    /**
+     * The App Nap exemption and the minute read, **only while `notify` is chat or all**. Both exist so a
+     * message is not missed; with notifications off every record is dropped by [inScope] anyway, so holding
+     * them would cost battery for nothing — and off is the Mac's default. Re-run whenever `notify` is saved.
+     * On [exec].
+     */
+    private fun applyScope() {
+        val on = state == State.WATCHING && Settings.get("notify").let { it == "chat" || it == "all" }
+        if (on) {
+            Bridge.notifKeepAwake()
+            if (poller == null) {
+                poller = exec.scheduleWithFixedDelay({ poll() }, POLL_MS, POLL_MS, TimeUnit.MILLISECONDS)
+                Log.i(TAG, "fallback read armed: every ${POLL_MS / 1000}s; App Nap exemption held")
+            }
+        } else {
+            Bridge.notifLetSleep()
+            poller?.let {
+                it.cancel(false)
+                poller = null
+                Log.i(TAG, "notifications off: fallback read stopped, App Nap exemption released")
+            }
+        }
     }
 
     /** One read on the timer. On [exec], so it can never overlap the watcher's read. */
@@ -131,7 +148,12 @@ object MacNotifications {
         readNew()
     }
 
-    @Volatile private var polling = false
+    /** The minute read, while it runs. [exec] only. */
+    private var poller: ScheduledFuture<*>? = null
+
+    init {
+        Settings.onSaved { keys -> if ("notify" in keys) exec.execute { applyScope() } }
+    }
 
     /**
      * Decides [state] again, for the self-check card's 重新检测.

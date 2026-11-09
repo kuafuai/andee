@@ -57,6 +57,10 @@ class NotificationTriage(
         // See the class KDoc: a classification does not think.
         thinking = false,
         reasoningEffort = cfg.reasoningEffort,
+        // ~500 tokens in, one line out. On the phone this runs inside a wake lock with a deadline
+        // (NotificationRelayService.KeepAwake), and the call has to end before the lock does; a triage that
+        // has not answered in this long is a failed one, which falls back to the signboard.
+        readTimeoutSeconds = READ_TIMEOUT_S,
     )
 
     enum class Action {
@@ -202,6 +206,9 @@ class NotificationTriage(
     }
 
     companion object {
+        /** See [llm]. Well inside the phone's 60 s wake-lock deadline, with the 10 s settle before it. */
+        const val READ_TIMEOUT_S = 30L
+
         private const val TAG = "Brain"
 
         /**

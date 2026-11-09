@@ -2003,6 +2003,8 @@ class CommandDispatcher(
             ui.removeCallbacks(endDriving)
             ripple.setBreathing(false)
             window.setWorking(false)
+            // Whatever notification was held behind this task gets its look now, not on the next uptime tick.
+            net.kuafuai.andee.device.NotificationRelayService.taskEnded()
         }
     }
 

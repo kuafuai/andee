@@ -670,6 +670,7 @@
     <string name="tl_held">收到 %1$s 的通知，正在忙，先放着</string>
     <string name="tl_capped">收到 %1$s 的通知，这个小时看得太多了，先放着</string>
     <string name="tl_listener_lost">通知监听断了，重新连上之前新消息我看不到（自检里可以重新授权）</string>
+    <string name="tl_notify_late">%1$s 的消息晚到了 %2$d 分钟：手机锁屏省电时我被暂停了。在自检里把 Andee 加进电池优化白名单就不会了</string>
     <string name="tl_diary_updated">改写了今天的日记</string>
     <string name="tl_memory_updated">更新了记忆：%1$s</string>
     <string name="tl_plan_today_updated">改了今天的打算</string>
@@ -973,6 +974,7 @@
     <string name="check_detail_wake_off">还没录。自己选个词（例如「嘿 Andee」）录 3 遍就能喊醒。不录也能用，只是得点球。</string>
     <string name="check_detail_battery_on">已在白名单，待办闹钟不会被推迟。</string>
     <string name="check_detail_battery_off">不在电池优化白名单里。点右边「去开启」，系统会问「是否忽略电池优化？」，选「忽略」就好。\n厂商自己的「应用启动管理 / 后台运行」是另一套，在那里怎么改这项都是红的。息屏后待办提醒会晚到，唤醒词也会停。</string>
+    <string name="check_detail_battery_off_notify">不在电池优化白名单里。点右边「去开启」，系统会问「是否忽略电池优化？」，选「忽略」就好。\n厂商自己的「应用启动管理 / 后台运行」是另一套，在那里怎么改这项都是红的。消息提醒开着：锁屏久了，消息会晚几分钟才到我这里；息屏后待办提醒也会晚到，唤醒词也会停。</string>
     <string name="check_detail_auto_start_on">已允许。进程被系统杀掉后能自己拉回来。</string>
     <string name="check_detail_auto_start_off">没开。小米的省电策略会定时杀掉后台进程，没开自启动就拉不回来，表现就是「用一会儿自己关掉」。点右边去开启。</string>
     <string name="check_detail_disk_ok">剩余 %1$d MB。</string>

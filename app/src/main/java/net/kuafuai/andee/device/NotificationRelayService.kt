@@ -71,6 +71,14 @@ class NotificationRelayService : NotificationListenerService() {
      */
     override fun onListenerConnected() {
         connected = true
+        live = this
+        // Back: a later outage is a new one and gets its own row (see [armRebindCheck]).
+        rebound()
+    }
+
+    override fun onDestroy() {
+        if (live === this) live = null
+        super.onDestroy()
     }
 
     override fun onListenerDisconnected() {
@@ -85,36 +93,9 @@ class NotificationRelayService : NotificationListenerService() {
         // this point, and the request is queued against the component, not
         // against this instance.
         runCatching { requestRebind(ComponentName(this, NotificationRelayService::class.java)) }
-        // And then check whether it worked. This is the half of "a message got
-        // no reaction" that no fix in this file can cure: if the system never
-        // binds us again, [onNotificationPosted] is never called at all, so
-        // nothing upstream of this point can notice — the device simply goes
-        // quiet, which is indistinguishable from "the user had no messages".
-        // Saying so on the timeline is the only honest answer, and it is what
-        // stops a silence from being read as a filter.
-        main.removeCallbacks(verifyRebind)
-        main.postDelayed(verifyRebind, REBIND_CHECK_MS)
+        // And then check whether it worked — see [armRebindCheck].
+        armRebindCheck(this)
     }
-
-    /** Still unbound a while after asking? Say it where the user will see it. [main] only. */
-    private val verifyRebind = object : Runnable {
-        override fun run() {
-            if (connected) {
-                lostReported = false
-                return
-            }
-            android.util.Log.w(
-                "Body",
-                "notification listener still unbound ${REBIND_CHECK_MS / 1000}s after a rebind request",
-            )
-            if (lostReported) return
-            lostReported = true
-            net.kuafuai.andee.ui.PhoneTimeline.lostListener(this@NotificationRelayService)
-        }
-    }
-
-    /** One row per disconnect, not one per check. [main] only. */
-    private var lostReported = false
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         sbn ?: return
@@ -346,7 +327,7 @@ class NotificationRelayService : NotificationListenerService() {
      * the device could form no opinion — then the signboard goes up and the user
      * decides, exactly as this service did before any of this existed.
      */
-    private fun deliver(n: JSONObject) {
+    private fun deliver(n: JSONObject, retry: Boolean = false) {
         // The number the user asks about ("why did this take ten minutes?") is
         // this one, and it was invisible: every row on the timeline is written
         // *after* here, so a late notification and a fast one looked identical.
@@ -354,8 +335,18 @@ class NotificationRelayService : NotificationListenerService() {
         val waited = System.currentTimeMillis() - n.optLong("when")
         android.util.Log.i(
             "Body",
-            "notification reached triage ${waited}ms after posting (${n.optString("app")})",
+            "notification reached triage ${waited}ms after posting (${n.optString("app")})${if (retry) " — held behind a task" else ""}",
         )
+        // Late on its first try means the settle could not run: the phone was
+        // asleep in a way the wake lock does not reach (deep Doze, without the
+        // battery exemption). Say so, and say what fixes it. Not for a retry —
+        // that one waited for a task on purpose.
+        if (!retry && waited > LATE_MS) {
+            val pm = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            if (pm?.isIgnoringBatteryOptimizations(packageName) == false) {
+                net.kuafuai.andee.ui.PhoneTimeline.lateBySleep(this, n.optString("app").ifEmpty { "?" }, waited)
+            }
+        }
         val svc = net.kuafuai.andee.BodyCoreService.get()
         if (svc?.dispatcherForNotification()?.isTaskActive() == true) {
             // A task is running: the ball is busy gripping the ledge and the
@@ -388,7 +379,9 @@ class NotificationRelayService : NotificationListenerService() {
             KeepAwake.exit()
             return
         }
-        // The triage is a network round trip, so it cannot happen here.
+        // The triage is a network round trip, so it cannot happen here. Its own
+        // full deadline, whatever the settle used up (KeepAwake).
+        KeepAwake.refresh()
         Thread {
             try {
                 val handled = runCatching { svc?.handleNotification(n) }.getOrNull() ?: false
@@ -418,7 +411,7 @@ class NotificationRelayService : NotificationListenerService() {
             // held notification is retried by the same uptime-based timer, so it
             // needs the same real-time guarantee.
             KeepAwake.enter(this@NotificationRelayService)
-            deliver(n)
+            deliver(n, retry = true)
             if (held.isNotEmpty()) main.postDelayed(this, HELD_RETRY_MS)
         }
     }
@@ -545,6 +538,70 @@ class NotificationRelayService : NotificationListenerService() {
         /** How often a notification held behind a task asks again whether the task is over. */
         private const val HELD_RETRY_MS = 3_000L
 
+        /** First seen this long after it was posted, it is late — see [deliver]. Settle plus a slow read is well under it. */
+        private const val LATE_MS = 2 * 60 * 1000L
+
+        /** The bound instance, for [taskEnded]. Main thread writes. */
+        @Volatile private var live: NotificationRelayService? = null
+
+        /**
+         * A task just ended (CommandDispatcher.setBusy(false)): look at what was
+         * held behind it now. The 3 s poll alone ran on uptime, so with the
+         * screen off a task ending did not get held messages looked at until the
+         * next wake; this moment is one where the CPU is certainly awake. The
+         * poll stays as the fallback.
+         */
+        fun taskEnded() {
+            val svc = live ?: return
+            svc.main.post {
+                svc.main.removeCallbacks(svc.retryHeld)
+                svc.retryHeld.run()
+            }
+        }
+
+        private val checks = android.os.Handler(android.os.Looper.getMainLooper())
+
+        /** One row per outage, not one per check. Main thread only. */
+        private var lostReported = false
+
+        private var verify: Runnable? = null
+
+        /**
+         * After asking for a rebind, check that it took — from both places that
+         * ask: a disconnect, and [ensureBound] at service start (the reinstall
+         * case, where no disconnect is ever delivered to the new process).
+         *
+         * This is the half of "a message got no reaction" no fix in this file can
+         * cure: unbound, [onNotificationPosted] is never called, so the device
+         * simply goes quiet — indistinguishable from "the user had no messages".
+         * A timeline row is the only honest answer.
+         */
+        fun armRebindCheck(context: Context) {
+            val app = context.applicationContext
+            checks.post {
+                verify?.let { checks.removeCallbacks(it) }
+                val r = Runnable {
+                    verify = null
+                    if (connected) return@Runnable
+                    android.util.Log.w("Body", "notification listener still unbound ${REBIND_CHECK_MS / 1000}s after a rebind request")
+                    if (lostReported) return@Runnable
+                    lostReported = true
+                    net.kuafuai.andee.ui.PhoneTimeline.lostListener(app)
+                }
+                verify = r
+                checks.postDelayed(r, REBIND_CHECK_MS)
+            }
+        }
+
+        /** Bound again: the check is moot, and the next outage is a new one. */
+        private fun rebound() {
+            checks.post {
+                verify?.let { checks.removeCallbacks(it) }
+                verify = null
+                lostReported = false
+            }
+        }
+
         /**
          * How long a rebind request gets before the device admits it did not
          * work. The system's own rebind is usually immediate; this is a delay
@@ -644,6 +701,7 @@ class NotificationRelayService : NotificationListenerService() {
             val cn = ComponentName(context, NotificationRelayService::class.java)
             if (!isPermitted(context, cn)) return // nothing to rebind; the user has to grant it
             runCatching { requestRebind(cn) }
+            armRebindCheck(context)
         }
 
         private fun isPermitted(context: Context, cn: ComponentName): Boolean =
@@ -704,42 +762,51 @@ class NotificationRelayService : NotificationListenerService() {
  * the verdict never returns — a hung socket, a process being torn down — the
  * system takes the lock back rather than leaving a phone awake in a pocket.
  * Depth-counted, because two apps can each be mid-burst; the last exit
- * releases. All callers must pair [enter] with exactly one [exit].
+ * releases. All callers must pair [enter] with exactly one [exit] — and
+ * [AwakeCount] survives one that does not.
+ *
+ * **What it cannot do: deep Doze.** In deep Doze the platform ignores wake
+ * locks and cuts the network for any app not exempt from battery
+ * optimisation, so there this only helps the light sleep a screen-off phone
+ * is in most of the time. The self-check's battery row says so when
+ * notifications are on, and [NotificationRelayService.deliver] writes a row
+ * when a message came in late for that reason.
  */
 private object KeepAwake {
 
-    /** A burst of two chats plus a slow triage still lands well inside this. */
+    /** A burst of two chats plus the triage (30 s read timeout, see [net.kuafuai.andee.brain.NotificationTriage]) lands inside this. */
     private const val MAX_MS = 60_000L
 
-    private val guard = Any()
-    private var depth = 0
-    private var lock: android.os.PowerManager.WakeLock? = null
+    @Volatile private var lock: android.os.PowerManager.WakeLock? = null
+    @Volatile private var app: android.content.Context? = null
+
+    /** The count and the deadline; see [AwakeCount] for the two rules it keeps. */
+    private val count = AwakeCount(
+        MAX_MS,
+        clock = { android.os.SystemClock.elapsedRealtime() },
+        acquire = { ms -> wakeLock()?.let { runCatching { it.acquire(ms) } } },
+        release = { lock?.let { if (it.isHeld) runCatching { it.release() } } },
+    )
+
+    /**
+     * One lock for the process, created on first use. Non-refcounted, so a second `acquire(ms)` does not stack —
+     * it moves the deadline, which is what [AwakeCount.enter] and [AwakeCount.refresh] rely on.
+     */
+    private fun wakeLock(): android.os.PowerManager.WakeLock? {
+        lock?.let { return it }
+        val c = app ?: return null
+        val pm = c.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager ?: return null
+        return pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "andee:notification")
+            .also { it.setReferenceCounted(false); lock = it }
+    }
 
     fun enter(c: android.content.Context) {
-        synchronized(guard) {
-            if (depth++ > 0) return
-            val pm = c.getSystemService(android.content.Context.POWER_SERVICE)
-                as? android.os.PowerManager
-            if (pm == null) {
-                depth = 0
-                return
-            }
-            lock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "andee:notification").also {
-                // Non-refcounted: the timeout is a deadline, not a count, and a
-                // reference-counted lock would need release() to match exactly
-                // or throw.
-                it.setReferenceCounted(false)
-                runCatching { it.acquire(MAX_MS) }
-            }
-        }
+        app = c.applicationContext
+        count.enter()
     }
 
-    fun exit() {
-        synchronized(guard) {
-            if (depth == 0) return
-            if (--depth > 0) return
-            lock?.let { if (it.isHeld) runCatching { it.release() } }
-            lock = null
-        }
-    }
+    /** Before the triage's network call: the full deadline for it, whatever the settle used up. */
+    fun refresh() = count.refresh()
+
+    fun exit() = count.exit()
 }

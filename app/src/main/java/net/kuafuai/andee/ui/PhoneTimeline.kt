@@ -99,4 +99,8 @@ object PhoneTimeline {
      * something with, and here the honest news is that it can see nothing.
      */
     fun lostListener(c: Context) = body(Body.IGNORED, s(c, R.string.tl_listener_lost))
+
+    /** A message first seen [ms] after it was posted, on a phone without the battery exemption — see the relay's `deliver`. */
+    fun lateBySleep(c: Context, app: String, ms: Long) =
+        body(Body.IGNORED, s(c, R.string.tl_notify_late, app, (ms / 60_000L).coerceAtLeast(1L)))
 }

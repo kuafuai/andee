@@ -67,6 +67,12 @@ class LlmClient(
     model: String,
     thinking: Boolean,
     reasoningEffort: String,
+    /**
+     * How long to wait for an answer. 180 s for a turn (a thinking model answers in minutes); a caller that
+     * classifies something small and runs under a deadline of its own — the notification triage, inside the
+     * phone's wake lock — passes less.
+     */
+    readTimeoutSeconds: Long = 180,
 ) {
 
     // Request parameters, read once per [complete]. Volatile because [retune]
@@ -102,7 +108,7 @@ class LlmClient(
         .followRedirects(false)
         .followSslRedirects(false)
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(180, TimeUnit.SECONDS)
+        .readTimeout(readTimeoutSeconds, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 

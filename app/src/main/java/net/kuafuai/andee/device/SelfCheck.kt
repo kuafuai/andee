@@ -1015,12 +1015,18 @@ object SelfCheck {
     private fun background(context: Context): Finding {
         val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
         val ignored = pm?.isIgnoringBatteryOptimizations(context.packageName) == true
+        // With notifications on, this row is also why a message on a locked phone can reach Andee minutes late:
+        // in deep Doze the relay's wake lock is ignored and the triage has no network. Said here, where the fix is.
+        val notifying = net.kuafuai.andee.config.VoiceConfig.notifyScope(context) != net.kuafuai.andee.config.VoiceConfig.NOTIFY_OFF
         return Finding(
             id = "battery",
             title = R.string.check_title_battery,
             level = if (ignored) Level.OK else Level.WARN,
-            detail = if (ignored) R.string.check_detail_battery_on
-            else R.string.check_detail_battery_off,
+            detail = when {
+                ignored -> R.string.check_detail_battery_on
+                notifying -> R.string.check_detail_battery_off_notify
+                else -> R.string.check_detail_battery_off
+            },
             fix = if (ignored) Fix.Nothing else batteryFix(context),
         )
     }

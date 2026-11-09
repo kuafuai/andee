@@ -646,6 +646,7 @@
     <string name="tl_held">A notification from %1$s came in while busy; kept for later</string>
     <string name="tl_capped">A notification from %1$s came in past the hourly limit; kept for later</string>
     <string name="tl_listener_lost">Notification access dropped — I cannot see new messages until it is granted again</string>
+    <string name="tl_notify_late">A message from %1$s reached me %2$d min late: the phone paused me while it slept. Exempting Andee from battery optimisation in the self-check fixes this</string>
     <string name="tl_diary_updated">Rewrote today\'s diary</string>
     <string name="tl_memory_updated">Updated a memory: %1$s</string>
     <string name="tl_plan_today_updated">Revised today\'s plan</string>
@@ -889,6 +890,7 @@
     <string name="check_detail_wake_off">Not taught yet. Pick a phrase (e.g. “Hey Andee”) and say it 3 times to wake me by voice. Everything still works without it, you just tap the ball to talk.</string>
     <string name="check_detail_battery_on">Exempt, so pending reminders are not delayed.</string>
     <string name="check_detail_battery_off">Not exempt from battery optimisation. Tap “Open settings” — the system asks “Ignore battery optimisations?”; take the button that ignores them.\nThe vendor’s own “App launch / background running” controls are a separate system; changing them leaves this row red. With the screen off a pending reminder may arrive late, and the wake phrase stops listening.</string>
+    <string name="check_detail_battery_off_notify">Not exempt from battery optimisation. Tap “Open settings” — the system asks “Ignore battery optimisations?”; take the button that ignores them.\nThe vendor’s own “App launch / background running” controls are a separate system; changing them leaves this row red. Notifications are on: on a phone that has been locked a while, messages reach me minutes late. With the screen off a pending reminder may arrive late too, and the wake phrase stops listening.</string>
     <string name="check_detail_auto_start_on">Allowed. The process can bring itself back after the system kills it.</string>
     <string name="check_detail_auto_start_off">Off. Xiaomi’s power policy reaps background processes on a timer, and without auto-start the assistant cannot come back after that — it looks like it just closes by itself. Tap to enable.</string>
     <string name="check_detail_disk_ok">%1$d MB free.</string>
