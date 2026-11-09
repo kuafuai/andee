@@ -758,6 +758,8 @@
     <string name="notebook_task_on">在等 %1$s</string>
     <string name="notebook_task_next">下一步：%1$s</string>
     <string name="notebook_task_dropped_by_user">用户在小本本里放下了</string>
+    <string name="notebook_tasks_empty">还没有在办的事。它接下一件一时办不完的事（要问别人、要等回话、要过会儿再做），就会出现在这里，办完为止。</string>
+    <string name="notebook_timed_empty">没有定时的提醒</string>
     <string name="notebook_type_user">关于你</string>
     <string name="notebook_type_feedback">你的偏好</string>
     <string name="notebook_type_way">做事的方式</string>

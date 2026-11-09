@@ -890,18 +890,18 @@ class NotebookUi(
         val tasks = Notebook.tasks(context)
         val open = tasks.active().sortedWith(compareBy<net.kuafuai.andee.config.Tasks.Task> { if (it.status == "ready") 0 else 1 }.thenByDescending { it.touchedAt })
         val active = Notebook.todos(context, "active")
-        if (active.isEmpty() && open.isEmpty()) {
-            body.addView(emptyState(lctx.getString(R.string.notebook_empty_todos)))
-            return
+        // Both headings always: with no tasks the tab looked exactly like the old 待办 list, and the user concluded
+        // there were no tasks at all.
+        body.addView(label(lctx.getString(R.string.notebook_tasks_head), Glass.Type.CAPTION, Glass.MUTED), matchWrap().apply { bottomMargin = dp(6) })
+        if (open.isEmpty()) {
+            body.addView(label(lctx.getString(R.string.notebook_tasks_empty), Glass.Type.CAPTION, Glass.SECONDARY), matchWrap().apply { bottomMargin = dp(10) })
         }
-        if (open.isNotEmpty()) {
-            body.addView(label(lctx.getString(R.string.notebook_tasks_head), Glass.Type.CAPTION, Glass.MUTED), matchWrap().apply { bottomMargin = dp(6) })
-            for (t in open) body.addView(taskRow(tasks, t), matchWrap().apply { bottomMargin = dp(10) })
+        for (t in open) body.addView(taskRow(tasks, t), matchWrap().apply { bottomMargin = dp(10) })
+        body.addView(label(lctx.getString(R.string.notebook_timed_head), Glass.Type.CAPTION, Glass.MUTED, top = 8), matchWrap().apply { bottomMargin = dp(6) })
+        if (active.isEmpty()) {
+            body.addView(label(lctx.getString(R.string.notebook_timed_empty), Glass.Type.CAPTION, Glass.SECONDARY), matchWrap())
         }
         if (active.isNotEmpty()) {
-            if (open.isNotEmpty()) {
-                body.addView(label(lctx.getString(R.string.notebook_timed_head), Glass.Type.CAPTION, Glass.MUTED, top = 8), matchWrap().apply { bottomMargin = dp(6) })
-            }
             for (t in active.sortedBy { it.nextRunAt }) {
                 body.addView(todoRow(t), matchWrap().apply { bottomMargin = dp(10) })
             }

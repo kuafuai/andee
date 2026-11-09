@@ -507,13 +507,14 @@ private fun TodosTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
     val todos = DesktopNotebook.book.todos("pending").filter { it.status in listOf("active", "paused") }
         .sortedBy { if (it.nextRunAt > 0) it.nextRunAt else Long.MAX_VALUE }
 
-    if (todos.isEmpty() && open.isEmpty()) {
-        EmptyState(t("没有在办的事", "Nothing in progress"))
-        return
-    }
-    if (open.isNotEmpty()) {
-        Text(t("在办的事", "In progress"), color = Palette.muted, fontSize = 12.sp)
-        Spacer(Modifier.height(6.dp))
+    // Both headings always: with no tasks the tab looked exactly like the old 待办 list (NotebookUi.buildTodos).
+    Text(t("在办的事", "In progress"), color = Palette.muted, fontSize = 12.sp)
+    Spacer(Modifier.height(6.dp))
+    if (open.isEmpty()) {
+        Text(t("还没有在办的事。它接下一件一时办不完的事（要问别人、要等回话、要过会儿再做），就会出现在这里，办完为止。",
+            "Nothing in progress. When it takes on something it cannot finish at once (asking someone, waiting for an answer, coming back later), it shows here until it is done."),
+            color = Palette.secondary, fontSize = 12.sp, lineHeight = 18.sp)
+        Spacer(Modifier.height(10.dp))
     }
     for (task in open) {
         Row(Modifier.fillMaxWidth().glassPanel(14).padding(12.dp), verticalAlignment = Alignment.Top) {
@@ -535,11 +536,10 @@ private fun TodosTab(zh: Boolean, refresh: Int, onRefresh: () -> Unit) {
         }
         Spacer(Modifier.height(8.dp))
     }
-    if (open.isNotEmpty() && todos.isNotEmpty()) {
-        Spacer(Modifier.height(4.dp))
-        Text(t("定时", "Timed"), color = Palette.muted, fontSize = 12.sp)
-        Spacer(Modifier.height(6.dp))
-    }
+    Spacer(Modifier.height(4.dp))
+    Text(t("定时", "Timed"), color = Palette.muted, fontSize = 12.sp)
+    Spacer(Modifier.height(6.dp))
+    if (todos.isEmpty()) Text(t("没有定时的提醒", "No timed reminders"), color = Palette.secondary, fontSize = 12.sp)
 
     for (t in todos) {
         Row(Modifier.fillMaxWidth().glassPanel(14).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {

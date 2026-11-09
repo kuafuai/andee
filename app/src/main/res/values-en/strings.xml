@@ -734,6 +734,8 @@
     <string name="notebook_task_on">waiting on %1$s</string>
     <string name="notebook_task_next">Next: %1$s</string>
     <string name="notebook_task_dropped_by_user">let go by the user in the notebook</string>
+    <string name="notebook_tasks_empty">Nothing in progress. When it takes on something it cannot finish at once (asking someone, waiting for an answer, coming back later), it shows here until it is done.</string>
+    <string name="notebook_timed_empty">No timed reminders</string>
     <string name="notebook_type_user">About you</string>
     <string name="notebook_type_feedback">Your preferences</string>
     <string name="notebook_type_way">How things get done</string>
