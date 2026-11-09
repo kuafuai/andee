@@ -661,6 +661,11 @@ class NotebookUi(
             person.impressions.firstOrNull()?.let {
                 p.addView(md(it.text, Glass.PHOTO_INK, Glass.Type.CAPTION), matchWrap().apply { topMargin = dp(8) })
             }
+            // What is open between us: the tasks for them or waiting on them (Tasks.owedFor).
+            person.owed.filter { it.status == "open" }.forEach { o ->
+                val key = if (o.dir == "i_owe") R.string.notebook_people_i_owe else R.string.notebook_people_they_owe
+                p.addView(label(lctx.getString(key, o.what), Glass.Type.CAPTION, Glass.ACCENT, top = 6), matchWrap())
+            }
             addRow(body, p)
         }
         val undoable = book.merges().filter { it.undoable }.take(5)

@@ -111,6 +111,9 @@ interface BrainHost {
     /** What it is in the middle of ([net.kuafuai.andee.config.Tasks.indexForPrompt]); empty for none. */
     fun tasksIndex(): String = ""
 
+    /** The people this turn may touch ([net.kuafuai.andee.config.NotebookBook.peopleIndex]); empty for none. */
+    fun peopleIndex(sourcePerson: String?): String = ""
+
     /** What is on the stage (the home screen's middle), one or two lines. Empty for a host without one. */
     fun stageIndex(): String = ""
 

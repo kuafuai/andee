@@ -97,6 +97,8 @@ class AndroidBrainHost(
 
     override fun tasksIndex(): String = Notebook.tasks(ctx).indexForPrompt()
 
+    override fun peopleIndex(sourcePerson: String?): String = Notebook.notebook(ctx).peopleIndex(sourcePerson)
+
     override fun wikiIndex(): String = Notebook.wiki(ctx).indexForPrompt()
 
     override fun stageIndex(): String = net.kuafuai.andee.config.Stage.indexForPrompt(ctx)

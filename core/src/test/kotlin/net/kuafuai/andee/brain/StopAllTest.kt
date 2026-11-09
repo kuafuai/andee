@@ -39,7 +39,7 @@ class StopAllTest {
             "locale" -> Locale.ENGLISH
             "maxSteps" -> 5
             "persona", "platformPrompt", "notebookIndex", "scenesIndex", "pagesIndex", "topicsIndex",
-            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "stageIndex", "wikiIndex", "tasksIndex", "reviewRecord", "guard" -> ""
+            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "stageIndex", "wikiIndex", "tasksIndex", "peopleIndex", "reviewRecord", "guard" -> ""
             "scrollback" -> emptyList<ScrollRow>()
             "toolLists" -> listOf(JSONArray())
             "event" -> { synchronized(events) { events += args[0] as BrainEvent }; null }

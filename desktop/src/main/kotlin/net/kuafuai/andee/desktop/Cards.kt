@@ -712,6 +712,12 @@ private fun PersonCard(
             Spacer(Modifier.height(8.dp))
             Markdown(person.impressions.first().text, color = Palette.photoInk, size = 13.sp)
         }
+        // What is open between us: the tasks for them or waiting on them (Tasks.owedFor), as on the phone.
+        person.owed.filter { it.status == "open" }.forEach { o ->
+            Spacer(Modifier.height(6.dp))
+            Text((if (o.dir == "i_owe") (if (zh) "要交给他：" else "For them: ") else (if (zh) "在等他：" else "Waiting on them: ")) + o.what,
+                color = Palette.accent, fontSize = 12.sp)
+        }
     }
 }
 

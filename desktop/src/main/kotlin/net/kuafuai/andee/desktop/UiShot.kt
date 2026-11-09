@@ -250,7 +250,7 @@ private fun seedLife() {
     val gone = b.people.upsert("王总", null, net.kuafuai.andee.config.People.Channel("wechat", "王总", "C群"), null, null, null, null, null, asNew = true)
     b.people.find("老王").firstOrNull()?.let { b.people.merge(gone, it.id, "C群里的王总就是老王，他自己说的") }
     // 在办: one answered, one waiting on someone, one of the user's own.
-    val ask = net.kuafuai.andee.brain.Source(kind = "notify", app = "微信", channel = "wechat", conversation = "B群", group = true, sender = "小王", quote = "这个报价多少？")
+    val ask = net.kuafuai.andee.brain.Source(kind = "notify", app = "微信", channel = "wechat", conversation = "B群", group = true, sender = "小王", quote = "这个报价多少？", personId = b.people.find("小王").firstOrNull()?.id)
     b.tasks.open("小王问新版报价", "等老板回话再回 B群", 0L, ask, untrusted = true).getOrNull()?.let { t ->
         b.tasks.wait(t.id, net.kuafuai.andee.config.Tasks.Wait(kind = "person", name = "老板", channel = "wechat", chat = "C群", asked = "报价多少"))
         b.tasks.answered(net.kuafuai.andee.brain.Source(kind = "notify", channel = "wechat", conversation = "C群", group = true, sender = "老板", quote = "按上次的价，八折"))

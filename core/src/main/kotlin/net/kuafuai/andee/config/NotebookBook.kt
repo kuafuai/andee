@@ -561,6 +561,15 @@ class NotebookBook(private val store: NotebookStore) {
         return added
     }
 
+    /**
+     * The people a turn may touch ([People.indexForPrompt]): [sourcePerson] — who it came from — then whoever an open
+     * task waits on or is for. Empty when there is nobody, so it costs nothing.
+     */
+    fun peopleIndex(sourcePerson: String?): String = runCatching {
+        val fromTasks = tasks.active().flatMap { t -> listOfNotNull(t.deliverTo.personId, t.from.personId) + t.waits.filter { it.open }.mapNotNull { it.person } }
+        people.indexForPrompt(listOfNotNull(sourcePerson) + fromTasks)
+    }.getOrDefault("")
+
     /** A once-per-notebook flag (a migration, a seed). */
     @Synchronized
     fun metaFlag(flag: String): Boolean = book().optJSONObject("meta")?.optBoolean(flag) == true

@@ -710,6 +710,8 @@
     <string name="notebook_people_merges">Recent merges</string>
     <string name="notebook_people_unmerge">Undo</string>
     <string name="notebook_people_unconfirmed">unconfirmed</string>
+    <string name="notebook_people_i_owe">For them: %1$s</string>
+    <string name="notebook_people_they_owe">Waiting on them: %1$s</string>
     <string name="notebook_empty_wiki">Wiki is empty</string>
     <string name="notebook_empty_wiki_hint">Ask Andee knowledge questions</string>
     <string name="notebook_self_heading">Who I am</string>

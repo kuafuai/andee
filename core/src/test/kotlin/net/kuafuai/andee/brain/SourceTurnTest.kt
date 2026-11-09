@@ -47,7 +47,7 @@ class SourceTurnTest {
             "locale" -> Locale.ENGLISH
             "maxSteps" -> 10
             "persona", "platformPrompt", "notebookIndex", "scenesIndex", "pagesIndex", "topicsIndex",
-            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "stageIndex", "wikiIndex", "tasksIndex", "reviewRecord", "guard" -> ""
+            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "stageIndex", "wikiIndex", "tasksIndex", "peopleIndex", "reviewRecord", "guard" -> ""
             "scrollback" -> emptyList<ScrollRow>()
             "toolLists" -> listOf(JSONArray())
             "methodOf" -> null

@@ -220,4 +220,17 @@ class PeopleTest {
         assertTrue(people.owner().byUser)
         assertEquals(1, people.all().size)
     }
+
+    @Test fun theTurnSeesTheFewPeopleItMayTouchNotEveryone() {
+        val a = add("小王", "wang")
+        people.log(a, "in", "wechat", "报价多少")
+        add("老李", "li")
+        val line = people.indexForPrompt(listOf(a, a, "nobody"))
+        assertEquals(1, line.lines().size)
+        assertTrue(line, line.startsWith("$a 小王") && line.contains("← 报价多少"))
+        val t = book.tasks.open("回小王报价", "", 0L, net.kuafuai.andee.brain.Source(kind = "user"), false,
+            deliverTo = net.kuafuai.andee.brain.Source(kind = "person", sender = "小王", personId = a)).getOrThrow()
+        assertTrue(book.peopleIndex(null).contains(t.id))                         // in the index because a task is for them
+        assertTrue(people.get(a)!!.owed.any { it.id == t.id && it.dir == "i_owe" })
+    }
 }

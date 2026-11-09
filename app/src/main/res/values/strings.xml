@@ -734,6 +734,8 @@
     <string name="notebook_people_merges">最近合并</string>
     <string name="notebook_people_unmerge">撤销</string>
     <string name="notebook_people_unconfirmed">未确认</string>
+    <string name="notebook_people_i_owe">要交给他：%1$s</string>
+    <string name="notebook_people_they_owe">在等他：%1$s</string>
     <string name="notebook_empty_wiki">维基还是空的</string>
     <string name="notebook_empty_wiki_hint">问 Andee 知识性的问题，它会保存到维基</string>
     <string name="notebook_self_heading">我是谁</string>
