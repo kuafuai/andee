@@ -12,7 +12,7 @@ Pick the route that matches what you want to do:
 - **Try a repository build:** download the bare debug APK from the [latest release](https://github.com/kuafuai/andee/releases/latest). It has no credentials, so you must configure the on-device model and voice keys later.
 - **Build it yourself:** follow the Android requirements and commands in [Build from source](../README.md#build-from-source), then use the detailed [Provisioning](../README.md#provisioning) reference if the toolchain is not ready.
 
-For a first run, use a real Android 11 (API 30) or newer device. An emulator can install the app, but most device-control features are not meaningful there.
+For a first run, use a real Android 11 (API 30) or newer device. The app installs on Android 8.1 (API 27) and up, but **below 11 it cannot see the screen** (screen capture, visual tap targeting and window blur need API 30+), so the device-control half is what you lose. An emulator can install the app, but most device-control features are not meaningful there.
 
 ## 2. Install and make the ball appear
 

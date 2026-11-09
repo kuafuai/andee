@@ -69,7 +69,7 @@ CodeFlying 是一个独立的服务，和本项目没有直接关系；它自己
 
 | 设备 | 下载哪个 | 装好之后 |
 | --- | --- | --- |
-| Android 手机 / 平板（Android 11+） | `andee-<版本>-zh-android-arm64-v8a.apk`（绝大多数设备） | 开悬浮窗、开无障碍 |
+| Android 手机 / 平板（Android 8.1+） | `andee-<版本>-zh-android-arm64-v8a.apk`（绝大多数设备） | 开悬浮窗、开无障碍 |
 | Mac，Apple 芯片（macOS 14+） | `andee-<版本>-zh-mac-arm64.dmg` | 打开 dmg，把 Andee 拖进「应用程序」；它要「辅助功能」和「屏幕录制」时允许 |
 | Mac，Intel | `andee-<版本>-zh-mac-x64.dmg` | 同上 |
 
@@ -405,7 +405,8 @@ skiko 那个文件名本身就带着架构（`libskiko-macos-arm64.dylib` / `lib
 
 > **环境要求**
 >
-> - Android 11（API 30）或更新 —— `ACTION_IME_ENTER` 和 `takeScreenshot` 都是 API 30+
+> - Android 8.1（API 27）或更新 —— 能装能跑。**但屏幕相关的能力要 Android 11（API 30）**：
+>   `ACTION_IME_ENTER` 和 `takeScreenshot` 都是 API 30+，低于它只能读无障碍树、看不了屏幕
 > - **JDK 17–20。** AGP 8.3.1 要 17+；Gradle 8.4 的 wrapper 跑不了 21+（Android Studio 自带的
 >   JBR 25 会被直接拒绝：`Unsupported class file major version 69`）
 > - Android SDK：platform 34 + build-tools 34.0.0
@@ -581,10 +582,10 @@ API 只认后一句。刚开通的服务默认是**后付费**，它只能在火
 | Android Gradle Plugin | 8.3.1 | `gradle/libs.versions.toml` 里的 `agp` |
 | Kotlin | 2.1.21 | 根目录 `build.gradle` 固定，三个模块一起动 |
 | compileSdk / targetSdk | 34 | Android 14 |
-| minSdk | 30 | Android 11 —— 因为要用 `AccessibilityAction.ACTION_IME_ENTER`（API 30+）和 `takeScreenshot`（API 30+） |
+| minSdk | 27 | Android 8.1 —— 装得上就能聊。**屏幕能力要 API 30+**：`ACTION_IME_ENTER` 和 `takeScreenshot` 都是 API 30+，低于它装完会在自检里看到一条琥珀色提醒 |
 | Java / Kotlin JVM target | 1.8 | `sourceCompatibility` 1.8、`jvmTarget = '1.8'` |
 | **构建用 JDK** | **17–20** | 见[配 JDK](#配-jdk)，这是最容易卡住的一步 |
-| versionCode / versionName | 25 / 0.12.1 | 策略见 [CHANGELOG.md](CHANGELOG.md) |
+| versionCode / versionName | 26 / 0.13.0 | 策略见 [CHANGELOG.md](CHANGELOG.md) |
 | applicationId / namespace | `net.kuafuai.andee` | 从模板里没改，不影响功能 |
 
 **运行库依赖**（`app/build.gradle`）：
@@ -637,7 +638,7 @@ Gradle 编译时读 `local.properties` 里的 `sdk.dir=` 找 SDK。这个文件�
 2. 用 Android Studio **打开本仓库根目录** → 它会自己写 `local.properties`，并检测缺什么 SDK
    组件、蓝条提示 "Install missing SDK"，点 Accept 装完就行。
 3. SDK Manager（顶栏 → Tools → SDK Manager）确认下列都装了：
-   - **SDK Platforms**：Android 14（API 34，compileSdk / targetSdk）；Android 11（API 30，minSdk，装一份方便起模拟器）
+   - **SDK Platforms**：Android 14（API 34，compileSdk / targetSdk）；Android 11（API 30，跑屏幕能力的最低版本，装一份方便起模拟器）
    - **SDK Tools**：Android SDK Build-Tools（34.x）、Android SDK Platform-Tools（最新）、Android SDK Command-line Tools（latest）
 4. macOS 默认 SDK 路径 `~/Library/Android/sdk`，Windows 默认 `%LOCALAPPDATA%\Android\Sdk`。
 
@@ -702,7 +703,8 @@ Linux 通常是 `/home/<user>/Android/Sdk`，Windows 是
 
 ## 硬件 / 系统要求
 
-- Android 11（API 30）或更高
+- Android 8.1（API 27）或更高 —— 装得上就能用聊天、语音、笔记和设置；
+  **屏幕截图、看图点击、窗口毛玻璃要 Android 11（API 30）或更高**，低于它这些功能不可用
 - 屏幕方向随意，悬浮球会浮在最上层
 - 需要麦克风，否则 ASR 用不了
 - 需要联网（WiFi / 4G / 5G 都行）—— ASR / TTS 走公网，大脑 hub 走 LAN；用 `local` 模式则只走公网
@@ -1054,7 +1056,7 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
 随包分发的第三方组件清单在 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。再分发之前请先看：
 **ML Kit 扫码 SDK 和 `play-services-*` 不是开源许可**，而且扫码模型是运行时从 Google 拉的。
 
-改了什么、以及版本号策略见 [CHANGELOG.md](CHANGELOG.md) —— 当前版本是 **`v0.12.1`**，故意停在
+改了什么、以及版本号策略见 [CHANGELOG.md](CHANGELOG.md) —— 当前版本是 **`v0.13.0`**，故意停在
 pre-1.0：线上协议和构建开关都还在动。
 
 ## 相关文档

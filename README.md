@@ -75,7 +75,7 @@ package and a Mac package, in English and in Chinese:
 
 | Device | Download | After installing |
 | --- | --- | --- |
-| Android phone / tablet (Android 11+) | `andee-<version>-en-android-arm64-v8a.apk` (almost every device) | grant Overlay, then Accessibility |
+| Android phone / tablet (Android 8.1+) | `andee-<version>-en-android-arm64-v8a.apk` (almost every device) | grant Overlay, then Accessibility |
 | Mac, Apple silicon (macOS 14+) | `andee-<version>-en-mac-arm64.dmg` | open the dmg, drag Andee to Applications; allow Accessibility and Screen Recording when it asks |
 | Mac, Intel | `andee-<version>-en-mac-x64.dmg` | the same |
 
@@ -470,7 +470,9 @@ To build the Android app yourself:
 
 > **Requirements**
 >
-> - Android 11 (API 30) or newer — `ACTION_IME_ENTER` and `takeScreenshot` are both API 30+
+> - Android 8.1 (API 27) or newer — it installs and runs. **Screen capability needs Android 11
+>   (API 30)**: `ACTION_IME_ENTER` and `takeScreenshot` are both API 30+, and below that it can
+>   read the accessibility tree but cannot see the screen
 > - **JDK 17–20.** AGP 8.3.1 needs 17+; the Gradle 8.4 wrapper cannot run on 21+ (Android Studio's  
 >   bundled JBR 25 is rejected with `Unsupported class file major version 69`)
 > - Android SDK with platform 34 and build-tools 34.0.0
@@ -771,10 +773,10 @@ Pure Kotlin, no Compose; the whole thing hangs off two pillars, `WindowManager` 
 | Android Gradle Plugin     | 8.3.1               | `agp` in `gradle/libs.versions.toml`                                                      |
 | Kotlin                    | 2.1.21              | pinned in the root `build.gradle`; all three modules move together                        |
 | compileSdk / targetSdk    | 34                  | Android 14                                                                                |
-| minSdk                    | 30                  | Android 11 — `AccessibilityAction.ACTION_IME_ENTER` and `takeScreenshot` are both API 30+ |
+| minSdk                    | 27                  | Android 8.1 — it installs and chats. **Screen capability needs API 30+**: `ACTION_IME_ENTER` and `takeScreenshot` are both API 30+, and below that the self-check shows an amber row |
 | Java / Kotlin JVM target  | 1.8                 | `sourceCompatibility` 1.8, `jvmTarget = '1.8'`                                            |
 | **Build JDK**             | **17–20**           | see [Which JDK](#which-jdk) — this is the step people get stuck on                        |
-| versionCode / versionName | 25 / 0.12.1          | see [CHANGELOG.md](CHANGELOG.md) for the policy                                           |
+| versionCode / versionName | 26 / 0.13.0          | see [CHANGELOG.md](CHANGELOG.md) for the policy                                           |
 | applicationId / namespace | `net.kuafuai.andee` | never changed from the template. It affects nothing                                       |
 
 **Runtime dependencies** (`app/build.gradle`):
@@ -834,7 +836,7 @@ you; it is **not in the repository** (it is in `.gitignore`), so every machine c
 2. **Open this repository's root directory** in Android Studio. It writes `local.properties`, notices  
    which SDK pieces are missing, and offers "Install missing SDK" in a blue bar. Accept it.
 3. In SDK Manager (top bar → Tools → SDK Manager), confirm:
-   - **SDK Platforms**: Android 14 (API 34 — compileSdk / targetSdk); Android 11 (API 30 — minSdk,  
+   - **SDK Platforms**: Android 14 (API 34 — compileSdk / targetSdk); Android 11 (API 30 — the floor for screen capability,  
      handy if you want an emulator)
    - **SDK Tools**: Android SDK Build-Tools (34.x), Android SDK Platform-Tools (latest), Android SDK  
      Command-line Tools (latest)
@@ -903,7 +905,8 @@ Gradle reads either.
 
 ### Hardware and system requirements
 
-- Android 11 (API 30) or newer
+- Android 8.1 (API 27) or newer — chat, voice, the notebook and settings all work;
+  **screen capture, visual tap targeting and window blur need Android 11 (API 30) or newer**
 - Any screen orientation — the ball always floats on top
 - A microphone, or ASR is unusable
 - Network (WiFi / 4G / 5G all fine). ASR and TTS go over the public internet, the brain hub goes over  
@@ -1210,7 +1213,7 @@ Read it before redistributing: **the ML Kit barcode SDK and the `play-services-*
 open-source**, and the barcode model is fetched from Google at runtime.
 
 See [CHANGELOG.md](CHANGELOG.md) for what changed and for the versioning policy. The latest release is
-**`v0.12.1`** — pre-1.0 on purpose, because the wire contract and the build flags are still moving.
+**`v0.13.0`** — pre-1.0 on purpose, because the wire contract and the build flags are still moving.
 
 ## Related documents
 

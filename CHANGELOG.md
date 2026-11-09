@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`25` / `"0.12.1"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`26` / `"0.13.0"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,50 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.13.0] - 2026-11-09
+
+**Installs on Android 8.1 now — with an honest warning about what is missing — and you can set how
+strictly the wake phrase has to match.**
+
+`minSdk` moves 30 → 27. The screen tools are built on an API 30 screenshot call, so on 8.1–10 the app
+installs, talks and runs **but has no pixels to aim with**. Rather than let the installer reject the whole
+package, it says so at the top of the checklist.
+
+### Added
+
+- **唤醒词严格度 — 严格 / 标准 / 灵敏 / 很灵敏**, in Settings → 唤醒词. It **scales the threshold learned at
+  enrolment** (×0.85 / ×1.0 / ×1.2 / ×1.4) rather than replacing it, so it survives a re-enrolment, and
+  标准 is exactly the old behaviour. Written on tap and read on every segment, so it is live at once.
+  - **The picker says where the safety runs out.** 灵敏 at the learned cap reaches 2.16, still short of
+    every impostor measured (2.21–2.59); **很灵敏 reaches into them**, the note says so, and the result is
+    capped at 2.4. An unreadable value falls back to **严格** — the deaf direction, leftmost.
+- **The app installs on Android 8.1–10 (API 27+) instead of refusing.** All of chat, voice, the notebook
+  and settings work. What is gone on those versions is named in an amber row at the top of the self-check
+  and in the startup nudge: **screen capture, visual tap targeting and window blur** need newer system
+  APIs. **Upgrading to Android 11 or later restores them** — nothing else is different.
+
+### Fixed
+
+- **The status bar was counted twice** in the pre-30 window insets, on exactly the devices this release
+  adds. `legacyInsets` read the height difference as the navigation bar, but that difference already
+  excludes the status bar too, so adding `status_bar_height` on top described **three bars' worth of inset
+  on a device with two**. The cost: the folded ball rested a status bar above the navigation bar, and
+  every card came back a status bar shorter than the screen it is centred on. Portrait and landscape fail
+  differently, so the status bar now comes out of whichever axis holds the navigation bar.
+- **Reminders were inexact on Android 11.** `Scheduler.exactAllowed()` called `canScheduleExactAlarms()`,
+  which is API 31; the swallowed exception made every reminder inexact on API 30.
+
+### Internal
+
+- **`compat/WindowMetricsCompat.kt`** holds the `SDK_INT` branch for `currentWindowMetrics` /
+  `maximumWindowMetrics` / `WindowInsets.Type`, with a `Display.getRealMetrics` fallback. Twelve UI files
+  now ask it instead of touching API 30 APIs directly.
+- Every other API 28–33 call lint found is guarded: screenshot and `ACTION_IME_ENTER`, gesture exclusion
+  rects, `fitInsetsTypes`, cutout mode, `blurBehindRadius`, `WindowInsetsController`, the 3-arg
+  `startForeground`, `ACTIVITY_RECOGNITION`, and `ImageDecoder` (with a `BitmapFactory` fallback on 8.1).
+- **On API 30+ every guard takes the original branch** and `platformVersion()` returns null, so the
+  checklist and all window geometry are unchanged. `lintDebug` NewApi errors **37 → 0**.
 
 ## [0.12.1] - 2026-11-06
 
