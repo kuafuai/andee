@@ -910,6 +910,38 @@ object VoiceConfig {
         }
 
         /**
+         * How strictly the wake phrase has to match: `strict` / `normal` / `loose` /
+         * `looser`, applied by [net.kuafuai.andee.wake.WakeTemplates.effectiveThreshold]
+         * as a multiplier on the threshold learned at enrolment.
+         *
+         * A multiplier rather than a number, so it survives a re-enrolment: the
+         * learned value already says how consistently *this* voice says *this*
+         * phrase, and what the user is adjusting is how much slack to give on
+         * top of it. Unset is `normal` (exactly the learned threshold, i.e. what
+         * every device did before this existed); anything unrecognised is
+         * `strict`, the deaf direction the threshold's own bounds lean towards.
+         *
+         * Written straight through like [setWakeWhileLocked], and read on every
+         * segment, so a change is live on the next thing the user says.
+         */
+        fun wakeSensitivity(context: Context): String {
+            val v = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("wake_sens", null) ?: return WAKE_NORMAL
+            return if (v in WAKE_LEVELS) v else WAKE_STRICT
+        }
+
+        fun setWakeSensitivity(context: Context, level: String) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString("wake_sens", level).apply()
+        }
+
+        const val WAKE_STRICT = "strict"
+        const val WAKE_NORMAL = "normal"
+        const val WAKE_LOOSE = "loose"
+        const val WAKE_LOOSER = "looser"
+        val WAKE_LEVELS = listOf(WAKE_STRICT, WAKE_NORMAL, WAKE_LOOSE, WAKE_LOOSER)
+
+        /**
          * The scene the assistant is in, by [net.kuafuai.andee.config.Scene.name], or null.
          *
          * Persisted for the same reason as [ballLook]: a service restart is not

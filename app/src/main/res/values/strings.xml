@@ -198,6 +198,12 @@
     <string name="settings_wake_locked_on">锁屏时也听：已开启</string>
     <string name="settings_wake_locked_off">锁屏时也听：已关闭</string>
     <string name="settings_wake_locked_note">屏幕关闭时也会听。更耗电，麦克风会一直开着，状态栏的录音提示也会一直显示。</string>
+    <string name="settings_wake_sens">匹配严格度</string>
+    <string name="settings_wake_sens_strict">严格</string>
+    <string name="settings_wake_sens_normal">标准</string>
+    <string name="settings_wake_sens_loose">灵敏</string>
+    <string name="settings_wake_sens_looser">很灵敏</string>
+    <string name="settings_wake_sens_note">经常叫不醒就往右调；平时说话也会把它叫醒，就往左调。「很灵敏」更容易被电视、闲聊误唤醒。改完立即生效，不用重录。</string>
     <string name="common_clear">清除</string>
     <string name="common_delete">删除</string>
     <string name="settings_section_vault">保险箱</string>

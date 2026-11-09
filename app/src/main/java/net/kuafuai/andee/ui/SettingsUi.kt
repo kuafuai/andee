@@ -1025,6 +1025,24 @@ class SettingsUi(
         })
         panel.addView(row, rowParams(dp(12)))
 
+        // How strictly the phrase has to match. Written the instant it is
+        // tapped, like the screen-off switch below: the listener reads it on
+        // every segment, so the next thing said is judged by the new value.
+        // 严格 leftmost, the direction an unreadable value falls back to.
+        rowLabel(panel, lctx.getString(R.string.settings_wake_sens))
+        val sens = segments(
+            options = listOf(
+                VoiceConfig.WAKE_STRICT to lctx.getString(R.string.settings_wake_sens_strict),
+                VoiceConfig.WAKE_NORMAL to lctx.getString(R.string.settings_wake_sens_normal),
+                VoiceConfig.WAKE_LOOSE to lctx.getString(R.string.settings_wake_sens_loose),
+                VoiceConfig.WAKE_LOOSER to lctx.getString(R.string.settings_wake_sens_looser),
+            ),
+            picked = VoiceConfig.wakeSensitivity(context),
+            radius = dp(13),
+        ) { VoiceConfig.setWakeSensitivity(context, it) }
+        panel.addView(sens, rowParams(dp(7)))
+        note(panel, lctx.getString(R.string.settings_wake_sens_note))
+
         // The screen-off half of the wake word, as one button that carries its
         // own state. Two buttons in a picker would read as a choice to make;
         // this is a thing that is on or off, and tapping it says which.

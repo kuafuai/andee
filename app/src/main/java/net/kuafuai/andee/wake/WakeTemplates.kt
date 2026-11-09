@@ -199,8 +199,35 @@ object WakeTemplates {
     }
 
     /**
+     * The user's sensitivity setting applied to the learned threshold.
+     *
+     * The learned value stays the anchor (see [thresholdFor]) and the setting
+     * only scales it, so `normal` is byte-for-byte the old behaviour. The
+     * factors are read against the one set of measurements there is: real
+     * attempts at 1.16–1.46, unrelated speech at 2.21–2.59. `loose` on a
+     * threshold already at [MAX_THRESHOLD] reaches 2.16, still short of every
+     * impostor measured; `looser` reaches into them, which is the trade the
+     * user is choosing and the settings note says so. [EFFECTIVE_MAX] keeps
+     * even that below the far end of the impostors, and [EFFECTIVE_MIN] keeps
+     * `strict` from asking for a recording.
+     */
+    fun effectiveThreshold(store: Store, level: String): Float {
+        val factor = when (level) {
+            "strict" -> 0.85f
+            "loose" -> 1.2f
+            "looser" -> 1.4f
+            else -> 1.0f
+        }
+        if (factor == 1.0f) return store.threshold
+        return (store.threshold * factor).coerceIn(EFFECTIVE_MIN, EFFECTIVE_MAX)
+    }
+
+    private const val EFFECTIVE_MIN = 0.85f
+    private const val EFFECTIVE_MAX = 2.4f
+
+    /**
      * How well [candidate] matches the enrolled phrase: the closest template,
-     * or [Dtw.NO_MATCH]. Compared against [Store.threshold] by the caller.
+     * or [Dtw.NO_MATCH]. Compared against [effectiveThreshold] by the caller.
      */
     fun bestDistance(store: Store, candidate: Array<FloatArray>): Float {
         var best = Dtw.NO_MATCH

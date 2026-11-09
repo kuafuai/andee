@@ -3,6 +3,7 @@ package net.kuafuai.andee.wake
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
+import net.kuafuai.andee.config.VoiceConfig
 
 /**
  * The wake word — whatever phrase the user enrolled, the hands-free way to do
@@ -142,15 +143,17 @@ object WakeWord {
         val feats = Mfcc.features(pcm)
         if (feats.isEmpty()) return
         val d = WakeTemplates.bestDistance(store, feats)
-        if (d <= store.threshold) {
-            Log.i(TAG, "wake: d=%.2f <= %.2f (%d ms)".format(d, store.threshold, pcm.size / 16))
+        val level = VoiceConfig.wakeSensitivity(ctx)
+        val threshold = WakeTemplates.effectiveThreshold(store, level)
+        if (d <= threshold) {
+            Log.i(TAG, "wake: d=%.2f <= %.2f %s (%d ms)".format(d, threshold, level, pcm.size / 16))
             lastWakeAt = now
             heard = true
         } else if (d != Dtw.NO_MATCH) {
             // The one number worth having when the user says "it didn't hear
             // me": a near miss and an unrelated sentence look identical from
             // the outside, and only this tells them apart.
-            Log.d(TAG, "no wake: d=%.2f > %.2f (%d ms)".format(d, store.threshold, pcm.size / 16))
+            Log.d(TAG, "no wake: d=%.2f > %.2f %s (%d ms)".format(d, threshold, level, pcm.size / 16))
         }
     }
 }

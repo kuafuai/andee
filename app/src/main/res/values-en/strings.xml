@@ -221,6 +221,12 @@
     <string name="settings_wake_locked_on">Listen while locked: on</string>
     <string name="settings_wake_locked_off">Listen while locked: off</string>
     <string name="settings_wake_locked_note">Andee keeps listening with the screen off. That costs battery: the microphone stays open, and so does the system recording indicator.</string>
+    <string name="settings_wake_sens">Match strictness</string>
+    <string name="settings_wake_sens_strict">Strict</string>
+    <string name="settings_wake_sens_normal">Normal</string>
+    <string name="settings_wake_sens_loose">Sensitive</string>
+    <string name="settings_wake_sens_looser">Very sensitive</string>
+    <string name="settings_wake_sens_note">Move right if it often fails to wake; move left if ordinary talk wakes it. “Very sensitive” is more easily woken by the TV or conversation. Takes effect at once — no need to re-record.</string>
     <string name="common_clear">Clear</string>
     <string name="common_delete">Delete</string>
     <string name="settings_section_vault">Vault</string>
