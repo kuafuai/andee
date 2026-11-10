@@ -228,8 +228,10 @@ test decides what gets written: *"next time I deal with them, would not knowing 
 it wrong?"* The notebook is **private** — the tools are `localOnly` and filtered out of the hub  
 payload, so habits and promises never leave the device. On top of it sits a real scheduler, under  
 a hard rule: the moment it says "I'll remind you", the task must already be set and confirmed. And it  
-is yours to read: the **notebook** has eight tabs — Self · Cares · Diary · Plan · People · Wiki · Memories ·
-Todos — and every memory and todo there is deletable.
+is yours to read: the **notebook** has nine tabs — Guard · Self · Cares · Diary · Plan · People · Wiki ·
+Memories · **In hand** — and every memory there is deletable. **In hand** is what it has taken on, not a
+list of alarms: a thing with an end that can outlive the turn it started in (asked in group B, waiting on
+someone in group C) shows up there, until it is delivered.
 **Finished topics get put away, not deleted.** A conversation that has ended is the most expensive
 thing in every later request and the least likely to be needed again, so the nightly review folds it
 into a titled summary with a one-line marker left in its place — and the verbatim conversation is
@@ -776,7 +778,7 @@ Pure Kotlin, no Compose; the whole thing hangs off two pillars, `WindowManager` 
 | minSdk                    | 27                  | Android 8.1 — it installs and chats. **Screen capability needs API 30+**: `ACTION_IME_ENTER` and `takeScreenshot` are both API 30+, and below that the self-check shows an amber row |
 | Java / Kotlin JVM target  | 1.8                 | `sourceCompatibility` 1.8, `jvmTarget = '1.8'`                                            |
 | **Build JDK**             | **17–20**           | see [Which JDK](#which-jdk) — this is the step people get stuck on                        |
-| versionCode / versionName | 26 / 0.13.0          | see [CHANGELOG.md](CHANGELOG.md) for the policy                                           |
+| versionCode / versionName | 27 / 0.14.0          | see [CHANGELOG.md](CHANGELOG.md) for the policy                                           |
 | applicationId / namespace | `net.kuafuai.andee` | never changed from the template. It affects nothing                                       |
 
 **Runtime dependencies** (`app/build.gradle`):
@@ -1213,7 +1215,7 @@ Read it before redistributing: **the ML Kit barcode SDK and the `play-services-*
 open-source**, and the barcode model is fetched from Google at runtime.
 
 See [CHANGELOG.md](CHANGELOG.md) for what changed and for the versioning policy. The latest release is
-**`v0.13.0`** — pre-1.0 on purpose, because the wire contract and the build flags are still moving.
+**`v0.14.0`** — pre-1.0 on purpose, because the wire contract and the build flags are still moving.
 
 ## Related documents
 

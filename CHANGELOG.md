@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`26` / `"0.13.0"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`27` / `"0.14.0"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,85 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.14.0] - 2026-11-10
+
+**事 (tasks) — what it took on, until it is delivered. And a notification's turn finally knows who it
+came from.**
+
+A todo is an alarm clock. A task is a thing with an end that can outlive the turn it started in: asked in
+群 B, asked the leader in 群 C, the turn ended, the answer arrives three things later. This release is
+mostly about that — and about the two things a turn was blind to: who spoke to it, and who it is allowed to
+touch.
+
+### Added
+
+- **事 (tasks).** A task has a source and an end, and the device records where it came from — the model's
+  own values for that are thrown away.
+  - **`task` tool: `open` / `wait` / `step` / `done` / `drop`.** `wait` takes `on: person | user | friend |
+    time` — the four kinds of thing a task can be stuck on.
+  - **The device recognises the answer.** A message from the person (or group) a task waits on tells the
+    triage what it answers, and the turn it starts carries the task's record: who asked, where, and to
+    quote-reply them.
+  - **`done` means delivered** — refused for someone else unless this turn actually sent something. A turn
+    that sent something and wrote no task is reminded once.
+  - **Trust follows the task**, through its alarm and through heartbeat turns.
+  - **小本本 待办 → 在办**: tasks first (answered on top), then timed todos, with timeline rows for
+    opened / waiting / answered / done / dropped on both bodies.
+- **People: one record per person.** `upsert` no longer creates a second record of someone already known —
+  a name matching a name, alias or handle once spacing, case and emoji are gone (or one name inside the
+  other) stops the write and returns them as `possible_same`; the model writes again with their id, or with
+  `new: true`.
+  - **A channel carries the conversation a nickname belongs to**, so 「小王」 in 群 B and 「小王」 in 群 C
+    are not taken for each other.
+  - **Merges, and taking them back.** `person merge` (model, with a reason) and the people card's 合并
+    (user) fold one record into another. **The old id still finds the person**, and a merge can be
+    **taken back for 30 days** without losing what was written since. The review is shown the groups that
+    look like one person, and the card now lists unconfirmed records, which it used to hide.
+- **A notification's turn knows who it came from.** The source is read into app, conversation, group or
+  private, sender, and what they wrote (WeChat's `[有人@我]` / `[N条]` tags stripped). The turn carries it
+  as a bracket line on its user message, and queued turns keep it.
+  - **In a group it says to quote-reply that message and to @ only that sender** — the 群 B reply that
+    @-ed somebody else was a name half remembered.
+  - **Whoever spoke to us goes on record**, by the device: a private message the triage told or acted on,
+    or any message a turn starts from. Not everyone in a group, and not a private message it ignored. A
+    sender who may be someone already known is pointed out on the line, for the model to merge.
+- **The turn sees who it may touch.** The user message carries one line per person this turn may involve —
+  the sender it came from, and whoever an open task waits on or is for, **at most six**. Person cards on
+  both bodies list the tasks for or waiting on them.
+
+### Fixed
+
+- **Waiting on the user is its own kind of wait.** Measured on the phone: asked to remember a parcel number
+  the user would send tomorrow, the model registered a **person** wait on 「他」 — a wait the device would
+  try to match against notifications forever, shown as 在等 他. `on: user` is now a wait kind, and a person
+  wait naming the user (他, 用户, their name…) becomes one. Shown as **在等 你**.
+- **Something to do later is a task, not a memory.** Measured on the phone: 「周五我发你纪要，你帮我改错别字」
+  was saved with `remember` — which **never comes back when it is due** and never shows the user it is
+  pending. Both the prompt and `remember`'s description now say so.
+- **在办 always shows both headings.** With no tasks yet the tab looked exactly like the old 待办 list, and
+  the user concluded tasks did not exist.
+- **A notification that arrived on a locked phone waited for the screen to come on** — the eleven minutes
+  the user reported. The ten-second settle ran on `Handler.postDelayed`, i.e. **uptime**, which stops when
+  nobody is looking. A bounded `PARTIAL_WAKE_LOCK` now covers settle through verdict (**60 s backstop**,
+  depth-counted), and the held retry — which runs on the same uptime clock — gets the same treatment.
+  - **The wake lock's deadline is re-armed on every enter**, and a count past its deadline resets, so
+    overlapping bursts or one missed exit can no longer leave it lapsed or never taken again
+    (`AwakeCount`). The triage reads with a 30 s timeout and gets a fresh deadline before its call.
+  - **Deep Doze ignores wake locks**: the self-check's battery row says what that means for
+    notifications, and a message first seen **>2 min** late on a phone without the exemption writes a
+    timeline row naming the fix.
+- **On the Mac, one missed event made a notification invisible rather than late.** The store was read only
+  when the FSEvents watcher fired, with no fallback. **A read every 60 s now runs regardless**, and the app
+  holds an App Nap exemption while it watches — `userInitiatedAllowingIdleSystemSleep`, so **a closed laptop
+  is still allowed to sleep**. Both run only while `notify` is chat or all, and are released when it is
+  turned off.
+- **Both bodies now log the number the question is actually about**: `reached triage Nms after posting`,
+  against the notification's own delivered time. Every timeline row is written after that point, so a
+  message that waited ten minutes and one that waited ten seconds used to look identical.
+- **A held message is looked at the moment the task ends**, not on the next uptime tick; a rebind request
+  that did not take, and a second outage of the listener, now write a timeline row instead of passing
+  silently.
 
 ## [0.13.0] - 2026-11-09
 
