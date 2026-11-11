@@ -522,13 +522,33 @@ public func andee_screenshot(_ path: UnsafePointer<CChar>, _ maxSide: Int32) -> 
             var w = Double(display.width) * scale, h = Double(display.height) * scale
             let longSide = max(w, h)
             if maxSide > 0 && longSide > Double(maxSide) { let k = Double(maxSide) / longSide; w *= k; h *= k }
-            cfg.width = Int(w); cfg.height = Int(h)
+            // SCStream rejects output dimensions that are not even. Int() truncation of a
+            // downscaled frame is enough to break it: a 3024x1964 XDR display scaled to a
+            // 1600 long side becomes 1600x1039, and startCapture() fails. The caller has
+            // historically worked around this by passing maxSide=0 (native, always even),
+            // which is why zoom/look_region kept working while plain screenshots did not.
+            cfg.width = max(2, Int(w) & ~1)
+            cfg.height = max(2, Int(h) & ~1)
             cfg.showsCursor = false
             let img = try await oneFrame(filter: filter, configuration: cfg)
             let rep = NSBitmapImageRep(cgImage: img)
             if let png = rep.representation(using: .png, properties: [:]) { try png.write(to: out); box.ok = 1 }
         } catch {
-            FileHandle.standardError.write("screenshot: \(error)\n".data(using: .utf8)!)
+            let msg = "screenshot: \(error)\n"
+            FileHandle.standardError.write(msg.data(using: .utf8)!)
+            // A GUI-launched app has no visible stderr, so the only clue about a real
+            // ScreenCaptureKit failure used to be lost. Keep it where it can be read;
+            // otherwise every error is reported upstream as "no permission".
+            if let data = msg.data(using: .utf8) {
+                let log = NSHomeDirectory() + "/Library/Application Support/Andee/screenshot_error.log"
+                if let h = FileHandle(forWritingAtPath: log) {
+                    h.seekToEndOfFile()
+                    h.write(data)
+                    h.closeFile()
+                } else {
+                    try? data.write(to: URL(fileURLWithPath: log))
+                }
+            }
         }
     }
     _ = sem.wait(timeout: .now() + 10)

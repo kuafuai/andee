@@ -528,13 +528,21 @@ class MacScreen(
         return JSONObject().put("png_base64", shot(grid)).put("aim_grid", AIM_GRID_NOTE)
     }
 
-    /** [maxSide] is the size wanted, so a plain shot is not captured at 2560 to be shrunk to 1280 again. */
+    /**
+     * [maxSide] is the size wanted. Always ask the native layer for the display's NATIVE
+     * resolution and downscale here instead: ScreenCaptureKit refuses some downscaled
+     * SCStream output sizes. On a 3024x1964 XDR display, shrinking to a 1600 long side
+     * produces 1600x1039 -- an odd height -- and startCapture() fails. maxSide=0 (native,
+     * always even) succeeds, which is why zoom/look_region kept working while plain
+     * screenshots and with_shot element lists did not.
+     */
     private fun capture(maxSide: Int = 2560): BufferedImage {
         val f = File.createTempFile("andee-shot", ".png")
         try {
-            val ok = gestureless { Bridge.screenshot(f.path, maxSide) }
-            if (!ok) throw IllegalStateException(SCREEN_RECORDING_NOTE)
-            return ImageIO.read(f)
+            val ok = gestureless { Bridge.screenshot(f.path, 0) }
+            if (!ok) throw IllegalStateException(CAPTURE_FAILED_NOTE)
+            val img = ImageIO.read(f)
+            return if (maxSide > 0 && maxOf(img.width, img.height) > maxSide) scale(img, maxSide) else img
         } finally { f.delete() }
     }
 
@@ -711,6 +719,11 @@ class MacScreen(
         )
 
         val SCREEN_RECORDING_NOTE: String get() = PermissionHelp.SCREEN_RECORDING
+
+        /** A native capture failure is NOT a permission denial -- do not send the user back to System Settings. */
+        val CAPTURE_FAILED_NOTE: String get() =
+            "Screen capture failed inside ScreenCaptureKit (this is not a permission problem). " +
+                "See ~/Library/Application Support/Andee/screenshot_error.log for the underlying error."
 
         private const val AIM_GRID_NOTE =
             "This image carries an 8x12 aim grid, A1 (top-left) to H12 (bottom-right): letters run along the TOP edge and numbers " +
