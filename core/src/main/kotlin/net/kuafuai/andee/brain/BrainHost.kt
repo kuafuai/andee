@@ -173,6 +173,13 @@ interface BrainHost {
 
     /** Where the trace file lives. */
     fun traceDir(): File
+
+    /**
+     * Where what leaves the context is kept ([ContextArchive]): the stretches a harvest or the trim let go of,
+     * and the note a restarted brain picks the conversation up from. Null for a host that keeps none — a
+     * friend's request ([GuestHost]) starts empty and ends with its turn.
+     */
+    fun archiveDir(): File? = null
 }
 
 /** One row of the persisted conversation, as the brain needs to see it. */

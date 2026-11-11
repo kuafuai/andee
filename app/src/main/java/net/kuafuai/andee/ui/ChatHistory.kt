@@ -634,6 +634,8 @@ object ChatHistory {
             // that outlived a factory reset would be a conversation the user
             // asked to be rid of, sitting on disk with nothing pointing at it.
             File(context.filesDir, "topics").deleteRecursively()
+            // And what the context let go of, with the note a restarted brain resumes from (`ContextArchive`).
+            File(context.filesDir, net.kuafuai.andee.brain.CONTEXT_ARCHIVE_DIR).deleteRecursively()
         }.onFailure { Log.w(TAG, "history: wipe failed: ${it.message}") }
         listener?.invoke()
     }

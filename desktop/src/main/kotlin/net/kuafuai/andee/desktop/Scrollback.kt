@@ -150,6 +150,8 @@ object Scrollback {
             topics.clear()
         }
         topicDir.listFiles()?.forEach { it.delete() }
+        // And what the context let go of, with the note a restarted brain resumes from (`ContextArchive`).
+        AppDirs.file(net.kuafuai.andee.brain.CONTEXT_ARCHIVE_DIR).deleteRecursively()
         saveAndNotify()
     }
 

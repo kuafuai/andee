@@ -2,6 +2,7 @@ package net.kuafuai.andee.desktop
 
 import net.kuafuai.andee.brain.BrainHost
 import net.kuafuai.andee.brain.BrainText
+import net.kuafuai.andee.brain.CONTEXT_ARCHIVE_DIR
 import net.kuafuai.andee.brain.FoldedTopic
 import net.kuafuai.andee.brain.ScrollRow
 import net.kuafuai.andee.config.Scene
@@ -130,6 +131,9 @@ class DesktopBrainHost(
     override fun event(e: net.kuafuai.andee.brain.BrainEvent) = TimelineEvents.brain(e)
 
     override fun traceDir(): File = AppDirs.root
+
+    /** Wiped with the scrollback by `Scrollback.wipe`: it is the same conversation. */
+    override fun archiveDir(): File = AppDirs.file(CONTEXT_ARCHIVE_DIR)
 }
 
 /**

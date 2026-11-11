@@ -160,9 +160,20 @@ object TopicSplitter {
      */
     private val INDEX_MARKERS = listOf(
         "(what your notebook holds",
+        // Every section `LocalBrain.runTurn` appends after the words. The list stopped at the first four while the
+        // message grew, so a folded topic's text carried the plan, the tasks and the people line of every turn.
+        "(you, and your shelf",
+        "(your plan",
         "(scenes you can enter",
         "(pages you have made",
+        "(your stage",
         "(conversations you have finished",
+        "(installed here and worth reaching for",
+        "(other Andees you can ask",
+        "(things you are in the middle of",
+        "(people this may involve",
+        "(where this turn came from",
+        "(unfinished:",
     )
 
     /**

@@ -2329,6 +2329,34 @@ object ToolSchemas {
                 "id" to prop("integer", "A topic id from list_topics. Do not make one up."),
             ),
         ),
+        tool(
+            localOnly = true,
+            name = "read_earlier",
+            method = "note.earlier",
+            description = """
+        Read back an earlier part of this conversation that left the context to make room.
+
+        When the conversation grows long, the device replaces its older part with a summary, or cuts it,
+        and first writes it down word for word here: what was said both ways, which tools were used and
+        what they returned (shortened; screenshots and results from the vault, text messages, contacts
+        and notifications are never kept). The summary or the cut line at the head of the conversation
+        names the archive number, `#N`. A summary says what it left out — when the user asks about a
+        detail from before it (「刚才那个价格」「我一开始说的预算」), read it here instead of guessing, and
+        never tell them it is gone.
+
+        - No `id`: the newest archived stretches, one line each — number, time span, size, first words.
+        - `id`: that stretch as plain text, 20 000 characters at a time; when `next_offset` is not null,
+          call again with `offset` set to it for the rest.
+
+        This is not `get_topic`: a topic is a finished conversation the nightly review put away;
+        this is what the context let go of mid-conversation. Reading shows nothing on screen.
+    """.trimIndent(),
+            required = emptyList(),
+            props = mapOf(
+                "id" to prop("integer", "An archive number (#N) from the summary, the cut line, or a list. Omit to list."),
+                "offset" to prop("integer", "Where to continue reading, from next_offset. Default 0."),
+            ),
+        ),
 
         // ------------------------------------------------------------------
         // Scenes — `scene.*`, localOnly.

@@ -143,6 +143,9 @@ class AndroidBrainHost(
 
     override fun traceDir(): File = ctx.filesDir
 
+    /** Wiped with the scrollback by `ChatHistory.wipe`: it is the same conversation. */
+    override fun archiveDir(): File = File(ctx.filesDir, CONTEXT_ARCHIVE_DIR)
+
     private fun res(key: BrainText): Int = when (key) {
         BrainText.NO_KEY -> R.string.brain_no_key
         BrainText.NO_KEY_CODEFLYING -> R.string.brain_no_key_codeflying

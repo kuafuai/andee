@@ -384,6 +384,19 @@ class LocalBrain(
     /** Loop thread only. */
     private val history = mutableListOf<JSONObject>()
 
+    /**
+     * Loop thread only. The clock-and-words part of each user message built in [runTurn], without the index block
+     * after it — what [ContextPruner] cuts an old one back to. Weak and keyed by identity (`JSONObject` does not
+     * override `equals`), so a message that leaves [history] takes its entry with it.
+     */
+    private val userCore = java.util.WeakHashMap<JSONObject, String>()
+
+    /** Loop thread only. What [ContextPruner] replaced, so the archive written later still has the original. */
+    private val originals = java.util.WeakHashMap<JSONObject, String>()
+
+    /** What leaves the context goes here first; null on a host that keeps none. See [ContextArchive]. */
+    private val archive: ContextArchive? = host.archiveDir()?.let { ContextArchive(it) }
+
     /** Image messages currently in [history], oldest first. See [trimImages]. */
     private val imageMessages = mutableListOf<JSONObject>()
 
@@ -514,7 +527,7 @@ class LocalBrain(
             // would trigger and then skip on "0 messages". Rebuild the dialogue
             // from the persisted scrollback first; a fresh conversation with no
             // rows still comes back empty and hits the usual gate below.
-            if (history.isEmpty()) rebuildHistoryFromScrollback()
+            if (history.isEmpty()) restoreConversation(null)
             when {
                 cfg.apiKey.isEmpty() -> host.logInfo(TAG, "sweep skipped: no API key")
                 busy.get() -> host.logInfo(TAG, "sweep skipped: a turn is running")
@@ -526,38 +539,53 @@ class LocalBrain(
     }
 
     /**
-     * Rebuild the dialogue half of [history] from the persisted scrollback.
+     * Pick up the conversation a previous brain left behind: the last harvest summary, and the scrollback rows said
+     * since it. Loop thread; called when [history] is empty — the first turn of a new brain, and a sweep that runs
+     * after a restart (which used to rebuild the rows on its own and nothing else).
      *
-     * The sweep reviews "this conversation", but the only record that survives
-     * a killed process is [net.kuafuai.andee.ui.ChatHistory] — [history] itself
-     * is a memory-only list. This walks the rows and rebuilds the two roles the
-     * sweep cares about (the person's words and the assistant's), each user
-     * message re-stamped with the row's own clock so [TopicSplitter] can still
-     * find the turns and their silences. Pages and errors are skipped: they are
-     * artifacts, not conversation.
+     * **Why.** [history] lives in memory, so an app update, a crash, the system killing the process or a change of
+     * backend in settings used to start the next turn from nothing: the notebook survived, "where we got to" did
+     * not. The scrollback already holds every word on disk on both bodies, and [ContextArchive.Session] holds the
+     * summary that stood in for what came before it — between them, nothing new about the user has to be written
+     * down for this. **What does not come back** is everything that was never words: tool results, screenshots, a
+     * task half-way through its steps. The opening message says so, so the model checks again instead of acting on
+     * a memory of a screen.
      *
-     * Capped at the tail so a weeks-old scrollback does not blow the context
-     * window — the sweep is about what was *just* said, and the rest is the
-     * notebook's business. Caller runs on the loop thread, so touching
-     * [history] here is safe.
+     * [current] is the sentence about to be added as this turn's own message; the body has usually written its row
+     * already, and it must not appear twice. Folded rows are skipped (their topic is in the topics line), and so are
+     * leading assistant rows, so the restored stretch opens on something the user said.
      */
-    private fun rebuildHistoryFromScrollback() {
-        val rows = host.scrollback()
-            .filter { it.isUser || it.isAssistant }
-            .filter { it.text.isNotBlank() }
-            .takeLast(REBUILD_MAX_MESSAGES)
-        if (rows.isEmpty()) return
+    private fun restoreConversation(current: String?) {
+        val session = archive?.loadSession()
+        var rows = host.scrollback()
+            .filter { (it.isUser || it.isAssistant) && it.text.isNotBlank() && it.topicId == null }
+            .filter { session == null || it.ts >= session.since }
+            // A live turn only (see [RESTORE_MAX_AGE_MS]); a sweep reviews what went quiet, however long ago.
+            .filter { current == null || System.currentTimeMillis() - it.ts <= RESTORE_MAX_AGE_MS }
+        if (current != null && rows.lastOrNull()?.let { it.isUser && it.text.trim() == current.trim() } == true) rows = rows.dropLast(1)
+        rows = rows.takeLast(RESTORE_MAX_ROWS)
+        var chars = rows.sumOf { it.text.length }
+        while (rows.isNotEmpty() && chars > RESTORE_MAX_CHARS) { chars -= rows.first().text.length; rows = rows.drop(1) }
+        rows = rows.dropWhile { !it.isUser }
+        if (rows.isEmpty() && session == null) return
         history += JSONObject().put("role", "system").put("content", systemPrompt())
+        val at = SimpleDateFormat("yyyy-MM-dd HH:mm", host.locale()).format(Date())
+        val opening = StringBuilder(RESTORED_PREFIX).append(at).append(
+            "; this is the conversation rebuilt from what was said, not the context as it was. Tool results, screenshots " +
+                "and steps from before are not here — if something you did then matters now, look again rather than " +
+                "going by memory.)",
+        )
+        if (session != null) opening.append("\n\n").append(session.summary)
+        history += JSONObject().put("role", "assistant").put("content", opening.toString())
         val fmt = SimpleDateFormat("yyyy-MM-dd EEE HH:mm", host.locale())
         for (r in rows) {
             history += if (r.isUser) {
-                JSONObject().put("role", "user")
-                    .put("content", "[now ${fmt.format(Date(r.ts))}] ${r.text}")
+                JSONObject().put("role", "user").put("content", "[now ${fmt.format(Date(r.ts))}] ${r.text}")
             } else {
                 JSONObject().put("role", "assistant").put("content", r.text)
             }
         }
-        host.logInfo(TAG, "sweep rebuilt ${rows.size} messages from the scrollback")
+        host.logInfo(TAG, "restored ${rows.size} rows${if (session != null) " and the last summary" else ""} from before the restart")
     }
 
     /**
@@ -609,7 +637,13 @@ class LocalBrain(
         source: Source? = null,
         untrusted: Boolean = false,
     ) {
-        val gen = generation.incrementAndGet()
+        // Only the user's own words supersede what came before. A turn the device starts itself — the harvest or a
+        // queued wake out of a turn's `finally`, a todo, a sweep — is only ever launched when nothing is running, and
+        // it used to bump the generation too: a sentence the user said in that instant was already queued with the
+        // old number, so it was abandoned at its first step with no answer and no error. Found by
+        // `ContextCompactionTest`, which says the next thing the moment an answer arrives. A later [submit] or
+        // [cancel] still cuts a background turn short, as before.
+        val gen = if (kind == TurnKind.USER) generation.incrementAndGet() else generation.get()
         loop.execute {
             busy.set(true)
             currentKind = kind
@@ -684,6 +718,11 @@ class LocalBrain(
                 onAnswer?.let { cb -> runCatching { cb(answer) }.onFailure { host.logWarn(TAG, "answer callback failed", it) } }
                 busy.set(false)
                 dropUnfinishedHarvest(kind)
+                // A harvest the user talked over did not try and fail: it gave way. Measured on the phone (2026-11-11): a user
+                // who answers quickly cut every harvest short, and the size it had been launched at (which the trim then held the
+                // history at) read as "already tried here", so it never ran again and the trim cut a turn off every turn instead.
+                // Only a harvest that ran to the end counts as tried.
+                if (kind == TurnKind.HARVEST && gen != generation.get()) lastHarvestAtSize = -1
                 // After the turn, never during it — see [pendingFolds]. A fold
                 // that succeeded leaves one message where a stretch used to be,
                 // and the splice has to happen when nothing is holding an index
@@ -1062,7 +1101,10 @@ class LocalBrain(
         val quiet = kind.quiet
         val harvest = kind == TurnKind.HARVEST
         if (history.isEmpty()) {
-            history += JSONObject().put("role", "system").put("content", systemPrompt())
+            // A new brain — after a restart, an update, a crash or a change of backend — picks up the conversation
+            // the last one left instead of starting from nothing. See [restoreConversation].
+            if (!internal) restoreConversation(userText)
+            if (history.isEmpty()) history += JSONObject().put("role", "system").put("content", systemPrompt())
         } else {
             reseatPersona()
         }
@@ -1134,6 +1176,7 @@ class LocalBrain(
             } else {
                 userText
             }
+            val head = "[now ${stamp()}${if (kind == TurnKind.USER && !wordless) "" else " · ui-language ${uiLangTag()}"}] $said"
             JSONObject()
                 .put("role", "user")
                 .put(
@@ -1156,7 +1199,7 @@ class LocalBrain(
                     // is the answer and absent when there is a better one, and
                     // the model is never asked to arbitrate between two.
                     "content",
-                    "[now ${stamp()}${if (kind == TurnKind.USER && !wordless) "" else " · ui-language ${uiLangTag()}"}] $said" +
+                    head +
                         if (index.isEmpty()) {
                             ""
                         } else {
@@ -1245,6 +1288,9 @@ class LocalBrain(
                         // A task cut off at the step limit, so 继续 has something to continue. See [Unfinished].
                         unfinishedNote(),
                 )
+                // Once this turn is over, the index block is only the newest copy until the next one arrives; the clock,
+                // the words and where it came from are what is worth keeping. See [pruneOld].
+                .also { userCore[it] = head + (turnSource?.let { s -> "\n\n" + s.forPrompt() } ?: "") }
         }
         val turnStart = history.last()
         var acted = false
@@ -1440,6 +1486,10 @@ class LocalBrain(
             // which is static and cannot tell one turn kind from another.
             if (host.methodOf(tc.name) == "note.fold" || tc.name == "note.fold") {
                 return toolMessage(tc.id, noteFold(args))
+            }
+            // The same reason: the archive is this object's, written from [history] by [archiveStretch].
+            if (host.methodOf(tc.name) == "note.earlier" || tc.name == "read_earlier") {
+                return toolMessage(tc.id, readEarlier(args))
             }
             // Same two-name translation BodyWsClient does, and the same
             // fallback: an extension registered its tool under one name and
@@ -1927,12 +1977,51 @@ class LocalBrain(
      * Turn-at-a-time, never message-at-a-time: an orphaned `tool` message whose
      * assistant message is gone is a 400 from the API, and one that arrives
      * mid-task takes the task with it. The system message at index 0 stays.
+     *
+     * This is the backstop for a harvest that did not happen (no key, a failed
+     * call), and it used to throw the turns away with nothing left behind. They
+     * are archived first now, and one line at the head says where — the line is
+     * counted against [MAX_HISTORY], so the next trim does not have to make
+     * room for it. A marker from an earlier trim is dropped with the turns
+     * after it and archived with them, so the chain of ids stays readable.
      */
     private fun trimHistory() {
         val before = history.size
         if (before <= MAX_HISTORY) return
-        for (gone in HistoryTrim.dropIndexes(history.map { isBoundary(it) }, MAX_HISTORY, keepFrom()).sortedDescending()) drop(gone)
-        host.logInfo(TAG, "history trimmed to ${history.size} msgs")
+        val max = if (archive != null) MAX_HISTORY - 1 else MAX_HISTORY
+        val doomed = HistoryTrim.dropIndexes(history.map { isBoundary(it) }, max, keepFrom())
+        if (doomed.isEmpty()) return
+        val gone = doomed.sorted().map { history[it] }
+        // Trims in a row grow the archive the last one started instead of starting one each: the backstop runs on every
+        // turn while no harvest lands, and the first measurement left 22 three-message archives in two minutes, each
+        // pointing at the one before — a chain the model would have had to walk to find one sentence.
+        val earlier = gone.firstNotNullOfOrNull { m ->
+            (m.opt("content") as? String)?.takeIf { it.startsWith(TRIM_MARKER_PREFIX) }
+                ?.let { Regex("#(\\d+)").find(it)?.groupValues?.get(1)?.toLongOrNull() }
+        }
+        val appended = earlier != null && archive?.append(
+            earlier,
+            ContextArchive.render(
+                gone.filter { (it.opt("content") as? String)?.startsWith(TRIM_MARKER_PREFIX) != true },
+                { originals[it] }, ::sensitiveTool,
+            ),
+            gone.map { TopicSplitter.stampOf(it) }.lastOrNull { it > 0 } ?: 0L,
+            gone.size - 1,
+        ) == true
+        val id = if (appended) earlier else archiveStretch(gone, "trim")
+        for (g in doomed.sortedDescending()) drop(g)
+        if (id != null) {
+            history.add(
+                1,
+                JSONObject().put("role", "assistant").put(
+                    "content",
+                    "$TRIM_MARKER_PREFIX the older part of this conversation was cut to make room, with no summary. Its " +
+                        "text is archived as #$id — read it back with read_earlier(id=$id) before answering about anything " +
+                        "from it, and do not say it did not happen.)",
+                ),
+            )
+        }
+        host.logInfo(TAG, "history trimmed to ${history.size} msgs${if (id != null) ", archived as #$id" else ""}")
     }
 
     private fun drop(index: Int) {
@@ -1955,7 +2044,12 @@ class LocalBrain(
      */
     private fun historyChars(): Int {
         var n = 0
+        // The conversation only. The system prompt is ~50 000 characters on its own and does not shrink, so counting it
+        // left ~10 000 for the conversation: the Mac harvested every twenty messages and the tail it kept was still
+        // "over budget", and on the phone (2026-11-11) the pruner ran after every single turn — each time costing the
+        // prefix cache of the turn before. It is also the cached part of every request; the budget is for what grows.
         for (m in history) {
+            if (m.optString("role") == "system") continue
             val c = m.opt("content")
             n += when (c) {
                 is String -> c.length
@@ -1984,8 +2078,13 @@ class LocalBrain(
      * at once is why this costs no more than the sweep would have.
      */
     private fun maybeHarvest() {
-        if (cfg.apiKey.isEmpty()) return
         if (history.size <= MAX_HISTORY && historyChars() <= MAX_HISTORY_CHARS) return
+        // The free step first: old tool results and stale index blocks are most of the weight, and cutting them
+        // costs no call and no words. Often that alone brings it back under — see [ContextPruner].
+        if (historyChars() > MAX_HISTORY_CHARS && pruneOld() > 0 &&
+            history.size <= MAX_HISTORY && historyChars() <= MAX_HISTORY_CHARS
+        ) return
+        if (cfg.apiKey.isEmpty()) return
         if (history.size == lastHarvestAtSize) {
             // Already tried at this size — a tail that cannot shrink (one huge
             // message, say) must not become an infinite review loop.
@@ -2051,7 +2150,9 @@ class LocalBrain(
             host.logWarn(TAG, "harvest finished without a usable start index")
             return
         }
-        val summary = summaryRaw.trim().take(MAX_INTERNAL_NOTE_CHARS)
+        // A face or `[quiet]` is for the voice, and a summary is never spoken: on the phone (2026-11-11) the first one
+        // opened with `[quiet]`, which would then have sat at the head of every request until the next harvest.
+        val summary = SpeechMood.strip(summaryRaw).replace("[END]", "").trim().take(MAX_SUMMARY_CHARS)
         if (summary.isEmpty()) {
             // Keeping the long conversation beats replacing it with nothing.
             host.logWarn(TAG, "harvest produced no summary; nothing dropped")
@@ -2062,13 +2163,21 @@ class LocalBrain(
             host.logInfo(TAG, "harvest has nothing old enough to replace; kept as is")
             return
         }
+        // What the summary stands in for is written down first, word for word, and the summary says where: a
+        // question about a detail is then answered by reading it back, not from a paragraph that left it out.
+        val id = archiveStretch(history.subList(1, keepStart).toList(), "harvest")
+        val pointer = if (id == null) "" else
+            "\n\n(the conversation this summary replaced is archived word for word as #$id — read_earlier(id=$id) " +
+                "when a detail matters; the summary is not the whole story)"
+        val head = "$HARVEST_PREFIX$summary$pointer"
         val kept = ArrayList<JSONObject>(history.size - keepStart + 2)
         kept.add(history[0])
-        kept.add(
-            JSONObject().put("role", "assistant")
-                .put("content", "$HARVEST_PREFIX$summary"),
-        )
+        kept.add(JSONObject().put("role", "assistant").put("content", head))
         for (i in keepStart until from) kept.add(history[i])
+        // What a new brain starts from after a restart: this summary, and the rows said from the first kept turn on.
+        // A minute early, because the stamp is to the minute and the row may be from the end of the one before.
+        val firstStamp = (keepStart until from).asSequence().map { TopicSplitter.stampOf(history[it]) }.firstOrNull { it > 0 }
+        archive?.saveSession(ContextArchive.Session(head, (firstStamp ?: 0L).let { if (it > 0) it - 60_000L else 0L }))
 
         val dropped = from - keepStart
         history.clear()
@@ -2103,6 +2212,54 @@ class LocalBrain(
 
     private fun isBoundary(msg: JSONObject): Boolean =
         msg.optString("role") == "user" && msg.opt("content") is String
+
+    /**
+     * Cut back what is old and bulky, before the newest turn and before a task the user may still say 继续 to.
+     * Returns the characters saved. Loop thread only; see [ContextPruner].
+     */
+    private fun pruneOld(): Int {
+        val newest = (history.lastIndex downTo 1).firstOrNull { userCore.containsKey(history[it]) }
+            ?: (history.lastIndex downTo 1).firstOrNull { isBoundary(history[it]) }
+            ?: return 0
+        val before = historyChars()
+        val saved = ContextPruner.prune(history, minOf(newest, keepFrom()), { userCore[it] }) { m, original ->
+            if (!originals.containsKey(m)) originals[m] = original
+        }
+        if (saved > 0) host.logInfo(TAG, "pruned $saved chars of old tool results and index blocks ($before → ${historyChars()} chars)")
+        return saved
+    }
+
+    /**
+     * Write [messages] to the archive before they leave the context. Returns the id, or null when there is no
+     * archive or nothing was written. Loop thread only.
+     */
+    private fun archiveStretch(messages: List<JSONObject>, kind: String): Long? {
+        val a = archive ?: return null
+        if (messages.isEmpty()) return null
+        val text = ContextArchive.render(messages, { originals[it] }, ::sensitiveTool)
+        val stamps = messages.map { TopicSplitter.stampOf(it) }.filter { it > 0 }
+        val id = a.write(text, kind, stamps.firstOrNull() ?: 0L, stamps.lastOrNull() ?: 0L, messages.size)
+        if (id == null) host.logWarn(TAG, "could not archive ${messages.size} messages before they left the context")
+        return id
+    }
+
+    /**
+     * Tools whose results are never written to the archive: the archive is plain text on disk, and a verification
+     * code, an account field or a contact list must not outlive the turn it was read in.
+     */
+    private fun sensitiveTool(toolName: String): Boolean {
+        val m = host.methodOf(toolName) ?: toolName
+        return SENSITIVE_PREFIXES.any { m.startsWith(it) }
+    }
+
+    /** `read_earlier`: list the archive, or read one stretch of it. Returns what the model reads. */
+    private fun readEarlier(args: JSONObject): String {
+        val a = archive ?: return "Nothing is archived on this device."
+        if (!args.has("id")) return a.list(host.locale())
+        val id = args.optLong("id", -1L)
+        return a.read(id, args.optInt("offset", 0))?.toString()
+            ?: "There is no archived stretch #$id. Call read_earlier with no id to see what there is; do not make an id up."
+    }
 
     // ------------------------------------------------------------------
     // narration
@@ -2218,9 +2375,11 @@ class LocalBrain(
         /**
          * The other half of the context budget. See [historyChars] — 60
          * messages is a lot of chit-chat and very little screenshot, so the
-         * character count is what actually protects the window.
+         * character count is what actually protects the window. The
+         * conversation's characters, not the system prompt's: about 15–25k
+         * tokens on top of a ~48k-token prompt and tool list.
          */
-        private const val MAX_HISTORY_CHARS = 60_000
+        private const val MAX_HISTORY_CHARS = 40_000
 
         /** Messages left untouched at the tail when a harvest folds the rest in. */
         private const val KEEP_TAIL_MESSAGES = 16
@@ -2232,15 +2391,35 @@ class LocalBrain(
         private const val MIN_MESSAGES_TO_REVIEW = 6
 
         /**
-         * How much of the persisted scrollback a post-restart sweep rebuilds.
-         * The sweep is about the conversation that just went quiet, so the tail
-         * is enough; anything older is the notebook's business, not a context
-         * window to re-fill.
+         * How much of the persisted scrollback a new brain picks up ([restoreConversation]): the rows since the last
+         * summary, at most this many and this many characters. Anything older is in the summary, the archive and
+         * the notebook — not a context window to refill.
          */
-        private const val REBUILD_MAX_MESSAGES = 40
+        private const val RESTORE_MAX_ROWS = 40
+        private const val RESTORE_MAX_CHARS = 16_000
 
-        /** Caps what a silent turn leaves behind in the history. */
-        private const val MAX_INTERNAL_NOTE_CHARS = 900
+        /**
+         * Rows older than this are not restored: opening the app the next morning would otherwise carry yesterday's
+         * chat in every request until a harvest. The summary still comes back whatever its age — it is short, and it
+         * is what "where we got to" means — and the rest is in the archive, the topics and the notebook.
+         */
+        private const val RESTORE_MAX_AGE_MS = 24 * 60 * 60_000L
+
+        /** How the opening message of a restored conversation begins. */
+        private const val RESTORED_PREFIX = "(the device restarted before "
+
+        /**
+         * Caps the harvest summary. It was 900, and every summary in the Mac's log hit it; the summary now has four
+         * parts that carry forward from one harvest to the next (see [HARVEST_SUMMARY_RULES]), and a cut one loses
+         * the last part, which is the one that says what is still waiting.
+         */
+        private const val MAX_SUMMARY_CHARS = 2_000
+
+        /** How the stand-in for trimmed turns begins. Not [FOLD_MARKER_PREFIX]: it is not a topic. */
+        private const val TRIM_MARKER_PREFIX = "(cut from this conversation —"
+
+        /** Methods whose results [archiveStretch] leaves out; see [sensitiveTool]. */
+        private val SENSITIVE_PREFIXES = listOf("device.vault", "device.sms", "device.notifications", "device.contacts")
 
         /** Marks the message that stands in for the conversation it replaced. */
         private const val HARVEST_PREFIX = "(wrap-up summary of the conversation before this)"
@@ -2324,6 +2503,25 @@ Up to three topics per review. If `fold_topic` refuses, the reason names the con
                 REVIEW_RULES
 
         /**
+         * What the harvest's summary is made of. Four parts that carry forward, rather than a fresh paragraph each
+         * time: a summary that rewrites the previous summary in its own words loses a little more of the start every
+         * time (measured on the Mac: six harvests in a week, every summary cut at the 900-character cap). The device
+         * appends where the replaced text is archived; [restoreConversation] starts a new brain from the result.
+         */
+        private const val HARVEST_SUMMARY_RULES =
+            "The summary replaces the conversation above, which is about to leave the context (it is archived word for " +
+                "word, and the device adds where). Write it in four parts, under these headings, in the language the " +
+                "conversation was in:\n" +
+                "Settled — facts and decisions that still hold: what he wants, what was agreed, the names and numbers that matter.\n" +
+                "In progress — what you are in the middle of, how far it got, the next step.\n" +
+                "Waiting — what was asked and not answered, by him or by you, and what you promised.\n" +
+                "Left out — what this summary does not carry, so future-you knows to read the archive for it.\n" +
+                "If the conversation above opens with an earlier summary, carry its parts forward: keep what still holds, " +
+                "drop what is done or no longer true, and keep its archive number(s) under Left out. Do not summarise " +
+                "the summary.\n" +
+                "At most 300 words. Not a log of who said what — write what future-you must know to take over."
+
+        /**
          * The pre-trim review. Same job as the sweep, plus the summary that
          * takes the place of everything about to be dropped.
          */
@@ -2332,11 +2530,8 @@ Up to three topics per review. If `fold_topic` refuses, the reason names the con
                 "You are not facing the user now, and nobody is watching you. Go back over the conversation above, and put only what should be kept into the notebook.\n" +
                 "Do not reply to the user, make no sound, do not touch the device — touching the device will be refused.\n\n" +
                 REVIEW_RULES +
-                "\n\n7. The last step (in this turn's final message) is a summary of no more than 300 words: what has happened so far, " +
-                "how far it got, what the next step is, and whether anything is hanging without an answer.\n" +
-                "The conversation above is about to be deleted from the context, leaving only your summary, so do not write a log — " +
-                "write \"what future-you must know in order to take over\".\n" +
-                "Finish items 1-6 first, and write that summary last."
+                "\n\n11. The last step (in this turn's final message) is the summary. " + HARVEST_SUMMARY_RULES +
+                "\nFinish items 0-10 first, and write the summary last."
 
         /** [HARVEST_INSTRUCTION] right after a sweep: the notebook is current, so only the summary is asked for. */
         private const val HARVEST_SUMMARY_ONLY =
@@ -2344,9 +2539,7 @@ Up to three topics per review. If `fold_topic` refuses, the reason names the con
                 "You are not facing the user now, and nobody is watching you. You reviewed this conversation a moment ago and the " +
                 "notebook is up to date, so write nothing to it now.\n" +
                 "Do not reply to the user, make no sound, do not touch the device.\n\n" +
-                "Write only a summary of no more than 300 words: what has happened so far, how far it got, what the next step is, " +
-                "and whether anything is hanging without an answer. The conversation above is about to be deleted from the " +
-                "context, leaving only your summary, so write \"what future-you must know in order to take over\"."
+                "Write only the summary. " + HARVEST_SUMMARY_RULES
 
         /** How long a topic summary may be. Long enough to carry "where it got to". */
         private const val MAX_TOPIC_SUMMARY_CHARS = 1200

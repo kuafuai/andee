@@ -56,6 +56,9 @@ class GuestHost(private val inner: BrainHost) : BrainHost by inner {
 
     override fun traceDir(): File = inner.traceDir()
 
+    /** Not forwarded: the owner's archive is the owner's conversation, and a guest's brain must not resume it. */
+    override fun archiveDir(): File? = null
+
     companion object {
         private val ALLOWED_PREFIXES = listOf("screen.")
         private val ALLOWED = setOf("ui.ask", "ui.alert", "ui.show_html", "device.launch", "device.open_url")

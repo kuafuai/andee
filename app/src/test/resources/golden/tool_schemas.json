@@ -2233,6 +2233,26 @@
   },
   {
     "localOnly": true,
+    "method": "note.earlier",
+    "name": "read_earlier",
+    "description": "Read back an earlier part of this conversation that left the context to make room.\n\nWhen the conversation grows long, the device replaces its older part with a summary, or cuts it,\nand first writes it down word for word here: what was said both ways, which tools were used and\nwhat they returned (shortened; screenshots and results from the vault, text messages, contacts\nand notifications are never kept). The summary or the cut line at the head of the conversation\nnames the archive number, `#N`. A summary says what it left out \u2014 when the user asks about a\ndetail from before it (「刚才那个价格」「我一开始说的预算」), read it here instead of guessing, and\nnever tell them it is gone.\n\n- No `id`: the newest archived stretches, one line each \u2014 number, time span, size, first words.\n- `id`: that stretch as plain text, 20 000 characters at a time; when `next_offset` is not null,\n  call again with `offset` set to it for the rest.\n\nThis is not `get_topic`: a topic is a finished conversation the nightly review put away;\nthis is what the context let go of mid-conversation. Reading shows nothing on screen.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "offset": {
+          "description": "Where to continue reading, from next_offset. Default 0.",
+          "type": "integer"
+        },
+        "id": {
+          "description": "An archive number (#N) from the summary, the cut line, or a list. Omit to list.",
+          "type": "integer"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "localOnly": true,
     "method": "scene.list",
     "name": "list_scenes",
     "description": "List the scenes you and the user have saved: name, title, one-line summary, the apps that enter it automatically, how often it was used, and which one you are in now.",
