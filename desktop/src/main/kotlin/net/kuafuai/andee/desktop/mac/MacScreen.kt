@@ -529,20 +529,17 @@ class MacScreen(
     }
 
     /**
-     * [maxSide] is the size wanted. Always ask the native layer for the display's NATIVE
-     * resolution and downscale here instead: ScreenCaptureKit refuses some downscaled
-     * SCStream output sizes. On a 3024x1964 XDR display, shrinking to a 1600 long side
-     * produces 1600x1039 -- an odd height -- and startCapture() fails. maxSide=0 (native,
-     * always even) succeeds, which is why zoom/look_region kept working while plain
-     * screenshots and with_shot element lists did not.
+     * [maxSide] is the size wanted, so a plain shot is not captured at 2560 to be shrunk to 1280 again — and the
+     * 480 probe a tap polls every 150 ms stays cheap. The native side rounds the size down to even: on a 3024x1964
+     * XDR display a 1600 long side came out 1600x1039, ScreenCaptureKit refused it, and every shot but the native-
+     * size zoom failed. A false here is not a missing grant — every caller asks `screenCaptureAllowed` first.
      */
     private fun capture(maxSide: Int = 2560): BufferedImage {
         val f = File.createTempFile("andee-shot", ".png")
         try {
-            val ok = gestureless { Bridge.screenshot(f.path, 0) }
+            val ok = gestureless { Bridge.screenshot(f.path, maxSide) }
             if (!ok) throw IllegalStateException(CAPTURE_FAILED_NOTE)
-            val img = ImageIO.read(f)
-            return if (maxSide > 0 && maxOf(img.width, img.height) > maxSide) scale(img, maxSide) else img
+            return ImageIO.read(f)
         } finally { f.delete() }
     }
 
