@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`27` / `"0.14.0"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`28` / `"0.14.1"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,41 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.14.1] - 2026-11-11
+
+**Mac: screenshots work again on an XDR display, and a real capture failure no longer tells you to grant
+a permission you already granted.**
+
+Two bugs, and the second is the one that wasted your time: the first made capture fail, the second made it
+**blame the wrong thing** — sending you back to System Settings to re-grant Screen Recording when the grant
+was already valid.
+
+### Fixed
+
+- **Screenshots failed on a 3024×1964 XDR display.** Scaling a capture to a 1600 long side produced a
+  height of **1039 — odd**, and `ScreenCaptureKit` rejects a stream configuration with an odd dimension, so
+  `take_screenshot` and `get_screen_element(with_shot=true)` **always failed**. `zoom_screen_region`
+  kept working, because it passes `maxSide=0` (native resolution, always even) — which is what made the
+  symptom confusing.
+  - The output width and height are now forced even (`max(2, Int(w) & ~1)`), so an odd downscale can no
+    longer make `startCapture()` fail.
+  - **The real `NSError` is now kept** at `~/Library/Application Support/Andee/screenshot_error.log`. A
+    GUI-launched app's stderr goes to `/dev/null`, so that message used to be lost entirely — which is why
+    every native failure got reported upstream as "you need to grant permission".
+- **A native capture failure is no longer reported as a permission denial.** The Kotlin layer translated
+  **every** false return into `SCREEN_RECORDING_NOTE`, which sends you back to System Settings. It now
+  throws `CAPTURE_FAILED_NOTE` instead:
+
+  > Screen capture failed inside ScreenCaptureKit (this is not a permission problem). See
+  > ~/Library/Application Support/Andee/screenshot_error.log for the underlying error.
+
+  Every caller has already asked `screenCaptureAllowed` before a capture can fail, so a failure at that
+  point is never about the grant.
+- **And the workaround for the first bug was itself a cost, so it is gone.** Fixing the odd dimension had
+  been worked around by asking the native layer for **native resolution every time** and shrinking in Java —
+  which turned the 480 px probe that a tap polls **every 150 ms** into a full 3024×1964 PNG encode and
+  decode. `maxSide` is passed through again; the even rounding on the Swift side is what makes that safe.
 
 ## [0.14.0] - 2026-11-10
 

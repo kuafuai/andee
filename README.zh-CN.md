@@ -586,7 +586,7 @@ API 只认后一句。刚开通的服务默认是**后付费**，它只能在火
 | minSdk | 27 | Android 8.1 —— 装得上就能聊。**屏幕能力要 API 30+**：`ACTION_IME_ENTER` 和 `takeScreenshot` 都是 API 30+，低于它装完会在自检里看到一条琥珀色提醒 |
 | Java / Kotlin JVM target | 1.8 | `sourceCompatibility` 1.8、`jvmTarget = '1.8'` |
 | **构建用 JDK** | **17–20** | 见[配 JDK](#配-jdk)，这是最容易卡住的一步 |
-| versionCode / versionName | 27 / 0.14.0 | 策略见 [CHANGELOG.md](CHANGELOG.md) |
+| versionCode / versionName | 28 / 0.14.1 | 策略见 [CHANGELOG.md](CHANGELOG.md) |
 | applicationId / namespace | `net.kuafuai.andee` | 从模板里没改，不影响功能 |
 
 **运行库依赖**（`app/build.gradle`）：
@@ -1057,7 +1057,7 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
 随包分发的第三方组件清单在 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。再分发之前请先看：
 **ML Kit 扫码 SDK 和 `play-services-*` 不是开源许可**，而且扫码模型是运行时从 Google 拉的。
 
-改了什么、以及版本号策略见 [CHANGELOG.md](CHANGELOG.md) —— 当前版本是 **`v0.14.0`**，故意停在
+改了什么、以及版本号策略见 [CHANGELOG.md](CHANGELOG.md) —— 当前版本是 **`v0.14.1`**，故意停在
 pre-1.0：线上协议和构建开关都还在动。
 
 ## 相关文档
