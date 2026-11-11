@@ -374,7 +374,7 @@ If you only want to use it, see [Install](#install) above. This is the route for
 Android steps are further down, under [Provisioning](#provisioning).
 
 **On a Mac**, build the desktop app from the same checkout (Apple silicon, macOS 14+, the Command Line Tools
-for `swiftc`, and the same JDK 17–20):
+15 or newer for `swiftc` and the macOS 14 SDK — an older SDK stops the build — and the same JDK 17–20):
 
 ```bash
 ./gradlew :desktop:createDistributable   # → desktop/build/compose/binaries/main/app/Andee.app

@@ -329,8 +329,8 @@ agent loop **就是** `LocalBrain`。它让系统提示词保持不变，把会�
 只想用、不想自己构建的话，看上面的[安装](#安装)。下面是自己构建的路：Android 的完整步骤在后面的
 [构建配置](#构建配置)、[配 JDK](#配-jdk)、[把自己构建的包装到设备](#把自己构建的包装到设备)几节。
 
-**在 Mac 上**，同一份代码可以构建桌面版（Apple 芯片、macOS 14+，要装 Command Line Tools 来提供
-`swiftc`，JDK 同样是 17–20）：
+**在 Mac 上**，同一份代码可以构建桌面版（Apple 芯片、macOS 14+，要装 Command Line Tools 15 或更新——它带的 macOS 14
+SDK 提供 `swiftc` 和截图用的 `SCScreenshotManager`，更旧的会让构建直接报错——JDK 同样是 17–20）：
 
 ```bash
 ./gradlew :desktop:createDistributable   # → desktop/build/compose/binaries/main/app/Andee.app

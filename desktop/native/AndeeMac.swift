@@ -12,7 +12,6 @@ import ApplicationServices
 import AVFoundation
 import CoreLocation
 import CoreGraphics
-import CoreImage
 import Foundation
 import ScreenCaptureKit
 import WebKit
@@ -454,56 +453,13 @@ public func andee_key(_ keyCode: Int32, _ flags: Int32) {
  * Capture the main display to a PNG at [path], leaving out every window of
  * this process — the ball and the cards are never in the picture.
  * Returns 1 on success.
- */
-
-/**
- * One frame from a ScreenCaptureKit stream.
  *
- * `SCScreenshotManager.captureImage` is the one-shot convenience and it is macOS 14-only, which
- * meant this bridge could not be compiled with the Command Line Tools' 13 SDK — a machine without
- * a full Xcode could not build the native half at all. A stream that is started, read once and
- * stopped does the same job on 12.3+.
+ * `SCScreenshotManager` (macOS 14), not a one-frame `SCStream`. The stream stood in for it
+ * from 2026-11-05 so the bridge would build on a 13 SDK, and from then on every downscaled
+ * shot failed on a 3024x1964 XDR MacBook while native-size ones still worked — why, inside
+ * SCStream, was never pinned down. The 14 SDK is now required to build (`buildBridge`
+ * checks), so every package captures the same way.
  */
-@available(macOS 12.3, *)
-private func oneFrame(filter: SCContentFilter, configuration: SCStreamConfiguration) async throws -> CGImage {
-    final class Sink: NSObject, SCStreamOutput {
-        private let ready = DispatchSemaphore(value: 0)
-        private let lock = NSLock()
-        private var image: CGImage?
-
-        func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-            guard type == .screen else { return }
-            lock.lock()
-            let taken = image != nil
-            lock.unlock()
-            if taken { return }
-            guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-            let ci = CIImage(cvImageBuffer: buffer)
-            guard let cg = CIContext().createCGImage(ci, from: ci.extent) else { return }
-            lock.lock()
-            if image == nil { image = cg }
-            lock.unlock()
-            ready.signal()
-        }
-
-        func wait(_ milliseconds: Int) -> CGImage? {
-            _ = ready.wait(timeout: .now() + .milliseconds(milliseconds))
-            lock.lock()
-            defer { lock.unlock() }
-            return image
-        }
-    }
-
-    let sink = Sink()
-    let stream = SCStream(filter: filter, configuration: configuration, delegate: nil)
-    try stream.addStreamOutput(sink, type: .screen, sampleHandlerQueue: DispatchQueue(label: "andee.shot"))
-    try await stream.startCapture()
-    let image = sink.wait(2500)
-    try? await stream.stopCapture()
-    guard let image else { throw NSError(domain: "andee.screenshot", code: 1, userInfo: [NSLocalizedDescriptionKey: "no frame in 2.5 s"]) }
-    return image
-}
-
 @_cdecl("andee_screenshot")
 public func andee_screenshot(_ path: UnsafePointer<CChar>, _ maxSide: Int32) -> Int32 {
     let out = URL(fileURLWithPath: String(cString: path))
@@ -522,15 +478,9 @@ public func andee_screenshot(_ path: UnsafePointer<CChar>, _ maxSide: Int32) -> 
             var w = Double(display.width) * scale, h = Double(display.height) * scale
             let longSide = max(w, h)
             if maxSide > 0 && longSide > Double(maxSide) { let k = Double(maxSide) / longSide; w *= k; h *= k }
-            // SCStream rejects output dimensions that are not even. Int() truncation of a
-            // downscaled frame is enough to break it: a 3024x1964 XDR display scaled to a
-            // 1600 long side becomes 1600x1039, and startCapture() fails. The caller has
-            // historically worked around this by passing maxSide=0 (native, always even),
-            // which is why zoom/look_region kept working while plain screenshots did not.
-            cfg.width = max(2, Int(w) & ~1)
-            cfg.height = max(2, Int(h) & ~1)
+            cfg.width = Int(w); cfg.height = Int(h)
             cfg.showsCursor = false
-            let img = try await oneFrame(filter: filter, configuration: cfg)
+            let img = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: cfg)
             let rep = NSBitmapImageRep(cgImage: img)
             if let png = rep.representation(using: .png, properties: [:]) { try png.write(to: out); box.ok = 1 }
         } catch {

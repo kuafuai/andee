@@ -37,12 +37,24 @@ tasks.register('buildTrashTool', Exec) {
     commandLine 'swiftc', '-O', '-target', swiftTarget, src.path, '-o', out.path
 }
 // The bridge JNA loads: accessibility tree, input events, ScreenCaptureKit, workspace.
+//
+// It needs the macOS 14 SDK (Command Line Tools 15+) for `SCScreenshotManager`, and an older
+// SDK stops the build here rather than building a bridge that captures some other way: two
+// packages of one version must not take screenshots differently.
 tasks.register('buildBridge', Exec) {
     def src = file('native/AndeeMac.swift')
     def out = nativeOut.get().file('libandeemac.dylib').asFile
     inputs.file(src)
     outputs.file(out)
-    doFirst { out.parentFile.mkdirs() }
+    doFirst {
+        def sdk = ['xcrun', '--show-sdk-version'].execute().text.trim()
+        def major = (sdk =~ /^(\d+)/) ? (sdk =~ /^(\d+)/)[0][1] as int : 0
+        if (major < 14) throw new GradleException(
+            "The Mac bridge needs the macOS 14 SDK or newer (found: ${sdk ?: 'none'}). " +
+                "Update the Command Line Tools: `softwareupdate --list`, or `sudo rm -rf /Library/Developer/CommandLineTools && xcode-select --install`.\n" +
+                "打包 Mac 版需要 macOS 14 或更新的 SDK（当前：${sdk ?: '无'}），请先升级 Command Line Tools。")
+        out.parentFile.mkdirs()
+    }
     commandLine 'swiftc', '-O', '-target', swiftTarget, '-emit-library', '-framework', 'CoreDisplay', '-framework', 'CoreLocation', '-framework', 'WebKit', '-lsqlite3', src.path, '-o', out.path
 }
 tasks.register('buildNative') { dependsOn('buildTrashTool', 'buildBridge') }

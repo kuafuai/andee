@@ -530,9 +530,8 @@ class MacScreen(
 
     /**
      * [maxSide] is the size wanted, so a plain shot is not captured at 2560 to be shrunk to 1280 again — and the
-     * 480 probe a tap polls every 150 ms stays cheap. The native side rounds the size down to even: on a 3024x1964
-     * XDR display a 1600 long side came out 1600x1039, ScreenCaptureKit refused it, and every shot but the native-
-     * size zoom failed. A false here is not a missing grant — every caller asks `screenCaptureAllowed` first.
+     * 480 probe a tap polls every 150 ms stays cheap. A false here is not a missing grant — every caller asks
+     * `screenCaptureAllowed` first — so it must not send the user back to System Settings.
      */
     private fun capture(maxSide: Int = 2560): BufferedImage {
         val f = File.createTempFile("andee-shot", ".png")
