@@ -778,7 +778,7 @@ Pure Kotlin, no Compose; the whole thing hangs off two pillars, `WindowManager` 
 | minSdk                    | 27                  | Android 8.1 — it installs and chats. **Screen capability needs API 30+**: `ACTION_IME_ENTER` and `takeScreenshot` are both API 30+, and below that the self-check shows an amber row |
 | Java / Kotlin JVM target  | 1.8                 | `sourceCompatibility` 1.8, `jvmTarget = '1.8'`                                            |
 | **Build JDK**             | **17–20**           | see [Which JDK](#which-jdk) — this is the step people get stuck on                        |
-| versionCode / versionName | 28 / 0.14.1          | see [CHANGELOG.md](CHANGELOG.md) for the policy                                           |
+| versionCode / versionName | 29 / 0.14.2          | see [CHANGELOG.md](CHANGELOG.md) for the policy                                           |
 | applicationId / namespace | `net.kuafuai.andee` | never changed from the template. It affects nothing                                       |
 
 **Runtime dependencies** (`app/build.gradle`):
@@ -1215,7 +1215,7 @@ Read it before redistributing: **the ML Kit barcode SDK and the `play-services-*
 open-source**, and the barcode model is fetched from Google at runtime.
 
 See [CHANGELOG.md](CHANGELOG.md) for what changed and for the versioning policy. The latest release is
-**`v0.14.1`** — pre-1.0 on purpose, because the wire contract and the build flags are still moving.
+**`v0.14.2`** — pre-1.0 on purpose, because the wire contract and the build flags are still moving.
 
 ## Related documents
 

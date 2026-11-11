@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`28` / `"0.14.1"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`29` / `"0.14.2"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,41 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.14.2] - 2026-11-11
+
+**Mac: capture goes back to `SCScreenshotManager`, and the odd-height theory from v0.14.1 was wrong.**
+
+v0.14.1 said the XDR screenshots failed because a 1600 downscale came out an odd 1039 and ScreenCaptureKit
+refuses uneven dimensions. **That was not the cause.** It has since been shown that a **1280×827** shot
+worked on the development Mac — an odd height — so the even rounding from v0.14.1 is removed with the
+theory. The real cause inside `SCStream` was **never pinned down**, and this release stops guessing at it.
+
+### Fixed
+
+- **Capture is `SCScreenshotManager.captureImage` again, not a one-frame `SCStream`.** The stream was a
+  stand-in introduced on 2026-11-05 (`aec109f`) so the bridge would build on a **13 SDK** — `SCScreenshotManager`
+  is macOS 14-only. That is exactly when the XDR failures began: **every downscaled shot failed while
+  native-size ones still worked**, on one specific machine, and the Kotlin side reported each failure as a
+  **missing Screen Recording grant** — sending the user to System Settings for a permission that was
+  already valid. Going back to the one-shot API restores the path that worked.
+  - The **even rounding** (`max(2, Int(w) & ~1)`) is removed along with the theory that motivated it.
+- **`buildBridge` now refuses an SDK older than 14 instead of building a capture path of its own.** Two
+  packages of the same version must not take screenshots differently — that is how a build-time workaround
+  became a user-visible bug. The check stops the build with a message that names the fix
+  (`softwareupdate --list`, or reinstall Command Line Tools).
+  - This means **the Mac app now needs the macOS 14 SDK (Command Line Tools 15+) to build.** It still
+    needs **no Xcode** — only the SDK, because `ld` also comes from Xcode.
+- **Kept from v0.14.1, because these were right:** a native capture failure says it is **not** a permission
+  problem (`CAPTURE_FAILED_NOTE`; every caller has already checked the grant), and the real `NSError` is
+  appended to `~/Library/Application Support/Andee/screenshot_error.log`. That log is what made this
+  diagnosis possible at all.
+
+### Documentation
+
+- The Mac build section of both READMEs, `CLAUDE.md` and `desktop/native/README.md` now state the SDK
+  requirement and the history: the one-frame stream, why it was introduced, what it broke, and **"do not
+  bring a second capture path back behind an SDK check."**
 
 ## [0.14.1] - 2026-11-11
 
