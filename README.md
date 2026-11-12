@@ -288,7 +288,8 @@ the user is true. And when something is genuinely wrong, the mask comes off.
 Tap the ball, or say "Hey Andee" (fully offline wake word). Prefer typing? The typing field takes  
 up to six photos — from the camera or the gallery — with or without words.
 
-Tap the ball or use the wake word, then say "Exit Andee" or "Take a break" to stop the task and close Andee.
+Tap the ball or use the wake word, then say "Exit Andee" or "Take a break" to stop the task and close Andee —
+or, without saying anything, tap **Exit** on Andee's ongoing notification. Both are the same exit.
 Automatic follow-up listening cannot trigger exit; exit is declined while a meeting is recording.
 The microphone and wake listener stop. Tap the app icon to reopen; Android accessibility reconnection may also restart Andee.
 

@@ -764,6 +764,7 @@
     <string name="body_notify_text_no_screen">Accessibility was switched off, so I can\'t reach the screen. Tap the action to get it back.</string>
     <string name="body_notify_action_fix">Get it back</string>
     <string name="body_notify_action_see">Let me see the screen</string>
+    <string name="body_notify_action_exit">Exit</string>
     <string name="cmd_vault_filling">Typing the “%2$s” for %1$s…</string>
     <string name="cmd_ask_yes">OK</string>
     <string name="cmd_ask_no">No thanks</string>

@@ -803,6 +803,7 @@
     <string name="body_notify_text_no_screen">无障碍被系统关掉了，我现在碰不到屏幕。点右边接回来。</string>
     <string name="body_notify_action_fix">接回来</string>
     <string name="body_notify_action_see">允许看屏幕</string>
+    <string name="body_notify_action_exit">退出</string>
 
     <!-- net/CommandDispatcher.kt — the three lines from it a user can see. -->
     <string name="cmd_vault_filling">正在填入「%1$s」的%2$s…</string>
