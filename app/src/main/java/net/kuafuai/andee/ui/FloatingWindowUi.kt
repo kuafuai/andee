@@ -3577,15 +3577,19 @@ class FloatingWindowUi(
             // signboard above it), so its centre is not `ballH / 2` from the
             // window's top — read it from the area's real position.
             val cy = (ballAreaView?.top ?: 0) + ballH / 2f + (ball?.translationY ?: 0f)
-            // Matches the visible sphere: camera z=4.9 + fov=42 makes the ball
-            // fill ~55% of the shorter dimension, times whatever view scale the
-            // ball is drawn at. Add a small margin so grazing taps still count.
+            // Matches the visible sphere: a body of radius ~0.87 seen from camera
+            // z=4.9 through fov=42 is drawn at ~0.235 of the shorter side, times
+            // whatever view scale the ball is drawn at. HIT_RADIUS adds a small
+            // margin so grazing taps still count — it was 0.32, about 11 dp of
+            // invisible rim on the folded ball, so a tap aimed at the app beside
+            // the ball started listening instead (issue #34). 0.27 still leaves the
+            // folded ball a ~56 dp target, above the 48 dp minimum.
             // Compact mode differs only in that scale (1f, no subtitle to make
             // room for) — it used to claim the whole window because a disc was
             // painted there, and without the disc that would be an invisible
             // square in the corner eating the user's taps.
             val scale = if (compact) 1f else BALL_SCALE
-            val r = min(width, ballH) * 0.32f * scale
+            val r = min(width, ballH) * HIT_RADIUS * scale
             val dx = x - cx
             val dy = y - cy
             return dx * dx + dy * dy <= r * r
@@ -3821,6 +3825,9 @@ class FloatingWindowUi(
          */
         // 0.8 since 2026-10-23: the user asked for a smaller ball on both shapes of the card.
         private const val BALL_SCALE = 0.8f
+
+        /** Tap radius as a fraction of the ball area's shorter side; the sphere is drawn at ~0.235. See `isOnBall`. */
+        private const val HIT_RADIUS = 0.27f
 
         /**
          * How much more sideways than vertical a drag on the ball must be

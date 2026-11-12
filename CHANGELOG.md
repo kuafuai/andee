@@ -29,6 +29,22 @@ hash into `versionName` at build time would close this hole; it is not implement
 
 ## [Unreleased]
 
+### Added
+
+- **Speaking speed** ([#17](https://github.com/kuafuai/andee/issues/17)). Settings → **Speaking speed**
+  (朗读速度): 1×, 1.5× or 2×. It is a time stretch in the player with the pitch kept, so it applies to
+  Volcengine, Google and the system voice at once; a device that cannot stretch audio plays at 1×.
+
+### Fixed
+
+- **The wake phrase stops a running task first** ([#21](https://github.com/kuafuai/andee/issues/21)),
+  exactly as a tap on the ball does. It used to open a second turn beside the one still driving the
+  screen.
+- **The ball no longer catches taps meant for the app beside it**
+  ([#34](https://github.com/kuafuai/andee/issues/34)). Its tap radius was 0.32 of the ball area against a
+  sphere drawn at about 0.235 — roughly 11 dp of invisible rim on the folded ball. It is now 0.27, which
+  still leaves a target of about 56 dp.
+
 ## [0.15.0] - 2026-11-12
 
 **The phone never operates WeChat — one tap locks you out of your own WeChat. Plus a local quit that needs
