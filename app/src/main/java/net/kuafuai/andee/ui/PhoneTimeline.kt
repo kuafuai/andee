@@ -54,6 +54,7 @@ object PhoneTimeline {
             BrainEvent.Kind.TASK_OPENED -> s(c, R.string.tl_task_opened, x)
             BrainEvent.Kind.TASK_WAITING -> s(c, R.string.tl_task_waiting, x, e.detail)
             BrainEvent.Kind.TASK_ANSWERED -> s(c, R.string.tl_task_answered, x)
+            BrainEvent.Kind.TASK_DELIVERED -> s(c, R.string.tl_task_delivered, x)
             BrainEvent.Kind.TASK_DONE -> s(c, R.string.tl_task_done, x)
             BrainEvent.Kind.TASK_DROPPED -> s(c, R.string.tl_task_dropped, x)
             BrainEvent.Kind.CARE -> when (e.detail) {

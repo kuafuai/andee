@@ -246,7 +246,17 @@ class LifeTools(
                 if (elsewhere && !a.optBoolean(TASK_SENT)) {
                     return fail("Nothing was sent on this turn, and ${t.id} is for ${t.deliverTo.short()}. Deliver it first (reply to them), then mark it done — or task step if it is not finished.")
                 }
-                book.close(id, "done", a.optString("result")).fold({ changed(it, "done") }, { fail(it.message) })
+                // Delivered, not closed: whether it is finished is the user's to say (`confirm`, or 在办's 办完了).
+                book.deliver(id, a.optString("result")).fold({
+                    changed(it, "delivered").put("note", "Marked delivered. It stays in hand until the user confirms it is done — in 在办, or by telling you so on their own turn (then call confirm).")
+                }, { fail(it.message) })
+            }
+            "confirm", "reopen" -> {
+                // Only on a turn the user started: these are the user's word on their own task, which a todo, a report, a
+                // notification or Andee's own work turn cannot give on their behalf.
+                if (src.kind != "user" || untrusted) return fail("Only the user can say a task is done or not done. Do this only on their own turn, when they said so; otherwise leave it delivered and tell them.")
+                if (action == "confirm") book.confirm(id).fold({ changed(it, "done") }, { fail(it.message) })
+                else book.reopen(id, a.optString("why")).fold({ JSONObject().put("reopened", true).put("id", it.id).put("status", it.status) }, { fail(it.message) })
             }
             "drop" -> {
                 val t = book.get(id) ?: return fail("no task $id")

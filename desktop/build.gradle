@@ -228,6 +228,8 @@ tasks.register('probe', JavaExec) {
 tasks.named('test') {
     dependsOn('buildNative')
     systemProperty 'andee.trashTool', layout.buildDirectory.file('native/andee-trash').get().asFile.path
+    // The live dsh test (DshLiveTest) runs only when this is set; it spends tokens and needs the network.
+    environment 'ANDEE_DSH_LIVE', System.getenv('ANDEE_DSH_LIVE') ?: ''
 }
 
 // One frame of the ball to a PNG, to check the desktop renderer without the window:

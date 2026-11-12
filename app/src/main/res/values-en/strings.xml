@@ -630,6 +630,9 @@
     <string name="tl_task_waiting">Waiting on %2$s: %1$s</string>
     <string name="tl_task_answered">The answer came: %1$s</string>
     <string name="tl_task_done">Done: %1$s</string>
+    <string name="tl_task_delivered">Delivered, for you to confirm: %1$s</string>
+    <string name="notebook_task_delivered">delivered — confirm?</string>
+    <string name="notebook_task_confirm">✓ Done</string>
     <string name="tl_task_dropped">Let go: %1$s</string>
     <string name="tl_care_add">Now cares about: %1$s</string>
     <string name="tl_care_done">A care is done</string>

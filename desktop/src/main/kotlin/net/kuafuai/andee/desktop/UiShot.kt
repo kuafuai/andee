@@ -73,6 +73,45 @@ fun main(args: Array<String>) {
             step = 4, secondsAgo = 23,
         )
     }
+    // `chat … dsh`: a job handed to dsh, live at the foot of the conversation.
+    if (args.getOrElse(4) { "" } == "dsh") {
+        Scrollback.add(Scrollback.Role.USER, "深度分析一下这次风波的幕后，用 dsh")
+        // A throwaway notebook with three things in hand: one with a dsh worker on it, one answered, one waiting.
+        DesktopNotebook.storeOverride = object : net.kuafuai.andee.config.NotebookStore {
+            var s: String? = null
+            override fun read() = s
+            override fun write(plain: String): Boolean { s = plain; return true }
+            override fun wipe() { s = null }
+        }
+        val tasks = DesktopNotebook.book.tasks
+        val user = net.kuafuai.andee.brain.Source(kind = "user")
+        tasks.open("给老王的合作方案", "等他看完再改", 0L, user, false).getOrNull()?.let { t ->
+            tasks.wait(t.id, net.kuafuai.andee.config.Tasks.Wait(kind = "person", name = "老王", asked = "方案看完了吗"))
+        }
+        tasks.open("小王问报价", "回他", 0L, net.kuafuai.andee.brain.Source(kind = "person", sender = "小王"), false).getOrNull()?.let { t ->
+            tasks.wait(t.id, net.kuafuai.andee.config.Tasks.Wait(kind = "person", name = "老板", asked = "报价多少"))
+            tasks.answered(net.kuafuai.andee.brain.Source.fromNotification(org.json.JSONObject().put("pkg", "com.tencent.mm").put("app", "微信")
+                .put("title", "老板").put("latest", "按上次的价，八折").put("when", System.currentTimeMillis())))
+        }
+        tasks.open("黄仁勋风波·幕后深挖", "", 0L, user, false).getOrNull()?.let { t ->
+            tasks.wait(t.id, net.kuafuai.andee.config.Tasks.Wait(kind = "worker", name = "3", asked = "黄仁勋风波·幕后深挖"))
+        }
+        TimelineEvents.body(TimelineEvents.Body.DSH, "交给 dsh：黄仁勋风波·幕后深挖 · T3", "深挖时间线、治理层、市场与各方立场")
+        Scrollback.add(Scrollback.Role.ASSISTANT, "交给 dsh 去查了，它查完我再跟你说。")
+        val t = net.kuafuai.andee.desktop.dsh.DshWorkers::Todo
+        DshLive.on("3", net.kuafuai.andee.desktop.dsh.DshWorkers.Progress(
+            "3", "黄仁勋风波·幕后深挖", System.currentTimeMillis() - 192_000, step = 15,
+            recent = listOf("搜：Nvidia lead independent director 等 3 条", "读网页：businessinsider.com", "读网页：theguardian.com", "读网页：en.infomaxai.com"),
+            thought = "Business Insider 的侧栏给了几条关键线索，先把期权那篇读完。",
+            todos = listOf(
+                t("核实时间线原始来源（官网信件、董事会声明、NYT首曝）", "completed"),
+                t("核实治理层：律师团队、股权结构、接班人名单", "in_progress"),
+                t("核实市场数据：股价、机构减持、期权", "pending"),
+                t("撰写报告并校核字数与链接", "pending"),
+            ),
+            tokens = 182_000,
+        ))
+    }
     if (args.getOrElse(4) { "" } == "pending") {
         Scrollback.add(Scrollback.Role.ASSISTANT, "这一版改的是手感和反馈：\n\n" + "金豆出现了，每吃 5 个普通豆随机长出一颗金色豆子，6.5 秒后消失，最后一秒会闪，吃到 3 分。撞死时棋盘会抖一下、蛇头位置炸开一层红粒子。".repeat(4) + "\n\n要是你原本想改的是别的东西，跟我说一句我就接着改。")
         Pages.add("贪吃蛇", "<html>", null)?.let { Assistant.beginEdit(it) }

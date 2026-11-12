@@ -2068,8 +2068,11 @@ object ToolSchemas {
           to come back with something (they will tell you). friend: `name` of the other Andee. time: `at` epoch ms. **When that person answers, the device recognises it** and brings this task
           back to you with their words; you do not have to remember to look.
         - `step` (id, text, next?) — what happened, and what comes next.
-        - `done` (id, result) — delivered. For someone other than the user, something must have gone out to them on
-          this turn first; otherwise it is refused.
+        - `done` (id, result) — you delivered it. It is not closed: it stays in hand as **delivered** until the user
+          confirms it is done. For someone other than the user, something must have gone out to them on this turn first;
+          otherwise it is refused. Do not mark done what this turn was not about.
+        - `confirm` (id) / `reopen` (id, why) — the user's word: it is done, or it is not (say what is missing). Only on the
+          user's own turn, and only when they said so; anywhere else it is refused.
         - `drop` (id, why) — let it go, with the reason. Say so to whoever was waiting, if anyone was.
         - `list` / `get` (id).
 
@@ -2079,7 +2082,7 @@ object ToolSchemas {
     """.trimIndent(),
             required = listOf("action"),
             props = mapOf(
-                "action" to propEnum("What to do", listOf("open", "wait", "step", "done", "drop", "list", "get")),
+                "action" to propEnum("What to do", listOf("open", "wait", "step", "done", "confirm", "reopen", "drop", "list", "get")),
                 "id" to prop("string", "The task id (T1, T2, …)."),
                 "what" to prop("string", "For open: one line, what it is."),
                 "next" to prop("string", "For open / step: the next thing to do."),
@@ -2093,7 +2096,7 @@ object ToolSchemas {
                 "at" to prop("integer", "For wait on time: epoch ms."),
                 "text" to prop("string", "For step: what happened."),
                 "result" to prop("string", "For done: what came of it."),
-                "why" to prop("string", "For drop: why you are letting it go."),
+                "why" to prop("string", "For drop: why you are letting it go. For reopen: what the user found missing."),
                 "status" to prop("string", "For list: `closed` for the finished ones."),
             ),
         ),

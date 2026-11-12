@@ -54,6 +54,43 @@ object Assistant {
         )
     }
 
+    /**
+     * dsh workers (`dsh/DshWorkers`): Andee routes, a DeepSeek Harness session works. One per app, like [shell], so a
+     * job in flight survives a brain rebuild. A report comes back as a turn fenced as another agent's words — the
+     * worker may have read anything — so it is woken `untrusted`, like a friend's report.
+     */
+    val dsh: net.kuafuai.andee.desktop.dsh.DshWorkers by lazy {
+        net.kuafuai.andee.desktop.dsh.DshWorkers(
+            indexFile = AppDirs.file("dsh_workers.json"),
+            home = java.io.File(System.getProperty("user.home"), "Andee/workers"),
+            ask = { q ->
+                val zh = Strings.lang() == "zh"
+                val yes = if (zh) "允许一次" else "Allow once"
+                runCatching { ProcessBuilder("afplay", "/System/Library/Sounds/Glass.aiff").start() }
+                AskGate.ask(q, listOf(yes, if (zh) "不允许" else "Don't allow"), DSH_ASK_MS).button == yes
+            },
+            onFinished = { _, turn ->
+                whenQuiet("dsh-report") {
+                    if (brain?.isBusy() != true) busy(true)
+                    ensure().wake(turn, untrusted = true)
+                }
+            },
+            onEvent = { text, detail, id -> Scrollback.event(TimelineEvents.Body.DSH.name, text, detail, id) },
+            // The user's own DeepSeek key, when Andee itself talks to DeepSeek; otherwise dsh's own credentials.
+            key = { config().let { c -> if ("api.deepseek.com" in c.baseUrl) c.apiKey else "" } },
+            model = { Settings.get("dsh_model").ifEmpty { net.kuafuai.andee.desktop.dsh.DshWorkers.DEFAULT_MODEL } },
+            zh = { Strings.lang() == "zh" },
+            tasks = net.kuafuai.andee.desktop.dsh.DshTaskLink { DesktopNotebook.book.tasks },
+            onProgress = DshLive::on,
+        )
+    }
+
+    /** `delegate_task` and friends. Listed only while dsh is installed and not switched off (`dsh` = off). */
+    private val dshTools by lazy { dsh.provider { Settings.get("dsh") != "off" } }
+
+    /** How long a worker's request to go wider waits on the user. */
+    private const val DSH_ASK_MS = 300_000L
+
     /** Hides Andee's own windows for the instant of a click; set by the window. */
     @Volatile var hideWindows: (Boolean) -> Unit = {}
 
@@ -151,6 +188,7 @@ object Assistant {
             gear,
             peerTools,
             marketTools(),
+            dshTools,
         )
     }
 
@@ -410,6 +448,8 @@ object Assistant {
     sealed class Pending {
         data class Edit(val page: Pages.Page) : Pending()
         data class Topic(val topic: Scrollback.Topic) : Pending()
+        /** A 「事」 from 在办: the next words are about it, and its whole record goes with them. */
+        data class Task(val id: String, val what: String) : Pending()
     }
     @Volatile var pending: Pending? = null
         private set
@@ -417,6 +457,16 @@ object Assistant {
 
     fun beginEdit(page: Pages.Page) { pending = Pending.Edit(page); onPendingChanged() }
     fun beginTopic(topic: Scrollback.Topic) { pending = Pending.Topic(topic); onPendingChanged() }
+    fun beginTask(task: net.kuafuai.andee.config.Tasks.Task) { pending = Pending.Task(task.id, task.what); onPendingChanged() }
+
+    /**
+     * 接着办 from 在办: one tap, a turn about that 「事」. The task is named by the device, not guessed by the model
+     * from "that one" — the same rule as an artifact picked in 产物.
+     */
+    fun continueTask(task: net.kuafuai.andee.config.Tasks.Task) {
+        pending = Pending.Task(task.id, task.what)
+        say(if (Strings.lang() == "zh") "接着办" else "Carry on")
+    }
     fun cancelPending() { if (pending != null) { pending = null; onPendingChanged() } }
 
     fun say(text: String, attachments: List<Attachment> = emptyList()) {
@@ -444,6 +494,7 @@ object Assistant {
         val row = when (p) {
             is Pending.Edit -> if (zh) "修改「${p.page.title}」：$t" else "Revise “${p.page.title}”: $t"
             is Pending.Topic -> if (zh) "继续「${p.topic.title}」：$t" else "Continue “${p.topic.title}”: $t"
+            is Pending.Task -> if (zh) "「${p.what}」：$t" else "“${p.what}”: $t"
             null -> t
         }
         // The record says what was sent in words, since a picture has no text to show.
@@ -458,6 +509,7 @@ object Assistant {
         val forBrain = when (p) {
             is Pending.Edit -> { Pages.armNextTurn(p.page.groupId); editQuery(p.page, row) }
             is Pending.Topic -> topicQuery(p.topic, row)
+            is Pending.Task -> taskQuery(p.id, row)
             null -> t
         }
         val withFiles = if (files.isEmpty()) forBrain else forBrain + Attachments.fileNote(files)
@@ -478,6 +530,19 @@ object Assistant {
             append(".)\n\n<<<CURRENT PAGE SOURCE>>>\n")
             append(if (cut) html.take(cap) else html)
             append("\n<<<END PAGE SOURCE>>>")
+        }
+    }
+
+    private fun taskQuery(id: String, said: String): String {
+        val tasks = DesktopNotebook.book.tasks
+        val task = tasks.get(id) ?: return said
+        val worker = task.waits.lastOrNull { it.kind == "worker" }?.name
+        return buildString {
+            append(said)
+            append("\n\n(I picked this from 在办: it is about task ").append(task.id).append(". Its record follows. Pick it up from where it")
+            append(" stands — what it is waiting on, what came back, what is next — and use `task` on ").append(task.id).append(" as you go.")
+            if (worker != null) append(" It was handed to dsh worker #").append(worker).append("; for that worker to carry on, delegate_task with for_task=").append(task.id).append(".")
+            append(")\n\n").append(tasks.forPrompt(task))
         }
     }
 
@@ -546,6 +611,9 @@ object Assistant {
         Nudges.dismiss()
         guest?.cancel()
         shell.stopAll()
+        // Not the dsh workers: a job handed off is meant to carry on while the user talks to Andee, and a tap (or a
+        // new request, which comes through here too) cut one off mid-research on 11-12. They stop when asked to
+        // (delegate_cancel); their 「事」 says what is in hand.
         net.kuafuai.andee.desktop.voice.MacVoice.stopSpeaking()
         busy(false)
     }

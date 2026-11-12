@@ -415,6 +415,24 @@ fun SettingsScreen(
             ) { v["drive"] = it }
             Note(st("settings_drive_note"))
         }
+        // ---- 交给 dsh 的活: hand general-agent jobs to DeepSeek Harness workers. 关 leftmost; unset reads as 开,
+        // but the tools are listed only while dsh is actually installed, so "on" with nothing installed offers nothing. ----
+        Section(st("settings_section_dsh")) {
+            SegmentedPicker(
+                listOf("off" to st("common_off"), "on" to st("common_on")),
+                v["dsh"].orEmpty().ifEmpty { if (Settings.get("dsh") == "off") "off" else "on" },
+            ) { v["dsh"] = it }
+            val installed = remember { runCatching { Assistant.dsh.available() }.getOrDefault(false) }
+            val jobs = remember { runCatching { Assistant.dsh.status(org.json.JSONObject()).getJSONArray("workers").length() }.getOrDefault(0) }
+            Note(if (installed) st("settings_dsh_installed", jobs) else st("settings_dsh_missing"))
+            Note(st("settings_dsh_note"))
+            if (installed) Row(Modifier.padding(top = 8.dp)) {
+                Pill(st("settings_dsh_open")) {
+                    val dir = java.io.File(System.getProperty("user.home"), "Andee/workers").apply { mkdirs() }
+                    runCatching { ProcessBuilder("open", dir.path).start() }
+                }
+            }
+        }
         // ---- 对话里显示: everything, or only what was said. A preference, not a control you reach for, so it
         // left the chat header for here — the phone moved it the same way. 全部 leftmost; unset reads as 全部. ----
         Section(st("settings_section_timeline")) {

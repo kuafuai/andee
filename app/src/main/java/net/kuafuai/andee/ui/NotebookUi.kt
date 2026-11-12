@@ -923,6 +923,7 @@ class NotebookUi(
         val st = lctx.getString(
             when (t.status) {
                 "ready" -> R.string.notebook_task_ready
+                net.kuafuai.andee.config.Tasks.DELIVERED -> R.string.notebook_task_delivered
                 "waiting" -> R.string.notebook_task_waiting
                 else -> R.string.notebook_task_open
             },
@@ -933,6 +934,13 @@ class NotebookUi(
         row.addView(label(bits.joinToString(" · "), Glass.Type.MICRO, Glass.MUTED, top = 4), matchWrap())
         t.waits.lastOrNull { !it.open }?.let { row.addView(label("「" + it.answer.take(80) + "」", Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap()) }
         if (t.next.isNotBlank()) row.addView(label(lctx.getString(R.string.notebook_task_next, t.next), Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap())
+        // Andee said it delivered; only the user closes it.
+        if (t.status == net.kuafuai.andee.config.Tasks.DELIVERED) {
+            if (t.result.isNotBlank()) row.addView(label(t.result.take(120), Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap())
+            row.addView(label(lctx.getString(R.string.notebook_task_confirm), Glass.Type.CAPTION, Glass.ACCENT, top = 8).apply {
+                setOnClickListener { tasks.confirm(t.id).onSuccess { c -> c.cancel.forEach { Scheduler.cancelTodo(context, it) } }; rebuild() }
+            }, matchWrap())
+        }
         return row
     }
 

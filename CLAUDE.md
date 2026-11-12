@@ -712,7 +712,7 @@ Design: `docs/design/tasks.zh-CN.md` §3. A `Todo` is an alarm clock; a task (�
 
 - **`task` (`note.task`): open / wait / step / done / drop / list / get.** `LocalBrain.deviceFields` fills `_source`, `_untrusted` and `_sent` on every `note.task` / `note.person` call and throws away whatever the model put there — where a task came from is never the model's to say.
 - **Answers are recognised by the device** (`Tasks.awaiting`): same channel, same conversation, same sender name (`People.norm`) or person id; a group wait with no name is answered by anyone there. Before the triage, `NotifyTasks.awaited` tells it what this message answers (so a bare 「可以，八折」 is `act`, not `ignore`); when the turn starts, `NotifyTasks.turn` marks the waits answered and appends the task's record. A friend's report answers a `friend` wait (`friendAnswered`). An answer stays `ready` until a `task` call on it (`Wait.seen`).
-- **`done` means delivered**: for anyone other than the user it is refused unless this turn sent something (`turnSent`: typed-then-sent, `sms.send`, `peer.ask`, `shell.run`). **A turn that sent something and wrote no task gets one reminder before it ends** (`TASK_REMINDER`), never two.
+- **`done` means delivered, and only the user closes** (11-12: the model closed two of the user's tasks in a turn about something else, and they vanished): the model's `done` sets status `delivered` (`Tasks.deliver`, still active, shown first in 在办 as 交付了，等你确认); the user closes it with 办完了 (Mac 在办 page, phone notebook ✓ → `Tasks.confirm`) or sends it back with 还没完 (`Tasks.reopen`, a step says why). The model may `confirm` / `reopen` only on the user's own trusted turn (`LifeTools` checks `_source.kind == user`). Closed ones stay readable for 7 days under 最近办完 with 重新打开. `reviveRecentDone` (once, meta flag) turned the done-by-model tasks of the two days before this into `delivered`. For anyone other than the user `done` is refused unless this turn sent something (`turnSent`: typed-then-sent, `sms.send`, `peer.ask`, `shell.run`). **A turn that sent something and wrote no task gets one reminder before it ends** (`TASK_REMINDER`), never two.
 - **Trust follows the task.** A task opened on an untrusted turn is `untrusted`; its time-wait todo carries it, and a heartbeat work turn on it runs with `untrusted` (`LocalBrain.work(untrusted)` → `turnUntrusted`). An untrusted turn may not set `deliver_to` or drop a trusted task.
 - **The heartbeat sees tasks as cares of kind `task`** (`Selfhood.due` → `Tasks.asCares`): waiting a day with no answer, open and untouched 12 h, a due date, or an answer nothing was done with. `SelfWork` opens such a turn with the task's whole record.
 - **Promises and owed items moved here** (`Tasks.migrate`, once, meta flag): `cares` no longer accepts `promise` (it points at `task`), and a person's `owed` is now a view of the tasks involving them (`Tasks.owedFor`); `person owe` / `settle` open and close tasks. The originals are marked `moved` / emptied, not deleted from history.
@@ -861,6 +861,44 @@ meetings, gear, friends) and lists exactly the tools some provider handles. What
 - **Every value the Swift bridge hands back goes through `json()`, which makes numbers finite first.** `JSONSerialization` raises an Objective-C exception on NaN or ∞ — Swift cannot catch it, so the app aborts. It did, on 2026-11-04: the system Weather app has an accessibility element with an infinite size, and reading its screen took Andee down mid-task. `frame()` also drops non-finite frames at the source.
 - **A prompt card appears beside the ball** (`PromptWindow`), which may be on a screen the user is not looking
   at. A friend's request therefore plays a sound and waves the ball first — the first one timed out unseen.
+- **Andee routes, a dsh session works** (`desktop/dsh/`, design `docs/design/dsh-integration.zh-CN.md`, 2026-11-12).
+  `delegate_task` hands a job that wants a whole agent (a repository, research written up, a batch of files, long
+  commands) to a DeepSeek Harness worker in its own folder `~/Andee/workers/<id>` and **returns at once**; the report
+  comes back later as a turn woken `untrusted` and fenced as another agent's words (`DshPlan.reportTurn`, 1 200
+  characters in context, the whole of it in `report.md`). Listed only while `dsh` is installed (`DshWorkers.Bin.find`
+  asks a login shell — a GUI app has no `/usr/local/bin` on its PATH) and `dsh` ≠ `off`. Things measured against
+  dsh 0.2.2-rc.1 that shape it: the SDK is `dsh --profile sdk`, newline JSON-RPC on stdio (`initialize` →
+  `session/working-directory/set` or `session/resume` → `session/query` → `session/wait`, the answer is the last
+  assistant text before `turn/end`); **there is no cancel**, so each job is its own process and cancelling kills it;
+  the default preset is `workspace-write`, and a write outside the folder is refused by its sandbox and widening
+  it is an `approval/request` — answered with a card only on a turn the user started (`DshPlan.Trust.USER`), with
+  "rejected" on any other; the sdk profile carries no `workspace-changes`, so **what a job produced is read off the
+  folder by the device** (`DshPlan.snapshot` / `diff`, before and after), never from the report's prose.
+  `continue=<id>` resumes that worker's session (it found its own file from "the file you created", measured) —
+  **decided by the device** (`DshPlan.reuse`): a session opened on the user's turn is not continued from a todo's,
+  nor the reverse, nor one older than 30 days; a fresh one is seeded with the old report. `TurnGuards` refuses
+  `dsh.delegate` on untrusted and silent turns. At most two jobs at once. **A tap on the ball does not cancel them,
+  and neither does a new request or 清空聊天记录** — it did at first, and a tap to say one more sentence killed a
+  research job mid-way (11-12); only `delegate_cancel` stops one. Jobs running when Andee quit are marked interrupted
+  at the next start and their orphan process ended.
+  **Every job is a 「事」** (`DshTaskLink`): the one named with `for_task`, else the one the continued worker was on,
+  else one the device opens (`origin` `dsh`). The device sets a `worker` wait (`Tasks.Wait.kind`, never settable by
+  the model) and answers it on the report (`Tasks.workerAnswered`), whose turn carries the task's record; a stopped
+  job answers it as already seen (no work turn restarts it), an interrupted one leaves the task ready.
+  Timeline rows (`Body.DSH`, ref = worker id) and the task in 在办 carry 文件夹 › (and the row 在办 ›). **在办 is a sidebar list above 话题** (`TasksUi.kt`: answered first, then
+  running, at most six, 全部 N 件 ›, 定时 ›), and one page per 事 (`task:<id>`) with 接着办 (a turn now, the task named
+  by the device and its record attached — `Assistant.continueTask`), 说点要求再办 (`Pending.Task`) and 放下. A 事 is not a
+  conversation of its own: Andee keeps one thread. While a job runs, `DshLive` feeds the row's line and the page's
+  live card (step, time, tokens, its own `todo_write` checklist, its newest actions via `DshPlan.describe`); 动态 no
+  longer carries a dsh card — only Andee's own turn is shown there. The Mac notebook's last tab is 定时 (alarms only);
+  the phone's is still 在办 until the phone moves too. **There is no link into dsh's own web window, on purpose**
+  (tried and removed 11-12): dsh web reads a session another process is running as 「任务已停止 … 本轮已中止」, and
+  once it has shown a session it holds that session's write lock — which is also why a resume that meets
+  `writer-held` goes on in a new session in the same folder (`resumeOrHeld`), told the old report and the files
+  already there (`DshPlan.brief(existing)`). Settings has 交给 dsh 的活.
+  `DshPlanTest` always runs; `DshLiveTest` and `DshRouteTest` (the brain's own loop → real dsh → report back, and
+  a notification's turn refused) spend tokens and run only with `ANDEE_DSH_LIVE=1`, `DshRouteTest` alone in a
+  throwaway `andee.home` and skipped if `AppDirs` was already fixed elsewhere.
 
 ## Friends (`core/peer/`)
 

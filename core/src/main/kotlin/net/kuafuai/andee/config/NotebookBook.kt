@@ -74,7 +74,7 @@ class NotebookBook(private val store: NotebookStore) {
      * Things it took on and has not finished ([Tasks]). Promises and owed items moved here from cares and people;
      * the move runs once, the first time anything asks.
      */
-    val tasks: Tasks by lazy { Tasks(this).also { it.migrate(selfhood, people) } }
+    val tasks: Tasks by lazy { Tasks(this).also { it.migrate(selfhood, people); it.reviveRecentDone() } }
 
     /** 守卫: the user's own paragraph of rules, above everything in the prompt. Written from the notebook card only. */
     val guard: Guard by lazy { Guard(this) }

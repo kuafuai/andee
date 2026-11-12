@@ -654,6 +654,9 @@
     <string name="tl_task_waiting">在等 %2$s 回话：%1$s</string>
     <string name="tl_task_answered">等的回话到了：%1$s</string>
     <string name="tl_task_done">办完了：%1$s</string>
+    <string name="tl_task_delivered">交付了，等你确认：%1$s</string>
+    <string name="notebook_task_delivered">交付了，等你确认</string>
+    <string name="notebook_task_confirm">✓ 办完了</string>
     <string name="tl_task_dropped">放下了一件事：%1$s</string>
     <string name="tl_care_add">开始在意：%1$s</string>
     <string name="tl_care_done">一件在意的事做完了</string>

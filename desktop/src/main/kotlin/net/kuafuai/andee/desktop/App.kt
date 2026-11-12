@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun AppRoot(nav: Nav) {
+    TaskNav.open = { nav.go("task:$it") }
     Box(Modifier.fillMaxSize()) {
         BackdropLayer()
         Row(Modifier.fillMaxSize()) {
@@ -34,6 +35,10 @@ fun AppRoot(nav: Nav) {
                         )
                         screen == "selfcheck" -> SelfCheckCard(onDone = { nav.back() }, onOpenSettings = { nav.push("settings") })
                         screen == "notebook" -> NotebookCard(onDone = { nav.back() })
+                        // 在办: one 事, all of them, and 定时 (the alarms, still on the notebook's last tab).
+                        screen.startsWith("task:") -> TaskScreen(screen.removePrefix("task:"), nav, onTalk = { nav.go("chat"); ComposerFocus.pending = true })
+                        screen == "tasks" -> AllTasksScreen(nav)
+                        screen == "timed" -> NotebookCard(onDone = { nav.back() }, startTab = NOTEBOOK_TAB_TODOS)
                         // `notebook:<tab>` opens on that tab; only the screenshot harness names one.
                         // A wiki article opened from the timeline: the notebook's wiki tab, on that article.
                         screen.startsWith("wiki:") -> NotebookCard(onDone = { nav.back() }, startTab = 6, startWiki = screen.removePrefix("wiki:"))

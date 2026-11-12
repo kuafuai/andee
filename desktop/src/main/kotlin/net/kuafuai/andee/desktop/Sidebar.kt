@@ -82,6 +82,9 @@ fun Sidebar(nav: Nav, width: androidx.compose.ui.unit.Dp = 228.dp) {
         NavItem(AndeeIcon.FRIENDS, t("朋友", "Friends"), here == "peers", badge = Peers.count.value) { nav.go("peers") }
 
         Spacer(Modifier.height(14.dp))
+        // 在办 above 话题: what is in hand now, then what was said and put away.
+        SidebarTasks(nav)
+        Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(t("话题", "Topics"), color = Palette.secondary, fontSize = 12.sp)
             Spacer(Modifier.weight(1f))

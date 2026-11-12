@@ -315,6 +315,7 @@ fun ChatScreen(onOpenArtifacts: () -> Unit, onOpenTopic: (Long) -> Unit = {}, on
                     when (p) {
                         is Assistant.Pending.Edit -> if (zh) "修改「${p.page.title}」：说说想怎么改" else "Revising “${p.page.title}”: say what to change"
                         is Assistant.Pending.Topic -> if (zh) "继续「${p.topic.title}」：想从哪接着聊" else "Continuing “${p.topic.title}”: where to take it"
+                        is Assistant.Pending.Task -> if (zh) "关于「${p.what}」：想让它怎么办" else "About “${p.what}”: how to go on"
                     },
                     color = Palette.label, fontSize = 13.sp, modifier = Modifier.weight(1f),
                 )
@@ -612,6 +613,8 @@ private fun EventRow(r: Scrollback.Row, onOpenWiki: (String) -> Unit = {}) {
                 Text(if (Strings.lang() == "zh") "打开 ›" else "Open ›", color = Palette.accent, fontSize = 12.sp,
                     modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onOpenWiki(r.ref) }.padding(horizontal = 4.dp, vertical = 1.dp))
             }
+            // A dsh worker's job (ref = the worker's id): its folder is where what it made is.
+            if (r.ref.isNotBlank() && r.kind == TimelineEvents.Body.DSH.name) DshLinks(r.ref, withTask = true)
         }
         if (open && r.detail.isNotBlank()) {
             Markdown(r.detail, color = Palette.photoInk, size = 12.sp,
@@ -667,6 +670,73 @@ internal fun WorkCard(modifier: Modifier = Modifier) {
                             modifier = Modifier.offset(y = rise).graphicsLayer { alpha = dim },
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A dsh worker at work ([DshLive]): the step and time, where it is in its own checklist, and its newest actions.
+ * A click opens the whole checklist and the start of its latest thought.
+ */
+@Composable
+internal fun DshCard(p: net.kuafuai.andee.desktop.dsh.DshWorkers.Progress, modifier: Modifier = Modifier) {
+    val zh = Strings.lang() == "zh"
+    fun t(a: String, b: String) = if (zh) a else b
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); kotlinx.coroutines.delay(1000) } }
+    var open by remember(p.id) { mutableStateOf(false) }
+    val pulse by androidx.compose.animation.core.rememberInfiniteTransition().animateFloat(
+        0.35f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(900), androidx.compose.animation.core.RepeatMode.Reverse),
+    )
+    Column(
+        modifier.widthIn(max = 560.dp).fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp)).clickable { open = !open }
+            .background(Palette.glass, RoundedCornerShape(14.dp))
+            .border(1.dp, Palette.glassEdge, RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).graphicsLayer { alpha = pulse }.background(Palette.accent, CircleShape))
+            Spacer(Modifier.width(8.dp))
+            Text("dsh #${p.id} · ${p.title}", color = Palette.label, fontSize = 12.sp, maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Spacer(Modifier.width(8.dp))
+            Text(DshStatus.line(p, now, zh), color = Palette.secondary, fontSize = 12.sp, maxLines = 1)
+            Spacer(Modifier.width(4.dp))
+            Text(if (open) "▴" else "▾", color = Palette.secondary, fontSize = 10.sp)
+        }
+        p.current?.let { c ->
+            Spacer(Modifier.height(4.dp))
+            Text(t("清单 ${p.done}/${p.todos.size} · ", "Checklist ${p.done}/${p.todos.size} · ") + c.text,
+                color = Palette.label, fontSize = 12.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        }
+        val recent = p.recent.takeLast(if (open) net.kuafuai.andee.desktop.dsh.DshWorkers.RECENT else 3)
+        if (recent.isNotEmpty()) {
+            Spacer(Modifier.height(3.dp))
+            recent.forEachIndexed { i, r ->
+                val age = recent.lastIndex - i
+                Text("› $r", color = Palette.secondary, fontSize = 12.sp, lineHeight = 18.sp, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.graphicsLayer { alpha = listOf(1f, 0.72f, 0.5f, 0.4f, 0.32f, 0.26f)[age.coerceIn(0, 5)] })
+            }
+        } else if (p.step == 0) {
+            Spacer(Modifier.height(3.dp))
+            Text(t("正在起步…", "Getting started…"), color = Palette.secondary, fontSize = 12.sp)
+        }
+        if (open) {
+            if (p.thought.isNotBlank()) {
+                Spacer(Modifier.height(5.dp))
+                Text(p.thought, color = Palette.secondary, fontSize = 12.sp, lineHeight = 18.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+            }
+            if (p.todos.isNotEmpty()) {
+                Spacer(Modifier.height(5.dp))
+                for (todo in p.todos) {
+                    val mark = when (todo.status) { "completed" -> "✓"; "in_progress" -> "▸"; else -> "·" }
+                    Text("$mark ${todo.text}", fontSize = 12.sp, lineHeight = 18.sp,
+                        color = if (todo.status == "in_progress") Palette.label else Palette.secondary)
                 }
             }
         }
@@ -765,3 +835,29 @@ private fun wechatQr(): androidx.compose.ui.graphics.ImageBitmap? = runCatching 
     val bytes = WeChatQrImage::class.java.getResourceAsStream("/wechat_qr.png")!!.use { it.readBytes() }
     org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap()
 }.getOrNull()
+
+/**
+ * The way into a dsh worker's job, beside its timeline row and its task in 在办: its folder in Finder. A link to the
+ * job's session in dsh's own web window was tried and removed (11-12): dsh web reads a session another process is
+ * running as a dead turn, and once it has shown one it holds that session's write lock, so the job cannot be resumed.
+ */
+@Composable
+fun DshLinks(workerId: String, withTask: Boolean = false) {
+    val zh = Strings.lang() == "zh"
+    // On a timeline row: the 事 this job is for, where its live progress and record are.
+    if (withTask) Assistant.dsh.get(workerId)?.task?.takeIf { it.isNotBlank() }?.let { id ->
+        Spacer(Modifier.width(8.dp))
+        LinkText(if (zh) "在办 ›" else "In hand ›") { TaskNav.open(id) }
+    }
+    Spacer(Modifier.width(8.dp))
+    LinkText(if (zh) "文件夹 ›" else "Folder ›") {
+        // A row written before the worker id was the ref carried the folder's path.
+        if (workerId.startsWith("/")) runCatching { ProcessBuilder("open", workerId).start() } else Assistant.dsh.openFolder(workerId)
+    }
+}
+
+@Composable
+private fun LinkText(text: String, onClick: () -> Unit) {
+    Text(text, color = Palette.accent, fontSize = 12.sp,
+        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 1.dp))
+}

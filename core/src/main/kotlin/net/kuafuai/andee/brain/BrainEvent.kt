@@ -51,7 +51,7 @@ data class BrainEvent(
          * Things it took on ([net.kuafuai.andee.config.Tasks]): [subject] is what, [detail] who or why. The id leads the subject.
          * ANSWERED is the device's — someone a task was waiting on wrote back — the rest come from `task` calls.
          */
-        TASK_OPENED, TASK_WAITING, TASK_ANSWERED, TASK_DONE, TASK_DROPPED,
+        TASK_OPENED, TASK_WAITING, TASK_ANSWERED, TASK_DELIVERED, TASK_DONE, TASK_DROPPED,
     }
 
     companion object {
@@ -94,7 +94,8 @@ data class BrainEvent(
                         "open" -> if (r?.optBoolean("opened") == true) BrainEvent(Kind.TASK_OPENED, what, r.optString("for")) else null
                         "wait" -> if (r?.optBoolean("waiting") == true) BrainEvent(Kind.TASK_WAITING, what,
                             if (args.optString("on") == "time") args.optLong("at").toString() else args.optString("name") + (args.optString("chat").takeIf { it.isNotBlank() }?.let { "@$it" } ?: "")) else null
-                        "done" -> if (r?.optBoolean("done") == true) BrainEvent(Kind.TASK_DONE, what, args.optString("result")) else null
+                        "done" -> if (r?.optBoolean("delivered") == true) BrainEvent(Kind.TASK_DELIVERED, what, args.optString("result")) else null
+                        "confirm" -> if (r?.optBoolean("done") == true) BrainEvent(Kind.TASK_DONE, what, "") else null
                         "drop" -> if (r?.optBoolean("dropped") == true) BrainEvent(Kind.TASK_DROPPED, what, args.optString("why")) else null
                         else -> null
                     }

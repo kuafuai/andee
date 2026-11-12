@@ -16,7 +16,7 @@ import net.kuafuai.andee.brain.BrainEvent
 object TimelineEvents {
 
     /** Body-side event kinds, alongside [BrainEvent.Kind]'s names. */
-    enum class Body { THOUGHT, WORK, BUBBLE, BUBBLE_MUTED, IGNORED, MEETING, VERSION, LOOK, VAULT, PAGE, MORNING, SHELL, SCENE, TOLD, STEPS }
+    enum class Body { THOUGHT, WORK, BUBBLE, BUBBLE_MUTED, IGNORED, MEETING, VERSION, LOOK, VAULT, PAGE, MORNING, SHELL, SCENE, TOLD, STEPS, DSH }
 
     private val zh get() = Strings.lang() == "zh"
     private fun t(z: String, e: String) = if (zh) z else e
@@ -54,6 +54,7 @@ object TimelineEvents {
             BrainEvent.Kind.TASK_OPENED -> t("接下了一件事：$s", "Took on: $s")
             BrainEvent.Kind.TASK_WAITING -> t("在等 ${e.detail} 回话：$s", "Waiting on ${e.detail}: $s")
             BrainEvent.Kind.TASK_ANSWERED -> t("等的回话到了：$s", "The answer came: $s")
+            BrainEvent.Kind.TASK_DELIVERED -> t("交付了，等你确认：$s", "Delivered, for you to confirm: $s")
             BrainEvent.Kind.TASK_DONE -> t("办完了：$s", "Done: $s")
             BrainEvent.Kind.TASK_DROPPED -> t("放下了一件事：$s", "Let go: $s")
             BrainEvent.Kind.CARE -> when (e.detail) {
@@ -99,7 +100,7 @@ object TimelineEvents {
         Body.TOLD.name -> AndeeIcon.CHAT
         BrainEvent.Kind.WOKE.name, BrainEvent.Kind.NOTIFIED.name, Body.IGNORED.name -> AndeeIcon.ALERT_CIRCLE
         BrainEvent.Kind.FRIEND_TASK.name -> AndeeIcon.FRIENDS
-        BrainEvent.Kind.REVIEWED.name, BrainEvent.Kind.FOLDED.name, BrainEvent.Kind.TASK_DONE.name -> AndeeIcon.CHECK_CIRCLE
+        BrainEvent.Kind.REVIEWED.name, BrainEvent.Kind.FOLDED.name, BrainEvent.Kind.TASK_DONE.name, BrainEvent.Kind.TASK_DELIVERED.name -> AndeeIcon.CHECK_CIRCLE
         BrainEvent.Kind.TASK_OPENED.name, BrainEvent.Kind.TASK_WAITING.name, BrainEvent.Kind.TASK_ANSWERED.name,
         BrainEvent.Kind.TASK_DROPPED.name -> AndeeIcon.NOTEBOOK
         BrainEvent.Kind.WIKI.name, BrainEvent.Kind.WIKI_READ.name, BrainEvent.Kind.WIKI_SHOWN.name, Body.PAGE.name -> AndeeIcon.DOCUMENT
@@ -111,6 +112,7 @@ object TimelineEvents {
         Body.LOOK.name -> AndeeIcon.IMAGE
         Body.VAULT.name -> AndeeIcon.LOCK
         Body.SHELL.name -> AndeeIcon.GRID
+        Body.DSH.name -> AndeeIcon.DOCUMENT
         Body.STEPS.name -> AndeeIcon.GRID
         Body.SCENE.name -> AndeeIcon.SPARKLE
         else -> AndeeIcon.NOTEBOOK

@@ -141,6 +141,41 @@ class TasksTest {
         assertEquals("ready", tasks.get(id)!!.status)
     }
 
+    @Test fun aDshWorkersReportAnswersTheTaskThatHandedItTheJob() {
+        val id = tasks.open("整理周报", "", 0L, Source(kind = "user"), false).getOrThrow().id
+        assertNull(tasks.lastWorker(id))
+        tasks.wait(id, Tasks.Wait(kind = "worker", name = "3", asked = "周报")).getOrThrow()
+        assertEquals("waiting", tasks.get(id)!!.status)
+        assertEquals("3", tasks.lastWorker(id))
+        assertEquals(id, tasks.ofWorker("#3")!!.id)
+        assertTrue(tasks.indexForPrompt().contains("waiting on dsh worker #3"))
+
+        assertTrue(tasks.workerAnswered("4", "x").isEmpty())                        // another worker: not this wait
+        val ready = tasks.workerAnswered("3", "Files: weekly.md. Week 46 done.")
+        assertEquals(id, ready.single().id)
+        assertEquals("ready", tasks.get(id)!!.status)
+        assertTrue(tasks.forPrompt(ready.single()).contains("answered by dsh worker #3"))
+        assertEquals("the answered wait still names the worker", "3", tasks.lastWorker(id))
+        assertEquals(id, tasks.ofWorker("3")!!.id)
+
+        // The next job on the same task; the user stops it: answered, but nothing for a work turn to pick up again.
+        now += h
+        tasks.step(id, "read it", null).getOrThrow()
+        tasks.wait(id, Tasks.Wait(kind = "worker", name = "3", asked = "改一下")).getOrThrow()
+        tasks.workerAnswered("3", "Stopped before it finished (cancelled).", seen = true)
+        assertEquals("open", tasks.get(id)!!.status)
+
+        tasks.close(id, "done", "交给用户了").getOrThrow()
+        assertNull("a closed task is not one a worker is still working for", tasks.ofWorker("3"))
+    }
+
+    @Test fun theModelCannotSetAWorkerWait_onlyTheDeviceCan() {
+        val open = call(JSONObject().put("action", "open").put("what", "x"), Source(kind = "user"), untrusted = false)
+        val id = open.getString("id")
+        call(JSONObject().put("action", "wait").put("id", id).put("on", "worker").put("name", "3"), Source(kind = "user"), untrusted = false)
+        assertTrue(tasks.get(id)!!.waits.none { it.kind == "worker" })
+    }
+
     @Test fun promisesAndOwedItemsMoveOverOnce() {
         val self = Selfhood(book, { now })
         // Written the way an older build wrote them: a promise care, and owed items on a person.
