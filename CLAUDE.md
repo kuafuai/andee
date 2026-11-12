@@ -52,6 +52,8 @@ Toolchain notes that bite:
 
 `ScreenBodyService.onServiceConnected()` builds the entire object graph and is the best single file to read first. It creates `FloatingWindowUi` → `AudioIO` → `TtsController` / `AsrController` → `ScreenController` → `CommandDispatcher`, then starts **both** networking paths.
 
+**Exit is a teardown of the body, not a hide** (`BodyCoreService.exitByVoice()`, which every door reaches whatever its name says). Four doors reach it: 「退出」 by voice, the same phrase typed, the power key in the control bar (issue #44), and **退出 on the ongoing notification** (`ACTION_EXIT`, a `PendingIntent.getService` back into the service, issue #16) — the shade is where people go to turn a persistent service off, and it needs no voice, no ball and no card. All of them stop the task, close cards, stop the wake listener and `stopSelf()`, so `onDestroy` does the real teardown; grants and history stay, and the exit is declined with a card while a meeting is recording. The launcher icon starts the body again.
+
 ### Two networking paths, one dispatcher
 
 The app simultaneously runs an inbound server and an outbound client, both terminating in the same `CommandDispatcher`:

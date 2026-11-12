@@ -29,6 +29,13 @@ hash into `versionName` at build time would close this hole; it is not implement
 
 ## [Unreleased]
 
+### Added
+
+- **Exit from the notification** ([#16](https://github.com/kuafuai/andee/issues/16)). Andee's ongoing
+  notification has an **Exit** (退出) action — the same teardown as saying 「退出」 or pressing the control
+  bar's power key, with no voice, no ball and no card needed. It is declined while a meeting is recording,
+  like the voice exit. The launcher icon starts it again.
+
 ## [0.15.0] - 2026-11-12
 
 **The phone never operates WeChat — one tap locks you out of your own WeChat. Plus a local quit that needs

@@ -901,6 +901,7 @@ class BodyCoreService : Service() {
         // [promoteForMicrophone]. The caller is the launcher; the extra is how
         // it says so.
         if (intent?.getBooleanExtra(EXTRA_MICROPHONE, false) == true) promoteForMicrophone()
+        if (intent?.action == ACTION_EXIT) ui.post { exitByVoice() }
         return START_STICKY
     }
 
@@ -2098,6 +2099,18 @@ class BodyCoreService : Service() {
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setContentIntent(openApp)
+        // A way out that needs no voice and costs the ball nothing (issue #16): the
+        // shade is where people go to turn a persistent service off, and the way
+        // back — the launcher icon — survives it. Same teardown as 「退出」 by voice.
+        val exit = PendingIntent.getService(
+            this,
+            REQ_EXIT,
+            Intent(this, BodyCoreService::class.java).setAction(ACTION_EXIT),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        b.addAction(
+            Notification.Action.Builder(null, AppLocale.str(this, R.string.body_notify_action_exit), exit).build()
+        )
         if (!hasScreen) {
             val fix = PendingIntent.getActivity(
                 this,
@@ -3746,6 +3759,10 @@ class BodyCoreService : Service() {
         private const val REQ_OPEN_APP = 0x0B0D
         private const val REQ_FIX_A11Y = 0x0B0E
         private const val REQ_GRANT_CAPTURE = 0x0B0F
+        private const val REQ_EXIT = 0x0B10
+
+        /** Start-intent action from the notification's 退出 button. See [exitByVoice]. */
+        private const val ACTION_EXIT = "net.kuafuai.andee.action.EXIT"
 
         /**
          * Begin the body, or hand an already-running one what it was asked for.
