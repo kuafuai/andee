@@ -308,6 +308,52 @@ object VoiceConfig {
                 .getString("show_hub", "")?.trim()?.lowercase() == "on"
 
         /**
+         * The 9008 control port: [WS_OFF], [WS_LOCAL] (loopback, for `adb forward`) or
+         * [WS_LAN] (every interface, for a call extension on another machine).
+         *
+         * It used to be always on and bound to 0.0.0.0 with no credential, so anyone on
+         * the same Wi-Fi could drive the device — screen, SMS, the vault — and the local
+         * brain, which is the default, never needed it. **Unset and unrecognised are
+         * both off**, the same fail-closed rule as [groundingEnabled]; the picker lists
+         * 关 leftmost to match. Loopback is not "safe" either — any app on the device can
+         * dial 127.0.0.1 — which is why every mode also needs [wsToken].
+         */
+        fun wsServerMode(context: Context): String =
+            when (context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("ws_server", "")?.trim()?.lowercase()) {
+                WS_LOCAL -> WS_LOCAL
+                WS_LAN -> WS_LAN
+                else -> WS_OFF
+            }
+
+        /**
+         * The secret a 9008 client must present (`Authorization: Bearer …` or `?token=…`).
+         * Generated once, like `device_id`, and deliberately **not** in [ALLOWED_KEYS]: it
+         * is the device's to choose, and a factory reset clears it, which mints a new one.
+         */
+        fun wsToken(context: Context): String {
+            val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            p.getString("ws_token", null)?.takeIf { it.length >= 32 }?.let { return it }
+            val bytes = ByteArray(24).also { java.security.SecureRandom().nextBytes(it) }
+            val token = bytes.joinToString("") { "%02x".format(it) }
+            p.edit().putString("ws_token", token).apply()
+            return token
+        }
+
+        /** Called on every write to the prefs file; the service uses it to follow [wsServerMode]. */
+        fun watch(context: Context, listener: android.content.SharedPreferences.OnSharedPreferenceChangeListener) =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .registerOnSharedPreferenceChangeListener(listener)
+
+        fun unwatch(context: Context, listener: android.content.SharedPreferences.OnSharedPreferenceChangeListener) =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .unregisterOnSharedPreferenceChangeListener(listener)
+
+        const val WS_OFF = "off"
+        const val WS_LOCAL = "local"
+        const val WS_LAN = "lan"
+
+        /**
          * Hub connection settings. Not part of the voice pipeline but stored
          * in the same SharedPreferences file to keep the settings UI simple.
          * Read via [hubConfig] instead of [load].
@@ -722,6 +768,7 @@ object VoiceConfig {
                 "llm_thinking" to if (bc.thinking) "enabled" else "disabled",
                 "llm_reasoning_effort" to bc.reasoningEffort,
                 "grounding" to p.getString("grounding", "off")!!,
+                "ws_server" to wsServerMode(context),
                 "notify" to notifyScope(context),
                 "nudge" to nudgeLevel(context),
                 "drive" to if (driveEnabled(context)) "on" else "off",
@@ -1086,6 +1133,7 @@ object VoiceConfig {
             "llm_api_key", "llm_base_url", "llm_model",
             "llm_thinking", "llm_reasoning_effort",
             "grounding",
+            "ws_server",
             "notify",
             "nudge",
             "drive",

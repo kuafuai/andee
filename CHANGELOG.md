@@ -29,6 +29,29 @@ hash into `versionName` at build time would close this hole; it is not implement
 
 ## [Unreleased]
 
+### Security
+
+- **The 9008 control port is off by default, and every connection needs a token.** `BodyWsServer` used to
+  start with the service, bind `0.0.0.0:9008` and accept every connection with no credential — anyone on
+  the same Wi-Fi could drive the device: the screen, SMS, the vault. The local brain, which is the
+  default, never needed it.
+  - New setting **Control port 9008** (控制端口 9008) under Settings → Advanced → Diagnostics: **Off** /
+    **This device** / **LAN**, Off leftmost. Unset and unrecognised values read as off.
+  - **This device** binds `127.0.0.1`, for `adb forward`; **LAN** binds `0.0.0.0`, for a call extension
+    on another machine.
+  - **Every mode needs the port token**, as `Authorization: Bearer <token>` or `?token=<token>`, checked in
+    constant time before the connection opens. Loopback alone is not enough: any app on the same phone
+    can dial `127.0.0.1`. The token is generated once per device, shown with a Copy button under the
+    setting, and replaced by a factory reset.
+  - The service follows the setting from wherever it is changed, without restarting Andee.
+  - The self-check shows the port while it is open: a note in **This device**, a warning in **LAN**.
+  - `tools/body.py` sends the token: `--token`, `ANDEE_TOKEN`, or read from a debug build over `adb`.
+  - **A call extension (e.g. the whatsapp-agent box) must now be updated to send the token**, and the
+    port must be set to **LAN**; until then it is refused at the handshake and its tools report
+    "not connected". A restart that fails to bind the port is retried instead of leaving a dead server.
+  - **Not fixed:** in LAN mode the link is still plain `ws://`, so the token can be read off that network.
+    See `SECURITY.md` §1.
+
 ## [0.15.0] - 2026-11-12
 
 **The phone never operates WeChat — one tap locks you out of your own WeChat. Plus a local quit that needs

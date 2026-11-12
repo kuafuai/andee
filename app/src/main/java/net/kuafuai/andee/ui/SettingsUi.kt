@@ -1141,12 +1141,49 @@ class SettingsUi(
             panel,
             lctx.getString(R.string.settings_grounding_note),
         )
+        wsServerRows(panel)
         readOnly(
             panel,
             lctx.getString(R.string.settings_device_id),
             saved["device_id"].orEmpty().ifEmpty { "—" },
         )
         dangerZone(panel)
+    }
+
+    /**
+     * The 9008 control port. 关 leftmost, because the leftmost option is what an
+     * unrecognised value falls back to and this socket can drive the whole device —
+     * same direction as [VoiceConfig.wsServerMode]. Written on 保存 like every other
+     * picker; the service follows the write by itself, from any door.
+     *
+     * The token is shown here because this card is the one place the owner, and only
+     * the owner, can read it; a client cannot connect without it in any mode.
+     */
+    private fun wsServerRows(panel: LinearLayout) {
+        rowLabel(panel, lctx.getString(R.string.settings_ws_server))
+        segmented(
+            panel,
+            "ws_server",
+            listOf(
+                VoiceConfig.WS_OFF to lctx.getString(R.string.common_off),
+                VoiceConfig.WS_LOCAL to lctx.getString(R.string.settings_ws_server_local),
+                VoiceConfig.WS_LAN to lctx.getString(R.string.settings_ws_server_lan),
+            ),
+        )
+        note(panel, lctx.getString(R.string.settings_ws_server_note))
+        val token = VoiceConfig.wsToken(context)
+        readOnly(panel, lctx.getString(R.string.settings_ws_token), token)
+        val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        lateinit var copy: TextView
+        copy = button(lctx.getString(R.string.common_copy), filled = false) {
+            runCatching {
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("Andee token", token))
+                copy.text = lctx.getString(R.string.common_copied)
+            }
+        }
+        row.addView(copy)
+        panel.addView(row, rowParams(dp(8)))
     }
 
     /**

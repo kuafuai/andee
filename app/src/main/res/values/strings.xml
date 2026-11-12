@@ -308,6 +308,11 @@
     <string name="settings_advanced_note">显示云端选项、打字、诊断和恢复出厂设置。日常用不到，都藏在这里。</string>
     <string name="settings_grounding">接地采集</string>
     <string name="settings_grounding_note">把坐标点击和截图记到 files/grounding 供离线分析 —— 它会拍下你当时在做的事。改完要重开无障碍服务才生效。</string>
+    <string name="settings_ws_server">控制端口 9008</string>
+    <string name="settings_ws_server_local">仅本机</string>
+    <string name="settings_ws_server_lan">局域网</string>
+    <string name="settings_ws_server_note">给电脑上的调试工具或通话扩展用的遥控口，能做 Andee 能做的一切：看屏幕、读短信、点按、用保险箱。平时用不到，保持关。「仅本机」配 adb forward 用；「局域网」让同一 Wi-Fi 上的机器连进来，只在你信任的网络上开。每个连接都要带下面的令牌。</string>
+    <string name="settings_ws_token">端口令牌</string>
     <string name="settings_device_id">设备 ID</string>
     <string name="settings_section_notebook">小本本</string>
     <string name="settings_notebook_sweep_note">聊完静下来之后，它会自己回头看一眼：该记的记下、该跟的排上。默认开着 —— 「它记得住」就是这么来的。关掉之后不再花你的 key 做这件事。</string>
@@ -921,6 +926,7 @@
     <string name="check_title_voice_key">语音密钥</string>
     <string name="check_title_voice_host">语音服务可达</string>
     <string name="check_title_wake">唤醒词</string>
+    <string name="check_title_ws_server">控制端口 9008</string>
     <string name="check_title_battery">后台运行</string>
     <string name="check_title_auto_start">自启动</string>
     <string name="check_title_disk">存储空间</string>
@@ -976,6 +982,8 @@
     <string name="check_detail_voice_host_bad">连不上 %1$s：%2$s。识别和合成都会超时。</string>
     <string name="check_detail_wake_on">已录入，喊一声就醒。</string>
     <string name="check_detail_wake_off">还没录。自己选个词（例如「嘿 Andee」）录 3 遍就能喊醒。不录也能用，只是得点球。</string>
+    <string name="check_detail_ws_lan">对同一 Wi-Fi 上的机器开着。连接要带令牌，但这个口能做 Andee 能做的一切 —— 只在信任的网络上这样用，用完就关。</string>
+    <string name="check_detail_ws_local">只对本机开着（配 adb forward 用），连接要带令牌。用完可以关掉。</string>
     <string name="check_detail_battery_on">已在白名单，待办闹钟不会被推迟。</string>
     <string name="check_detail_battery_off">不在电池优化白名单里。点右边「去开启」，系统会问「是否忽略电池优化？」，选「忽略」就好。\n厂商自己的「应用启动管理 / 后台运行」是另一套，在那里怎么改这项都是红的。息屏后待办提醒会晚到，唤醒词也会停。</string>
     <string name="check_detail_battery_off_notify">不在电池优化白名单里。点右边「去开启」，系统会问「是否忽略电池优化？」，选「忽略」就好。\n厂商自己的「应用启动管理 / 后台运行」是另一套，在那里怎么改这项都是红的。消息提醒开着：锁屏久了，消息会晚几分钟才到我这里；息屏后待办提醒也会晚到，唤醒词也会停。</string>

@@ -146,6 +146,19 @@ class BodyCoreService : Service() {
 
     private lateinit var dispatcher: CommandDispatcher
     private var wsServer: BodyWsServer? = null
+
+    /** The (mode, token) [wsServer] was started with; null while it is changing. See [reconcileWsServer]. */
+    private var wsServerSpec: Pair<String, String>? = null
+
+    /**
+     * Follows the 9008 setting wherever it is written from — the settings card in this
+     * service, the one `SelfCheckActivity` opens, or a factory reset (`key == null`).
+     * A field, because the prefs file only holds its listeners weakly.
+     */
+    private val wsPrefsListener =
+        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key == "ws_server" || key == "ws_token") ui.post { reconcileWsServer() }
+        }
     private var hubClient: net.kuafuai.andee.net.BodyWsClient? = null
 
     /**
@@ -824,7 +837,8 @@ class BodyCoreService : Service() {
                     // brain-visible.
                     val srv = wsServer
                         ?: throw IllegalStateException(
-                            "no local server running — cannot reach call extension"
+                            "no local server running — cannot reach call extension " +
+                                "(the 9008 control port is off: Settings → diagnostics)"
                         )
                     srv.forwardToExtension(method, params)
                 }
@@ -857,6 +871,7 @@ class BodyCoreService : Service() {
             }
         }
         startWsServer()
+        net.kuafuai.andee.config.VoiceConfig.watch(this, wsPrefsListener)
         // Before the brain, so the very first `type_text` finds the keyboard
         // where it expects it. A no-op unless the device is resting on the
         // headless IME — see [settleKeyboardOwner].
@@ -1849,6 +1864,7 @@ class BodyCoreService : Service() {
         if (::dogMotion.isInitialized) dogMotion.shutdown()
         if (::dogLink.isInitialized) dogLink.close()
         stopBrain()
+        net.kuafuai.andee.config.VoiceConfig.unwatch(this, wsPrefsListener)
         stopWsServer()
         net.kuafuai.andee.wake.WakeWord.stop()
         runCatching { unregisterReceiver(screenReceiver) }
@@ -2729,10 +2745,28 @@ class BodyCoreService : Service() {
         stopSelf()
     }
 
+    /**
+     * Starts the 9008 control port only if the user turned it on (Settings → 诊断),
+     * on loopback unless they chose LAN, and always behind [VoiceConfig.wsToken] —
+     * see `VoiceConfig.wsServerMode` for why it is off by default.
+     */
     private fun startWsServer() {
+        if (wsServer != null || exitRequested) return
+        val mode = net.kuafuai.andee.config.VoiceConfig.wsServerMode(this)
+        if (mode == net.kuafuai.andee.config.VoiceConfig.WS_OFF) {
+            wsServerSpec = mode to ""
+            android.util.Log.i("Body", "ws server off (Settings → diagnostics turns it on)")
+            return
+        }
+        val token = net.kuafuai.andee.config.VoiceConfig.wsToken(this)
+        val host = if (mode == net.kuafuai.andee.config.VoiceConfig.WS_LAN) "0.0.0.0" else "127.0.0.1"
         try {
+            var started: BodyWsServer? = null
             val srv = BodyWsServer(
                 port = WS_PORT,
+                bindHost = host,
+                token = token,
+                onServerError = { ex -> ui.post { onWsServerFailed(started, ex) } },
                 registry = callExtensions,
                 onExtensionEvent = { kind, data -> onExtensionEvent(kind, data) },
                 onCommand = { method, params ->
@@ -2748,12 +2782,58 @@ class BodyCoreService : Service() {
                 onSweep = { ui.post { onSweepTimer() } },
                 onSweepForced = { ui.post { localBrain?.runSweep() } },
             )
+            started = srv
             srv.start()
             wsServer = srv
-            android.util.Log.i("Body", "ws server started on 0.0.0.0:$WS_PORT")
+            wsServerSpec = mode to token
+            android.util.Log.i("Body", "ws server started on $host:$WS_PORT (token required)")
         } catch (t: Throwable) {
             android.util.Log.e("Body", "ws server start failed", t)
         }
+    }
+
+    /**
+     * Brings the running server in line with the setting. The old one is stopped
+     * *before* the new one binds, on a worker — `stop()` blocks, and binding the
+     * same port while the old socket is still open fails even with reuse-address.
+     */
+    private fun reconcileWsServer() {
+        // A restart in flight reads the setting when it lands, so a second change
+        // while it runs needs nothing more — and must not bind the port twice.
+        if (wsRestarting || exitRequested) return
+        val mode = net.kuafuai.andee.config.VoiceConfig.wsServerMode(this)
+        val want = mode to
+            if (mode == net.kuafuai.andee.config.VoiceConfig.WS_OFF) "" else net.kuafuai.andee.config.VoiceConfig.wsToken(this)
+        if (want == wsServerSpec) return
+        val old = wsServer
+        wsServer = null
+        wsServerSpec = null
+        wsRestarting = true
+        wsStartRetries = 0
+        Thread {
+            runCatching { old?.stop(500) }
+            ui.post {
+                wsRestarting = false
+                startWsServer()
+            }
+        }.start()
+    }
+
+    private var wsRestarting = false
+    private var wsStartRetries = 0
+
+    /**
+     * The server that [startWsServer] recorded did not come up — usually the port was still
+     * held by the one just stopped. Forget it, so the next reconcile does not take a dead
+     * server for the one it wanted, and try again a few times.
+     */
+    private fun onWsServerFailed(failed: BodyWsServer?, ex: Exception) {
+        if (failed == null || wsServer !== failed) return
+        android.util.Log.w("Body", "ws server failed on :$WS_PORT (${ex.message}), retry ${wsStartRetries + 1}/3")
+        wsServer = null
+        wsServerSpec = null
+        Thread { runCatching { failed.stop(0) } }.start()
+        if (wsStartRetries++ < 3) ui.postDelayed({ startWsServer() }, 1_500L)
     }
 
     /**
