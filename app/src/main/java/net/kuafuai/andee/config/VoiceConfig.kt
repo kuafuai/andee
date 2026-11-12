@@ -910,6 +910,23 @@ object VoiceConfig {
         }
 
         /**
+         * The master switch for wake-phrase listening — the mic toggle beside the ball's speaker key (issue #45).
+         * On (the default) is the old behaviour: once a phrase is enrolled the listener holds the microphone whenever
+         * the screen / [wakeWhileLocked] allows. Off releases the microphone entirely — the status-bar mic dot goes
+         * out, nothing is recorded, no battery is spent on it — **while keeping the enrolled templates**, the point
+         * the reporter could not reach (the only off-switch before was 清除, which threw the enrolment away). The
+         * gate reads it live like [wakeWhileLocked], so a toggle is seen on the next ~100 ms poll. Unset = on.
+         */
+        fun wakeListeningOn(context: Context): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getBoolean("wake_on", true)
+
+        fun setWakeListeningOn(context: Context, on: Boolean) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putBoolean("wake_on", on).apply()
+        }
+
+        /**
          * How strictly the wake phrase has to match: `strict` / `normal` / `loose` /
          * `looser`, applied by [net.kuafuai.andee.wake.WakeTemplates.effectiveThreshold]
          * as a multiplier on the threshold learned at enrolment.

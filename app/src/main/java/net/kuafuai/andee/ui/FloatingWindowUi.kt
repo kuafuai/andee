@@ -164,8 +164,14 @@ class FloatingWindowUi(
         /** The 产物 key — the pages the assistant has made. See [ArtifactsUi]. */
         fun onArtifactsClick()
 
-        /** The speaker key beside the input pill: answers read aloud or not. */
+            /** The speaker key beside the input pill: answers read aloud or not. */
         fun onMuteToggle() {}
+
+     /** The mic key beside the speaker: whether the wake listener may hold the microphone (issue #45). */
+        fun onWakeToggle() {}
+
+        /** The power key in the control bar: quit Andee entirely (issue #44). The service confirms, then exits locally. */
+        fun onQuitClick() {}
 
         /**
          * A community link at the foot of the card (GitHub, Discord). Handed out
@@ -373,8 +379,10 @@ class FloatingWindowUi(
     private var tipsView: View? = null
     private var tipsText: TextView? = null
     private var muteIcon: ImageView? = null
+    private var wakeIcon: ImageView? = null
     private var inputHint: TextView? = null
     private var muteKey: View? = null
+    private var wakeKey: View? = null
     private var inputPill: View? = null
     private var muteLabel: TextView? = null
 
@@ -389,6 +397,29 @@ class FloatingWindowUi(
         muteIcon?.setImageResource(if (mutedNow) R.drawable.ic_volume_off else R.drawable.ic_volume)
         muteIcon?.setColorFilter(Color.parseColor(Glass.PHOTO_INK))
         muteLabel?.text = AppLocale.str(context, if (mutedNow) R.string.window_muted else R.string.window_voice_on)
+    }
+
+    private var wakeOn = true
+
+    /** True while the card is unfolded and its ball-side keys may show; gates the mic key with the speaker key. */
+    private var keyAreaVisible = false
+
+    /**
+     * Reflect the wake-listening master switch (issue #45) on the mic key, and show the key only when a wake
+     * phrase is enrolled — with nothing enrolled the microphone is never held, so the toggle would mean nothing.
+     * Any thread. The body passes the live value, read from `VoiceConfig.wakeListeningOn`.
+     */
+    fun setWakeListening(on: Boolean) {
+        ui.post { wakeOn = on; paintWake() }
+    }
+
+    private fun paintWake() {
+        val key = wakeKey ?: return
+        val enrolled = runCatching { net.kuafuai.andee.wake.WakeTemplates.enrolled(context) }.getOrDefault(false)
+        key.visibility = if (enrolled && keyAreaVisible) View.VISIBLE else View.GONE
+        wakeIcon?.setImageResource(if (wakeOn) R.drawable.ic_mic else R.drawable.ic_mic_off)
+    wakeIcon?.setColorFilter(Color.parseColor(if (wakeOn) Glass.PHOTO_INK else Glass.LABEL))
+        key.contentDescription = AppLocale.str(context, if (wakeOn) R.string.window_wake_on else R.string.window_wake_off)
     }
 
     /**
@@ -2215,6 +2246,8 @@ class FloatingWindowUi(
         topBarView?.visibility = View.GONE
         sceneChip?.visibility = View.GONE
         muteKey?.visibility = View.GONE
+        keyAreaVisible = false
+        wakeKey?.visibility = View.GONE
         viewTabs?.visibility = View.GONE
         stageView?.visibility = View.GONE
         // Not just invisible — GONE, so the ball area has the whole window to
@@ -2303,6 +2336,17 @@ class FloatingWindowUi(
         if (!(lp.leftMargin == left && lp.topMargin == top)) {
             lp.leftMargin = minOf(left, w - kw - dp(8)); lp.topMargin = top
             key.layoutParams = lp
+        }
+        // The mic key sits just to the right of the speaker, sharing its row. Same top, left edge one key-width on.
+        wakeKey?.let { wk ->
+            val wlp = wk.layoutParams as? FrameLayout.LayoutParams ?: return@let
+            if (wk.width == 0) wk.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+            val ww = if (wk.width > 0) wk.width else wk.measuredWidth
+            val wleft = minOf(lp.leftMargin + kw + dp(2), w - ww - dp(8))
+            if (!(wlp.leftMargin == wleft && wlp.topMargin == top)) {
+                wlp.leftMargin = wleft; wlp.topMargin = top
+                wk.layoutParams = wlp
+            }
         }
         placeTabs(cy, r, w)
     }
@@ -2682,6 +2726,8 @@ class FloatingWindowUi(
         topBarView?.visibility = View.VISIBLE
         sceneChip?.visibility = if (sceneTitle != null) View.VISIBLE else View.GONE
         muteKey?.visibility = View.VISIBLE
+        keyAreaVisible = true
+        paintWake()
         applyHomeView()
         tipsView?.visibility = View.VISIBLE
         backdrop?.visibility = View.VISIBLE
@@ -3162,6 +3208,25 @@ class FloatingWindowUi(
         paintMute()
         root.addView(mute, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.START))
 
+        // ---- 话筒 (唤醒监听开关), just right of the speaker ----
+        // Master switch for wake-phrase listening (issue #45), here because the reporter noticed the microphone,
+        // not a settings row. Same bare-glyph style as the speaker; placed by [placeMuteKey] right beside it.
+        // Shown only when a phrase is enrolled (see [paintWake]) -- otherwise nothing holds the mic.
+        val wake = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            isClickable = true
+            Glass.pressable(this)
+            setOnClickListener { listeners.onWakeToggle() }
+            visibility = View.GONE
+        }
+        val micIcon = ImageView(context)
+        wake.addView(micIcon, LinearLayout.LayoutParams(dp(22), dp(22)))
+        wakeIcon = micIcon; wakeKey = wake
+        paintWake()
+        root.addView(wake, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.START))
+
         // ---- 舞台 | 对话: a small segmented pill at the ball's lower left, both names always showing ----
         fun tab(toStage: Boolean) = TextView(context).apply {
             textSize = Glass.Type.MICRO
@@ -3314,7 +3379,7 @@ class FloatingWindowUi(
         // 产物 · 小本本 · 情景 · 朋友 · 自检 · 设置 — the Mac's sidebar has the same doors in the same order.
         keys.addView(notebookKey())
         keys.addView(barButton(R.drawable.ic_scene, Glass.PHOTO_INK, "情景") { listeners.onScenesClick() })
-        keys.addView(friendsKey())
+        // 朋友 moved into Settings (⚙) to make room for the quit key — see SettingsUi and issue #44.
         // ✓ and not ■: the stop button used to sit here, and stop is the one
         // action in this bar the ball can already perform — see onStopClick.
         keys.addView(barButton(R.drawable.ic_check, Glass.PHOTO_INK, "自检") { listeners.onSelfCheckClick() })
@@ -3324,8 +3389,11 @@ class FloatingWindowUi(
         // that made "点右上角的 ⌨" a lie in a failure message), and it put a
         // second meaning on the one control the user already had to learn.
         keys.addView(barButton(R.drawable.ic_settings, Glass.PHOTO_INK, "设置") { listeners.onSettingsClick() })
-        // Reads as close, not as resize: the card is a thing you dismiss, and the
+            // Reads as close, not as resize: the card is a thing you dismiss, and the
         // corner ball it folds into stays on screen either way.
+        // 彻底退出 Andee (issue #44): a local exit, no voice and no model, so it works with no balance. A power
+        // glyph, not another ✕, so it does not read like 收起; the service pops a confirm before quitting.
+        keys.addView(barButton(R.drawable.ic_power, Glass.PHOTO_INK, "退出") { listeners.onQuitClick() })
         keys.addView(barButton(R.drawable.ic_close, Glass.PHOTO_INK, "收起") { listeners.onMinimizeClick() })
 
         bar.addView(keys)

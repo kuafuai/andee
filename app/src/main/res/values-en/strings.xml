@@ -584,6 +584,10 @@
     <string name="svc_btn_open_settings">Open settings</string>
     <string name="svc_stopped">Stopped</string>
     <string name="svc_exit_meeting_active">A meeting is recording. End it and save the minutes before exiting Andee.</string>
+    <string name="svc_quit_confirm">Quit Andee? It stops running — no watching your messages, no reminders, no operating the screen — until you open it again.</string>
+    <string name="svc_quit_confirm_yes">Quit</string>
+<string name="settings_friends">Friends (other Andees)</string>
+    <string name="settings_friends_note">Pair with Andee on your other devices so they can help each other.</string>
     <string name="svc_meeting_ended_line">(Meeting recording ended — %1$d characters, drafting the minutes…)</string>
     <string name="svc_call_ended_line">(Call ended — %1$d characters, summarising…)</string>
     <string name="svc_notification_look_line">(%1$s has a message — I tapped "Take a look"…)</string>
@@ -996,6 +1000,8 @@
     <string name="window_input_hint">Type to it…</string>
     <string name="window_voice_on">Voice on</string>
     <string name="window_muted">Muted</string>
+  <string name="window_wake_on">Listening for wake word (mic in use)</string>
+    <string name="window_wake_off">Wake listening off (mic free)</string>
     <string name="check_title_platform">Android version too old</string>
     <string name="check_detail_platform_old">This device runs Android %1$s (API %2$d), below Android 11. Screen capture, visual tap targeting and window blur need newer system APIs and are unavailable. Chat, voice, notebook and settings still work. Upgrade to Android 11 or later to restore them.</string>
 </resources>

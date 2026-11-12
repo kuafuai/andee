@@ -588,6 +588,10 @@
     <string name="svc_btn_open_settings">打开设置</string>
     <string name="svc_stopped">已停止</string>
     <string name="svc_exit_meeting_active">正在记录会议，请先结束会议并保存纪要，再退出安迪。</string>
+    <string name="svc_quit_confirm">退出安迪？退出后它不再运行，也不会替你盯消息、提醒或接管操作，直到你重新打开。</string>
+    <string name="svc_quit_confirm_yes">退出</string>
+    <string name="settings_friends">朋友（其他安迪）</string>
+    <string name="settings_friends_note">和其他设备上的安迪配对、互相帮忙。</string>
     <!--
         The two parenthesised rows dropped into the scrollback when a recording
         winds itself up. They read as a stage direction on purpose, mirroring
@@ -1077,6 +1081,8 @@
     <string name="window_input_hint">打字跟它说…</string>
     <string name="window_voice_on">朗读</string>
     <string name="window_muted">静音</string>
+    <string name="window_wake_on">在听唤醒词（占用话筒）</string>
+    <string name="window_wake_off">唤醒监听已关（不占话筒）</string>
     <string name="check_title_platform">系统版本偏低</string>
     <string name="check_detail_platform_old">当前是 Android %1$s（API %2$d），低于 Android 11。屏幕截图、看图点击、窗口毛玻璃等依赖新系统接口的功能不可用；聊天、语音、笔记和设置仍可正常使用。升级到 Android 11 及以上即可恢复。</string>
 </resources>

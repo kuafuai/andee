@@ -327,6 +327,15 @@ class BodyCoreService : Service() {
                 window.setMuted(on)
             }
 
+            override fun onWakeToggle() {
+                // Issue #45: flip the wake-listening master switch. The gate reads it on the next ~100 ms poll, so
+                // turning it off releases the microphone (status-bar dot out) without touching the enrolled templates.
+                // No model, no voice -- a local control for a user who only types.
+                val on = !net.kuafuai.andee.config.VoiceConfig.wakeListeningOn(this@BodyCoreService)
+                net.kuafuai.andee.config.VoiceConfig.setWakeListeningOn(this@BodyCoreService, on)
+                window.setWakeListening(on)
+            }
+
             override fun onOpenCommunityLink(url: String) {
                 // A link out of the card (GitHub, Discord). The overlay cannot
                 // open a browser itself — the background-launch restriction, and
@@ -362,6 +371,18 @@ class BodyCoreService : Service() {
                 if (::peers.isInitialized) net.kuafuai.andee.ui.PeersUi(this@BodyCoreService, peers).show()
             }
 
+
+            override fun onQuitClick() {
+                // Issue #44: the control bar's quit key. Confirm first (it is terminal), then exitByVoice() —
+                // the same local teardown the spoken exit phrase runs, needing neither the model nor a balance.
+                val yes = AppLocale.str(this@BodyCoreService, R.string.svc_quit_confirm_yes)
+                net.kuafuai.andee.ui.CardUi.ask(
+                    AppLocale.str(this@BodyCoreService, R.string.svc_quit_confirm),
+                    listOf(yes, AppLocale.str(this@BodyCoreService, R.string.common_cancel)),
+                ) { r ->
+                    if (r.button == yes) ui.post { exitByVoice() }
+                }
+            }
             override fun onSceneExitClick() {
                 net.kuafuai.andee.config.VoiceConfig.setActiveScene(this@BodyCoreService, null)
             }
@@ -759,6 +780,7 @@ class BodyCoreService : Service() {
         peers.onCount = { window.setFriendCount(it) }
         window.setFriendCount(peers.store.all().size)
         window.setMuted(net.kuafuai.andee.config.VoiceConfig.muted(this))
+        window.setWakeListening(net.kuafuai.andee.config.VoiceConfig.wakeListeningOn(this))
         peers.startIfEnabled()
         // Scanning the Mac's pairing QR from the Devices card: the unfolded card is an overlay above the camera,
         // so it folds for the scan and comes back if it was open. See [net.kuafuai.andee.ui.StandAside].
@@ -1141,6 +1163,15 @@ class BodyCoreService : Service() {
         if (exitRequested) return
         val said = text.trim()
         if (said.isEmpty() && images.isEmpty()) return
+        // Typing the exit phrase exits locally, exactly as speaking it does (the voice path matches it in
+        // onTranscript before either brain is consulted). Without this a typed 退出 Andee went to the model —
+        // issue #44, where a user out of balance could not even quit. Same whole-utterance whitelist, so a bare
+        // 退出 or 「怎么退出」 is still an ordinary turn; only the explicit phrases exit.
+        if (how == "typed" && images.isEmpty() && VoiceExitCommand.matches(said)) {
+            android.util.Log.i("Body", "typed exit phrase: $said")
+            exitByVoice()
+            return
+        }
         // A card is up and waiting for an answer. Voice should answer it
         // rather than start a new turn — the user spoke to the question on
         // screen, not to the brain. Match is fuzzy (case-insensitive, prefix),
@@ -1514,7 +1545,7 @@ class BodyCoreService : Service() {
         net.kuafuai.andee.wake.WakeWord.init(
             this,
             gate = {
-                !exitRequested && wakeListeningAllowed() && !asr.isActive() && !tts.isSpeaking() &&
+                !exitRequested && net.kuafuai.andee.config.VoiceConfig.wakeListeningOn(this@BodyCoreService) && wakeListeningAllowed() && !asr.isActive() && !tts.isSpeaking() &&
                         !meeting.isActive() && !net.kuafuai.andee.device.CallState.isActive &&
                         !net.kuafuai.andee.audio.Earcon.isSounding()
             },
@@ -2170,6 +2201,7 @@ class BodyCoreService : Service() {
             // and the pinned tips live in this service and have to be told.
             // See FloatingWindowUi.onLocaleChanged.
             onLocaleChanged = { window.onLocaleChanged() },
+            onOpenFriends = { if (::peers.isInitialized) net.kuafuai.andee.ui.PeersUi(this@BodyCoreService, peers).show() },
         )
         settings = s
         s.show()

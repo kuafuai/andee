@@ -127,6 +127,9 @@ class SettingsUi(
      * the page it just opened.
      */
     private val onOpenLink: (String) -> Unit = {},
+
+    /** Open the friends (peers) card. Non-null = show a 朋友 row here; the 朋友 key left the control bar (issue #44). */
+    private val onOpenFriends: (() -> Unit)? = null,
 ) {
 
     private val wm: WindowManager =
@@ -388,6 +391,7 @@ class SettingsUi(
         nudgeSection(form)
         driveSection(form)
         timelineSection(form)
+        friendsSection(form)
         vaultSection(form)
         maxStepsSection(form)
 
@@ -1080,6 +1084,20 @@ class SettingsUi(
      * its own overlay ([VaultUi]) because the list grows and this card is
      * already full. Only the count and the door belong here.
      */
+
+    /**
+     * The 朋友 (peers) door, moved here from the control bar so that bar had room for the quit key (issue #44).
+     * Only shown when the host wires [onOpenFriends]; a test or a hub-only build without peers draws nothing.
+     */
+    private fun friendsSection(form: LinearLayout) {
+        val open = onOpenFriends ?: return
+        val panel = group(form, lctx.getString(R.string.settings_friends))
+        note(panel, lctx.getString(R.string.settings_friends_note))
+        panel.addView(
+            button(lctx.getString(R.string.settings_friends), filled = false) { hide(); open() },
+            rowParams(dp(10)),
+        )
+    }
     private fun vaultSection(form: LinearLayout) {
         val panel = group(form, lctx.getString(R.string.settings_section_vault))
         fun summary(): String {
