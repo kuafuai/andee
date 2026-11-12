@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`29` / `"0.14.2"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`30` / `"0.15.0"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,61 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.15.0] - 2026-11-12
+
+**The phone never operates WeChat — one tap locks you out of your own WeChat. Plus a local quit that needs
+no balance, a switch that actually frees the microphone, and a context that is pruned instead of lost.**
+
+### Added
+
+- **A quit entry that runs locally — no model, no balance.** Reported: *「我就在里面打个退出，它都说余额不足，
+  还要调用大模型，这设计不合理呀！」* The control bar had **no real quit** — the ✕ was minimise — and the only
+  ways out were speaking 「退出安迪」 or typing it, and **typing it was a model turn**, so a user out of
+  balance **could not quit**. There is now a **power key left of 收起** that pops a confirm and runs the same
+  local teardown the spoken phrase runs: **no model, no voice, no balance needed**. (#44)
+  - **Typing 退出 now exits too**, on the explicit phrasing only — a bare 退出 stays an ordinary turn.
+  - 朋友 moved into Settings to make room.
+- **A switch that actually frees the microphone.** Reported: *「它的那个送话器的图标一直在手机上 24 小时不间断
+  的监听着语音呢，其实我也没有开通语音。都是打字在弄，很耗电。」* Wake listening **held the mic 24/7** even for
+  users who only type, and **the only off-switch was 清除, which threw the enrolment away**. There is now
+  **`VoiceConfig.wake_on`**, read live by the wake gate, and **a mic key beside the ball's speaker** that
+  toggles it **while keeping the templates**. The key appears only when a phrase is enrolled. (#45)
+- **A restarted brain picks the conversation up again.** A harvest used to leave nothing behind but a
+  summary, so an update, a crash, a kill or a backend change **dropped the thread**. Now the brain starts
+  from **the last summary plus the scrollback rows since it** — at most **24 hours** old.
+- **An archive of what the context dropped.** Whatever a harvest or a trim removes is **written down
+  first** — the words, the tool calls, results up to **3 000 characters** — and **`read_earlier` reads it
+  back**. Trims in a row share one archive. **Never** the vault, SMS, contacts or notifications.
+
+### Changed
+
+- **The phone refuses to operate WeChat.** Measured on a HONOR phone (WeChat 8.0.80): reading WeChat and
+  screenshotting it **is fine** — installing Andee, enabling accessibility, reading the screen, all fine.
+  **The very first accessibility-injected tap** (09:56:39) and five seconds later the window carried
+  **`FLAG_SECURE`** and its tree came back empty. It stayed that way **across a force-stop**; only clearing
+  WeChat's data and logging in again cleared it. **So one tap does not merely fail — it locks the user out
+  of screenshotting their own WeChat.**
+  - WeChat detects the injected gesture (`dispatchGesture` events are flagged as coming from an a11y
+    service). The phone's dispatcher therefore **refuses the write methods** when WeChat is in front —
+    `screen.tap`, `tap_id`, `tap_target`, `long_press`, `long_press_id`, `swipe`, `type`, `submit_input` —
+    **before the gesture is sent**.
+  - **Reads and global navigation stay open**: `screenshot`, `ui_tree`, `look_region`, `wait`, and
+    system back/home (which lets Andee *leave* WeChat). None of them triggered the state, and **a body that
+    cannot even read WeChat is worse and no safer.**
+  - The refusal names WeChat as the cause and points the model at **the desktop Andee and `ask_friend`**.
+    **Phone-only**: macOS WeChat was verified fine, so the guard lives in the Android dispatcher rather
+    than in `core`.
+- **The context is pruned before it is harvested.** Measured on the Mac's log: every harvest fired on the
+  character budget **and the tail it kept was still over it**. The weight was **old tool results** and **the
+  index block every user message carries**, and the budget **counted the ~50k-character system prompt** —
+  leaving **~10k for the conversation**. Now `ContextPruner` turns old tool results into a one-line stub and
+  strips old messages' index blocks **before** a harvest (**no model call, the words untouched**), and the
+  budget counts **the conversation only — 40 000 characters**.
+- **A harvest the user talks over is retried**, and a background turn no longer abandons a user sentence
+  queued in the same instant.
+- **`TopicSplitter` knows every index section**, so folded topics stop carrying them.
+- **The harvest summary has four parts**, carried from one harvest to the next.
 
 ## [0.14.2] - 2026-11-11
 

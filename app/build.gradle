@@ -136,8 +136,8 @@ android {
         // and the SDK_INT guards in ScreenController / the window UIs.
         minSdk 27
         targetSdk 34
-        versionCode 29
-        versionName "0.14.2"
+        versionCode 30
+        versionName "0.15.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 

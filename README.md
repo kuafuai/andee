@@ -150,6 +150,15 @@ delete them:
 | *"Record this meeting."*                                                        | It holds the mic for the hour, then hands you the minutes as a page — decisions, action items, open questions, key quotes — and offers to remind you about your own items.                                                                                            |
 | *"Book it for me the moment it opens."*                                         | At the time you set, it opens the app, reads the page, and fills everything up to just before the last button. Payment and the final confirmation stay with you.                                                                                                      |
 
+> **Why the phone will not tap WeChat.** Measured on a HONOR phone with WeChat 8.0.80: reading WeChat and
+> screenshotting it are fine, but **the very first accessibility-injected tap** makes WeChat protect its own
+> window — **screenshots go black for you too, not just for Andee** — and it stays that way across a
+> force-stop; only clearing WeChat's data and logging in again recovers it. So the phone refuses the gesture
+> **before sending it**: tap, long-press, swipe, type and submit are declined while WeChat is in front.
+> **Reads and system back/home are untouched** (that is how it leaves). To reach someone in WeChat the phone
+> uses **`ask_friend`** instead, or you do it on the desktop Andee. macOS WeChat was verified fine, so this
+> is the phone only — it is a **refusal in the dispatcher**, not a sandbox.
+
 ---
 
 **The phone is what it wears.** An individual is not the same thing as the device it moves into — the same  
@@ -778,7 +787,7 @@ Pure Kotlin, no Compose; the whole thing hangs off two pillars, `WindowManager` 
 | minSdk                    | 27                  | Android 8.1 — it installs and chats. **Screen capability needs API 30+**: `ACTION_IME_ENTER` and `takeScreenshot` are both API 30+, and below that the self-check shows an amber row |
 | Java / Kotlin JVM target  | 1.8                 | `sourceCompatibility` 1.8, `jvmTarget = '1.8'`                                            |
 | **Build JDK**             | **17–20**           | see [Which JDK](#which-jdk) — this is the step people get stuck on                        |
-| versionCode / versionName | 29 / 0.14.2          | see [CHANGELOG.md](CHANGELOG.md) for the policy                                           |
+| versionCode / versionName | 30 / 0.15.0          | see [CHANGELOG.md](CHANGELOG.md) for the policy                                           |
 | applicationId / namespace | `net.kuafuai.andee` | never changed from the template. It affects nothing                                       |
 
 **Runtime dependencies** (`app/build.gradle`):
@@ -1215,7 +1224,7 @@ Read it before redistributing: **the ML Kit barcode SDK and the `play-services-*
 open-source**, and the barcode model is fetched from Google at runtime.
 
 See [CHANGELOG.md](CHANGELOG.md) for what changed and for the versioning policy. The latest release is
-**`v0.14.2`** — pre-1.0 on purpose, because the wire contract and the build flags are still moving.
+**`v0.15.0`** — pre-1.0 on purpose, because the wire contract and the build flags are still moving.
 
 ## Related documents
 
