@@ -286,7 +286,9 @@ the user is true. And when something is genuinely wrong, the mask comes off.
 
 **11. Talk, type, or show it a photo.**  
 Tap the ball, or say "Hey Andee" (fully offline wake word). Prefer typing? The typing field takes  
-up to six photos — from the camera or the gallery — with or without words.
+up to six photos — from the camera or the gallery — with or without words. Ask it to read a file and it  
+opens the system file picker: you pick exactly one — text, an image, a PDF or a `.docx` — and it can read  
+that file and nothing else. No storage permission is involved.
 
 Tap the ball or use the wake word, then say "Exit Andee" or "Take a break" to stop the task and close Andee.
 Automatic follow-up listening cannot trigger exit; exit is declined while a meeting is recording.

@@ -640,6 +640,69 @@ class CommandDispatcher(
                 org.json.JSONObject().put("error", "scan timed out")
             }
 
+            // ---- device.file : a document the user hands over (issue #37) ----
+            "device.file.read" -> {
+                val offset = params?.optInt("offset", 0) ?: 0
+                val page = params?.optInt("page", 1) ?: 1
+                val again = params?.optBoolean("again", false) ?: false
+                val uri = if (again) {
+                    net.kuafuai.andee.device.FilePickActivity.held
+                        ?: return org.json.JSONObject().put(
+                            "error", "No file has been picked yet — call read_file without again to ask the user for one.",
+                        )
+                } else {
+                    // Not in LOCKED_BLOCKED, because `again` needs no screen; the picker does.
+                    if (keyguardLocked()) {
+                        throw IllegalStateException(
+                            "The phone is locked, so the file picker cannot be shown: $method. Say so, in the " +
+                                "user's language, and ask again once they have unlocked it.",
+                        )
+                    }
+                    // The picker is an activity, and our card sits above every activity: fold
+                    // first, the same as device.scan, or the user is choosing a file behind our face.
+                    ensureCompact()
+                    // Under the 60 s the brain waits for a call that declares no timeout,
+                    // so a slow pick ends here with a sentence and not as an abandoned call.
+                    val timeoutMs = (params?.optLong("timeout_ms", 55_000L) ?: 55_000L).coerceIn(10_000L, 300_000L)
+                    val request = net.kuafuai.andee.device.FilePickActivity.newRequest()
+                    val i = android.content.Intent(appContext, net.kuafuai.andee.device.FilePickActivity::class.java)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        .putExtra(net.kuafuai.andee.device.FilePickActivity.EXTRA_REQUEST, request)
+                        .putExtra(net.kuafuai.andee.device.FilePickActivity.EXTRA_MIMES, fileMimes(params?.optString("type")))
+                    runCatching { appContext.startActivity(i) }
+                    val deadline = System.currentTimeMillis() + timeoutMs
+                    var picked: net.kuafuai.andee.device.FilePickActivity.Result? = null
+                    while (System.currentTimeMillis() < deadline) {
+                        picked = net.kuafuai.andee.device.FilePickActivity.resultFor(request)
+                        if (picked != null) break
+                        Thread.sleep(250)
+                    }
+                    when {
+                        picked == null -> {
+                            // Take the picker down with the wait: one left up would answer nobody.
+                            net.kuafuai.andee.device.FilePickActivity.close("timed out")
+                            return org.json.JSONObject().put(
+                                "error",
+                                "The user did not pick a file within ${timeoutMs / 1000}s. Ask whether they still " +
+                                    "want to; if they need longer, call again with a larger timeout_ms (up to 300000).",
+                            )
+                        }
+                        picked.uri == null -> return org.json.JSONObject().put("error", picked.error ?: "no file picked")
+                        else -> picked.uri
+                    }
+                }
+                try {
+                    net.kuafuai.andee.device.FileReader.read(appContext, uri, offset, page)
+                } catch (e: SecurityException) {
+                    org.json.JSONObject().put(
+                        "error", "Access to that file has lapsed — call read_file without again and let the user pick it once more.",
+                    )
+                } finally {
+                    // The trampoline holds the grant until now; see FilePickActivity.
+                    net.kuafuai.andee.device.FilePickActivity.done()
+                }
+            }
+
             // ---- device.* : the live eye -----------------------------------
             "device.look" -> {
                 // See device.scan: the preview is the point of the command.
@@ -2098,6 +2161,8 @@ class CommandDispatcher(
      */
     fun cancelTask() {
         ui.post { setBusy(false) }
+        // A file picker the stopped task opened must not outlive it; its wait sees this answer and returns.
+        net.kuafuai.andee.device.FilePickActivity.close("stopped by the user")
     }
 
     /**
@@ -2248,6 +2313,19 @@ class CommandDispatcher(
          * perfectly well with the screen locked, and `tts.speak` is how the
          * answer gets out at all. Only the names that would fail are here.
          */
+        /** The picker's MIME filter for `read_file`'s `type`. Anything unknown offers every file. */
+        fun fileMimes(type: String?): Array<String> = when (type?.trim()?.lowercase()) {
+            "text" -> arrayOf("text/*", "application/json", "application/xml", "application/x-yaml", "application/csv")
+            "image" -> arrayOf("image/*")
+            "pdf" -> arrayOf("application/pdf")
+            "document" -> arrayOf(
+                "application/pdf",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "text/*",
+            )
+            else -> arrayOf("*/*")
+        }
+
         val LOCKED_BLOCKED = setOf(
             "device.launch",
             "device.open_url",

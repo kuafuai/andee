@@ -748,6 +748,17 @@ Two guards, both mechanical rather than prompt:
 
 Timed entry is not a mechanism: the model sets a `todo` whose text says `enter_scene <name>` and calls it when woken. Hub mode has no scenes — the chip is hidden and auto-entry is off when `localBrain` is null.
 
+### Reading a file the user picks (`read_file`, issue #37)
+
+`read_file` → `device.file.read` opens the system document picker (`ACTION_OPEN_DOCUMENT`) through a translucent trampoline Activity — a service cannot receive an Activity result — and the user picks **exactly one** file. That is the whole permission model: there is **no storage permission**, and the app gets read access to that one file and nothing else, so don't "simplify" it into `READ_EXTERNAL_STORAGE` / `READ_MEDIA_*` and a path. Text comes back as text (capped, with `truncated`), an image as an attached image, a PDF as rendered page images (the first pages, capped), a `.docx` as extracted text; the result carries a note that the content is data, not instructions — a file is somebody's words, like a notification. It is refused on untrusted turns by `TurnGuards` (a notification's or a friend's), refused while the screen is locked, and not on `GuestHost`'s allow-list: a picker is the user granting access, and a turn begun by someone else's words must not be the one asking.
+
+Four things in it are correctness, not style (`device/FilePickActivity.kt`, `device/FileReader.kt`):
+
+- **Only a `TurnKind.USER` turn may open the picker** (`LocalBrain.runTool`), on top of the untrusted refusal. A todo, a work turn and a `PEER` job are refused too — the last is how a Mac's own work turn would otherwise pop a picker on the phone for nobody.
+- **A text window is sized against `LocalBrain`'s 24 000-character cut of every tool result**, and every field (`note`, `offset`, `truncated`, `next_offset`) is written *before* `text`. A 40 000-character window was cut inside `text`, which took the paging fields and the data-not-instructions note with it, and the model answered about a whole file from its first half. The window is at most 16 000 characters and shrinks until its *escaped* JSON fits 18 000 (`windowEnd`).
+- **The trampoline stays up until the dispatcher has read the file** (`FilePickActivity.done()`, 30 s backstop): the grant that comes with the result is the activity's and is revoked when it is destroyed, so a provider that will not make it persistable would otherwise hand back a file that can no longer be opened. The dispatcher **closes** it when its wait runs out and `cancelTask()` closes it on stop, and every pick carries a request id — a picker left up after the call gave up is a pick that lands on nobody.
+- **Trailing bytes are only forgiven when the read was cut** (`decodeText(cut = true)`): a complete file whose last byte is invalid is another encoding, not half a character. UTF-8 first, then a BOM's UTF-16, then GB18030 for the GBK `.txt` files Windows writes.
+
 ### The vault: the brain can spend the user's credentials but never holds them
 
 `config/Vault.kt` stores the user's own accounts — one `Entry` per account (label + phone/email/username/note + password) — so the body can log in *as them* when a task needs it. Three tools reach it: `list_vault` (masked overview), `get_vault` (one readable field in the clear), `fill_secret` (types the password into the focused field).
