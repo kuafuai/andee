@@ -2495,6 +2495,23 @@ class ScreenController(
     }
 
     /**
+     * The package of the app in front right now, or empty when it cannot be read.
+     *
+     * The active window, not the topmost: our own card is `FLAG_NOT_FOCUSABLE`, so
+     * [android.accessibilityservice.AccessibilityService.getRootInActiveWindow] returns the app behind it even while
+     * the card covers the screen. That is what makes it safe for the WeChat guard in [CommandDispatcher] — it reads the
+     * real foreground app whether the card is folded or not.
+     */
+    fun foregroundPackage(): String {
+        val root = runCatching { service.rootInActiveWindow }.getOrNull() ?: return ""
+        return try {
+            runCatching { root.packageName?.toString() }.getOrNull().orEmpty()
+        } finally {
+            runCatching { root.recycle() }
+        }
+    }
+
+    /**
      * Dump the active window's UI tree, with enough diagnostics that an empty
      * tree can say *why* it is empty.
      *

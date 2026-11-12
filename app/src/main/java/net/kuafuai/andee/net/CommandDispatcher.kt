@@ -369,6 +369,24 @@ class CommandDispatcher(
             // know whose tool call it was.
             window.pulseTool()
         }
+        // WeChat on the phone: look, never operate. A single injected tap locks WeChat into a protected state that
+        // blanks its window and withholds its tree — and not just for Andee: the user can no longer screenshot their
+        // own WeChat until they clear its data and log in again. So the operation is refused before it is sent, not
+        // after the damage. Checked after the fold so [ScreenController.foregroundPackage] reads the app, not our card;
+        // reads and system navigation are not in [WECHAT_WRITE_METHODS]. See that set for the measurement.
+        if (method in WECHAT_WRITE_METHODS &&
+            runCatching { screenOrNull()?.foregroundPackage() }.getOrNull() == WECHAT_PKG
+        ) {
+            throw IllegalStateException(
+                "I won't operate WeChat on the phone — not because I can't tap, but because WeChat treats an " +
+                    "automated tap as an intrusion: the moment I touch it, it blanks its own screen and I (and you) " +
+                    "can no longer even screenshot WeChat until its data is cleared and you log in again. So to keep " +
+                    "your account out of that state, here I only look and read — I don't tap, type or send. " +
+                    "Tell the user this plainly, in their language, and offer a way through: the desktop Andee can " +
+                    "drive WeChat normally, and if a computer of theirs is paired (check your friends list) you can " +
+                    "hand this very task to it with ask_friend. Do not retry this on the phone.",
+            )
+        }
         return when (method) {
             // ---- device.* : read-only context queries ----------------------
             // Deliberately outside the `screen.` prefix so they never fold the
@@ -2240,6 +2258,30 @@ class CommandDispatcher(
             "ui.alert",
             // Not `ui.show_html`: a locked page is kept as a card in the
             // conversation instead — see its branch.
+        )
+
+        /** WeChat's package — the one app that must not be operated from the phone. See [WECHAT_WRITE_METHODS]. */
+        const val WECHAT_PKG = "com.tencent.mm"
+
+        /**
+         * The write methods refused when WeChat is in front, and why they and not the reads.
+         *
+         * Measured on a HONOR phone (2026-11-12, WeChat 8.0.80): WeChat does not withhold its tree or black out its
+         * window until Andee *acts* on it. Install Andee, enable accessibility, read the screen and screenshot it —
+         * all fine. The very first injected tap (09:56:39) and five seconds later the window carried `FLAG_SECURE`
+         * and the tree came back empty, and it stayed that way across a force-stop; only clearing WeChat's data and
+         * logging in again cleared it. So a single tap does not just fail, it locks the user out of screenshotting
+         * their own WeChat. The responsibility is WeChat's — it detects the accessibility-injected gesture (a
+         * `dispatchGesture` event is flagged as coming from an a11y service) and enters that protected state — and
+         * the only safe answer on the phone is never to send the gesture. Reads (`screenshot`, `ui_tree`,
+         * `look_region`, `wait`) and `global` (system back/home, which lets Andee leave WeChat) are left alone: none
+         * of them triggered it, and a body that cannot even read WeChat is worse and no safer. The Mac body does not
+         * do this — macOS WeChat was verified fine — so the guard lives here, in the phone's dispatcher, not in core.
+         */
+        val WECHAT_WRITE_METHODS = setOf(
+            "screen.tap", "screen.tap_id", "screen.tap_target",
+            "screen.long_press", "screen.long_press_id",
+            "screen.swipe", "screen.type", "screen.submit_input",
         )
 
         /**
