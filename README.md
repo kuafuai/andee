@@ -292,6 +292,9 @@ Tap the ball or use the wake word, then say "Exit Andee" or "Take a break" to st
 Automatic follow-up listening cannot trigger exit; exit is declined while a meeting is recording.
 The microphone and wake listener stop. Tap the app icon to reopen; Android accessibility reconnection may also restart Andee.
 
+If it talks too slowly for you, **⚙ → Speaking speed** reads answers at 1×, 1.5× or 2×. The pitch stays
+the same, only faster; a device that cannot speed audio up reads at 1×.
+
 **12. Answers you can keep.**  
 Anything structured — a comparison, a plan, meeting minutes — comes back as a page it writes and  
 puts on screen. The **Made for you** panel keeps one row per page and holds the revisions behind it —
@@ -958,7 +961,8 @@ If any step does not line up, go back to that section's **Verify**.
 If you would rather not tap the ball every time, teach it your voice: **⚙ → wake word → record wake  
 word**, and say the phrase you want to use three times as prompted (for example "Hey Andee" — any  
 other phrase works too, as long as you say the same one each time). After that, saying it does exactly
-what tapping the ball does — **the screen does not have to be on**, unless you turn that off.
+what tapping the ball does — including stopping whatever it is in the middle of before it listens —
+and **the screen does not have to be on**, unless you turn that off.
 
 
 A few things worth knowing first:

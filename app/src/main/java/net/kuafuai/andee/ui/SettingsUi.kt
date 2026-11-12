@@ -392,6 +392,7 @@ class SettingsUi(
         driveSection(form)
         timelineSection(form)
         friendsSection(form)
+        speechSpeedSection(form)
         vaultSection(form)
         maxStepsSection(form)
 
@@ -1453,6 +1454,22 @@ class SettingsUi(
             "timeline_events",
             listOf("on" to lctx.getString(R.string.tl_show_all), "off" to lctx.getString(R.string.tl_show_talk)),
         )
+    }
+
+    /**
+     * How fast answers are read aloud (issue #17). Its own section rather than a row in the
+     * voice block, because the speed belongs to the player, not to a provider — it applies to
+     * 火山, Google and the system engine alike, and the voice block is not drawn at all under
+     * CodeFlying. 1× leftmost: the default, and what an unknown value reads as.
+     */
+    private fun speechSpeedSection(form: LinearLayout) {
+        val panel = group(form, lctx.getString(R.string.settings_section_speech_speed))
+        segmented(
+            panel,
+            "tts_speed",
+            listOf("1" to "1×", "1.5" to "1.5×", "2" to "2×"),
+        )
+        note(panel, lctx.getString(R.string.settings_speech_speed_note))
     }
 
     private fun nudgeSection(form: LinearLayout) {

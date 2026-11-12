@@ -331,6 +331,8 @@
     <string name="settings_advanced_note">Show the cloud option, typing, diagnostics and factory reset. Nothing here for day-to-day use.</string>
     <string name="settings_grounding">Grounding capture</string>
     <string name="settings_grounding_note">Records coordinate taps and screenshots to files/grounding for offline analysis — it photographs whatever you are doing. Needs the accessibility service restarted to take effect.</string>
+    <string name="settings_section_speech_speed">Speaking speed</string>
+    <string name="settings_speech_speed_note">Takes effect from the next reply. The pitch stays the same; only the pauses get shorter. A device that cannot speed audio up reads at 1×.</string>
     <string name="settings_device_id">Device ID</string>
     <string name="settings_section_notebook">Notebook</string>
     <string name="settings_notebook_sweep_note">Once a conversation goes quiet it reviews it by itself: keeps what is worth keeping, schedules what it owes. On by default — this is where \\"it remembers\\" comes from. Off means it stops spending your key on those calls.</string>

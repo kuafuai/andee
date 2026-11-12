@@ -308,6 +308,21 @@ object VoiceConfig {
                 .getString("show_hub", "")?.trim()?.lowercase() == "on"
 
         /**
+         * How fast replies are read aloud: `1`, `1.5` or `2` (issue #17). Applied by the
+         * player ([net.kuafuai.andee.audio.AudioIO]) as a time stretch, so it covers every
+         * TTS backend at once and keeps the voice's pitch. Anything else reads as `1`.
+         */
+        fun speechSpeedKey(context: Context): String =
+            when (context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("tts_speed", "")?.trim()) {
+                "1.5" -> "1.5"
+                "2" -> "2"
+                else -> "1"
+            }
+
+        fun speechSpeed(context: Context): Float = speechSpeedKey(context).toFloat()
+
+        /**
          * Hub connection settings. Not part of the voice pipeline but stored
          * in the same SharedPreferences file to keep the settings UI simple.
          * Read via [hubConfig] instead of [load].
@@ -722,6 +737,7 @@ object VoiceConfig {
                 "llm_thinking" to if (bc.thinking) "enabled" else "disabled",
                 "llm_reasoning_effort" to bc.reasoningEffort,
                 "grounding" to p.getString("grounding", "off")!!,
+                "tts_speed" to speechSpeedKey(context),
                 "notify" to notifyScope(context),
                 "nudge" to nudgeLevel(context),
                 "drive" to if (driveEnabled(context)) "on" else "off",
@@ -1086,6 +1102,7 @@ object VoiceConfig {
             "llm_api_key", "llm_base_url", "llm_model",
             "llm_thinking", "llm_reasoning_effort",
             "grounding",
+            "tts_speed",
             "notify",
             "nudge",
             "drive",

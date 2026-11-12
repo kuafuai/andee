@@ -1549,7 +1549,17 @@ class BodyCoreService : Service() {
                         !meeting.isActive() && !net.kuafuai.andee.device.CallState.isActive &&
                         !net.kuafuai.andee.audio.Earcon.isSounding()
             },
-            onWake = { ui.post { if (!asr.isActive()) startTurn() } },
+            // Saying the wake phrase mid-task is the spoken shoulder-tap, so it stops
+            // the old task the way a tap on the ball does (issue #21). Without this a
+            // new turn opened while the old one was still driving the screen.
+            onWake = {
+                ui.post {
+                    if (!asr.isActive()) {
+                        if (dispatcher.isTaskActive()) stopEverything()
+                        startTurn()
+                    }
+                }
+            },
         )
         net.kuafuai.andee.wake.WakeWord.start()
     }
