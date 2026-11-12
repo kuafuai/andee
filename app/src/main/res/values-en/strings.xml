@@ -331,6 +331,11 @@
     <string name="settings_advanced_note">Show the cloud option, typing, diagnostics and factory reset. Nothing here for day-to-day use.</string>
     <string name="settings_grounding">Grounding capture</string>
     <string name="settings_grounding_note">Records coordinate taps and screenshots to files/grounding for offline analysis — it photographs whatever you are doing. Needs the accessibility service restarted to take effect.</string>
+    <string name="settings_ws_server">Control port 9008</string>
+    <string name="settings_ws_server_local">This device</string>
+    <string name="settings_ws_server_lan">LAN</string>
+    <string name="settings_ws_server_note">A remote control for debugging tools or a call extension on a computer. It can do everything Andee can: see the screen, read SMS, tap, use the vault. You do not need it day to day, so leave it off. \"This device\" is for adb forward; \"LAN\" lets machines on the same Wi-Fi connect, so only turn it on for a network you trust. Every connection must carry the token below.</string>
+    <string name="settings_ws_token">Port token</string>
     <string name="settings_device_id">Device ID</string>
     <string name="settings_section_notebook">Notebook</string>
     <string name="settings_notebook_sweep_note">Once a conversation goes quiet it reviews it by itself: keeps what is worth keeping, schedules what it owes. On by default — this is where \\"it remembers\\" comes from. Off means it stops spending your key on those calls.</string>
@@ -836,6 +841,7 @@
     <string name="check_title_voice_key">Voice API key</string>
     <string name="check_title_voice_host">Voice service</string>
     <string name="check_title_wake">Wake phrase</string>
+    <string name="check_title_ws_server">Control port 9008</string>
     <string name="check_title_battery">Background running</string>
     <string name="check_title_auto_start">Auto-start</string>
     <string name="check_title_disk">Storage</string>
@@ -892,6 +898,8 @@
     <string name="check_detail_voice_host_bad">Could not reach %1$s: %2$s. Both recognition and synthesis will time out.</string>
     <string name="check_detail_wake_on">Taught, and it wakes when you say it.</string>
     <string name="check_detail_wake_off">Not taught yet. Pick a phrase (e.g. “Hey Andee”) and say it 3 times to wake me by voice. Everything still works without it, you just tap the ball to talk.</string>
+    <string name="check_detail_ws_lan">Open to machines on the same Wi-Fi. A connection needs the token, but this port can do everything Andee can, so use it only on a network you trust and turn it off when you are done.</string>
+    <string name="check_detail_ws_local">Open on this device only (for adb forward), and a connection needs the token. Turn it off when you are done.</string>
     <string name="check_detail_battery_on">Exempt, so pending reminders are not delayed.</string>
     <string name="check_detail_battery_off">Not exempt from battery optimisation. Tap “Open settings” — the system asks “Ignore battery optimisations?”; take the button that ignores them.\nThe vendor’s own “App launch / background running” controls are a separate system; changing them leaves this row red. With the screen off a pending reminder may arrive late, and the wake phrase stops listening.</string>
     <string name="check_detail_battery_off_notify">Not exempt from battery optimisation. Tap “Open settings” — the system asks “Ignore battery optimisations?”; take the button that ignores them.\nThe vendor’s own “App launch / background running” controls are a separate system; changing them leaves this row red. Notifications are on: on a phone that has been locked a while, messages reach me minutes late. With the screen off a pending reminder may arrive late too, and the wake phrase stops listening.</string>

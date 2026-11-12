@@ -2,7 +2,11 @@ package net.kuafuai.andee.net
 
 import android.util.Log
 import org.java_websocket.WebSocket
+import org.java_websocket.drafts.Draft
+import org.java_websocket.exceptions.InvalidDataException
+import org.java_websocket.framing.CloseFrame
 import org.java_websocket.handshake.ClientHandshake
+import org.java_websocket.handshake.ServerHandshakeBuilder
 import org.java_websocket.server.WebSocketServer
 import org.json.JSONArray
 import org.json.JSONObject
@@ -49,12 +53,18 @@ import java.util.concurrent.TimeUnit
  * [onCommand] returns a JSON-serializable value (usually JSONObject) or throws.
  * Thrown exceptions become error responses; nothing else propagates.
  *
- * Binding to 0.0.0.0 by default so the brain running on another host on the
- * LAN can reach it. Loopback-only is also fine when driven via adb forward.
+ * **Every connection must present [token]**, as `Authorization: Bearer <token>`
+ * or `?token=<token>`, and a handshake without it is refused before [onOpen].
+ * This socket can do everything the app can — read the screen and SMS, type,
+ * fill the vault — so it used to be a remote control for anyone on the same
+ * Wi-Fi. Binding to loopback alone does not close it: any app on the device can
+ * dial 127.0.0.1. The service starts this only when the user turned it on, and
+ * binds 0.0.0.0 only for the LAN mode (see `VoiceConfig.wsServerMode`).
  */
 class BodyWsServer(
     port: Int,
-    bindHost: String = "0.0.0.0",
+    bindHost: String = "127.0.0.1",
+    private val token: String,
     private val registry: CallExtensionRegistry,
     /** Extension-pushed event; the service turns these into hub broadcasts + UI updates. */
     private val onExtensionEvent: (kind: String, data: JSONObject) -> Unit = { _, _ -> },
@@ -82,6 +92,13 @@ class BodyWsServer(
 
     /** `debug.sweep {"skip":true}` — the review with the silence gate bypassed. */
     private val onSweepForced: () -> Unit = {},
+
+    /**
+     * The server itself failed — in practice, the port would not bind. `start()` returns
+     * before binding and reports this only here, on the server's own thread, so a caller
+     * that trusted `start()` would record a server that is not listening.
+     */
+    private val onServerError: (Exception) -> Unit = {},
 ) : WebSocketServer(InetSocketAddress(bindHost, port)) {
 
     /** Driver connections only — the ones broadcasts go to. Extensions never join. */
@@ -95,7 +112,37 @@ class BodyWsServer(
     private val pending = ConcurrentHashMap<String, SynchronousQueue<PendingResult>>()
 
     init {
+        require(token.length >= 32) { "BodyWsServer needs a real token" }
         isReuseAddr = true
+    }
+
+    /** Refuses the upgrade itself, so an unauthenticated peer never reaches [onOpen] or [onMessage]. */
+    override fun onWebsocketHandshakeReceivedAsServer(
+        conn: WebSocket?,
+        draft: Draft?,
+        request: ClientHandshake?,
+    ): ServerHandshakeBuilder {
+        val builder = super.onWebsocketHandshakeReceivedAsServer(conn, draft, request)
+        if (request == null || !presentsToken(request)) {
+            Log.w(TAG, "refused ${conn?.remoteSocketAddress}: no valid token")
+            throw InvalidDataException(CloseFrame.POLICY_VALIDATION, "unauthorized")
+        }
+        return builder
+    }
+
+    internal fun presentsToken(request: ClientHandshake): Boolean {
+        val header = request.getFieldValue("Authorization").orEmpty().trim()
+        val fromHeader = if (header.startsWith("Bearer ", ignoreCase = true)) header.substring(7).trim() else ""
+        val fromQuery = request.resourceDescriptor.orEmpty()
+            .substringAfter('?', "")
+            .split('&')
+            .firstOrNull { it.startsWith("token=") }
+            ?.substringAfter('=')
+            .orEmpty()
+        val given = fromHeader.ifEmpty { fromQuery }
+        // Constant-time, so the reply time says nothing about how much of a guess was right.
+        return given.isNotEmpty() &&
+            java.security.MessageDigest.isEqual(given.toByteArray(), token.toByteArray())
     }
 
     override fun onOpen(conn: WebSocket, handshake: ClientHandshake?) {
@@ -262,6 +309,8 @@ class BodyWsServer(
         if (conn != null) {
             active.remove(conn)
             if (registry.unregister(conn)) failAllPending("call extension error: ${ex.message}")
+        } else {
+            onServerError(ex)
         }
     }
 
@@ -299,7 +348,8 @@ class BodyWsServer(
     ): Any? {
         val conn = registry.connection()
             ?: throw IllegalStateException(
-                "call extension is not connected — is the call box on and reachable?"
+                "call extension is not connected — is the call box on and reachable, with the " +
+                    "9008 port set to LAN and the box sending this device's port token?"
             )
         val id = UUID.randomUUID().toString()
         val slot = SynchronousQueue<PendingResult>()

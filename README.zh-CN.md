@@ -542,9 +542,9 @@ API 只认后一句。刚开通的服务默认是**后付费**，它只能在火
   绕过去之后仍然挡得住的那层。
 - **本机大脑不需要任何厂商后端。** `brain = local` 接任意 OpenAI 兼容端点是受支持的正式模式，
   不是降级模式。
-- **没修好的，是写下来的。** [SECURITY.md](SECURITY.md) 列了五条已知限制，包括调试用 WebSocket
-  服务绑在 `0.0.0.0:9008` 且不验证客户端身份、以及保险箱尚未绑定设备解锁。在你控制不了的网络上
-  跑之前先读它。
+- **没修好的，是写下来的。** [SECURITY.md](SECURITY.md) 列了五条已知限制，包括 9008 控制端口
+  （默认关、开了也要令牌）在局域网模式下走的是明文 `ws://`、以及保险箱尚未绑定设备解锁。在你控制
+  不了的网络上跑之前先读它。
 
 这是一个有意的取舍：**宁可要一个小一点但站得住的说法，也不要一个大到只能靠相信的说法。**
 
@@ -574,8 +574,9 @@ API 只认后一句。刚开通的服务默认是**后付费**，它只能在火
   朋友，下面是自检和设置 —— 对话上方也有那颗球。
 - **桌面图标有两扇门。** 助手在运行时，点图标就是展开卡片 —— 和长按球是同一个动作。无障碍没开时，
   它显示自检卡片：那是手机唯一没有别的办法告诉你"它为什么什么都不做"的时刻。
-- **活儿全在 `ScreenBodyService`（`AccessibilityService`）里。** 它构建整个对象图，并同时启动
-  两条网络通路。
+- **活儿全在 `BodyCoreService`（前台服务）里。** 它构建整个对象图，配了大脑 hub 才往外拨；
+  `ScreenBodyService`（`AccessibilityService`）只负责把屏幕能力交给它。设备自己的控制端口（9008）
+  不打开就一直关着 —— 见[从电脑驱动它](#从电脑驱动它9008-端口)。
 
 另有几个瞬时 Activity（`PermissionRequestActivity`、`ScanActivity`、`LookActivity`、
 `HtmlActivity`、`TextInputActivity`），都是为了借系统能力临时上台，不是页面。
@@ -597,7 +598,7 @@ API 只认后一句。刚开通的服务默认是**后付费**，它只能在火
 
 **运行库依赖**（`app/build.gradle`）：
 
-- `org.java-websocket:Java-WebSocket:1.5.7` —— 设备自己起的 ws server（端口 9008，给同网段调试用）+ 拨向大脑 hub 的 ws client
+- `org.java-websocket:Java-WebSocket:1.5.7` —— 设备自己起的 ws server（9008 控制端口，默认关，见[从电脑驱动它](#从电脑驱动它9008-端口)）+ 拨向大脑 hub 的 ws client
 - `com.squareup.okhttp3:okhttp:4.12.0` —— ASR / TTS / 本地模型的 HTTP + WS 客户端
 - `com.github.mik3y:usb-serial-for-android:3.8.1` —— 机器狗加密狗（USB 串口）。**故意停在 3.8.1**：3.11.0 会拉进 `kotlin-stdlib` 2.2.x，而本项目的 Kotlin 1.9.22 编译器读不了它的 metadata
 - `androidx.camera:camera-*:1.3.4` + `com.google.mlkit:barcode-scanning:17.2.0` —— 扫码（球球的眼睛）
@@ -778,8 +779,10 @@ Manifest 里声明的能力（`res/xml/accessibility_service_config.xml`）：
 
 **验证**：
 
-- 看 logcat 出现 `Body: ws server started on 0.0.0.0:9008`，说明 `onServiceConnected` 已触发
-- 在悬浮球顶部条点一下 `☰`（UI Tree）或 `◉`（Screenshot），字幕栏应反馈成功和文件名
+- 看 logcat 出现 `Body: ws server off (Settings → diagnostics turns it on)`（如果你打开了控制端口，
+  则是 `Body: ws server started on 127.0.0.1:9008 (token required)`），说明身体服务已经起来了
+- 在悬浮球顶部条点一下 `☰`（UI Tree）或 `◉`（Screenshot），字幕栏应反馈成功和文件名 —— 这一步
+  才证明无障碍那一半接上了
 
 **注意**：大部分厂商 ROM 在每次系统更新、每次强制停止应用之后会**自动关掉**这个权限，需要重开。
 这是 ROM 行为，不是应用能阻止的。
@@ -841,6 +844,30 @@ adb shell pm grant net.kuafuai.andee android.permission.WRITE_SECURE_SETTINGS
 
 **验证**：`adb logcat -s Wake:*`，叫一声应该看到 `wake: d=1.52 <= 1.96`；没叫醒但确实说了话会
 看到 `no wake: d=… > …` —— 这两个数就是调阈值的依据，差得不多就重录一次。
+
+## 从电脑驱动它（9008 端口）
+
+设备也可以直接通过 9008 端口上的 WebSocket 来驱动 —— 用 `tools/body.py`、调试客户端，或者跑在另一台
+机器上的通话扩展。这个口能做 Andee 能做的一切（看屏幕、读短信、点按、用保险箱），所以**默认是关的**。
+在 **⚙ → 高级 → 诊断 → 控制端口 9008** 里打开并保存：
+
+- **仅本机**：绑 `127.0.0.1`，电脑上用 `adb forward` 连过来。
+- **局域网**：绑 `0.0.0.0`，同一 Wi-Fi 上的机器都能连。只在你信任的网络上用。
+
+**每个连接都要带端口令牌**（就显示在同一个设置下面，旁边有复制按钮），写成
+`Authorization: Bearer <令牌>` 或 `?token=<令牌>`。「仅本机」也一样要 —— 同一台手机上的任何 App
+都能连 `127.0.0.1`。
+
+```bash
+adb forward tcp:9008 tcp:9008
+ANDEE_TOKEN=<令牌> ./tools/body.py ui_tree     # 或者：./tools/body.py --token <令牌> ui_tree
+```
+
+两样都没给的话，`tools/body.py` 会试着通过 `adb`（`run-as`）从 **debug** 包里自己读令牌。这个口上的
+方法名是内部名（`screen.tap`、`screen.ui_tree`……），不是模型看到的工具名。
+
+局域网模式下链路是明文 `ws://`，同一网络上能抓包的人就能读到令牌 —— 见 [SECURITY.md](SECURITY.md)。
+端口开着的时候，自检里会一直列着它；**用完就关掉。**恢复出厂设置会换一个新令牌。
 
 ## 机器狗（USB 加密狗）
 
@@ -1029,8 +1056,8 @@ CLAUDE.md               给 AI 编码助手看的架构说明（英文）
 
 安全问题**请不要开公开 issue**。私密上报渠道和处理流程在 **[SECURITY.md](SECURITY.md)**。
 
-那份文件同时列出了**部署前必须知道的已知限制**，其中一条在任何你控制不了的网络上都成立：调试
-用的 WebSocket 服务绑在 `0.0.0.0:9008` 且不验证客户端身份。本应用申请的权限组合与安卓银行木马
+那份文件同时列出了**部署前必须知道的已知限制**，其中一条在任何你控制不了的网络上都成立：9008
+控制端口默认关、开了也要令牌，但局域网模式下走的是明文 `ws://`，令牌能被同一网络上的人读走。本应用申请的权限组合与安卓银行木马
 的检测特征高度重合 —— [docs/permissions.zh-CN.md](docs/permissions.zh-CN.md) 把每一条对应到一个具体工具，
 而 [SECURITY.md](SECURITY.md) 对"还没修的"是诚实的。
 

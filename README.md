@@ -608,8 +608,10 @@ There is no home screen. What exists:
 - **The launcher icon opens two doors.** With the assistant running, it unfolds the card — exactly  
   what a long-press on the ball does. With accessibility off, it shows the self-check card instead,  
   because that is the one moment the phone has nothing else to tell you why it is doing nothing.
-- **`ScreenBodyService`** (`AccessibilityService`) — the whole job. It builds the object graph and  
-  starts both network paths.
+- **`BodyCoreService`** (a foreground service) — the whole job. It builds the object graph and dials the  
+  brain hub when one is configured; `ScreenBodyService` (`AccessibilityService`) only hands it the  
+  screen. The device's own control port (9008) stays closed unless you turn it on — see  
+  [Driving it from a computer](#driving-it-from-a-computer-port-9008).
 
 A handful of transient activities (`PermissionRequestActivity`, `ScanActivity`, `LookActivity`,  
 `HtmlActivity`, `TextInputActivity`) exist only to borrow a system capability for a moment. They are  
@@ -677,9 +679,11 @@ then shows the large red warning that the service can view everything you do; co
 ROMs (Xiaomi / Huawei / HONOR) additionally want "allow background pop-ups" or "show on lock screen" —  
 turn those on too.
 
-*Verify:* logcat shows `Body: ws server started on 0.0.0.0:9008`, which means `onServiceConnected`  
-fired. Then tap `☰` (UI tree) or `◉` (screenshot) on the ball's top bar; the subtitle line should  
-report success and a filename.
+*Verify:* logcat shows `Body: ws server off (Settings → diagnostics turns it on)` — or, if you have  
+turned the control port on, `Body: ws server started on 127.0.0.1:9008 (token required)` — which  
+means the body service is up. Then tap `☰` (UI tree) or `◉` (screenshot) on the ball's top bar; the  
+subtitle line should report success and a filename, which is what proves the accessibility half is  
+attached.
 
 *Note:* most vendor ROMs **switch this grant off again** after every system update and every  
 force-stop. That is ROM behaviour, and not something the app can prevent.
@@ -742,9 +746,9 @@ party has audited. This project's claims are duller and checkable, in code you c
 - **The local brain needs no vendor backend.** `brain = local` against any OpenAI-compatible  
   endpoint is a supported mode, not a degraded one.
 - **What is *not* fixed is written down.** [SECURITY.md](SECURITY.md) lists five known limitations,  
-  including that the debug WebSocket server binds `0.0.0.0:9008` without authenticating clients and  
-  that the vault is not yet bound to device unlock. Read it before running this on a network you do  
-  not control.
+  including that the 9008 control port — off by default, token-gated when on — is plain `ws://` in  
+  LAN mode, and that the vault is not yet bound to device unlock. Read it before running this on a  
+  network you do not control.
 
 
 The trade is deliberate: a smaller claim that holds, over a bigger one that has to be taken on  
@@ -792,8 +796,9 @@ Pure Kotlin, no Compose; the whole thing hangs off two pillars, `WindowManager` 
 
 **Runtime dependencies** (`app/build.gradle`):
 
-- `org.java-websocket:Java-WebSocket:1.5.7` — the device's own ws server (port 9008, for debugging  
-  from the same LAN) plus the ws client that dials the brain hub
+- `org.java-websocket:Java-WebSocket:1.5.7` — the device's own ws server (the 9008 control port, off  
+  by default — see [Driving it from a computer](#driving-it-from-a-computer-port-9008)) plus the ws  
+  client that dials the brain hub
 - `com.squareup.okhttp3:okhttp:4.12.0` — HTTP + WS client for ASR / TTS / local models
 - `com.github.mik3y:usb-serial-for-android:3.8.1` — the robot-dog USB serial dongle. **Deliberately  
   pinned at 3.8.1**: 3.11.0 pulls in `kotlin-stdlib` 2.2.x, whose metadata this project's Kotlin  
@@ -989,6 +994,33 @@ A few things worth knowing first:
 that failed to wake it shows `no wake: d=… > …`. Those two numbers are what you tune the threshold
 against — if they are close, record it again.
 
+## Driving it from a computer (port 9008)
+
+The device can also be driven directly over a WebSocket on port 9008 — by `tools/body.py`, a debugging
+client, or a call extension running on another machine. That port can do everything Andee can (see the
+screen, read SMS, tap, use the vault), so **it is off by default**. Turn it on in **⚙ → Advanced →
+Diagnostics → Control port 9008** and save:
+
+- **This device** binds `127.0.0.1`. Reach it from a computer with `adb forward`.
+- **LAN** binds `0.0.0.0`, so machines on the same Wi-Fi can connect. Only on a network you trust.
+
+**Every connection must carry the port token** shown under the same setting (with a Copy button), as
+`Authorization: Bearer <token>` or `?token=<token>`. That holds for **This device** too, because any app
+on the same phone can dial `127.0.0.1`.
+
+```bash
+adb forward tcp:9008 tcp:9008
+ANDEE_TOKEN=<token> ./tools/body.py ui_tree     # or: ./tools/body.py --token <token> ui_tree
+```
+
+With neither given, `tools/body.py` tries to read the token from a **debug** build over `adb`
+(`run-as`). Methods on this port are the internal names (`screen.tap`, `screen.ui_tree`, …), not the
+tool names the model sees.
+
+In LAN mode the link is plain `ws://`, so anyone watching that network can read the token — see
+[SECURITY.md](SECURITY.md). The self-check lists the port for as long as it is open; **turn it off when
+you are done.** A factory reset replaces the token.
+
 ## The robot dog (USB dongle)
 
 The dog is a **peripheral**, not part of this device's screen: it hangs off an Arduino Nano dongle
@@ -1183,8 +1215,9 @@ Please do not open a public issue for a security problem. The private reporting 
 process are in **[SECURITY.md](SECURITY.md)**.
 
 That document also lists the **known limitations** you should read before deploying this, including
-one that matters on any network you do not control: the debug WebSocket server binds `0.0.0.0:9008`
-and does not authenticate its clients. [docs/permissions.md](docs/permissions.md)
+one that matters on any network you do not control: the 9008 control port is off by default and needs
+a token when on, but in LAN mode it is plain `ws://`, so that token can be read off the network.
+[docs/permissions.md](docs/permissions.md)
 ([Chinese](docs/permissions.zh-CN.md)) explains each permission against a concrete tool, and
 [SECURITY.md](SECURITY.md) is honest about what is not fixed yet.
 

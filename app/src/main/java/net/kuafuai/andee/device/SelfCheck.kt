@@ -259,6 +259,7 @@ object SelfCheck {
             typingChannel(context),
             adbKeyboard(context, a11yIme),
             secureSettings(context, a11yIme),
+            controlPort(context),
             voiceKey(context),
             voiceReach(context, probe, online),
             wakePhrase(context),
@@ -982,6 +983,25 @@ object SelfCheck {
             detail = if (err == null) R.string.check_detail_voice_host_ok
             else R.string.check_detail_voice_host_bad,
             detailArgs = if (err == null) listOf(host) else listOf(host, err),
+        )
+    }
+
+    /**
+     * The 9008 control port, which is off unless the user turned it on — and then
+     * no row at all, because a row for a closed door is noise. LAN is a WARN: it
+     * works as asked, but a remote control left open on whatever Wi-Fi the device
+     * joins next is exactly what this list exists to make impossible to forget.
+     */
+    private fun controlPort(context: Context): Finding? {
+        val mode = net.kuafuai.andee.config.VoiceConfig.wsServerMode(context)
+        if (mode == net.kuafuai.andee.config.VoiceConfig.WS_OFF) return null
+        val lan = mode == net.kuafuai.andee.config.VoiceConfig.WS_LAN
+        return Finding(
+            id = "ws_server",
+            title = R.string.check_title_ws_server,
+            level = if (lan) Level.WARN else Level.NOTE,
+            detail = if (lan) R.string.check_detail_ws_lan else R.string.check_detail_ws_local,
+            fix = Fix.OurSettings,
         )
     }
 
