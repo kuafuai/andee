@@ -29,6 +29,16 @@ hash into `versionName` at build time would close this hole; it is not implement
 
 ## [Unreleased]
 
+### Added
+
+- **Reading a file you pick** ([#37](https://github.com/kuafuai/andee/issues/37)). A new `read_file` tool
+  opens the system file picker; you choose exactly one file and the app can read that file and nothing
+  else — **no storage permission**. Text comes back as text (capped), images as an image, PDFs as rendered
+  pages (two at a time), `.docx` as text, marked as data rather than instructions. Long text is read in
+  windows sized to fit what the brain keeps of a tool result. Only a request the user just made can open
+  the picker — not a notification, a friend, a todo, a self-started work turn or another device — and not
+  while the screen is locked. The picker closes when the wait times out or the task is stopped.
+
 ## [0.15.0] - 2026-11-12
 
 **The phone never operates WeChat — one tap locks you out of your own WeChat. Plus a local quit that needs

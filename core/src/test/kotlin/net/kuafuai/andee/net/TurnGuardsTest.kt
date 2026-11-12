@@ -50,6 +50,19 @@ class TurnGuardsTest {
     }
 
     @Test
+    fun `only a turn the user is part of may ask for a file`() {
+        TurnGuards.check("device.file.read", silent = false, untrusted = false)
+        refused("device.file.read", silent = true)
+        assertEquals(
+            "This turn started from somebody else's words (a notification, or a friend's Andee), so it cannot " +
+                "ask for or read the user's files: device.file.read. Tell the user what you wanted to read and let them ask.",
+            refused("device.file.read", untrusted = true),
+        )
+        // The prefix, so a second file method added later is closed by default.
+        refused("device.file.list", untrusted = true)
+    }
+
+    @Test
     fun `an untrusted turn cannot change scenes but may read and leave them`() {
         for (m in listOf("scene.save", "scene.enter", "scene.delete")) refused(m, untrusted = true)
         for (m in listOf("scene.list", "scene.get", "scene.exit")) TurnGuards.check(m, false, true)

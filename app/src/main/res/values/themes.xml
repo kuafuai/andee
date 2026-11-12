@@ -69,4 +69,13 @@
     <style name="Theme.Body.Stage.NoPreview" parent="Theme.Body.Stage">
         <item name="android:windowDisablePreview">true</item>
     </style>
+    <!-- read_file 的文件选择跳板：自己什么也不画，只把系统选择器叫出来。
+         透明且无动画，否则用户在选择器出现前会先看到一闪的黑窗。 -->
+    <style name="Theme.Body.Trampoline" parent="Theme.Body.Fullscreen">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowDisablePreview">true</item>
+    </style>
 </resources>
