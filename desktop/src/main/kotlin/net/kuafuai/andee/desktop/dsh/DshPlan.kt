@@ -88,6 +88,13 @@ object DshPlan {
         append("make reasonable choices and say in your report what you assumed.\n")
         append("End with a short report in plain text: what you did, what you produced (file names), anything ")
         append("unfinished or uncertain.\n")
+        // A report or write-up is read on a phone, so it is delivered as one self-contained page that opens as it is
+        // (owner's call, 11-13), unless the job asks for another form.
+        append("When the job is to research, compare, explain or write something up for a person to read, deliver it as ONE ")
+        append("self-contained HTML file (all CSS inline, no external scripts, fonts or images, readable on a phone screen: ")
+        append("a responsive layout, real tables with horizontal scroll where they are wide, short paragraphs, light and dark ")
+        append("colours via prefers-color-scheme) — not a markdown file. If the job names a form (markdown, a spreadsheet, code, ")
+        append("a repository change), use that. Sources and assumptions go in the page, not only in your report.\n")
         if (!seed.isNullOrBlank()) {
             append("\nAn earlier worker did related work; its report was:\n<<<EARLIER REPORT>>>\n")
             append(seed.take(2_000)).append("\n<<<END>>>\n")

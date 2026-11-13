@@ -112,9 +112,9 @@ object TaskView {
 private fun RunningDot(modifier: Modifier = Modifier) {
     val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "running")
     val a by transition.animateFloat(
-        initialValue = 0.35f, targetValue = 1f,
+        initialValue = 0.12f, targetValue = 1f,
         animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing),
+            androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.LinearEasing),
             androidx.compose.animation.core.RepeatMode.Reverse,
         ),
         label = "running-alpha",

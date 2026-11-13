@@ -676,6 +676,7 @@ class DshWorkers(
 
                         - `task`: the whole job, as you would brief a capable colleague — what to make, the inputs, the form of
                           the result. The worker cannot ask questions; say what matters.
+                        - For research, comparison or a write-up someone is going to read, ask for **one self-contained HTML page** (inline CSS, readable on a phone) rather than markdown, and say so in `task`: it opens as it is, with real tables, where markdown is a file to be read as text. Ask for another form only when the user does.
                         - `title`: a few words for the user's timeline and the task list.
                         - `for_task`: the id of an open task (T…) this job is for. Its last worker is continued unless you say
                           `continue` yourself.

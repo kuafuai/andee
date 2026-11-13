@@ -521,7 +521,7 @@ class FloatingWindowUi(
 
     /** A slow fade in and out for as long as the dot is shown: the one thing on the bar that says "still working". */
     private fun pulse(v: View) {
-        v.animate().alpha(if (v.alpha > 0.6f) 0.35f else 1f).setDuration(900)
+        v.animate().alpha(if (v.alpha > 0.5f) 0.12f else 1f).setDuration(600)
             .withEndAction { if (v.tag == "pulse" && v.isAttachedToWindow) pulse(v) }.start()
     }
 

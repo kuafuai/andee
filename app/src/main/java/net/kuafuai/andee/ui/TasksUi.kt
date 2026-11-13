@@ -345,7 +345,8 @@ class TasksUi(
         val pulse = object : Runnable {
             override fun run() {
                 if (!isAttachedToWindow) return
-                animate().alpha(if (alpha > 0.6f) 0.35f else 1f).setDuration(900).withEndAction(this).start()
+                // Deep and fairly quick, so it reads as alive at a glance (owner's call, 11-13: it was too faint to notice).
+                animate().alpha(if (alpha > 0.5f) 0.12f else 1f).setDuration(600).withEndAction(this).start()
             }
         }
         addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {

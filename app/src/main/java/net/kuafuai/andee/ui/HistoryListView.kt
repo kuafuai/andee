@@ -228,8 +228,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
         textSize = Glass.Type.BODY
         visibility = View.GONE
         setPadding(dp(4), dp(8), dp(4), dp(2))
-        maxLines = 4
-        ellipsize = android.text.TextUtils.TruncateAt.END
+        // No cut and no dots: what Andee says is shown whole (owner's call, 11-13). It used to stop at four lines.
     }
 
     /** The turn in progress ([PhoneWorkLog]), under the live row. Hides itself when nothing is working. */
@@ -755,8 +754,6 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
             text = label(false)
             textSize = Glass.Type.MICRO
             setTextColor(Color.parseColor(Glass.PHOTO_INK))
-            maxLines = 2
-            ellipsize = android.text.TextUtils.TruncateAt.END
             gravity = Gravity.CENTER
         }
         line.addView(words, LinearLayout.LayoutParams(0, WRAP, 1f))
@@ -783,7 +780,6 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
             line.setOnClickListener {
                 val open = detail.visibility != View.VISIBLE
                 detail.visibility = if (open) View.VISIBLE else View.GONE
-                words.maxLines = if (open) 6 else 2
                 words.text = label(open)
             }
         }
@@ -843,10 +839,8 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
             setLineSpacing(dp(3).toFloat(), 1f)
             setTextColor(Color.parseColor(if (bad) Glass.DANGER else Glass.LABEL))
             setPadding(0, dp(3), 0, 0)
-            // Long answers are for glancing at here and listening to in full;
-            // the row is a handle, not the document.
-            maxLines = 6
-            ellipsize = android.text.TextUtils.TruncateAt.END
+            // Shown whole, with no dots (owner's call, 11-13). This used to stop at six lines on the idea that a long answer is
+            // for listening to; people read it here, and a report cut off in the middle read as lost.
         }
         bubble.addView(body)
 
