@@ -126,12 +126,28 @@ class PeerStore(private val store: NotebookStore, private val defaultName: () ->
         if (!o.has("trust")) Trust.OWN else Trust.of(o.optString("trust")) ?: Trust.FRIEND
     }
 
-    fun setTrust(id: String, t: Trust) = update(id) { it.put("trust", t.key) }
+    fun setTrust(id: String, t: Trust) = update(id) {
+        it.put("trust", t.key)
+        // A device filed as a friend loses what only an own device may have.
+        if (t != Trust.OWN) it.put("dsh_ok", false)
+    }
 
     /** For a friend: run its requests without asking each time. Meaningless for [Trust.OWN], which never asks. */
     fun autoAccept(id: String): Boolean = synchronized(lock) { record(id)?.optBoolean("auto") ?: false }
 
     fun setAutoAccept(id: String, on: Boolean) = update(id) { it.put("auto", on) }
+
+    /**
+     * Whether [id], one of the user's own devices, may use this device's dsh directly: its `delegate_task` and friends
+     * are carried over the link to the local [DshWorkers] with no Andee in between (see [PeerRemote]). The owner's switch,
+     * per device, off until they turn it on, and only ever honoured for [Trust.OWN]: a friend's Andee never gets it.
+     */
+    fun dshAllowed(id: String): Boolean = synchronized(lock) {
+        val o = record(id) ?: return false
+        o.optBoolean("dsh_ok") && (if (!o.has("trust")) Trust.OWN else Trust.of(o.optString("trust"))) == Trust.OWN
+    }
+
+    fun setDshAllowed(id: String, on: Boolean) = update(id) { it.put("dsh_ok", on) }
 
     /**
      * Where [id] was last reached (`host:port`), kept across restarts. mDNS is the way to find a friend, and on some

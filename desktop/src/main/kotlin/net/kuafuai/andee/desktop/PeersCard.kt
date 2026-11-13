@@ -125,10 +125,23 @@ fun PeersCard(onDone: () -> Unit) {
                     Peers.setTrust(r.id, if (it == "own") net.kuafuai.andee.peer.PeerStore.Trust.OWN else net.kuafuai.andee.peer.PeerStore.Trust.FRIEND); tick++
                 }
                 if (!own) {
+                Spacer(Modifier.height(6.dp))
+                SegmentedPicker(listOf("ask" to t("每次先问我", "Ask me each time"), "auto" to t("总是允许", "Always allow")), if (r.auto) "auto" else "ask") {
+                Peers.setAutoAccept(r.id, it == "auto"); tick++
+                }
+                }
+                if (own) {
+                    // Only for a device that is the user's own, and off until they turn it on.
                     Spacer(Modifier.height(6.dp))
-                    SegmentedPicker(listOf("ask" to t("每次先问我", "Ask me each time"), "auto" to t("总是允许", "Always allow")), if (r.auto) "auto" else "ask") {
-                        Peers.setAutoAccept(r.id, it == "auto"); tick++
+                    Text(t("让它直接使用这台电脑的 dsh", "Let it use this Mac's dsh directly"), color = Palette.label, fontSize = 12.sp)
+                    SegmentedPicker(listOf("off" to t("关", "Off"), "on" to t("开", "On")), if (r.dsh) "on" else "off") {
+                        Peers.setDshAllowed(r.id, it == "on"); tick++
                     }
+                    Text(
+                        t("打开后，它的 Andee 可以直接派活给这台电脑的 dsh，这台 Mac 的 Andee 不参与，也不过问。它产出的文件放在这台 Mac 上，手机点开才下载。",
+                            "When on, its Andee can hand work to this Mac's dsh directly; this Mac's Andee takes no part and is not asked. The files it makes stay on this Mac and are fetched only when opened."),
+                        color = Palette.secondary, fontSize = 11.sp, lineHeight = 15.sp,
+                    )
                 }
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {

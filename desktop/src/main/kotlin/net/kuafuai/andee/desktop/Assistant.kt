@@ -81,6 +81,8 @@ object Assistant {
             model = { Settings.get("dsh_model").ifEmpty { net.kuafuai.andee.desktop.dsh.DshWorkers.DEFAULT_MODEL } },
             zh = { Strings.lang() == "zh" },
             tasks = net.kuafuai.andee.desktop.dsh.DshTaskLink { DesktopNotebook.book.tasks },
+            // A job a paired phone started: its report goes to the phone's Andee, not to this Mac's brain.
+            onRemoteFinished = { w, turn -> Peers.remoteFinished(w.origin, w.id, turn, w.title) },
             onProgress = DshLive::on,
         )
     }

@@ -50,6 +50,8 @@ class DshWorkers(
     private val zh: () -> Boolean = { true },
     /** The 「事」 a job belongs to; null runs jobs unattached (tests). */
     private val tasks: TaskLink? = null,
+    /** A job from a paired device ended: [Worker.origin] is who to tell. Not called for a cancelled job. */
+    private val onRemoteFinished: (Worker, String) -> Unit = { _, _ -> },
     /** A running job's progress changed; null when it ended. For the live card — nobody should be blind to a job. */
     private val onProgress: (String, Progress?) -> Unit = { _, _ -> },
 ) {
@@ -74,7 +76,12 @@ class DshWorkers(
         val jobs: Int = 0,
         /** The 「事」 its newest job is for; blank when none could be opened. */
         val task: String = "",
-    )
+        /**
+         * Blank when this Mac's own Andee started it. Otherwise the paired device that did (its id): the job belongs to
+         * that device's Andee, which holds the 「事」 and hears the report — this Mac's notebook and brain are not involved.
+         */
+        val origin: String = "",
+        )
 
     /** One item of the worker's own checklist (dsh's `todo_write`): `pending`, `in_progress` or `completed`. */
     data class Todo(val text: String, val status: String)
@@ -185,8 +192,12 @@ class DshWorkers(
     // the tools
     // ------------------------------------------------------------------
 
-    /** Hand a job over. Returns at once; the report comes back through [onFinished]. */
-    fun delegate(p: JSONObject, trust: DshPlan.Trust): JSONObject {
+    /**
+     * Hand a job over. Returns at once; the report comes back through [onFinished] (or, for a job that came from a paired
+     * device ([origin] set), through [onRemoteFinished] to that device). Such a job opens no 「事」 here and may not name
+     * one: the task is the other device's, and so is its notebook.
+     */
+    fun delegate(p: JSONObject, trust: DshPlan.Trust, origin: String = ""): JSONObject {
         val request = p.optString("task").trim()
         require(request.isNotEmpty()) { "delegate_task needs task — what the worker should do, in full" }
         val b = bin ?: if (available()) bin!! else throw IllegalStateException(
@@ -194,7 +205,7 @@ class DshWorkers(
                 "tell the user it can be installed with: npm install -g @deepseek-ai/dsh",
         )
         // The task first: a job for a 「事」 the model named continues the worker that task used last, unless told otherwise.
-        val named = p.optString("for_task").trim()
+        val named = if (origin.isNotEmpty()) "" else p.optString("for_task").trim()
         if (named.isNotEmpty()) tasks?.check(named)
         val continueId = p.optString("continue").trim().removePrefix("#").ifEmpty { named.takeIf { it.isNotEmpty() }?.let { tasks?.lastWorker(it) }.orEmpty() }
         val running = synchronized(lock) { workers.values.count { it.status == Status.RUNNING } }
@@ -222,13 +233,14 @@ class DshWorkers(
             val next = (prior ?: Worker(id = id, title = title, dir = dir, trust = trust)).copy(
                 title = if (prior != null && p.optString("title").isBlank()) prior.title else title,
                 trust = trust, sessionId = session, status = Status.RUNNING, lastUsed = now, error = "", jobs = (prior?.jobs ?: 0) + 1,
-            )
+                origin = origin,
+                )
             workers[id] = next
             save()
             next
         }
         // Which 「事」 this is for: the one named, else the one the continued worker was on, else a new one.
-        val task = named.ifEmpty { tasks?.ofWorker(w0.id).orEmpty() }.ifEmpty { tasks?.open(w0.title, trust).orEmpty() }
+        val task = if (origin.isNotEmpty()) "" else named.ifEmpty { tasks?.ofWorker(w0.id).orEmpty() }.ifEmpty { tasks?.open(w0.title, trust).orEmpty() }
         val w = if (task.isEmpty()) w0 else {
             runCatching { tasks?.attach(task, w0) }.onFailure { Log.w(TAG, "worker #${w0.id}: not attached to $task", it) }
             update(w0.id) { it.copy(task = task) } ?: w0
@@ -465,10 +477,11 @@ class DshWorkers(
         Log.i(TAG, "worker #${w.id} ${if (ok) "done" else "failed"}: ${files.size} files, $steps steps, ~$tokens tokens${error?.let { ", $it" } ?: ""}")
         val summary = (if (ok) "" else "Did not finish: ${error ?: "unknown reason"}. ") +
             (if (files.isNotEmpty()) "Files: " + files.take(6).joinToString(", ") { it.path } + ". " else "") + report.trim().take(160)
-        val record = runCatching { tasks?.answered(w, summary, seen = false) }.getOrNull().orEmpty()
+        val record = if (w.origin.isNotEmpty()) "" else runCatching { tasks?.answered(w, summary, seen = false) }.getOrNull().orEmpty()
         val turn = DshPlan.reportTurn(w, ok, error, report, files, steps, tokens) +
             (if (record.isNotBlank()) "\n\nThis report answers something you are in the middle of:\n$record" else "")
-        runCatching { onFinished(w, turn) }.onFailure { Log.w(TAG, "worker #${w.id}: report not delivered", it) }
+        runCatching { if (w.origin.isNotEmpty()) onRemoteFinished(w, turn) else onFinished(w, turn) }
+            .onFailure { Log.w(TAG, "worker #${w.id}: report not delivered", it) }
     }
 
     /**
@@ -561,9 +574,9 @@ class DshWorkers(
                 createdAt = o.optLong("created"), lastUsed = o.optLong("used"), report = o.optString("report"),
                 files = o.optJSONArray("files")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty(),
                 tokens = o.optLong("tokens"), steps = o.optInt("steps"), error = o.optString("error"), pid = o.optLong("pid"),
-                jobs = o.optInt("jobs"), task = o.optString("task"),
-            )
-            if (w.id.isNotEmpty()) workers[w.id] = w
+                jobs = o.optInt("jobs"), task = o.optString("task"), origin = o.optString("origin"),
+                )
+                if (w.id.isNotEmpty()) workers[w.id] = w
         }
     }
 
@@ -573,8 +586,8 @@ class DshWorkers(
             JSONObject().put("id", w.id).put("title", w.title).put("dir", w.dir).put("trust", w.trust.name).put("session", w.sessionId)
                 .put("status", w.status.name).put("created", w.createdAt).put("used", w.lastUsed).put("report", w.report)
                 .put("files", JSONArray(w.files)).put("tokens", w.tokens).put("steps", w.steps).put("error", w.error).put("pid", w.pid)
-                .put("jobs", w.jobs).put("task", w.task),
-        )
+                .put("jobs", w.jobs).put("task", w.task).put("origin", w.origin),
+                )
         runCatching {
             indexFile.parentFile?.mkdirs()
             val tmp = File(indexFile.path + ".tmp")

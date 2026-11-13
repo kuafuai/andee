@@ -7,6 +7,7 @@ import net.kuafuai.andee.peer.PeerDiscovery
 import net.kuafuai.andee.peer.PeerEvents
 import net.kuafuai.andee.peer.PeerProtocol
 import net.kuafuai.andee.peer.PeerQr
+import net.kuafuai.andee.peer.PeerRemote
 import net.kuafuai.andee.peer.PeerServer
 import net.kuafuai.andee.peer.PeerStore
 import net.kuafuai.andee.peer.PeerTasks
@@ -71,6 +72,7 @@ object Peers {
         override val can = PeerTasks.canFor("mac")
         override fun trust(id: String) = store.trust(id)
         override fun enabled() = enabled
+        override fun offersAgentTo(id: String) = store.dshAllowed(id)
         override fun paired() = store.all()
         // Found by mDNS, or reached before: worth dialling. The handshake decides whether it is really them.
         override fun reachable(id: String) = seen.containsKey(id) || store.address(id) != null
@@ -81,6 +83,12 @@ object Peers {
     private val events = object : PeerEvents {
         override fun onMessage(channel: PeerChannel, msg: JSONObject) {
             if (tasks.onMessage(channel, msg)) return
+            // The owner's switch decides, per device, whether this Mac's dsh is used directly, with no Andee in between.
+            if (msg.optString("type").startsWith("remote.")) {
+                val agent = net.kuafuai.andee.desktop.dsh.DshRemoteAgent(Assistant.dsh, channel.peer.id) { Settings.get("dsh") != "off" }
+                PeerRemote.Server({ agent }, { store.dshAllowed(it) }).onMessage(channel, msg)
+                return
+            }
             if (msg.optString("type") == "ping") channel.send(JSONObject().put("type", "pong").put("n", msg.optInt("n")))
         }
         override fun onConnected(channel: PeerChannel) {
@@ -89,6 +97,7 @@ object Peers {
             channel.remoteHost?.let { store.setAddress(channel.peer.id, it, PeerDiscovery.DEFAULT_PORT) }
             changed()
             tasks.onConnected(channel)
+            flushEvents(channel)
         }
         override fun onDisconnected(channel: PeerChannel) { links.remove(channel.peer.id); changed() }
         override fun onRejected(remote: String, why: String) { Log.w(TAG, "refused $remote: $why") }
@@ -175,11 +184,32 @@ object Peers {
     fun setTrust(id: String, t: PeerStore.Trust) { store.setTrust(id, t); changed() }
     fun setAutoAccept(id: String, on: Boolean) { store.setAutoAccept(id, on); changed() }
 
+    /** The owner's switch for [id]: may that own device use this Mac's dsh directly. Tells it on the open link now. */
+    fun setDshAllowed(id: String, on: Boolean) { store.setDshAllowed(id, on); tasks.reannounce(id); changed() }
+
+    /** A job a paired device started has ended: its Andee gets the report on the open link, or when it is back (30 min). */
+    fun remoteFinished(device: String, worker: String, text: String, detail: String) {
+        val msg = JSONObject().put("type", "remote.event").put("worker", worker).put("text", text.take(8_000)).put("detail", detail.take(8_000))
+        if (links[device]?.takeIf { it.isOpen }?.send(msg) == true) return
+        pendingEvents.add(Triple(device, System.currentTimeMillis(), msg))
+    }
+
+    private val pendingEvents = java.util.concurrent.CopyOnWriteArrayList<Triple<String, Long, JSONObject>>()
+
+    /** Reports waiting for a device to come back, sent when its link comes up. Older than 30 minutes are dropped. */
+    private fun flushEvents(channel: PeerChannel) {
+        val now = System.currentTimeMillis()
+        for (e in pendingEvents.toList()) {
+            if (now - e.second > 30 * 60_000L) { pendingEvents.remove(e); continue }
+            if (e.first == channel.peer.id && channel.send(e.third)) pendingEvents.remove(e)
+        }
+    }
+
     // ---- the list ----
 
     data class Row(
-        val id: String, val name: String, val fingerprint: String, val paired: Boolean, val reachable: Boolean, val linked: Boolean,
-        val found: PeerDiscovery.Found?, val trust: PeerStore.Trust, val auto: Boolean,
+    val id: String, val name: String, val fingerprint: String, val paired: Boolean, val reachable: Boolean, val linked: Boolean,
+    val found: PeerDiscovery.Found?, val trust: PeerStore.Trust, val auto: Boolean, val dsh: Boolean = false,
     )
 
     fun rows(): List<Row> {
@@ -188,7 +218,7 @@ object Peers {
         return ids.map { id ->
             val p = paired[id]; val f = seen[id]
             Row(id, p?.name ?: f?.name.orEmpty(), p?.fingerprint ?: f?.fingerprint.orEmpty(), p != null, f != null, links[id]?.isOpen == true, f,
-                store.trust(id), store.autoAccept(id))
+                store.trust(id), store.autoAccept(id), store.dshAllowed(id))
         }.sortedWith(compareByDescending<Row> { it.paired }.thenBy { it.name })
     }
 

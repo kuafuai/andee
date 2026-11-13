@@ -41,6 +41,11 @@ class PeerTasks(private val net: Net) {
         /** One line, English, model-facing: what this body can do for a friend. */
         val can: String
         fun enabled(): Boolean
+        /**
+         * Whether this device offers its own agent (dsh) to [id] to use directly — the owner's switch for that device. Said
+         * in `about`, so the other side knows it may list the agent's tools. Default: no.
+         */
+        fun offersAgentTo(id: String): Boolean = false
         fun paired(): List<PeerProtocol.Peer>
         fun trust(id: String): PeerStore.Trust
         fun reachable(id: String): Boolean
@@ -71,7 +76,7 @@ class PeerTasks(private val net: Net) {
     /** Requests this device made and has no report for yet. Memory only: a restart forgets the wait, not the work. */
     private val sent = ConcurrentHashMap<String, Sent>()
 
-    private data class About(val platform: String, val can: String)
+    private data class About(val platform: String, val can: String, val agent: Boolean = false)
 
     /** What each friend said it is, from its `about`. */
     private val abouts = ConcurrentHashMap<String, About>()
@@ -89,10 +94,26 @@ class PeerTasks(private val net: Net) {
     /** What [id] said it is (`phone` / `mac`), or null before its first link. */
     fun platformOf(id: String): String? = abouts[id]?.platform
 
+    /**
+     * The paired device whose agent this one may use directly: the one that said, in its `about`, that it offers it.
+     * Null when none does (or none has been reached yet). If several do, the one reached most recently.
+     */
+    fun agentDevice(): String? = abouts.entries.filter { it.value.agent && net.paired().any { p -> p.id == it.key } }.map { it.key }.firstOrNull()
+
+    /** Whether [id] offers its agent to this device, as it last said. */
+    fun offersAgent(id: String): Boolean = abouts[id]?.agent == true
+
+    /** The owner changed the switch for [id]: say so on the open link now, not at the next one. */
+    fun reannounce(id: String) {
+        net.channel(id)?.takeIf { it.isOpen }?.send(
+            JSONObject().put("type", "about").put("platform", net.platform).put("can", net.can).put("agent", net.offersAgentTo(id)),
+        )
+    }
+
     // ---- link events, forwarded by the platform's PeerEvents -------------------------------------------
 
     fun onConnected(channel: PeerChannel) {
-        channel.send(JSONObject().put("type", "about").put("platform", net.platform).put("can", net.can))
+        channel.send(JSONObject().put("type", "about").put("platform", net.platform).put("can", net.can).put("agent", net.offersAgentTo(channel.peer.id)))
         // A report that was waiting for exactly this device can go now.
         retry.execute { runCatching { flushOutbox() } }
     }
@@ -101,7 +122,7 @@ class PeerTasks(private val net: Net) {
     fun onMessage(channel: PeerChannel, msg: JSONObject): Boolean {
         val from = channel.peer
         when (msg.optString("type")) {
-            "about" -> abouts[from.id] = About(msg.optString("platform").take(20), msg.optString("can").take(MAX_CAN_CHARS))
+            "about" -> abouts[from.id] = About(msg.optString("platform").take(20), msg.optString("can").take(MAX_CAN_CHARS), msg.optBoolean("agent"))
             "task" -> take(channel, msg)
             "task.taken" -> Log.i(TAG, "${from.name} took request ${msg.optString("id")}")
             "task.refused" -> sent.remove(msg.optString("id"))?.let {
