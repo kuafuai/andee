@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="shots" path="shots/" />
+    <!-- Files fetched from the computer's agent (RemoteAgentHost.fetch): opened by the system's viewers on tap. -->
+    <files-path name="agent_inbox" path="agent_inbox/" />
 </paths>

@@ -11,12 +11,9 @@ object DshStatus {
         return (if (zh) "第 ${p.step} 步 · $time" else "step ${p.step} · $time") + tok
     }
 
-    /** The task row's line: the status, then the checklist item in hand or the newest action. */
-    fun forTask(p: DshWorkers.Progress, now: Long, zh: Boolean): String {
-        // No token count here: on a sidebar row it pushed out the part worth reading, what it is on.
-        val s = ((now - p.startedAt) / 1000).coerceAtLeast(0)
-        val head = (if (zh) "第 ${p.step} 步 · " else "step ${p.step} · ") + "%d:%02d".format(s / 60, s % 60)
-        val what = p.current?.text ?: p.recent.lastOrNull().orEmpty()
-        return head + if (what.isNotBlank()) " · $what" else ""
-    }
+    /** The task row's status, three lines: where it is, its plan, what it is doing now. The phone's rows read the same. */
+    fun forTask(p: DshWorkers.Progress, now: Long, zh: Boolean): String =
+        net.kuafuai.andee.peer.RemoteProgressText.lines(
+            p.step, p.startedAt, now, p.tokens, p.todos.map { it.text to it.status }, p.recent, p.thought, zh,
+        ).asList().joinToString("\n")
 }

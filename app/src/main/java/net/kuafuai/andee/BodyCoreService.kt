@@ -368,6 +368,10 @@ class BodyCoreService : Service() {
 
             override fun onTasksClick() = openTasksCard()
 
+            override fun onWorkerFiles(worker: String, title: String) = openWorkerFiles(worker, title)
+
+            override fun onOpenTask(taskId: String) = openTasksCard(taskId)
+
             override fun onNotebookClick() {
                 net.kuafuai.andee.ui.NotebookUi(
                     this@BodyCoreService,
@@ -2510,15 +2514,30 @@ class BodyCoreService : Service() {
         if (!net.kuafuai.andee.ui.TextInputActivity.isShowing) toggleTyping()
     }
 
+    /**
+     * What worker [id] made, on the computer, as a drive (见 [net.kuafuai.andee.ui.WorkerFilesUi]). A page opens in the page
+     * viewer; the ball folds away first, as for any page.
+     */
+    private fun openWorkerFiles(id: String, title: String) {
+        val devId = peers.tasks.agentDevice()
+        net.kuafuai.andee.ui.WorkerFilesUi(
+            this, id, title, peers.remote, { peers.tasks.agentDevice() ?: devId },
+            java.io.File(filesDir, "agent_inbox"),
+            openPage = { name, file -> ui.post { openPageFrom(name, file) } },
+        ).show()
+    }
+
     /** The 在办 card, from the top bar's key (and from `debug.open`). */
-    private fun openTasksCard() {
+    private fun openTasksCard(taskId: String? = null) {
         net.kuafuai.andee.ui.TasksUi(
             this,
             // 接着办: a turn now, the task named by the device — not left to the model to guess from "that one".
             onContinue = { task -> ui.post { pendingTask = task.id; submitUserTurn(AppLocale.str(this, R.string.tasks_carry_on), "typed") } },
             onTalk = { task -> ui.post { beginTaskTalk(task) } },
-            watchProgress = { f -> peers.onProgressChanged = { ui.post(f) } },
+            onFiles = { worker, title -> ui.post { openWorkerFiles(worker, title) } },
+            watchProgress = { f -> peers.onProgressChanged = { ui.post(f); window.refreshTasksKey() } },
             onDismiss = { window.refreshTasksKey() },
+            openTask = taskId,
         ).show()
     }
 
@@ -2791,7 +2810,8 @@ class BodyCoreService : Service() {
                 onOpenCard = { card ->
                     when (card) {
                         "tasks" -> { ui.post { openTasksCard() }; true }
-                        else -> false
+                        "chat" -> { ui.post { dispatcher.expand() }; true }
+                        else -> if (card.startsWith("files:")) { ui.post { openWorkerFiles(card.removePrefix("files:"), "") }; true } else false
                     }
                 },
             )
@@ -3065,6 +3085,7 @@ class BodyCoreService : Service() {
         )
         peers.tasks.brain = peerBrain
         // A worker on the computer ended: its report is another agent's words, so it runs as a turn the brain cannot trust.
+        peers.onProgressChanged = { window.refreshTasksKey() }
         peers.onRemoteReport = { device, worker, text, title, summary ->
             val b = localBrain
             // The job is over: stop showing it as running, and answer the 「事」 that waited on it, whether or not a brain is up.
@@ -3660,7 +3681,8 @@ class BodyCoreService : Service() {
             // fires many times per task with successive drafts of the
             // same sentence — logging those would bury the answer under
             // its own rough cuts.
-            net.kuafuai.andee.ui.ChatHistory.addAssistant(plain, turn)
+            // The jobs this turn handed to the computer hang under the words that announce them, as one piece.
+            net.kuafuai.andee.ui.ChatHistory.addAssistant(plain, turn, net.kuafuai.andee.peer.HandedJobs.take())
             // Kept for one reason only: if speaking this fails and the card is
             // folded, the row above is `GONE` and this string is the last copy
             // of the answer on the device. See [showAnswerAsCard].

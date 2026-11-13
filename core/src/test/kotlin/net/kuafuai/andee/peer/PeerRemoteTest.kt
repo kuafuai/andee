@@ -330,6 +330,40 @@ class PeerRemoteTest {
         assertTrue(mac.calls.isEmpty())
     }
 
+    /** A link drops when the phone sleeps or the Wi-Fi blinks; the computer is still one dial away, so the call dials. */
+    @Test fun aDroppedLinkIsDialledAgainBeforeTheComputerIsGivenUpOn() {
+        val mac = Mac(Files.createTempDirectory("worker7").toFile())
+        val server = PeerRemote.Server({ mac }, { true })
+        lateinit var wire: Wire
+        var dialled = 0
+        var current: Wire.Side? = null
+        val client = PeerRemote.Client(
+            connect = { dialled++; current = wire.phoneToMac.also { it.open = true }; true },
+            link = { current },
+        )
+        wire = Wire(server, client)
+        current = wire.phoneToMac.also { it.open = false }
+        val r = client.call("mac-id", "dsh.delegate", JSONObject().put("task", "x"))
+        assertEquals("7", r.getString("worker"))
+        assertEquals(1, dialled)
+        // An open link is used as it is: no second dial.
+        client.call("mac-id", "dsh.delegate", JSONObject().put("task", "y"))
+        assertEquals(1, dialled)
+    }
+
+    @Test fun aDialThatFailsIsStillAnHonestErrorAndNothingRuns() {
+        val mac = Mac(Files.createTempDirectory("worker7").toFile())
+        val server = PeerRemote.Server({ mac }, { true })
+        lateinit var wire: Wire
+        val client = PeerRemote.Client(connect = { false }, link = { wire.phoneToMac })
+        wire = Wire(server, client)
+        wire.phoneToMac.open = false
+        try { client.list("mac-id", "7", ""); fail() } catch (e: IllegalStateException) {
+            assertTrue(e.message, e.message!!.contains("cannot be reached"))
+        }
+        assertTrue(mac.calls.isEmpty())
+    }
+
     @Test fun onlyAnOwnDeviceCanBeGivenTheSwitch() {
         val mem = object : net.kuafuai.andee.config.NotebookStore {
             var s: String? = null

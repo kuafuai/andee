@@ -246,11 +246,8 @@ class DshWorkers(
             update(w0.id) { it.copy(task = task) } ?: w0
         }
         File(w.dir).mkdirs()
-        onEvent(
-            (if (resume || seed != null) t("接着交给 dsh：${w.title}", "Handed on to dsh again: ${w.title}") else t("交给 dsh：${w.title}", "Handed to dsh: ${w.title}")) +
-                (if (task.isNotEmpty()) " · $task" else ""),
-            request.take(600), w.id,
-        )
+        // No row of its own for the hand-over any more: the answer that announces the job carries its card (HandedJobs), so
+        // "Handed to dsh: …" above and Andee's words below read as two things about one (owner's call, 11-13).
         Thread({ runJob(w, request, resume, seed, b) }, "dsh-worker-${w.id}").apply { isDaemon = true }.start()
         return JSONObject().put("handed_over", true).put("worker", w.id).put("folder", w.dir).put("continued", resume)
             .apply { if (task.isNotEmpty()) put("task", task) }
@@ -676,7 +673,7 @@ class DshWorkers(
 
                         - `task`: the whole job, as you would brief a capable colleague — what to make, the inputs, the form of
                           the result. The worker cannot ask questions; say what matters.
-                        - For research, comparison or a write-up someone is going to read, ask for **one self-contained HTML page** (inline CSS, readable on a phone) rather than markdown, and say so in `task`: it opens as it is, with real tables, where markdown is a file to be read as text. Ask for another form only when the user does.
+                        - For research, comparison or a write-up someone is going to read, ask for **one self-contained HTML page** (inline CSS, readable on a phone) rather than markdown, and say so in `task` (deliver ONE self-contained HTML file named x.html). Never write "deliver a Markdown file" into `task` on your own: markdown is a file to be read as text, an HTML page opens as it is, with real tables. Ask for markdown only when the user did.
                         - `title`: a few words for the user's timeline and the task list.
                         - `for_task`: the id of an open task (T…) this job is for. Its last worker is continued unless you say
                           `continue` yourself.

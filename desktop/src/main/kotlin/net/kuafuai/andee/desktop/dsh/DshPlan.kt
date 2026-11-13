@@ -93,8 +93,10 @@ object DshPlan {
         append("When the job is to research, compare, explain or write something up for a person to read, deliver it as ONE ")
         append("self-contained HTML file (all CSS inline, no external scripts, fonts or images, readable on a phone screen: ")
         append("a responsive layout, real tables with horizontal scroll where they are wide, short paragraphs, light and dark ")
-        append("colours via prefers-color-scheme) — not a markdown file. If the job names a form (markdown, a spreadsheet, code, ")
-        append("a repository change), use that. Sources and assumptions go in the page, not only in your report.\n")
+        append("colours via prefers-color-scheme) — not a markdown file, even when the job text below says to write a .md: ")
+        append("the person who will read it wants the page, and Andee, who wrote the job text, does not know the page is possible. ")
+        append("Use the same base name with .html. Only a job whose output is a spreadsheet, data, code or a repository change, ")
+        append("or that says the USER asked for markdown itself, keeps its own form. Sources and assumptions go in the page, not only in your report.\n")
         if (!seed.isNullOrBlank()) {
             append("\nAn earlier worker did related work; its report was:\n<<<EARLIER REPORT>>>\n")
             append(seed.take(2_000)).append("\n<<<END>>>\n")

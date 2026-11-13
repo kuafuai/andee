@@ -34,16 +34,20 @@ class TasksUi(
     private val onContinue: (Tasks.Task) -> Unit,
     /** 说点要求再办: the next words the user types or says are about this task. */
     private val onTalk: (Tasks.Task) -> Unit,
+    /** 工作文件 ›: what worker [id] made, on the computer, as a drive. Null hides the entry. */
+    private val onFiles: ((worker: String, title: String) -> Unit)? = null,
     /** Hand the service a callback to run when a worker's progress changes (or `{}` to stop). */
     private val watchProgress: (() -> Unit) -> Unit = {},
     private val onDismiss: () -> Unit = {},
+    /** Open straight on this task's page. */
+    openTask: String? = null,
 ) {
     private val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var root: View? = null
     private var frosted = false
 
     /** The 事 open in the card; null shows the list. */
-    private var open: String? = null
+    private var open: String? = openTask
 
     private fun zh() = VoiceConfig.uiLanguage(context) == "zh"
     private fun t(z: String, e: String) = if (zh()) z else e
@@ -146,8 +150,12 @@ class TasksUi(
         for (task in active) {
             val row = panel()
             row.addView(oneLine(label(task.what, Glass.Type.BODY, Glass.TITLE)), matchWrap())
-            val state = oneLine(label("${task.id} · " + TaskRows.state(task, now, zh()), Glass.Type.CAPTION,
-            if (task.status == "ready" || task.status == Tasks.DELIVERED) Glass.ACCENT else Glass.SECONDARY, top = 4))
+            val state = label("${task.id} · " + TaskRows.state(task, now, zh()), Glass.Type.CAPTION,
+            if (task.status == "ready" || task.status == Tasks.DELIVERED) Glass.ACCENT else Glass.SECONDARY, top = 4).apply {
+                // Up to three lines, each cut at its end: where it is, its plan, what it is doing (the Mac's rows too).
+                maxLines = 3
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            }
             val line = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
             val dot = runningDot()
             dot.visibility = if (TaskRows.runningWorker(task) != null) View.VISIBLE else View.GONE
@@ -184,6 +192,7 @@ class TasksUi(
     buildLiveCard(body, task)
         body.addView(label(task.what, Glass.Type.HEADLINE, Glass.TITLE), matchWrap())
         body.addView(label("${task.id} · " + TaskRows.state(task, now, zh()), Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap().apply { bottomMargin = dp(12) })
+        buildFilesEntry(body, task)
         when {
             task.status == Tasks.DELIVERED -> {
                 val p = panel()
@@ -235,6 +244,31 @@ class TasksUi(
             body.addView(label(t("经过", "Steps"), Glass.Type.CAPTION, Glass.MUTED, top = 4), matchWrap().apply { bottomMargin = dp(6) })
             val fmt = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US)
             for (s in task.steps) body.addView(label(fmt.format(java.util.Date(s.at)) + "  " + s.text, Glass.Type.CAPTION, Glass.TITLE), matchWrap().apply { bottomMargin = dp(4) })
+        }
+    }
+
+    /**
+     * 工作文件 ›: the way in to what the worker made, on the computer. Shown for every worker this task has handed work to, open
+     * or answered, whether it is running or done — a running job already has files in its folder. Only while a computer
+     * offers its agent to this phone, since that is what the listing is asked of.
+     */
+    private fun buildFilesEntry(body: LinearLayout, task: Tasks.Task) {
+        val open = onFiles ?: return
+        val workers = task.waits.filter { it.kind == "worker" }.map { it.name }.distinct()
+        for (w in workers) {
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(12), dp(14), dp(12))
+                background = Glass.panel(context, dp(14))
+                isClickable = true
+                Glass.pressable(this)
+                setOnClickListener { open(w, task.what) }
+            }
+            row.addView(label("📁", Glass.Type.BODY, Glass.TITLE).apply { setPadding(0, 0, dp(10), 0) })
+            row.addView(label(t("工作文件", "Work files") + " · dsh #$w", Glass.Type.BODY, Glass.TITLE), LinearLayout.LayoutParams(0, WRAP, 1f))
+            row.addView(label(t("在电脑上，点开才下载 ›", "on the computer, fetched when opened ›"), Glass.Type.CAPTION, Glass.SECONDARY))
+            body.addView(row, matchWrap().apply { bottomMargin = dp(10) })
         }
     }
 
@@ -415,7 +449,9 @@ object TaskRows {
         val open = t.waits.filter { it.open }
         // A worker on the computer that is running now: what it is on, like the Mac's row.
         open.firstOrNull { it.kind == "worker" }?.let { w ->
-            net.kuafuai.andee.peer.RemoteProgress.of(w.name)?.let { return "dsh #${w.name} · " + net.kuafuai.andee.peer.RemoteProgress.line(it, now, zh) }
+            net.kuafuai.andee.peer.RemoteProgress.of(w.name)?.let { s ->
+                return "dsh #${w.name} · " + net.kuafuai.andee.peer.RemoteProgressText.of(s, now, zh).asList().joinToString("\n")
+            }
         }
         if (open.isNotEmpty()) return tr("在等 ", "Waiting on ") + open.joinToString(", ") { who(it, zh) } + " · " + ago(now - open.maxOf { it.at }, zh)
         if (t.next.isNotBlank()) return tr("下一步：", "Next: ") + t.next

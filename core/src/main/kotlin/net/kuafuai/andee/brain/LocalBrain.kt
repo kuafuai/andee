@@ -652,6 +652,7 @@ class LocalBrain(
             turnSent = false
             turnTyped = false
             turnTasked = false
+            net.kuafuai.andee.peer.HandedJobs.reset()
             turnReminded = false
             runningWhat = describe(text, kind)
             aimMisses = 0
@@ -1528,6 +1529,7 @@ class LocalBrain(
                 if (method == "note.task") turnTasked = true
             }
             val result = dispatchWithTimeout(method, args, tc.id, silent, untrusted)
+            if (method == "dsh.delegate" && result is JSONObject && result.optBoolean("handed_over")) net.kuafuai.andee.peer.HandedJobs.note(result.optString("worker"))
             if (landed(result)) noteSent(method)
             if (currentKind == TurnKind.WORK) workCalls += WorkCall(method, args.optString("action"), tc.id, landed(result))
             BrainEvent.fromTool(method, args, result)?.let(::emit)

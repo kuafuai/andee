@@ -27,6 +27,9 @@ object Scrollback {
     /** [Row.kind] of an assistant row that is a page's card ([addPage]). */
     const val KIND_PAGE = "page"
 
+    /** [Row.kind] of an assistant row that handed work to dsh this turn: the workers' ids are in `ref`, comma-separated. */
+    const val KIND_JOBS = "jobs"
+
     /**
      * [EVENT] is something that happened that is not conversation — a todo woke it, the review ran, it wrote its
      * diary, it got up by itself ([TimelineEvents]). Shown in the timeline, **never** given to the brain:
@@ -63,11 +66,13 @@ object Scrollback {
 
     fun snapshot(): List<Row> = synchronized(lock) { rows.toList() }
 
-    fun add(role: Role, text: String) {
+    /** [jobs]: the dsh workers this answer handed work to; their cards hang under the words (`kind = "jobs"`, ids in `ref`). */
+    fun add(role: Role, text: String, jobs: List<String> = emptyList()) {
         val t = text.trim()
         if (t.isEmpty()) return
         synchronized(lock) {
-            rows += Row(nextId++, System.currentTimeMillis(), role, t.take(MAX_TEXT))
+            rows += Row(nextId++, System.currentTimeMillis(), role, t.take(MAX_TEXT),
+                kind = if (jobs.isEmpty()) "" else KIND_JOBS, ref = jobs.joinToString(","))
             while (rows.size > MAX_ROWS) rows.removeAt(0)
         }
         saveAndNotify()

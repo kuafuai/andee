@@ -59,6 +59,16 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
     /** Tapping a page row. Only ever fired for entries that still have a file. */
     var onPageClick: ((ChatHistory.Entry) -> Unit)? = null
 
+    /** A job card under a reply: its 工作文件 ›, and the card itself (the task page). Set by the window. */
+    var onWorkerFiles: ((worker: String, title: String) -> Unit)? = null
+    var onOpenTask: ((taskId: String) -> Unit)? = null
+
+    /** The job cards on screen, so a progress update rewrites them in place instead of drawing the list again. */
+    private val jobCards = mutableListOf<HandedJobCard>()
+
+    /** A worker's progress changed or it ended: rewrite the job cards' lines. Main thread. */
+    fun refreshJobCards() { jobCards.forEach { it.refresh() } }
+
     /**
      * Double-tapping a message — read it fullscreen. See [attachRowGestures].
      *
@@ -337,6 +347,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
             laidTopics.any { it !in topicIds }
         ) {
             column.removeAllViews()
+            jobCards.clear()
             column.addView(empty)
             column.addView(suggest)
             addLiveRows()
@@ -402,6 +413,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
         suggest.removeAllViews()
         laid.clear()
         laidOpen.clear()
+        jobCards.clear()
         column.removeAllViews()
         column.addView(empty)
         column.addView(suggest)
@@ -843,6 +855,15 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
             // for listening to; people read it here, and a report cut off in the middle read as lost.
         }
         bubble.addView(body)
+
+        // The jobs this answer handed to the computer hang under its words as one piece (ref = the worker ids).
+        if (e.role == ChatHistory.Role.ASSISTANT && e.ref.isNotBlank()) {
+            for (w in e.ref.split(',').filter { it.isNotBlank() }) {
+                val card = HandedJobCard(context, w, { id, title -> onWorkerFiles?.invoke(id, title) }, { id -> onOpenTask?.invoke(id) })
+                jobCards += card
+                bubble.addView(card.view, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) })
+            }
+        }
 
         if (e.role == ChatHistory.Role.PAGE && e.page != null) {
             bubble.isClickable = true

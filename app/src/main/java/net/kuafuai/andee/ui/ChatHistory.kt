@@ -659,7 +659,8 @@ object ChatHistory {
      *   called from `onFinal` on the loop thread and the next turn cannot have
      *   started.
      */
-    fun addAssistant(text: String, turn: String? = null) = add(Role.ASSISTANT, text, null, turn)
+    fun addAssistant(text: String, turn: String? = null, jobs: List<String> = emptyList()) =
+        add(Role.ASSISTANT, text, null, turn, ref = jobs.joinToString(","))
 
     /** Call through [CardUi.error], which de-dups bursts before they get here. */
     fun addError(text: String) = add(Role.ERROR, text, null)

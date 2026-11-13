@@ -28,3 +28,14 @@ class RemoteProgressTextTest {
         assertTrue("nothing done yet, so no third line", start.doing.isEmpty() && start.asList().size == 2)
     }
 }
+
+class HandedJobsTest {
+    @Test fun aTurnsJobsAreTakenOnceByTheAnswer_andTheNextTurnStartsEmpty() {
+        HandedJobs.reset()
+        HandedJobs.note("7"); HandedJobs.note("#8"); HandedJobs.note("7"); HandedJobs.note("")
+        assertEquals(listOf("7", "8"), HandedJobs.take())
+        assertTrue("taken once", HandedJobs.take().isEmpty())
+        HandedJobs.note("9"); HandedJobs.reset()
+        assertTrue("a new turn forgets the old", HandedJobs.take().isEmpty())
+    }
+}

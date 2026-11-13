@@ -89,11 +89,12 @@ private fun sheen(radius: Int): Modifier = Modifier.background(
 @Composable
 fun GlassHeader(title: String, subtitle: String? = null, onClose: () -> Unit, trailing: @Composable (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column {
-            Text(title, color = Palette.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-            if (subtitle != null) Text(subtitle, color = Palette.secondary, fontSize = 12.sp)
+        // The title takes what the buttons leave, never more: a long one (a task's whole sentence) used to fill the row and
+        // push the ✕ out of the window, leaving a page that could not be closed.
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, color = Palette.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            if (subtitle != null) Text(subtitle, color = Palette.secondary, fontSize = 12.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
-        Spacer(Modifier.weight(1f))
         trailing?.invoke()
         Box(Modifier.glassPanel(18).clickable { onClose() }.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Icon(AndeeIcon.CLOSE, Palette.secondary, 16.dp)

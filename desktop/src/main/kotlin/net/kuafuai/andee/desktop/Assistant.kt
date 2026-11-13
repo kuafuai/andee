@@ -359,7 +359,8 @@ object Assistant {
             onProgress = { BallCaption.push(it); onProgress(it) },
             onFinal = { text ->
                 val clean = net.kuafuai.andee.brain.SpeechMood.parse(text).text.replace("[END]", "").trim()
-                Scrollback.add(Scrollback.Role.ASSISTANT, clean)
+                // The jobs this turn handed to dsh hang under the words that announce them, as one piece.
+                Scrollback.add(Scrollback.Role.ASSISTANT, clean, net.kuafuai.andee.peer.HandedJobs.take())
                 MacBall.onAnswer(text)
                 BallCaption.clear()
                 onFinal(clean)

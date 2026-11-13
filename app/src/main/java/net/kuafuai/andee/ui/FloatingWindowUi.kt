@@ -266,6 +266,12 @@ class FloatingWindowUi(
          */
         fun onHistoryPageClick(entry: ChatHistory.Entry)
 
+        /** 工作文件 › on a job card under a reply: what worker [worker] made, on the computer. */
+        fun onWorkerFiles(worker: String, title: String) {}
+
+        /** A job card under a reply, tapped: its task's page in 在办. */
+        fun onOpenTask(taskId: String) {}
+
         /**
          * A message row, double-tapped, to be read fullscreen.
          *
@@ -528,6 +534,7 @@ class FloatingWindowUi(
     /** Re-read the 事 for the 在办 key. Any thread; also run every few seconds while the card is up. */
     fun refreshTasksKey() {
         ui.post {
+            historyView?.refreshJobCards()
             val list = runCatching { net.kuafuai.andee.config.Notebook.tasks(context).active() }.getOrDefault(emptyList())
             tasksBadge?.let { b -> b.text = list.size.toString(); b.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE }
             tasksDot?.visibility = if (TaskRows.wanting(list) > 0) View.VISIBLE else View.GONE
@@ -3142,6 +3149,8 @@ class FloatingWindowUi(
         // ---- Scrollback, straight under the ball ----
         val history = HistoryListView(context).apply {
             onPageClick = { listeners.onHistoryPageClick(it) }
+            onWorkerFiles = { w, title -> listeners.onWorkerFiles(w, title) }
+            onOpenTask = { listeners.onOpenTask(it) }
             onTextOpen = { listeners.onTextOpen(it) }
             onTraceOpen = { listeners.onTraceOpen(it) }
             onSuggestionClick = { name, title, example ->

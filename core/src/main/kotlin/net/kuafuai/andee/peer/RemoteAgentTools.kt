@@ -54,7 +54,7 @@ object RemoteAgentTools {
 
                     - `task`: the whole job, as you would brief a capable colleague — what to make, the inputs, the form of
                       the result. The worker cannot ask questions; say what matters.
-                    - For research, comparison or a write-up someone is going to read, ask for **one self-contained HTML page** (inline CSS, readable on a phone) rather than markdown, and say so in `task`: it opens as it is, with real tables, where markdown is a file to be read as text. Ask for another form only when the user does.
+                    - For research, comparison or a write-up someone is going to read, ask for **one self-contained HTML page** (inline CSS, readable on a phone) rather than markdown, and say so in `task` (deliver ONE self-contained HTML file named x.html). Never write "deliver a Markdown file" into `task` on your own: markdown is a file to be read as text, an HTML page opens as it is, with real tables. Ask for markdown only when the user did.
                     - `title`: a few words for the user's timeline.
                     - `continue`: a worker id (from an earlier report or delegate_status) to give the next job to the same
                       worker, so it keeps what it learned — the right choice for a follow-up, a revision, or a recurring job.

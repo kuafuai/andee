@@ -65,7 +65,8 @@ class DshTaskTest {
         assertEquals(DshTaskLink.ORIGIN, t.origin)
         assertEquals("user", t.from.kind)
         assertEquals("the task waits on the worker", "1", t.waits.single { it.kind == "worker" }.name)
-        assertTrue(rows.poll(5, TimeUnit.SECONDS)!!.let { it.first.contains(id) && it.third == "1" })
+        // The hand-over has no row of its own: the answer that announces it carries the job's card (HandedJobs).
+        assertTrue("handed_over", r.getBoolean("handed_over")); assertEquals("1", r.getString("worker"))
 
         val report = turn()
         assertTrue(report, report.contains("- out.md ("))

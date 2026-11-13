@@ -102,8 +102,14 @@ object PeerRemote {
     // the asking side (the phone)
     // ======================================================================================================
 
-    /** The phone's view of the Mac's agent. One call blocks for the reply, off any UI thread. */
-    class Client(private val link: (String) -> PeerChannel?) {
+    /**
+     * The phone's view of the Mac's agent. One call blocks for the reply, off any UI thread.
+     *
+     * [connect] dials the device when its link is not open: a link drops whenever the phone sleeps or the Wi-Fi blinks, and
+     * a call that only looked at the existing link reported "cannot be reached" for a computer one dial away. It does
+     * network I/O (seconds), which is why every call here is already off the main thread.
+     */
+    class Client(private val connect: (String) -> Boolean = { false }, private val link: (String) -> PeerChannel?) {
         private val waiting = ConcurrentHashMap<String, Pending>()
 
         private class Pending(val latch: CountDownLatch = CountDownLatch(1), @Volatile var reply: JSONObject? = null)
@@ -131,7 +137,7 @@ object PeerRemote {
         }
 
         private fun request(device: String, msg: JSONObject, timeoutMs: Long): JSONObject {
-            val ch = link(device)?.takeIf { it.isOpen } ?: throw IllegalStateException(
+            val ch = (link(device)?.takeIf { it.isOpen } ?: run { if (connect(device)) link(device)?.takeIf { it.isOpen } else null }) ?: throw IllegalStateException(
                 "The computer cannot be reached now — it is off, asleep, or on another network (it is only reachable on the same Wi-Fi). " +
                     "Nothing was done. Tell the user; do not say it was started.",
             )

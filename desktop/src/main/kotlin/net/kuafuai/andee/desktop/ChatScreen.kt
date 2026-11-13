@@ -750,6 +750,9 @@ private const val WORK_CARD_LINES = 4
 private fun Bubble(r: Scrollback.Row) {
     val mine = r.role == Scrollback.Role.USER
     val error = r.role == Scrollback.Role.ERROR
+    // The jobs this answer handed to dsh hang under its words as one piece, not as a grey line of their own above it.
+    val jobs = if (r.kind == Scrollback.KIND_JOBS) r.ref.split(',').filter { it.isNotBlank() } else emptyList()
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
         SelectionContainer {
             Text(
@@ -770,6 +773,11 @@ private fun Bubble(r: Scrollback.Row) {
                     .padding(horizontal = 14.dp, vertical = 9.dp),
             )
         }
+    }
+    for (w in jobs) {
+        Spacer(Modifier.height(6.dp))
+        DshJobCard(w, Modifier.widthIn(max = 560.dp))
+    }
     }
 }
 
@@ -837,7 +845,8 @@ private fun wechatQr(): androidx.compose.ui.graphics.ImageBitmap? = runCatching 
 }.getOrNull()
 
 /**
- * The way into a dsh worker's job, beside its timeline row and its task in 在办: its folder in Finder. A link to the
+ * The way into a dsh worker's job, beside its timeline row and its task in 在办: its files, listed and opened in the window (the
+ * Finder is one button on that page). A link to the
  * job's session in dsh's own web window was tried and removed (11-12): dsh web reads a session another process is
  * running as a dead turn, and once it has shown one it holds that session's write lock, so the job cannot be resumed.
  */
@@ -850,9 +859,9 @@ fun DshLinks(workerId: String, withTask: Boolean = false) {
         LinkText(if (zh) "在办 ›" else "In hand ›") { TaskNav.open(id) }
     }
     Spacer(Modifier.width(8.dp))
-    LinkText(if (zh) "文件夹 ›" else "Folder ›") {
+    LinkText(if (zh) "文件 ›" else "Files ›") {
         // A row written before the worker id was the ref carried the folder's path.
-        if (workerId.startsWith("/")) runCatching { ProcessBuilder("open", workerId).start() } else Assistant.dsh.openFolder(workerId)
+        if (workerId.startsWith("/")) runCatching { ProcessBuilder("open", workerId).start() } else FilesNav.open(workerId)
     }
 }
 

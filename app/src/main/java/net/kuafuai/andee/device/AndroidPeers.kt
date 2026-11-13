@@ -72,7 +72,7 @@ class AndroidPeers(context: Context) {
     })
 
     /** The paired computer's agent, used as if it were this phone's own ([PeerRemote]). */
-    val remote = PeerRemote.Client { id -> links[id] }
+    val remote = PeerRemote.Client(connect = { id -> connect(id) }, link = { id -> links[id] })
 
     /** A running worker's progress changed (or it ended): the 在办 card and key re-read. Set by the UI. */
     @Volatile var onProgressChanged: () -> Unit = {}

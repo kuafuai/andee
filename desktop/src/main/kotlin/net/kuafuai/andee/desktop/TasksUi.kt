@@ -21,6 +21,8 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +68,8 @@ object TaskView {
         val w = worker(t)
         val live = w?.let { DshLive.running[it] }
         if (t.status == Tasks.DELIVERED) return tr("交付了，等你确认", "Delivered — confirm?") + t.result.takeIf { it.isNotBlank() }?.let { "：" + it.lineSequence().first().take(50) }.orEmpty()
+        // A closed 事 is not "under way": without this a finished one fell through to the last line and read as still open.
+        if (!t.active) return if (t.status == "done") tr("办完了", "done") else tr("放下了", "let go")
         if (live != null) return "dsh #$w · " + DshStatus.forTask(live, now, zh)
         val answered = t.waits.lastOrNull { !it.open && !it.seen }
         if (t.status == "ready" && answered != null) return tr("回话到了：", "Answered: ") + answered.answer.lineSequence().first().take(60)
@@ -180,7 +184,7 @@ fun SidebarTasks(nav: Nav) {
             Column {
                 Text(task.what, color = if (on) Palette.title else Palette.label, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(TaskView.state(task, now, zh), color = if (task.status == "ready") Palette.label else Palette.photoInk,
-                fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                fontSize = 10.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -208,7 +212,7 @@ fun AllTasksScreen(nav: Nav) {
                 Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
                     Text(task.what, color = Palette.label, fontSize = 14.sp)
-                    Text("${task.id} · " + TaskView.state(task, now, zh), color = Palette.secondary, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text("${task.id} · " + TaskView.state(task, now, zh), color = Palette.secondary, fontSize = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -259,6 +263,11 @@ fun TaskScreen(id: String, nav: Nav, onTalk: () -> Unit) {
         val live = worker?.let { DshLive.running[it] }
         if (live != null) {
             DshCard(live, Modifier.padding(bottom = 10.dp))
+        }
+        // 工作文件: one row for every worker this 事 has handed work to, whether it runs or is done (a running job already
+        // has files in its folder). Whole row is the button, as on the phone.
+        for (w in task.waits.filter { it.kind == "worker" }.map { it.name }.distinct()) {
+            WorkFilesRow(w, Modifier.padding(bottom = 10.dp))
         }
         if (task.status == Tasks.DELIVERED) {
             // Andee says it delivered. Whether it is done is the user's to say.
@@ -322,7 +331,6 @@ fun TaskScreen(id: String, nav: Nav, onTalk: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text((if (w.open) "○ " else "● ") + TaskView.who(w, zh) + (if (w.asked.isNotBlank()) " · " + w.asked else ""),
                         color = Palette.label, fontSize = 13.sp, modifier = Modifier.weight(1f, fill = false))
-                        if (w.kind == "worker") DshLinks(w.name)
                     }
                     if (!w.open) Text("「" + w.answer + "」", color = Palette.secondary, fontSize = 12.sp, lineHeight = 17.sp)
                     else if (w.kind != "time") Text(t("已等 ", "Waiting ") + TaskView.ago(now - w.at, zh), color = Palette.photoInk, fontSize = 11.sp)
@@ -357,4 +365,73 @@ const val NOTEBOOK_TAB_TODOS = 8
 /** Opens a 事 from places that hold no [Nav] (a timeline row). Set by [AppRoot]. */
 object TaskNav {
     @Volatile var open: (String) -> Unit = {}
+}
+
+/** Opens a worker's files page, from places that hold no [Nav]. Set by [AppRoot]. */
+object FilesNav {
+    @Volatile var open: (String) -> Unit = {}
+}
+
+/** 📁 工作文件 · dsh #N — the phone's row: the whole row opens the worker's files, with what it is on the right. */
+@Composable
+fun WorkFilesRow(worker: String, modifier: Modifier = Modifier) {
+    val zh = Strings.lang() == "zh"
+    Row(
+        modifier.fillMaxWidth().glassPanel(14).clip(RoundedCornerShape(14.dp)).clickable { FilesNav.open(worker) }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("📁", fontSize = 14.sp)
+        Spacer(Modifier.width(10.dp))
+        Text((if (zh) "工作文件" else "Work files") + " · dsh #$worker", color = Palette.label, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Text(if (zh) "在电脑上，点开直接看 ›" else "on this computer, open to read ›", color = Palette.secondary, fontSize = 12.sp)
+    }
+}
+
+/**
+ * A job Andee handed to dsh, as a card hanging under the words that announce it: live while the worker runs (three lines and the
+ * breathing dot), the task's state once it has reported, and the way into its files. The same card the phone draws.
+ */
+@Composable
+fun DshJobCard(worker: String, modifier: Modifier = Modifier) {
+    val zh = Strings.lang() == "zh"
+    fun t(a: String, b: String) = if (zh) a else b
+    val now = ticking()
+    val live = DshLive.running[worker]
+    val task = remember(now / 2000) {
+        val book = DesktopNotebook.book.tasks
+        book.active().firstOrNull { x -> x.waits.any { it.kind == "worker" && it.name == worker } }
+            ?: book.all().lastOrNull { x -> x.waits.any { it.kind == "worker" && it.name == worker } }
+    }
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "job")
+    val pulse by transition.animateFloat(
+        initialValue = 0.12f, targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.LinearEasing),
+            androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "job-alpha",
+    )
+    Column(
+        modifier.fillMaxWidth().glassPanel(14)
+            .then(if (task != null) Modifier.clickable { TaskNav.open(task.id) } else Modifier)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (live != null) {
+                Box(Modifier.size(8.dp).graphicsLayer { alpha = pulse }.background(Palette.accent, CircleShape))
+                Spacer(Modifier.width(8.dp))
+            }
+            Text("dsh #$worker · ${task?.what.orEmpty()}", color = Palette.label, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        val status = when {
+            live != null -> DshStatus.forTask(live, now, zh)
+            task != null -> TaskView.state(task, now, zh)
+            else -> t("dsh 工作者 #$worker", "dsh worker #$worker")
+        }
+        Text(status, color = Palette.secondary, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 3.dp))
+        Text(t("📁 工作文件 ›", "📁 Work files ›"), color = Palette.accent, fontSize = 12.sp,
+            modifier = Modifier.padding(top = 6.dp).clip(RoundedCornerShape(8.dp)).clickable { FilesNav.open(worker) }.padding(horizontal = 2.dp, vertical = 2.dp))
+    }
 }

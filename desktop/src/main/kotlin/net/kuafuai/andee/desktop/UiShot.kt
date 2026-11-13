@@ -73,6 +73,20 @@ fun main(args: Array<String>) {
             step = 4, secondsAgo = 23,
         )
     }
+    // `task:T1 … closed`: the page of a 事 the user confirmed done, in a throwaway notebook. Nothing real.
+    if (args.getOrElse(4) { "" } == "closed") {
+        DesktopNotebook.storeOverride = object : net.kuafuai.andee.config.NotebookStore {
+            var s: String? = null
+            override fun read() = s
+            override fun write(plain: String): Boolean { s = plain; return true }
+            override fun wipe() { s = null }
+        }
+        val tasks = DesktopNotebook.book.tasks
+        tasks.open("Kafka 消息可靠性深度调研", "", 0L, net.kuafuai.andee.brain.Source(kind = "user"), false).getOrNull()?.let { t ->
+            tasks.wait(t.id, net.kuafuai.andee.config.Tasks.Wait(kind = "worker", name = "11", asked = "Kafka 消息可靠性深度调研"))
+            tasks.close(t.id, "done", "报告已交付，三条结论已汇报")
+        }
+    }
     // `chat … dsh`: a job handed to dsh, live at the foot of the conversation.
     if (args.getOrElse(4) { "" } == "dsh") {
         Scrollback.add(Scrollback.Role.USER, "深度分析一下这次风波的幕后，用 dsh")
@@ -138,6 +152,27 @@ fun main(args: Array<String>) {
         val doc = File(System.getProperty("andee.home"), "季度复盘-final.pdf").also { it.writeText("%PDF") }
         ChatPreview.attachments = listOfNotNull(Attachments.fromBytes("a.png", png), Attachments.fromBytes("b.png", png), Attachments.fromFile(doc))
     }
+    // `files:<worker>` / `files:<worker>:read`: an invented worker with a few files in its folder, in the throwaway home, so
+    // the page that lists and opens a worker's files can be drawn. Nothing real.
+    if (screen.startsWith("files:")) {
+        val parts = screen.split(':')
+        val id = parts[1]
+        val dir = File(System.getProperty("andee.home"), "workers/$id").also { it.mkdirs() }
+        File(dir, "kafka-4.0-message-reliability.md").writeText(
+            "# Kafka 消息可靠性\n\n> 基线版本：**Kafka 4.0.0**，检索日期 2026-11-13。\n\n" +
+                "一句话结论：可靠性是 `acks × min.insync.replicas × ISR` 的联合结果。\n\n## 目录\n\n- 0. 结论速览\n- 1. acks\n- 2. ISR\n\n" +
+                "| 参数 | 默认 |\n|---|---|\n| acks | all |\n| retries | MAX |\n",
+        )
+        File(dir, "report.md").writeText("# 报告\n\n已完成。")
+        File(dir, "data.csv").writeText("a,b\n1,2\n")
+        File(dir, "summary.html").writeText("<h1>x</h1>")
+        File(dir, "chart.png").writeBytes(ByteArray(2048))
+        File(dir, "sources").mkdirs()
+        File(dir, "sources/links.txt").writeText("https://kafka.apache.org/documentation/")
+        File(System.getProperty("andee.home"), "dsh_workers.json").writeText(
+            """[{"id":"$id","title":"Kafka 消息可靠性深度调研","dir":"${dir.path}","trust":"OWN","status":"DONE"}]""",
+        )
+    }
     // `… plan`: an invented plan, in a throwaway notebook. Nothing real.
     if (args.getOrElse(4) { "" } == "plan") {
         DesktopNotebook.storeOverride = object : net.kuafuai.andee.config.NotebookStore {
@@ -184,7 +219,7 @@ fun main(args: Array<String>) {
         Peers.store.add(net.kuafuai.andee.peer.PeerProtocol.Peer("phone-demo", "My phone", net.kuafuai.andee.peer.PeerCrypto.publicBytes(net.kuafuai.andee.peer.PeerCrypto.newKeyPair().public)))
         Peers.count.value = Peers.store.all().size
     }
-    val nav = Nav().also { if (screen != "chat") it.go(screen) }
+    val nav = Nav().also { if (screen != "chat") it.go(screen.removeSuffix(":read")) }
     val density = Density(2f)
     // `ask` draws one question card on its own: its layout (the close button in the corner, the
     // text held clear of it) is only otherwise visible when the brain happens to ask something.
@@ -219,6 +254,11 @@ fun main(args: Array<String>) {
             }
             screen == "confirm" -> Box(Modifier.background(Color(0xFF1C1C1E)).padding(24.dp)) {
                 ConfirmBlock("清空聊天记录？", "对话记录和它生成过的页面会删掉，这场对话聊过的内容它也会忘掉。小本本不受影响。", "确认清空", {}, {})
+            }
+            // `files:<id>:read`: the same page with the first file already open.
+            screen.endsWith(":read") -> Box(Modifier.fillMaxSize()) {
+                BackdropLayer()
+                Box(Modifier.padding(14.dp).frostedCard()) { WorkerFilesScreen(screen.removeSuffix(":read").removePrefix("files:"), nav, startOpen = "kafka-4.0-message-reliability.md") }
             }
             else -> AppRoot(nav)
         }
