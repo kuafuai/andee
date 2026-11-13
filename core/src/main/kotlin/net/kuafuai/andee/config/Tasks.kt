@@ -403,6 +403,21 @@ class Tasks(
         append("\n<<<END OF TASK>>>")
     }
 
+    /**
+     * The turn the user starts from 在办 (接着办, or their own words about the task): what they said, which task it is —
+     * named by the device, never left to the model to guess from "that one" — and its whole record. One text for both
+     * bodies.
+     */
+    fun pickedUp(t0: Task, said: String): String = buildString {
+        val t = derive(t0)
+        val worker = t.waits.lastOrNull { it.kind == "worker" }?.name
+        append(said)
+        append("\n\n(I picked this from 在办: it is about task ").append(t.id).append(". Its record follows. Pick it up from where it")
+        append(" stands — what it is waiting on, what came back, what is next — and use `task` on ").append(t.id).append(" as you go.")
+        if (worker != null) append(" It was handed to dsh worker #").append(worker).append("; for that worker to carry on, delegate_task with for_task=").append(t.id).append(".")
+        append(")\n\n").append(forPrompt(t))
+    }
+
     /** Tasks that involve [ids] (a person and the records merged into them), as the people card's "owed" view. */
     fun owedFor(ids: Set<String>): List<People.Owed> = all().mapNotNull { t ->
         val toThem = t.deliverTo.personId in ids || (t.deliverTo.kind == "person" && t.deliverTo.personId in ids)

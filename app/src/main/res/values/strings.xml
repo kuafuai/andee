@@ -520,6 +520,9 @@
     <string name="history_topic_output_item">%1$s · v%2$d</string>
     <string name="topic_continue_prompt">继续「%1$s」：接下来想做什么？说出来或打字告诉我</string>
     <string name="topic_continue_said">继续「%1$s」：%2$s</string>
+    <string name="tasks_carry_on">接着办</string>
+    <string name="tasks_said">「%1$s」：%2$s</string>
+    <string name="tasks_talk_prompt">关于「%1$s」：想让它怎么办？说出来或打字告诉我</string>
     <string name="textpage_topic_head">话题 · %1$s</string>
     <string name="textpage_topic_gone">这段对话的原文已经清理，只剩话题卡片上的摘要。</string>
     <string name="history_role_page_cleared">界面 · %1$s · 已清理</string>
@@ -655,8 +658,6 @@
     <string name="tl_task_answered">等的回话到了：%1$s</string>
     <string name="tl_task_done">办完了：%1$s</string>
     <string name="tl_task_delivered">交付了，等你确认：%1$s</string>
-    <string name="notebook_task_delivered">交付了，等你确认</string>
-    <string name="notebook_task_confirm">✓ 办完了</string>
     <string name="tl_task_dropped">放下了一件事：%1$s</string>
     <string name="tl_care_add">开始在意：%1$s</string>
     <string name="tl_care_done">一件在意的事做完了</string>
@@ -692,7 +693,7 @@
     <string name="notebook_copy_all">复制全部</string>
     <string name="notebook_copied">已复制</string>
     <string name="notebook_tab_memories">记忆</string>
-    <string name="notebook_tab_todos">在办</string>
+    <string name="notebook_tab_todos">定时</string>
     <string name="notebook_tab_guard">守卫</string>
     <string name="settings_notify_rule">怎么处理消息</string>
     <string name="settings_notify_rule_hint">没有设。跟 Andee 说一句就行，比如「消息都帮我处理一下」。</string>
@@ -758,17 +759,7 @@
     <string name="notebook_wiki_copy">复制全文</string>
     <string name="notebook_empty_memories">还没记下什么</string>
     <string name="notebook_empty_todos">没有在办的事</string>
-    <string name="notebook_tasks_head">在办的事</string>
     <string name="notebook_timed_head">定时</string>
-    <string name="notebook_task_open">进行中</string>
-    <string name="notebook_task_waiting">在等回话</string>
-    <string name="notebook_task_ready">回话到了</string>
-    <string name="notebook_task_for">办完交给 %1$s</string>
-    <string name="notebook_task_on">在等 %1$s</string>
-    <string name="notebook_task_you">你</string>
-    <string name="notebook_task_next">下一步：%1$s</string>
-    <string name="notebook_task_dropped_by_user">用户在小本本里放下了</string>
-    <string name="notebook_tasks_empty">还没有在办的事。它接下一件一时办不完的事（要问别人、要等回话、要过会儿再做），就会出现在这里，办完为止。</string>
     <string name="notebook_timed_empty">没有定时的提醒</string>
     <string name="notebook_type_user">关于你</string>
     <string name="notebook_type_feedback">你的偏好</string>

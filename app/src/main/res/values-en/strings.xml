@@ -536,6 +536,9 @@
     <string name="history_topic_output_item">%1$s · v%2$d</string>
     <string name="topic_continue_prompt">Continue “%1$s”: what next? Say it or type it</string>
     <string name="topic_continue_said">Continue “%1$s”: %2$s</string>
+    <string name="tasks_carry_on">Carry on</string>
+    <string name="tasks_said">“%1$s”: %2$s</string>
+    <string name="tasks_talk_prompt">About “%1$s”: how should it go on? Say it or type it</string>
     <string name="textpage_topic_head">Topic · %1$s</string>
     <string name="textpage_topic_gone">The full text of this conversation has been cleared; only the summary on the topic card is left.</string>
     <string name="history_role_page_cleared">Page · %1$s · Cleared</string>
@@ -631,8 +634,6 @@
     <string name="tl_task_answered">The answer came: %1$s</string>
     <string name="tl_task_done">Done: %1$s</string>
     <string name="tl_task_delivered">Delivered, for you to confirm: %1$s</string>
-    <string name="notebook_task_delivered">delivered — confirm?</string>
-    <string name="notebook_task_confirm">✓ Done</string>
     <string name="tl_task_dropped">Let go: %1$s</string>
     <string name="tl_care_add">Now cares about: %1$s</string>
     <string name="tl_care_done">A care is done</string>
@@ -668,7 +669,7 @@
     <string name="notebook_copy_all">Copy all</string>
     <string name="notebook_copied">Copied</string>
     <string name="notebook_tab_memories">Memories</string>
-    <string name="notebook_tab_todos">Doing</string>
+    <string name="notebook_tab_todos">Timed</string>
     <string name="notebook_tab_guard">Guard</string>
     <string name="settings_notify_rule">How to handle messages</string>
     <string name="settings_notify_rule_hint">Not set. Just tell Andee, e.g. \"handle all my messages\".</string>
@@ -734,17 +735,7 @@
     <string name="notebook_wiki_copy">Copy all</string>
     <string name="notebook_empty_memories">Nothing written down yet</string>
     <string name="notebook_empty_todos">Nothing in progress</string>
-    <string name="notebook_tasks_head">In progress</string>
     <string name="notebook_timed_head">Timed</string>
-    <string name="notebook_task_open">under way</string>
-    <string name="notebook_task_waiting">waiting for an answer</string>
-    <string name="notebook_task_ready">answer came</string>
-    <string name="notebook_task_for">for %1$s</string>
-    <string name="notebook_task_on">waiting on %1$s</string>
-    <string name="notebook_task_you">you</string>
-    <string name="notebook_task_next">Next: %1$s</string>
-    <string name="notebook_task_dropped_by_user">let go by the user in the notebook</string>
-    <string name="notebook_tasks_empty">Nothing in progress. When it takes on something it cannot finish at once (asking someone, waiting for an answer, coming back later), it shows here until it is done.</string>
     <string name="notebook_timed_empty">No timed reminders</string>
     <string name="notebook_type_user">About you</string>
     <string name="notebook_type_feedback">Your preferences</string>

@@ -196,6 +196,9 @@ class FloatingWindowUi(
         /** The 小本本 key — what it remembers. See [NotebookUi]. */
         fun onNotebookClick() {}
 
+        /** The 在办 key — the 「事」 in hand. See [TasksUi]. */
+        fun onTasksClick() {}
+
         /** The 朋友 key — the other Andees this one knows. See [PeersUi]. */
         fun onFriendsClick() {}
 
@@ -508,6 +511,63 @@ class FloatingWindowUi(
         })
         friendBadge = badge
         paintBadge(badge)
+        return box
+    }
+
+    /** 在办's count and dot: how many are in hand, and whether one wants the user. Null until the bar is built. */
+    private var tasksBadge: TextView? = null
+    private var tasksDot: View? = null
+
+    /** Re-read the 事 for the 在办 key. Any thread; also run every few seconds while the card is up. */
+    fun refreshTasksKey() {
+        ui.post {
+            val list = runCatching { net.kuafuai.andee.config.Notebook.tasks(context).active() }.getOrDefault(emptyList())
+            tasksBadge?.let { b -> b.text = list.size.toString(); b.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE }
+            tasksDot?.visibility = if (TaskRows.wanting(list) > 0) View.VISIBLE else View.GONE
+        }
+    }
+
+    /**
+     * 在办 on the bar, ahead of 小本本: the count of what is in hand, and a red dot when one wants the user (delivered,
+     * or an answer came back). The phone's twin of the Mac sidebar's list.
+     */
+    private fun tasksKey(): View {
+        val key = barButton(R.drawable.ic_tasks, Glass.PHOTO_INK, "在办") { listeners.onTasksClick() }
+        val lp = key.layoutParams as LinearLayout.LayoutParams
+        key.layoutParams = FrameLayout.LayoutParams(lp.width, lp.height)
+        val box = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(lp.width, lp.height).apply { leftMargin = lp.leftMargin }
+            clipChildren = false
+        }
+        box.addView(key)
+        val dot = RedDot.view(context)
+        box.addView(dot, FrameLayout.LayoutParams(dp(7), dp(7), Gravity.TOP or Gravity.START).apply {
+            topMargin = dp(6); leftMargin = dp(6)
+        })
+        val badge = TextView(context).apply {
+            textSize = 9f
+            setTextColor(Color.parseColor(Glass.SECONDARY))
+            gravity = Gravity.CENTER
+            setPadding(dp(3), 0, dp(3), 0)
+        }
+        box.addView(badge, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(15), Gravity.TOP or Gravity.END).apply {
+            topMargin = dp(2); rightMargin = dp(1)
+        })
+        tasksBadge = badge
+        tasksDot = dot
+        refreshTasksKey()
+        // A 事 changes while nobody looks (an answer, Andee's own work): look again every few seconds while the bar is up.
+        val tick = object : Runnable {
+            override fun run() {
+                if (!box.isAttachedToWindow) return
+                refreshTasksKey()
+                box.postDelayed(this, TASKS_KEY_TICK_MS)
+            }
+        }
+        box.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) { box.postDelayed(tick, TASKS_KEY_TICK_MS) }
+            override fun onViewDetachedFromWindow(v: View) { box.removeCallbacks(tick) }
+        })
         return box
     }
 
@@ -3377,6 +3437,7 @@ class FloatingWindowUi(
             barButton(R.drawable.ic_artifacts, Glass.PHOTO_INK, "产物") { listeners.onArtifactsClick() }
         )
         // 产物 · 小本本 · 情景 · 朋友 · 自检 · 设置 — the Mac's sidebar has the same doors in the same order.
+        keys.addView(tasksKey())
         keys.addView(notebookKey())
         keys.addView(barButton(R.drawable.ic_scene, Glass.PHOTO_INK, "情景") { listeners.onScenesClick() })
         // 朋友 moved into Settings (⚙) to make room for the quit key — see SettingsUi and issue #44.
@@ -3918,6 +3979,9 @@ class FloatingWindowUi(
          * 47.8 dp from the centre — went with the ledge.
          */
         private const val COMPACT_DP = 104
+
+        /** How often the 在办 key re-reads the 事 while the bar is up. */
+        private const val TASKS_KEY_TICK_MS = 5_000L
         private const val COMPACT_MARGIN_DP = 16
 
         /** How long [parkForGesture] waits for the main-thread move to run. */

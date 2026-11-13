@@ -60,9 +60,10 @@ class TasksTest {
 
         // Done means delivered: refused until something went out on this turn.
         val leaderTurn = turn.source
-        assertFalse(call(JSONObject().put("action", "done").put("id", id).put("result", "回了"), leaderTurn).optBoolean("done"))
-        assertTrue(call(JSONObject().put("action", "done").put("id", id).put("result", "回了小王：八折"), leaderTurn, sent = true).optBoolean("done"))
-        assertNull(tasks.active().firstOrNull { it.id == id })
+        assertFalse(call(JSONObject().put("action", "done").put("id", id).put("result", "回了"), leaderTurn).optBoolean("delivered"))
+        assertTrue(call(JSONObject().put("action", "done").put("id", id).put("result", "回了小王：八折"), leaderTurn, sent = true).optBoolean("delivered"))
+        // Delivered is not closed: it stays in hand until the user says it is done.
+        assertEquals(Tasks.DELIVERED, tasks.active().first { it.id == id }.status)
     }
 
     @Test fun aPrivateWaitIsAnsweredOnlyInPrivateAndByName() {
@@ -110,7 +111,59 @@ class TasksTest {
 
     @Test fun doneForTheUserNeedsNothingSentButForSomeoneElseItDoes() {
         val mine = call(JSONObject().put("action", "open").put("what", "查天气"), Source(kind = "user"), untrusted = false).getString("id")
-        assertTrue(call(JSONObject().put("action", "done").put("id", mine).put("result", "晴"), Source(kind = "user"), untrusted = false).optBoolean("done"))
+        assertTrue(call(JSONObject().put("action", "done").put("id", mine).put("result", "晴"), Source(kind = "user"), untrusted = false).optBoolean("delivered"))
+    }
+
+    @Test fun onlyTheUserClosesATask_andOnlyOnTheirOwnTurn() {
+        val user = Source(kind = "user")
+        val id = call(JSONObject().put("action", "open").put("what", "写周报"), user, untrusted = false).getString("id")
+        call(JSONObject().put("action", "done").put("id", id).put("result", "写好了，在 weekly.md"), user, untrusted = false)
+        val t = tasks.get(id)!!
+        assertEquals(Tasks.DELIVERED, t.status)
+        assertTrue(t.active)
+        assertEquals("nothing for the heartbeat to do while it waits on the user", 0.0, tasks.overdue(t), 0.0)
+        assertTrue(tasks.indexForPrompt().contains("waiting for the user to confirm"))
+
+        // A todo's, a report's or a notification's turn cannot say it is done for the user.
+        for ((src, untrusted) in listOf(Source(kind = "todo") to false, Source(kind = "self") to false, user to true)) {
+            val r = call(JSONObject().put("action", "confirm").put("id", id), src, untrusted = untrusted)
+            assertFalse(r.toString(), r.optBoolean("done"))
+        }
+        assertEquals(Tasks.DELIVERED, tasks.get(id)!!.status)
+
+        // The user said it is not done: back to open, with why on the record.
+        val back = call(JSONObject().put("action", "reopen").put("id", id).put("why", "少了第三节"), user, untrusted = false)
+        assertTrue(back.toString(), back.optBoolean("reopened"))
+        assertEquals("open", tasks.get(id)!!.status)
+        assertTrue(tasks.get(id)!!.steps.last().text.contains("少了第三节"))
+
+        // Delivered again, and this time the user says it is done.
+        call(JSONObject().put("action", "done").put("id", id).put("result", "补上了"), user, untrusted = false)
+        assertTrue(call(JSONObject().put("action", "confirm").put("id", id), user, untrusted = false).optBoolean("done"))
+        assertEquals("done", tasks.get(id)!!.status)
+        assertEquals("补上了", tasks.get(id)!!.result)
+
+        // A closed one can be taken up again.
+        assertTrue(tasks.reopen(id, "又要改").isSuccess)
+        assertTrue(tasks.get(id)!!.active)
+    }
+
+    @Test fun tasksTheModelClosedJustBeforeComeBackAsDelivered_once() {
+        val recent = tasks.open("刚被它关掉的", "", 0L, Source(kind = "user"), false).getOrThrow().id
+        val old = tasks.open("很久以前办完的", "", 0L, Source(kind = "user"), false).getOrThrow().id
+        val dropped = tasks.open("用户放下的", "", 0L, Source(kind = "user"), false).getOrThrow().id
+        tasks.close(old, "done", "ok").getOrThrow()
+        now += 72 * h
+        tasks.close(recent, "done", "ok").getOrThrow()
+        tasks.close(dropped, "dropped", "不要了").getOrThrow()
+        now += h
+        tasks.reviveRecentDone()
+        assertEquals(Tasks.DELIVERED, tasks.get(recent)!!.status)
+        assertEquals("done", tasks.get(old)!!.status)
+        assertEquals("dropped", tasks.get(dropped)!!.status)
+        tasks.confirm(recent).getOrThrow()
+        tasks.reviveRecentDone()
+        assertEquals("once only", "done", tasks.get(recent)!!.status)
     }
 
     @Test fun overdueRisesAsTheHeartbeatShouldSeeIt() {

@@ -887,17 +887,10 @@ class NotebookUi(
      * question of it — "what is it still going to do?" — and the alarms a task sets for itself show up in both.
      */
     private fun buildTodos(body: LinearLayout) {
-        val tasks = Notebook.tasks(context)
-        val open = tasks.active().sortedWith(compareBy<net.kuafuai.andee.config.Tasks.Task> { if (it.status == "ready") 0 else 1 }.thenByDescending { it.touchedAt })
+        // 定时: the alarms only. The 事 have a card of their own (在办 on the top bar, [TasksUi]); this tab used to list
+        // them too, which made two places for one thing.
         val active = Notebook.todos(context, "active")
-        // Both headings always: with no tasks the tab looked exactly like the old 待办 list, and the user concluded
-        // there were no tasks at all.
-        body.addView(label(lctx.getString(R.string.notebook_tasks_head), Glass.Type.CAPTION, Glass.MUTED), matchWrap().apply { bottomMargin = dp(6) })
-        if (open.isEmpty()) {
-            body.addView(label(lctx.getString(R.string.notebook_tasks_empty), Glass.Type.CAPTION, Glass.SECONDARY), matchWrap().apply { bottomMargin = dp(10) })
-        }
-        for (t in open) body.addView(taskRow(tasks, t), matchWrap().apply { bottomMargin = dp(10) })
-        body.addView(label(lctx.getString(R.string.notebook_timed_head), Glass.Type.CAPTION, Glass.MUTED, top = 8), matchWrap().apply { bottomMargin = dp(6) })
+        body.addView(label(lctx.getString(R.string.notebook_timed_head), Glass.Type.CAPTION, Glass.MUTED), matchWrap().apply { bottomMargin = dp(6) })
         if (active.isEmpty()) {
             body.addView(label(lctx.getString(R.string.notebook_timed_empty), Glass.Type.CAPTION, Glass.SECONDARY), matchWrap())
         }
@@ -906,42 +899,6 @@ class NotebookUi(
                 body.addView(todoRow(t), matchWrap().apply { bottomMargin = dp(10) })
             }
         }
-    }
-
-    /** One task: what, for whom, what it waits on, what is next. ✕ lets it go — the user's call, said in the record. */
-    private fun taskRow(tasks: net.kuafuai.andee.config.Tasks, t: net.kuafuai.andee.config.Tasks.Task): View {
-        val row = panel()
-        val title = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        title.addView(label(t.what, Glass.Type.BODY, Glass.TITLE), LinearLayout.LayoutParams(0, WRAP, 1f))
-        title.addView(deleteButton {
-            tasks.close(t.id, "dropped", lctx.getString(R.string.notebook_task_dropped_by_user)).onSuccess { c ->
-                c.cancel.forEach { Scheduler.cancelTodo(context, it) }
-            }
-            rebuild()
-        })
-        row.addView(title, matchWrap())
-        val st = lctx.getString(
-            when (t.status) {
-                "ready" -> R.string.notebook_task_ready
-                net.kuafuai.andee.config.Tasks.DELIVERED -> R.string.notebook_task_delivered
-                "waiting" -> R.string.notebook_task_waiting
-                else -> R.string.notebook_task_open
-            },
-        )
-        val bits = mutableListOf(t.id + " · " + st)
-        if (t.deliverTo.kind != "user") bits += lctx.getString(R.string.notebook_task_for, t.deliverTo.short())
-        t.waits.filter { it.open }.takeIf { it.isNotEmpty() }?.let { w -> bits += lctx.getString(R.string.notebook_task_on, w.joinToString(", ") { if (it.kind == "user") lctx.getString(R.string.notebook_task_you) else it.short() }) }
-        row.addView(label(bits.joinToString(" · "), Glass.Type.MICRO, Glass.MUTED, top = 4), matchWrap())
-        t.waits.lastOrNull { !it.open }?.let { row.addView(label("「" + it.answer.take(80) + "」", Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap()) }
-        if (t.next.isNotBlank()) row.addView(label(lctx.getString(R.string.notebook_task_next, t.next), Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap())
-        // Andee said it delivered; only the user closes it.
-        if (t.status == net.kuafuai.andee.config.Tasks.DELIVERED) {
-            if (t.result.isNotBlank()) row.addView(label(t.result.take(120), Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap())
-            row.addView(label(lctx.getString(R.string.notebook_task_confirm), Glass.Type.CAPTION, Glass.ACCENT, top = 8).apply {
-                setOnClickListener { tasks.confirm(t.id).onSuccess { c -> c.cancel.forEach { Scheduler.cancelTodo(context, it) } }; rebuild() }
-            }, matchWrap())
-        }
-        return row
     }
 
     @SuppressLint("SetTextI18n")

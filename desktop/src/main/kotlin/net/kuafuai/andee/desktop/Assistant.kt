@@ -535,15 +535,7 @@ object Assistant {
 
     private fun taskQuery(id: String, said: String): String {
         val tasks = DesktopNotebook.book.tasks
-        val task = tasks.get(id) ?: return said
-        val worker = task.waits.lastOrNull { it.kind == "worker" }?.name
-        return buildString {
-            append(said)
-            append("\n\n(I picked this from 在办: it is about task ").append(task.id).append(". Its record follows. Pick it up from where it")
-            append(" stands — what it is waiting on, what came back, what is next — and use `task` on ").append(task.id).append(" as you go.")
-            if (worker != null) append(" It was handed to dsh worker #").append(worker).append("; for that worker to carry on, delegate_task with for_task=").append(task.id).append(".")
-            append(")\n\n").append(tasks.forPrompt(task))
-        }
+        return tasks.get(id)?.let { tasks.pickedUp(it, said) } ?: said
     }
 
     private fun topicQuery(t: Scrollback.Topic, said: String): String {

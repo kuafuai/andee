@@ -109,6 +109,13 @@ class BodyCoreService : Service() {
      */
     private var pendingTopic: net.kuafuai.andee.ui.ChatHistory.Topic? = null
 
+    /**
+     * The 「事」 the user picked in 在办 (说点要求再办, or 接着办 with its own words), waiting for what they say.
+     * Same lifetime as [pendingTopic], and the three exclude each other: whatever was tapped last is what the next
+     * words are about.
+     */
+    private var pendingTask: String? = null
+
     private lateinit var audio: AudioIO
     private lateinit var asr: AsrController
     private lateinit var tts: TtsController
@@ -357,6 +364,16 @@ class BodyCoreService : Service() {
 
             override fun onWeChatClick() {
                 net.kuafuai.andee.ui.WeChatQrUi(this@BodyCoreService).show()
+            }
+
+            override fun onTasksClick() {
+                net.kuafuai.andee.ui.TasksUi(
+                    this@BodyCoreService,
+                    // 接着办: a turn now, the task named by the device — not left to the model to guess from "that one".
+                    onContinue = { task -> ui.post { pendingTask = task.id; submitUserTurn(AppLocale.str(this@BodyCoreService, R.string.tasks_carry_on), "typed") } },
+                    onTalk = { task -> ui.post { beginTaskTalk(task) } },
+                    onDismiss = { window.refreshTasksKey() },
+                ).show()
             }
 
             override fun onNotebookClick() {
@@ -1196,6 +1213,9 @@ class BodyCoreService : Service() {
         pendingArtifact = null
         val continuing = pendingTopic
         pendingTopic = null
+        val taskId = pendingTask
+        pendingTask = null
+        val task = taskId?.let { net.kuafuai.andee.config.Notebook.tasks(this).get(it) }
         // Tell the dispatcher which artifact this turn is about, before the
         // brain can call `show_html` inside it. The panel's 继续修改 is the one
         // turn that starts out already knowing, and without this the revised
@@ -1206,6 +1226,7 @@ class BodyCoreService : Service() {
         val row = when {
             editing != null -> AppLocale.str(this, R.string.artifacts_edit_said, editing.text, said)
             continuing != null -> AppLocale.str(this, R.string.topic_continue_said, continuing.title, said)
+            task != null -> AppLocale.str(this, R.string.tasks_said, task.what, said)
             else -> said
         }
         // The brain's message opens with the row's own words: a later topic fold
@@ -1213,6 +1234,7 @@ class BodyCoreService : Service() {
         // that began differently from its row could never be put away.
         val forBrain = editing?.let { artifactEditQuery(it, row) }
             ?: continuing?.let { topicContinueQuery(it, row) }
+            ?: task?.let { net.kuafuai.andee.config.Notebook.tasks(this).pickedUp(it, row) }
             ?: said
         net.kuafuai.andee.ui.ChatHistory.addUser(
             if (images.isEmpty()) row
@@ -2472,6 +2494,7 @@ class BodyCoreService : Service() {
         if (e.page == null) return
         pendingArtifact = e
         pendingTopic = null
+        pendingTask = null
         window.setSubtitle(
             AppLocale.str(this, R.string.artifacts_edit_prompt, e.text),
             FloatingWindowUi.SubtitleKind.FINAL,
@@ -2487,10 +2510,23 @@ class BodyCoreService : Service() {
     private fun beginTopicContinue(t: net.kuafuai.andee.ui.ChatHistory.Topic) {
         pendingTopic = t
         pendingArtifact = null
+        pendingTask = null
         window.setSubtitle(
             AppLocale.str(this, R.string.topic_continue_prompt, t.title),
             FloatingWindowUi.SubtitleKind.FINAL,
         )
+        if (!net.kuafuai.andee.ui.TextInputActivity.isShowing) toggleTyping()
+    }
+
+    /**
+     * 说点要求再办 from 在办: remember which 事, then ask how to go on — the same shape as [beginTopicContinue]; the
+     * words the user types or says next become a turn carrying the task's whole record ([Tasks.pickedUp]).
+     */
+    private fun beginTaskTalk(t: net.kuafuai.andee.config.Tasks.Task) {
+        pendingTask = t.id
+        pendingTopic = null
+        pendingArtifact = null
+        window.setSubtitle(AppLocale.str(this, R.string.tasks_talk_prompt, t.what), FloatingWindowUi.SubtitleKind.FINAL)
         if (!net.kuafuai.andee.ui.TextInputActivity.isShowing) toggleTyping()
     }
 
@@ -2668,10 +2704,11 @@ class BodyCoreService : Service() {
         }
         acceptBrainOutput = false
         guestBrain?.cancel()
-        // A 继续修改 / 继续话题 the user walked away from must not attach itself
+        // A 继续修改 / 继续话题 / 在办 pick the user walked away from must not attach itself
         // to whatever they ask next.
         pendingArtifact = null
         pendingTopic = null
+        pendingTask = null
         tts.stopSpeaking()
         if (asr.isActive()) asr.stop()
         // Task over from the device's point of view: whatever the brain had
