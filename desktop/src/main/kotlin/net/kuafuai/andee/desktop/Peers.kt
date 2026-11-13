@@ -209,8 +209,8 @@ object Peers {
     }
 
     /** A job a paired device started has ended: its Andee gets the report on the open link, or when it is back (30 min). */
-    fun remoteFinished(device: String, worker: String, text: String, detail: String) {
-        val msg = JSONObject().put("type", "remote.event").put("worker", worker).put("text", text.take(8_000)).put("detail", detail.take(8_000))
+    fun remoteFinished(device: String, worker: String, text: String, detail: String, summary: String) {
+    val msg = JSONObject().put("type", "remote.event").put("worker", worker).put("text", text.take(8_000)).put("detail", detail.take(8_000)).put("summary", summary.take(400))
         if (links[device]?.takeIf { it.isOpen }?.send(msg) == true) return
         pendingEvents.add(Triple(device, System.currentTimeMillis(), msg))
     }

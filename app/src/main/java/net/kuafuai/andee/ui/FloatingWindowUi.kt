@@ -517,6 +517,13 @@ class FloatingWindowUi(
     /** 在办's count and dot: how many are in hand, and whether one wants the user. Null until the bar is built. */
     private var tasksBadge: TextView? = null
     private var tasksDot: View? = null
+    private var tasksRunDot: View? = null
+
+    /** A slow fade in and out for as long as the dot is shown: the one thing on the bar that says "still working". */
+    private fun pulse(v: View) {
+        v.animate().alpha(if (v.alpha > 0.6f) 0.35f else 1f).setDuration(900)
+            .withEndAction { if (v.tag == "pulse" && v.isAttachedToWindow) pulse(v) }.start()
+    }
 
     /** Re-read the 事 for the 在办 key. Any thread; also run every few seconds while the card is up. */
     fun refreshTasksKey() {
@@ -524,6 +531,12 @@ class FloatingWindowUi(
             val list = runCatching { net.kuafuai.andee.config.Notebook.tasks(context).active() }.getOrDefault(emptyList())
             tasksBadge?.let { b -> b.text = list.size.toString(); b.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE }
             tasksDot?.visibility = if (TaskRows.wanting(list) > 0) View.VISIBLE else View.GONE
+        // Something is running on the computer: a quiet accent dot under the count, breathing, so it reads as alive.
+        tasksRunDot?.let { d ->
+            val on = TaskRows.running(list) > 0
+            d.visibility = if (on) View.VISIBLE else View.GONE
+            if (on && d.tag != "pulse") { d.tag = "pulse"; pulse(d) } else if (!on) { d.tag = null; d.animate().cancel() }
+        }
         }
     }
 
@@ -553,6 +566,17 @@ class FloatingWindowUi(
         box.addView(badge, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(15), Gravity.TOP or Gravity.END).apply {
             topMargin = dp(2); rightMargin = dp(1)
         })
+        // The running dot: accent, apart from the red one that asks something of the user.
+        val run = View(context).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(Color.parseColor(Glass.ACCENT))
+            }
+            visibility = View.GONE
+            isClickable = false
+        }
+        box.addView(run, FrameLayout.LayoutParams(dp(6), dp(6), Gravity.BOTTOM or Gravity.END).apply { bottomMargin = dp(5); rightMargin = dp(6) })
+        tasksRunDot = run
         tasksBadge = badge
         tasksDot = dot
         refreshTasksKey()

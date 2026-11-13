@@ -27,6 +27,13 @@ private val tasks: RemoteAgentTasks? = null,
         )
         return when (method) {
         "dsh.delegate" -> delegate(dev, p, fromUser)
+        "dsh.cancel" -> client.call(dev, method, p).also { r ->
+            // The user stopped it: its wait is answered and already seen, so the task does not come back as ready and draw a turn
+            // that starts the job again (the Mac does the same for its own).
+            if (r.optBoolean("cancelled")) runCatching {
+                tasks?.answered(p.optString("id").trim().removePrefix("#"), "Stopped before it finished (cancelled). What it made so far is on the computer.", seen = true)
+            }
+        }
         in RemoteAgentTools.CALLS -> client.call(dev, method, p)
             "dsh.ls" -> client.list(dev, p.optString("id").trim().removePrefix("#"), p.optString("path"))
             "dsh.fetch" -> fetch(dev, p.optString("id").trim().removePrefix("#"), p.optString("path").trim())

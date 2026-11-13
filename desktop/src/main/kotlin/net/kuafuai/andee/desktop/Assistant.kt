@@ -82,7 +82,7 @@ object Assistant {
             zh = { Strings.lang() == "zh" },
             tasks = net.kuafuai.andee.desktop.dsh.DshTaskLink { DesktopNotebook.book.tasks },
             // A job a paired phone started: its report goes to the phone's Andee, not to this Mac's brain.
-            onRemoteFinished = { w, turn -> Peers.remoteFinished(w.origin, w.id, turn, w.title) },
+            onRemoteFinished = { w, turn, summary -> Peers.remoteFinished(w.origin, w.id, turn, w.title, summary) },
             onProgress = { id, p ->
                 // A job a paired phone started is drawn on that phone, not in this window.
                 val origin = dsh.get(id)?.origin.orEmpty()

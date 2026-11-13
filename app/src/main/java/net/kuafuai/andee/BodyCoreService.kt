@@ -366,16 +366,7 @@ class BodyCoreService : Service() {
                 net.kuafuai.andee.ui.WeChatQrUi(this@BodyCoreService).show()
             }
 
-            override fun onTasksClick() {
-                net.kuafuai.andee.ui.TasksUi(
-                    this@BodyCoreService,
-                    // 接着办: a turn now, the task named by the device — not left to the model to guess from "that one".
-                    onContinue = { task -> ui.post { pendingTask = task.id; submitUserTurn(AppLocale.str(this@BodyCoreService, R.string.tasks_carry_on), "typed") } },
-                    onTalk = { task -> ui.post { beginTaskTalk(task) } },
-                    watchProgress = { f -> peers.onProgressChanged = { ui.post(f) } },
-                    onDismiss = { window.refreshTasksKey() },
-                ).show()
-            }
+            override fun onTasksClick() = openTasksCard()
 
             override fun onNotebookClick() {
                 net.kuafuai.andee.ui.NotebookUi(
@@ -2519,6 +2510,18 @@ class BodyCoreService : Service() {
         if (!net.kuafuai.andee.ui.TextInputActivity.isShowing) toggleTyping()
     }
 
+    /** The 在办 card, from the top bar's key (and from `debug.open`). */
+    private fun openTasksCard() {
+        net.kuafuai.andee.ui.TasksUi(
+            this,
+            // 接着办: a turn now, the task named by the device — not left to the model to guess from "that one".
+            onContinue = { task -> ui.post { pendingTask = task.id; submitUserTurn(AppLocale.str(this, R.string.tasks_carry_on), "typed") } },
+            onTalk = { task -> ui.post { beginTaskTalk(task) } },
+            watchProgress = { f -> peers.onProgressChanged = { ui.post(f) } },
+            onDismiss = { window.refreshTasksKey() },
+        ).show()
+    }
+
     /**
      * 说点要求再办 from 在办: remember which 事, then ask how to go on — the same shape as [beginTopicContinue]; the
      * words the user types or says next become a turn carrying the task's whole record ([Tasks.pickedUp]).
@@ -2785,6 +2788,12 @@ class BodyCoreService : Service() {
                 // path went unexercised; this runs the same code the alarm does.
                 onSweep = { ui.post { onSweepTimer() } },
                 onSweepForced = { ui.post { localBrain?.runSweep() } },
+                onOpenCard = { card ->
+                    when (card) {
+                        "tasks" -> { ui.post { openTasksCard() }; true }
+                        else -> false
+                    }
+                },
             )
             srv.start()
             wsServer = srv
@@ -3056,12 +3065,12 @@ class BodyCoreService : Service() {
         )
         peers.tasks.brain = peerBrain
         // A worker on the computer ended: its report is another agent's words, so it runs as a turn the brain cannot trust.
-        peers.onRemoteReport = { device, worker, text, title ->
+        peers.onRemoteReport = { device, worker, text, title, summary ->
             val b = localBrain
             // The job is over: stop showing it as running, and answer the 「事」 that waited on it, whether or not a brain is up.
             net.kuafuai.andee.peer.RemoteProgress.end(worker)
             val book = net.kuafuai.andee.config.Notebook.notebook(this)
-            val record = runCatching { net.kuafuai.andee.peer.RemoteAgentTasks { book.tasks }.answered(worker, text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().take(160)) }.getOrDefault("")
+            val record = runCatching { net.kuafuai.andee.peer.RemoteAgentTasks { book.tasks }.answered(worker, summary.ifBlank { title }) }.getOrDefault("")
             if (b != null) {
                 net.kuafuai.andee.ui.ChatHistory.addEvent("DSH", AppLocale.str(this, R.string.dsh_remote_done, title), "", worker)
                 waitForQuiet {
@@ -3093,7 +3102,7 @@ class BodyCoreService : Service() {
         val lb = localBrain ?: return
         localBrain = null
         peers.tasks.brain = null
-        peers.onRemoteReport = { _, _, _, _ -> }
+        peers.onRemoteReport = { _, _, _, _, _ -> }
         lb.stop()
         refreshSceneChip()
     }

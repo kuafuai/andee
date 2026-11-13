@@ -43,7 +43,7 @@ class DshRemoteTest {
         indexFile = File(root, "dsh_workers.json"), home = File(root, "workers"),
         ask = { false }, onFinished = { _, turn -> ownTurns += turn },
         locate = { fake }, zh = { false }, tasks = DshTaskLink { tasks },
-        onRemoteFinished = { w, turn -> remoteTurns += w.origin to turn },
+        onRemoteFinished = { w, turn, _ -> remoteTurns += w.origin to turn },
     ).also { made += it }
 
     @After fun tearDown() { made.forEach { it.cancelAll() }; root.deleteRecursively() }
@@ -112,7 +112,7 @@ class DshRemoteTest {
             indexFile = File(root, "dsh_workers.json"), home = File(root, "workers"),
             ask = { false }, onFinished = { _, turn -> ownTurns += turn },
             locate = { fake }, zh = { false }, tasks = DshTaskLink { tasks },
-            onRemoteFinished = { x, turn -> remoteTurns += x.origin to turn },
+            onRemoteFinished = { x, turn, _ -> remoteTurns += x.origin to turn },
             onProgress = { id, p -> seen += id to p },
         ).also { made += it }
         DshRemoteAgent(w, "phone-1") { true }.call("dsh.delegate", JSONObject().put("task", "weekly"))

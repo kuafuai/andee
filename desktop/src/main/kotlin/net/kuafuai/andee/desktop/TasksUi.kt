@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -106,6 +107,21 @@ object TaskView {
     }
 }
 
+/** A small accent dot that fades in and out: the one mark on 在办 that says something is still working. */
+@Composable
+private fun RunningDot(modifier: Modifier = Modifier) {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "running")
+    val a by transition.animateFloat(
+        initialValue = 0.35f, targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing),
+            androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "running-alpha",
+    )
+    Box(modifier.size(6.dp).background(Palette.accent.copy(alpha = a), CircleShape))
+}
+
 /** A clock the 在办 rows tick on, once a second, for the live dsh lines. */
 @Composable
 private fun ticking(): Long {
@@ -139,6 +155,8 @@ fun SidebarTasks(nav: Nav) {
         Text(t("在办", "In hand") + if (tasks.isNotEmpty()) "  ${tasks.size}" else "", color = Palette.secondary, fontSize = 12.sp,
         modifier = Modifier.clickable { nav.go("tasks") }.padding(2.dp))
         if (tasks.any { it.status == "ready" || it.status == Tasks.DELIVERED }) RedDot(Modifier.padding(start = 3.dp).align(Alignment.Top))
+        // Something is running in dsh now: a quiet accent dot that breathes, apart from the red one that asks something of you.
+        if (tasks.any { TaskView.worker(it)?.let { w -> w in DshLive.running } == true }) RunningDot(Modifier.padding(start = 5.dp).align(Alignment.CenterVertically))
         Spacer(Modifier.weight(1f))
         Text(t("定时 ›", "Timed ›"), color = Palette.accent, fontSize = 12.sp, modifier = Modifier.clickable { nav.go("timed") }.padding(2.dp))
     }

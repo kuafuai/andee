@@ -51,7 +51,7 @@ class DshWorkers(
     /** The 「事」 a job belongs to; null runs jobs unattached (tests). */
     private val tasks: TaskLink? = null,
     /** A job from a paired device ended: [Worker.origin] is who to tell. Not called for a cancelled job. */
-    private val onRemoteFinished: (Worker, String) -> Unit = { _, _ -> },
+    private val onRemoteFinished: (Worker, String, String) -> Unit = { _, _, _ -> },
     /** A running job's progress changed; null when it ended. For the live card — nobody should be blind to a job. */
     private val onProgress: (String, Progress?) -> Unit = { _, _ -> },
 ) {
@@ -480,7 +480,7 @@ class DshWorkers(
         val record = if (w.origin.isNotEmpty()) "" else runCatching { tasks?.answered(w, summary, seen = false) }.getOrNull().orEmpty()
         val turn = DshPlan.reportTurn(w, ok, error, report, files, steps, tokens, remote = w.origin.isNotEmpty()) +
             (if (record.isNotBlank()) "\n\nThis report answers something you are in the middle of:\n$record" else "")
-        runCatching { if (w.origin.isNotEmpty()) onRemoteFinished(w, turn) else onFinished(w, turn) }
+        runCatching { if (w.origin.isNotEmpty()) onRemoteFinished(w, turn, summary) else onFinished(w, turn) }
             .onFailure { Log.w(TAG, "worker #${w.id}: report not delivered", it) }
     }
 
@@ -618,7 +618,10 @@ class DshWorkers(
             out
         }
         for (w in interrupted) runCatching {
-            tasks?.answered(w, "Interrupted: Andee was closed while it worked. delegate_task with continue=${w.id} picks it up.", seen = false)
+            val text = "Interrupted: Andee was closed while it worked. delegate_task with continue=${w.id} picks it up."
+            // A job a paired phone started is that phone's to hear about (held until it is back); the Mac's own are this notebook's.
+            if (w.origin.isNotEmpty()) onRemoteFinished(w, "(the dsh worker you handed a job to was interrupted: the computer's Andee was closed while it worked. Nothing is lost that it had made; delegate_task with continue=${w.id} picks it up. Tell the user.)", text)
+            else tasks?.answered(w, text, seen = false)
         }
     }
 

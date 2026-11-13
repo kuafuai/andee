@@ -52,7 +52,7 @@ class TasksUi(
     fun show() {
     if (root != null) return
     // A worker made progress, or ended: draw again. Only while this card is up, and only on the main thread.
-    watchProgress { root?.post { if (root != null) rebuild() } }
+    watchProgress { root?.post { if (root != null) refreshLive() } }
         val p = WindowManager.LayoutParams(
             cardWidth(), cardHeight(), WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, 0, PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.CENTER }
@@ -80,6 +80,9 @@ class TasksUi(
 
     private fun rebuild() {
         val old = root ?: return
+        liveLines.clear()
+        runDots.clear()
+        liveCard = null
         val v = build()
         runCatching {
             v.hideFromAccessibility()
@@ -142,9 +145,18 @@ class TasksUi(
         }
         for (task in active) {
             val row = panel()
-            row.addView(label(task.what, Glass.Type.BODY, Glass.TITLE), matchWrap())
-            row.addView(label("${task.id} · " + TaskRows.state(task, now, zh()), Glass.Type.CAPTION,
-            if (task.status == "ready" || task.status == Tasks.DELIVERED) Glass.ACCENT else Glass.SECONDARY, top = 4), matchWrap())
+            row.addView(oneLine(label(task.what, Glass.Type.BODY, Glass.TITLE)), matchWrap())
+            val state = oneLine(label("${task.id} · " + TaskRows.state(task, now, zh()), Glass.Type.CAPTION,
+            if (task.status == "ready" || task.status == Tasks.DELIVERED) Glass.ACCENT else Glass.SECONDARY, top = 4))
+            val line = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            val dot = runningDot()
+            dot.visibility = if (TaskRows.runningWorker(task) != null) View.VISIBLE else View.GONE
+            line.addView(dot, LinearLayout.LayoutParams(dp(7), dp(7)).apply { rightMargin = dp(7); topMargin = dp(4) })
+            line.addView(state, LinearLayout.LayoutParams(0, WRAP, 1f))
+            row.addView(line, matchWrap())
+            runDots[task.id] = dot
+            // A running worker's line is rewritten in place as its progress arrives; the card is not rebuilt for it.
+            liveLines[task.id] = state
             row.isClickable = true
             Glass.pressable(row)
             row.setOnClickListener { open = task.id; rebuild() }
@@ -231,22 +243,37 @@ class TasksUi(
      * the Mac's live card. Nothing here when it is not running (the report has not come, or it ended).
      */
     private fun buildLiveCard(body: LinearLayout, task: Tasks.Task) {
+        liveCard = null
+        liveCardTask = task.id
+        val w = task.waits.lastOrNull { it.open && it.kind == "worker" } ?: return
+        if (net.kuafuai.andee.peer.RemoteProgress.of(w.name) == null) return
+        val p = panel()
+        liveCard = p
+        fillLiveCard(p)
+        body.addView(p, matchWrap().apply { bottomMargin = dp(10) })
+    }
+
+    /** The card showing the running worker of the open task, if one is: refilled in place as progress arrives. */
+    private var liveCard: LinearLayout? = null
+    private var liveCardTask: String? = null
+
+    private fun fillLiveCard(p: LinearLayout) {
+        val task = liveCardTask?.let { tasks.get(it) } ?: return
         val w = task.waits.lastOrNull { it.open && it.kind == "worker" } ?: return
         val s = net.kuafuai.andee.peer.RemoteProgress.of(w.name) ?: return
-        val p = panel()
-        p.addView(label("dsh #${w.name} · " + net.kuafuai.andee.peer.RemoteProgress.line(s, System.currentTimeMillis(), zh()),
-            Glass.Type.CAPTION, Glass.ACCENT), matchWrap())
+        p.removeAllViews()
+        p.addView(oneLine(label("dsh #${w.name} · " + net.kuafuai.andee.peer.RemoteProgress.line(s, System.currentTimeMillis(), zh()),
+            Glass.Type.CAPTION, Glass.ACCENT)), matchWrap())
         if (s.todos.isNotEmpty()) {
             p.addView(label(t("它的清单 ${s.done}/${s.todos.size}", "Its checklist ${s.done}/${s.todos.size}"), Glass.Type.CAPTION, Glass.MUTED, top = 6), matchWrap())
-            for (td in s.todos.take(8)) p.addView(label((when (td.status) { "completed" -> "✓ "; "in_progress" -> "▸ "; else -> "○ " }) + td.text,
-                Glass.Type.CAPTION, if (td.status == "in_progress") Glass.TITLE else Glass.SECONDARY, top = 2), matchWrap())
+            for (td in s.todos.take(8)) p.addView(oneLine(label((when (td.status) { "completed" -> "✓ "; "in_progress" -> "▸ "; else -> "○ " }) + td.text,
+                Glass.Type.CAPTION, if (td.status == "in_progress") Glass.TITLE else Glass.SECONDARY, top = 2)), matchWrap())
         }
         if (s.recent.isNotEmpty()) {
             p.addView(label(t("最近在做", "Lately"), Glass.Type.CAPTION, Glass.MUTED, top = 6), matchWrap())
-            for (a in s.recent.takeLast(4)) p.addView(label("· $a", Glass.Type.CAPTION, Glass.SECONDARY, top = 2), matchWrap())
+            for (a in s.recent.takeLast(4)) p.addView(oneLine(label("· $a", Glass.Type.CAPTION, Glass.SECONDARY, top = 2)), matchWrap())
         }
         if (s.files > 0) p.addView(label(t("已经产出 ${s.files} 个文件（在电脑上）", "${s.files} files so far (on the computer)"), Glass.Type.CAPTION, Glass.SECONDARY, top = 6), matchWrap())
-        body.addView(p, matchWrap().apply { bottomMargin = dp(10) })
     }
 
     private fun confirm(task: Tasks.Task) {
@@ -296,6 +323,56 @@ class TasksUi(
         background = Glass.panel(context, dp(14))
     }
 
+    /** One line, cut with an ellipsis: how the Mac's rows read, so a long title or status never makes a row taller. */
+    private fun oneLine(v: TextView): TextView = v.apply {
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+    }
+
+    /** The status line of each row on screen, by task id: what [refreshLive] rewrites. */
+    private val liveLines = HashMap<String, TextView>()
+
+    /** The breathing dot beside each row, shown while that task's worker is running. */
+    private val runDots = HashMap<String, View>()
+
+    /** An accent dot that fades in and out, for as long as it is attached: the mark that something is still working. */
+    private fun runningDot(): View = View(context).apply {
+        background = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
+            setColor(Color.parseColor(Glass.ACCENT))
+        }
+        isClickable = false
+        val pulse = object : Runnable {
+            override fun run() {
+                if (!isAttachedToWindow) return
+                animate().alpha(if (alpha > 0.6f) 0.35f else 1f).setDuration(900).withEndAction(this).start()
+            }
+        }
+        addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) { post(pulse) }
+            override fun onViewDetachedFromWindow(v: View) { animate().cancel() }
+        })
+    }
+
+    /**
+     * Progress arrived: rewrite the lines of the running rows, and nothing else. Rebuilding the card for it made it blink
+     * every two seconds. A change in *which* tasks there are (one opened, one ended) still rebuilds, once.
+     */
+    private fun refreshLive() {
+        val now = System.currentTimeMillis()
+        // Rows are all the open tasks; if one appeared or went, the list itself changes and is built again, once.
+        val seen = TaskRows.ordered(tasks.active()).map { it.id }.toSet()
+        if (open == null && seen != liveLines.keys) { rebuild(); return }
+        // A task that has just stopped being "running" (its report came) changes the open page too.
+        if (open != null && (tasks.get(open!!)?.waits?.any { it.open && it.kind == "worker" } != (liveCard != null))) { rebuild(); return }
+        for ((id, view) in liveLines) {
+            val task = tasks.get(id) ?: continue
+            view.text = "${task.id} · " + TaskRows.state(task, now, zh())
+            runDots[id]?.visibility = if (TaskRows.runningWorker(task) != null) View.VISIBLE else View.GONE
+        }
+        liveCard?.let { fillLiveCard(it) }
+    }
+
     private fun label(text: String, size: Float, color: String, top: Int = 0): TextView = TextView(context).apply {
         this.text = text
         textSize = size
@@ -317,6 +394,13 @@ object TaskRows {
     /** What wants the user first (delivered, answered), then the rest, newest-touched first. */
     fun ordered(list: List<Tasks.Task>): List<Tasks.Task> =
         list.sortedWith(compareBy<Tasks.Task> { if (it.status == Tasks.DELIVERED || it.status == "ready") 0 else 1 }.thenByDescending { it.touchedAt })
+
+    /** The worker on the computer this task waits on, while it is running there; null otherwise. */
+    fun runningWorker(t: Tasks.Task): String? =
+        t.waits.lastOrNull { it.open && it.kind == "worker" }?.name?.takeIf { net.kuafuai.andee.peer.RemoteProgress.of(it) != null }
+
+    /** How many tasks have a worker running now: the top bar key's quiet dot. */
+    fun running(list: List<Tasks.Task>): Int = list.count { runningWorker(it) != null }
 
     /** How many want the user now: the top bar key's dot. */
     fun wanting(list: List<Tasks.Task>): Int = list.count { it.status == Tasks.DELIVERED || it.status == "ready" }

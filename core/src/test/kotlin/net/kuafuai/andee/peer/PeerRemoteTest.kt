@@ -21,9 +21,11 @@ class PeerRemoteTest {
     private class Mac(val root: File) : PeerRemote.Agent {
         val calls = mutableListOf<Pair<String, JSONObject>>()
         var up = true
+        var cancelReply = false
         override fun available() = up
         override fun call(method: String, args: JSONObject): JSONObject {
-            calls += method to args
+        calls += method to args
+        if (method == "dsh.cancel" && cancelReply) return JSONObject().put("cancelled", true).put("worker", args.optString("id"))
             if (method == "dsh.delegate" && args.optString("task") == "boom") throw IllegalStateException("no worker for you")
             return JSONObject().put("handed_over", true).put("worker", "7")
         }
@@ -79,8 +81,8 @@ class PeerRemoteTest {
         return Triple(agent, client, wire)
     }
 
-    private fun rig(allowed: Boolean = true, dir: File = Files.createTempDirectory("worker7").toFile()): Triple<Mac, PeerRemote.Client, Wire> {
-    val mac = Mac(dir)
+    private fun rig(allowed: Boolean = true, dir: File = Files.createTempDirectory("worker7").toFile(), cancelReply: Boolean = false): Triple<Mac, PeerRemote.Client, Wire> {
+    val mac = Mac(dir).also { it.cancelReply = cancelReply }
     val server = PeerRemote.Server({ mac }, { allowed })
         lateinit var wire: Wire
         val client = PeerRemote.Client { wire.phoneToMac }
@@ -249,6 +251,24 @@ class PeerRemoteTest {
         val before = mac.calls.size
         try { host.dispatch("dsh.delegate", JSONObject().put("task", "x").put("for_task", "T99")); fail() } catch (e: IllegalArgumentException) { assertTrue(e.message!!.contains("no task T99")) }
         assertEquals("nothing reached the computer", before, mac.calls.size)
+    }
+
+    @Test fun stoppingAJobAnswersItsWaitAsSeen_soItDoesNotComeBackAndStartItAgain() {
+        val mem = object : net.kuafuai.andee.config.NotebookStore {
+            var s: String? = null
+            override fun read() = s
+            override fun write(plain: String): Boolean { s = plain; return true }
+            override fun wipe() { s = null }
+        }
+        val tasks = net.kuafuai.andee.config.Tasks(net.kuafuai.andee.config.NotebookBook(mem))
+        val (_, phone, _) = rig(cancelReply = true)
+        val host = RemoteAgentHost(phone, RemoteAgentTasks { tasks }, { "mac-id" }, Files.createTempDirectory("inbox").toFile())
+        val id = (host.dispatch("dsh.delegate", JSONObject().put("task", "long job"), fromUser = true) as JSONObject).getString("task")
+        host.dispatch("dsh.cancel", JSONObject().put("id", "7"))
+        val t = tasks.get(id)!!
+        assertEquals("the wait is answered", false, t.waits.single { it.kind == "worker" }.open)
+        assertTrue("and seen, so nobody is woken by it", t.waits.single { it.kind == "worker" }.seen)
+        assertTrue(t.waits.single().answer.contains("Stopped"))
     }
 
     @Test fun aJobThatNeverStartedLeavesNoTaskLookingLikeWorkInHand() {

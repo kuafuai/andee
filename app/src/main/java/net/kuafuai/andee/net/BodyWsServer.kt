@@ -82,7 +82,13 @@ class BodyWsServer(
 
     /** `debug.sweep {"skip":true}` — the review with the silence gate bypassed. */
     private val onSweepForced: () -> Unit = {},
-) : WebSocketServer(InetSocketAddress(bindHost, port)) {
+
+    /**
+     * `debug.open {"card":"tasks"}` — open one of the cards that has no other way in from a computer (the top bar's keys are
+     * taps on the unfolded card). Loopback only, like [onSay]; it shows a window and starts no turn.
+     */
+    private val onOpenCard: (card: String) -> Boolean = { false },
+    ) : WebSocketServer(InetSocketAddress(bindHost, port)) {
 
     /** Driver connections only — the ones broadcasts go to. Extensions never join. */
     private val active = CopyOnWriteArraySet<WebSocket>()
@@ -171,6 +177,13 @@ class BodyWsServer(
                         onSweep()
                         JSONObject().put("started", true).put("forced", false)
                     }
+                } else if (method == "debug.open") {
+                    if (conn.remoteSocketAddress?.address?.isLoopbackAddress != true) {
+                        throw IllegalStateException("debug.open is loopback only — use adb forward")
+                    }
+                    val card = params?.optString("card").orEmpty()
+                    require(onOpenCard(card)) { "no such card: '$card' (tasks)" }
+                    JSONObject().put("opened", card)
                 } else if (method == "debug.worklog") {
                     // A scripted turn through the step stream ([PhoneWorkLog]), so the work card and the docked
                     // caption can be looked at without a model or a key. Loopback only, like the two above. Ends

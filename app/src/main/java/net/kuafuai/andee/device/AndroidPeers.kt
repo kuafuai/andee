@@ -81,7 +81,7 @@ class AndroidPeers(context: Context) {
      * A worker on the computer ended: its report, as it came. Set by the service, which turns it into a turn of the
      * brain's own (fenced: the worker may have read anything). [device] is the computer it came from.
      */
-    @Volatile var onRemoteReport: (device: String, worker: String, text: String, title: String) -> Unit = { _, _, _, _ -> }
+    @Volatile var onRemoteReport: (device: String, worker: String, text: String, title: String, summary: String) -> Unit = { _, _, _, _, _ -> }
 
     private val events = object : PeerEvents {
     override fun onMessage(channel: PeerChannel, msg: JSONObject) {
@@ -92,7 +92,7 @@ class AndroidPeers(context: Context) {
         "remote.progress.end" -> { net.kuafuai.andee.peer.RemoteProgress.end(msg.optString("worker")); onProgressChanged(); return }
     }
     if (msg.optString("type") == "remote.event") {
-        onRemoteReport(channel.peer.id, msg.optString("worker"), msg.optString("text"), msg.optString("detail"))
+        onRemoteReport(channel.peer.id, msg.optString("worker"), msg.optString("text"), msg.optString("detail"), msg.optString("summary"))
         return
     }
             if (msg.optString("type") == "ping") channel.send(JSONObject().put("type", "pong").put("n", msg.optInt("n")))
@@ -104,7 +104,13 @@ class AndroidPeers(context: Context) {
             changed()
             tasks.onConnected(channel)
         }
-        override fun onDisconnected(channel: PeerChannel) { links.remove(channel.peer.id); changed() }
+        override fun onDisconnected(channel: PeerChannel) {
+            links.remove(channel.peer.id)
+            // What the computer was doing cannot be known while the link is down: stop drawing it as running. The next progress it
+            // sends after the link is back draws it again; the task's wait stays open until its report arrives.
+            net.kuafuai.andee.peer.RemoteProgress.clear(); onProgressChanged()
+            changed()
+        }
         override fun onRejected(remote: String, why: String) { Log.w(TAG, "refused $remote: $why") }
     }
 
