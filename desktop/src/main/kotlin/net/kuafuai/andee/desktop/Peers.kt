@@ -187,6 +187,27 @@ object Peers {
     /** The owner's switch for [id]: may that own device use this Mac's dsh directly. Tells it on the open link now. */
     fun setDshAllowed(id: String, on: Boolean) { store.setDshAllowed(id, on); tasks.reannounce(id); changed() }
 
+    private val progressSent = ConcurrentHashMap<String, Long>()
+
+    /**
+     * A worker a paired device started made progress (or ended: [p] null). Sent on the open link at most every two seconds
+     * per worker, and always the first and the last: a missed one is replaced by the next, so nothing waits on it.
+     */
+    fun remoteProgress(device: String, worker: String, p: net.kuafuai.andee.desktop.dsh.DshWorkers.Progress?) {
+        val ch = links[device]?.takeIf { it.isOpen } ?: return
+        if (p == null) { progressSent.remove(worker); ch.send(JSONObject().put("type", "remote.progress.end").put("worker", worker)); return }
+        val now = System.currentTimeMillis()
+        val last = progressSent[worker]
+        if (last != null && now - last < 2_000) return
+        progressSent[worker] = now
+        ch.send(
+            net.kuafuai.andee.peer.RemoteProgress.State(
+                worker = worker, title = p.title, startedAt = p.startedAt, step = p.step, recent = p.recent, thought = p.thought,
+                todos = p.todos.map { net.kuafuai.andee.peer.RemoteProgress.Todo(it.text, it.status) }, tokens = p.tokens, files = p.files,
+            ).toJson(),
+        )
+    }
+
     /** A job a paired device started has ended: its Andee gets the report on the open link, or when it is back (30 min). */
     fun remoteFinished(device: String, worker: String, text: String, detail: String) {
         val msg = JSONObject().put("type", "remote.event").put("worker", worker).put("text", text.take(8_000)).put("detail", detail.take(8_000))

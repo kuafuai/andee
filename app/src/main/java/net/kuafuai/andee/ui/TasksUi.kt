@@ -34,6 +34,8 @@ class TasksUi(
     private val onContinue: (Tasks.Task) -> Unit,
     /** 说点要求再办: the next words the user types or says are about this task. */
     private val onTalk: (Tasks.Task) -> Unit,
+    /** Hand the service a callback to run when a worker's progress changes (or `{}` to stop). */
+    private val watchProgress: (() -> Unit) -> Unit = {},
     private val onDismiss: () -> Unit = {},
 ) {
     private val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -48,7 +50,9 @@ class TasksUi(
     private val tasks: Tasks get() = Notebook.tasks(context)
 
     fun show() {
-        if (root != null) return
+    if (root != null) return
+    // A worker made progress, or ended: draw again. Only while this card is up, and only on the main thread.
+    watchProgress { root?.post { if (root != null) rebuild() } }
         val p = WindowManager.LayoutParams(
             cardWidth(), cardHeight(), WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, 0, PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.CENTER }
@@ -64,8 +68,9 @@ class TasksUi(
     }
 
     fun hide() {
-        val v = root ?: return
-        root = null
+    val v = root ?: return
+    root = null
+    watchProgress {}
         Glass.exit(v) {
             runCatching { wm.removeView(v) }
             OwnCard.hidden()
@@ -163,7 +168,8 @@ class TasksUi(
     // ---- one 事 ----
 
     private fun buildTask(body: LinearLayout, task: Tasks.Task) {
-        val now = System.currentTimeMillis()
+    val now = System.currentTimeMillis()
+    buildLiveCard(body, task)
         body.addView(label(task.what, Glass.Type.HEADLINE, Glass.TITLE), matchWrap())
         body.addView(label("${task.id} · " + TaskRows.state(task, now, zh()), Glass.Type.CAPTION, Glass.SECONDARY, top = 4), matchWrap().apply { bottomMargin = dp(12) })
         when {
@@ -218,6 +224,29 @@ class TasksUi(
             val fmt = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US)
             for (s in task.steps) body.addView(label(fmt.format(java.util.Date(s.at)) + "  " + s.text, Glass.Type.CAPTION, Glass.TITLE), matchWrap().apply { bottomMargin = dp(4) })
         }
+    }
+
+    /**
+     * The worker this 事 waits on, while it runs: what it is on, its own checklist and its newest actions — the phone's twin of
+     * the Mac's live card. Nothing here when it is not running (the report has not come, or it ended).
+     */
+    private fun buildLiveCard(body: LinearLayout, task: Tasks.Task) {
+        val w = task.waits.lastOrNull { it.open && it.kind == "worker" } ?: return
+        val s = net.kuafuai.andee.peer.RemoteProgress.of(w.name) ?: return
+        val p = panel()
+        p.addView(label("dsh #${w.name} · " + net.kuafuai.andee.peer.RemoteProgress.line(s, System.currentTimeMillis(), zh()),
+            Glass.Type.CAPTION, Glass.ACCENT), matchWrap())
+        if (s.todos.isNotEmpty()) {
+            p.addView(label(t("它的清单 ${s.done}/${s.todos.size}", "Its checklist ${s.done}/${s.todos.size}"), Glass.Type.CAPTION, Glass.MUTED, top = 6), matchWrap())
+            for (td in s.todos.take(8)) p.addView(label((when (td.status) { "completed" -> "✓ "; "in_progress" -> "▸ "; else -> "○ " }) + td.text,
+                Glass.Type.CAPTION, if (td.status == "in_progress") Glass.TITLE else Glass.SECONDARY, top = 2), matchWrap())
+        }
+        if (s.recent.isNotEmpty()) {
+            p.addView(label(t("最近在做", "Lately"), Glass.Type.CAPTION, Glass.MUTED, top = 6), matchWrap())
+            for (a in s.recent.takeLast(4)) p.addView(label("· $a", Glass.Type.CAPTION, Glass.SECONDARY, top = 2), matchWrap())
+        }
+        if (s.files > 0) p.addView(label(t("已经产出 ${s.files} 个文件（在电脑上）", "${s.files} files so far (on the computer)"), Glass.Type.CAPTION, Glass.SECONDARY, top = 6), matchWrap())
+        body.addView(p, matchWrap().apply { bottomMargin = dp(10) })
     }
 
     private fun confirm(task: Tasks.Task) {
@@ -299,6 +328,10 @@ object TaskRows {
         val answered = t.waits.lastOrNull { !it.open && !it.seen }
         if (t.status == "ready" && answered != null) return tr("回话到了：", "Answered: ") + answered.answer.lineSequence().first().take(50)
         val open = t.waits.filter { it.open }
+        // A worker on the computer that is running now: what it is on, like the Mac's row.
+        open.firstOrNull { it.kind == "worker" }?.let { w ->
+            net.kuafuai.andee.peer.RemoteProgress.of(w.name)?.let { return "dsh #${w.name} · " + net.kuafuai.andee.peer.RemoteProgress.line(it, now, zh) }
+        }
         if (open.isNotEmpty()) return tr("在等 ", "Waiting on ") + open.joinToString(", ") { who(it, zh) } + " · " + ago(now - open.maxOf { it.at }, zh)
         if (t.next.isNotBlank()) return tr("下一步：", "Next: ") + t.next
         return tr("进行中", "Under way")

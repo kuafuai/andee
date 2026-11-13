@@ -169,7 +169,7 @@ class PeerRemoteTest {
         File(dir, "report.pdf").writeBytes(big)
         val (mac, phone, wire) = rig(dir = dir)
         val inbox = Files.createTempDirectory("inbox").toFile()
-        val host = RemoteAgentHost(phone, { "mac-id" }, inbox)
+        val host = RemoteAgentHost(phone, null, { "mac-id" }, inbox)
 
         val r = host.dispatch("dsh.fetch", JSONObject().put("id", "7").put("path", "report.pdf")) as JSONObject
         assertEquals(3, r.getInt("pieces"))
@@ -189,13 +189,13 @@ class PeerRemoteTest {
         }
         val (_, phone2, w2) = rigWith(flaky)
         wire2 = w2
-        try { RemoteAgentHost(phone2, { "mac-id" }, inbox).dispatch("dsh.fetch", JSONObject().put("id", "7").put("path", "report.pdf")); fail("a dropped link must be an error") } catch (e: IllegalStateException) { }
+        try { RemoteAgentHost(phone2, null, { "mac-id" }, inbox).dispatch("dsh.fetch", JSONObject().put("id", "7").put("path", "report.pdf")); fail("a dropped link must be an error") } catch (e: IllegalStateException) { }
         assertTrue(File(inbox, "7").listFiles()!!.none { it.name.endsWith(".part") })
     }
 
     @Test fun withNoComputerOfferingItsAgentThePhoneSaysSoAndSendsNothing() {
         val (mac, phone, _) = rig()
-        val host = RemoteAgentHost(phone, { null }, Files.createTempDirectory("inbox").toFile())
+        val host = RemoteAgentHost(phone, null, { null }, Files.createTempDirectory("inbox").toFile())
         try { host.dispatch("dsh.delegate", JSONObject().put("task", "x")); fail() } catch (e: IllegalStateException) {
             assertTrue(e.message, e.message!!.contains("none of the paired devices offers its agent"))
         }
@@ -211,6 +211,72 @@ class PeerRemoteTest {
             assertEquals(RemoteAgentTools.methodOf(t.getString("name")), t.getString("method"))
             assertFalse("no Finder on a phone", t.getString("description").contains("Finder"))
         }
+    }
+
+    @Test fun aJobHandedToTheComputerIsATaskHere_waitsOnTheWorker_andTheReportAnswersIt() {
+        val mem = object : net.kuafuai.andee.config.NotebookStore {
+            var s: String? = null
+            override fun read() = s
+            override fun write(plain: String): Boolean { s = plain; return true }
+            override fun wipe() { s = null }
+        }
+        val tasks = net.kuafuai.andee.config.Tasks(net.kuafuai.andee.config.NotebookBook(mem))
+        val link = RemoteAgentTasks { tasks }
+        val (mac, phone, _) = rig()
+        val host = RemoteAgentHost(phone, link, { "mac-id" }, Files.createTempDirectory("inbox").toFile())
+
+        // No task named: one is opened, from the user's turn, and it waits on the worker the computer returned.
+        val r = host.dispatch("dsh.delegate", JSONObject().put("task", "write a report").put("title", "周报").put("for_task", ""), fromUser = true) as JSONObject
+        val id = r.getString("task")
+        val t = tasks.get(id)!!
+        assertEquals("周报", t.what)
+        assertEquals("user", t.from.kind)
+        assertEquals(RemoteAgentTasks.ORIGIN, t.origin)
+        assertEquals("7", t.waits.single { it.kind == "worker" }.name)
+        assertFalse("the computer was never told about our task", mac.calls.single().second.has("for_task"))
+        assertTrue(r.getString("note").contains(id))
+
+        // The report answers the wait, and the record rides on the turn.
+        val record = link.answered("7", "Files: out.md. done")
+        assertTrue(record, record.contains("<<<TASK $id"))
+        assertEquals("ready", tasks.get(id)!!.status)
+
+        // A job from a turn the user did not start is the device's own, not the user's.
+        val r2 = host.dispatch("dsh.delegate", JSONObject().put("task", "tidy up"), fromUser = false) as JSONObject
+        assertEquals("self", tasks.get(r2.getString("task"))!!.from.kind)
+
+        // A task the model names that is not open is refused before anything is sent.
+        val before = mac.calls.size
+        try { host.dispatch("dsh.delegate", JSONObject().put("task", "x").put("for_task", "T99")); fail() } catch (e: IllegalArgumentException) { assertTrue(e.message!!.contains("no task T99")) }
+        assertEquals("nothing reached the computer", before, mac.calls.size)
+    }
+
+    @Test fun aJobThatNeverStartedLeavesNoTaskLookingLikeWorkInHand() {
+        val mem = object : net.kuafuai.andee.config.NotebookStore {
+            var s: String? = null
+            override fun read() = s
+            override fun write(plain: String): Boolean { s = plain; return true }
+            override fun wipe() { s = null }
+        }
+        val tasks = net.kuafuai.andee.config.Tasks(net.kuafuai.andee.config.NotebookBook(mem))
+        val (_, phone, _) = rig()
+        val host = RemoteAgentHost(phone, RemoteAgentTasks { tasks }, { "mac-id" }, Files.createTempDirectory("inbox").toFile())
+        try { host.dispatch("dsh.delegate", JSONObject().put("task", "boom")); fail() } catch (e: IllegalStateException) { }
+        assertTrue("the task it opened is let go again", tasks.active().isEmpty())
+    }
+
+    @Test fun aWorkersProgressReachesThePhoneAndEndsWhenItEnds() {
+        RemoteProgress.clear()
+        val s = RemoteProgress.State("7", "周报", System.currentTimeMillis() - 65_000, step = 4, recent = listOf("searching", "reading a page"),
+            todos = listOf(RemoteProgress.Todo("collect", "completed"), RemoteProgress.Todo("write", "in_progress")), tokens = 3000, files = 1)
+        val back = RemoteProgress.parse(JSONObject(s.toJson().toString()))
+        assertEquals(s.step, back.step); assertEquals(s.recent, back.recent); assertEquals(2, back.todos.size); assertEquals("write", back.current?.text)
+        RemoteProgress.update(back)
+        assertEquals(listOf("7"), RemoteProgress.running().map { it.worker })
+        val line = RemoteProgress.line(RemoteProgress.of("7")!!, System.currentTimeMillis(), zh = false)
+        assertTrue(line, line.startsWith("step 4 · 1:") && line.endsWith("· write"))
+        RemoteProgress.end("7")
+        assertTrue(RemoteProgress.running().isEmpty())
     }
 
     @Test fun nothingOutsideTheWorkersFolderCanBeListedOrRead() {
@@ -265,5 +331,26 @@ class PeerRemoteTest {
         assertFalse("filing it as a friend takes the switch away", s.dshAllowed("phone-1"))
         s.setTrust("phone-1", PeerStore.Trust.OWN)
         assertFalse("and it does not come back by itself", s.dshAllowed("phone-1"))
+    }
+
+    @Test fun theSwitchIsSavedAndSurvivesARestartAndAPairingAgain() {
+        val mem = object : net.kuafuai.andee.config.NotebookStore {
+            var s: String? = null
+            override fun read() = s
+            override fun write(plain: String): Boolean { s = plain; return true }
+            override fun wipe() { s = null }
+        }
+        val phone = PeerProtocol.newIdentity("phone-1", "Phone")
+        val s = PeerStore(mem) { "Mac" }
+        s.add(PeerProtocol.Peer("phone-1", "Phone", phone.publicBytes))
+        s.setTrust("phone-1", PeerStore.Trust.OWN)
+        // The click: the card calls setDshAllowed and then reads the row again.
+        s.setDshAllowed("phone-1", true)
+        assertTrue(s.dshAllowed("phone-1"))
+        assertTrue("a fresh process over the same file sees it", PeerStore(mem) { "x" }.dshAllowed("phone-1"))
+        // Pairing the same phone again (new QR, same id) must not quietly turn it off.
+        s.add(PeerProtocol.Peer("phone-1", "Phone", phone.publicBytes))
+        assertTrue("trust is kept on a second pairing", s.trust("phone-1") == PeerStore.Trust.OWN)
+        assertTrue("and so is the switch", s.dshAllowed("phone-1"))
     }
 }

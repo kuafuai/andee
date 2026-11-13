@@ -1162,6 +1162,7 @@ class LocalBrain(
             // place that must never move. Empty until there is something worth a line.
             val gear = host.gearIndex()
             val friends = host.friendsIndex()
+            val agent = host.agentIndex()
             // What it is in the middle of (`Tasks`): one line each, answers that arrived first. Same position and
             // reason as the plan line — it changes every time something is taken on, waited for or delivered.
             val tasks = host.tasksIndex()
@@ -1267,6 +1268,9 @@ class LocalBrain(
                             "\n\n(installed here and worth reaching for first, most used first — if one of these is built " +
                                 "for the job, prefer handing it over to doing every step yourself; list_gear has the rest)\n$gear"
                         } +
+                        // An agent this device can hand general work to: its own capability, so it comes before the friends and
+                        // is not described as one. Same position, same reason: whether the computer is offering it changes.
+                        (if (agent.isEmpty()) "" else "\n\n(an agent you have — delegate_task hands it a job; it is yours, not a friend)\n$agent") +
                         // The other Andees it can ask. Same position, same reason: who is reachable changes all day.
                         if (friends.isEmpty()) {
                             ""

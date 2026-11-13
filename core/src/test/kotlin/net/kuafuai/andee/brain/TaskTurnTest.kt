@@ -73,7 +73,7 @@ class TaskTurnTest {
             "locale" -> Locale.ENGLISH
             "maxSteps" -> 10
             "persona", "platformPrompt", "notebookIndex", "scenesIndex", "pagesIndex", "topicsIndex",
-            "gearIndex", "planIndex", "friendsIndex", "selfIndex", "stageIndex", "wikiIndex", "reviewRecord", "guard" -> ""
+            "gearIndex", "planIndex", "friendsIndex", "agentIndex", "selfIndex", "stageIndex", "wikiIndex", "reviewRecord", "guard" -> ""
             "tasksIndex" -> tasks.indexForPrompt()
             "peopleIndex" -> book.peopleIndex(args?.get(0) as String?)
             "scrollback" -> emptyList<ScrollRow>()

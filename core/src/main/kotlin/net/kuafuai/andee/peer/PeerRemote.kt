@@ -87,6 +87,12 @@ object PeerRemote {
             return true
         }
 
+        /** A running worker's progress, to the device that handed the job over. Best effort: a missed one is replaced by the next. */
+        fun progress(to: PeerChannel, state: RemoteProgress.State): Boolean = to.send(state.toJson())
+
+        /** The worker ended: the phone stops showing it as running. */
+        fun progressEnded(to: PeerChannel, worker: String): Boolean = to.send(JSONObject().put("type", "remote.progress.end").put("worker", worker))
+
         /** A worker ended on this computer: tell [to] so its Andee hears the report. False when there is no link. */
         fun event(to: PeerChannel, worker: String, text: String, detail: String): Boolean =
             to.send(JSONObject().put("type", "remote.event").put("worker", worker).put("text", text.take(MAX_EVENT)).put("detail", detail.take(MAX_EVENT)))

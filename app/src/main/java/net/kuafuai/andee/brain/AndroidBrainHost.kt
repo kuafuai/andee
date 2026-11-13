@@ -88,6 +88,8 @@ class AndroidBrainHost(
 
     override fun friendsIndex(): String = peers.tasks.indexForPrompt()
 
+    override fun agentIndex(): String = peers.tasks.agentIndex()
+
     override fun topicsIndex(): String = ChatHistory.topicsForPrompt()
 
     override fun event(e: net.kuafuai.andee.brain.BrainEvent) = net.kuafuai.andee.ui.PhoneTimeline.brain(ctx, e)
@@ -131,8 +133,15 @@ class AndroidBrainHost(
         private fun agentDevice(): String? = peers.tasks.agentDevice()
 
         private val agentHost by lazy {
-            net.kuafuai.andee.peer.RemoteAgentHost(peers.remote, { agentDevice() }, File(ctx.filesDir, "agent_inbox"))
+        net.kuafuai.andee.peer.RemoteAgentHost(
+            peers.remote, net.kuafuai.andee.peer.RemoteAgentTasks { Notebook.tasks(ctx) }, { agentDevice() }, File(ctx.filesDir, "agent_inbox"),
+        )
         }
+
+        /** Whether the turn now running is one the user started: only then may a job it hands over be filed as theirs. */
+        @Volatile private var userTurn = true
+
+        override fun turnStarted(kind: String) { userTurn = kind == "USER" }
 
     override fun methodOf(toolName: String): String? =
         ToolSchemas.methodOf(toolName)
@@ -151,7 +160,7 @@ class AndroidBrainHost(
             }
             if (method.startsWith("dsh.")) {
                 net.kuafuai.andee.net.TurnGuards.check(method, silent, untrusted)
-                return agentHost.dispatch(method, params)
+                return agentHost.dispatch(method, params, fromUser = userTurn)
             }
         return dispatcher.dispatch(method, params, driving = true, silent = silent, untrusted = untrusted)
     }

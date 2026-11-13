@@ -77,7 +77,9 @@ class PeerStore(private val store: NotebookStore, private val defaultName: () ->
             JSONObject().put("id", peer.id).put("name", peer.name).put("key", b64(peer.publicKey))
                 .put("paired_at", System.currentTimeMillis())
                 .put("trust", before?.optString("trust")?.ifEmpty { null } ?: Trust.FRIEND.key)
-                .put("auto", before?.optBoolean("auto") ?: false),
+                .put("auto", before?.optBoolean("auto") ?: false)
+                // Pairing again keeps the owner's switch too, as it keeps trust and auto.
+                .put("dsh_ok", before?.optBoolean("dsh_ok") ?: false),
         )
         save(root.put("peers", kept))
     }

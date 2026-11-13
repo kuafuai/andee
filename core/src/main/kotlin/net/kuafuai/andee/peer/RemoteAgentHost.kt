@@ -13,22 +13,45 @@ import java.io.FileOutputStream
  * that drops leaves a partly written file that is thrown away rather than shown as if whole.
  */
 class RemoteAgentHost(
-    private val client: PeerRemote.Client,
+private val client: PeerRemote.Client,
+/** The 「事」 side of a job handed over; null runs jobs unattached (tests). */
+private val tasks: RemoteAgentTasks? = null,
     /** The paired device whose agent this is: the one that said it offers it. Null when none does. */
     private val device: () -> String?,
     /** Where fetched files are kept: one folder per worker. */
     private val inbox: File,
 ) {
-    fun dispatch(method: String, p: JSONObject): Any {
-        val dev = device() ?: throw IllegalStateException(
+    fun dispatch(method: String, p: JSONObject, fromUser: Boolean = true): Any {
+    val dev = device() ?: throw IllegalStateException(
             "There is no computer to hand this to: none of the paired devices offers its agent to this phone (the owner turns that on for this phone in the computer's Friends page).",
         )
         return when (method) {
-            in RemoteAgentTools.CALLS -> client.call(dev, method, p)
+        "dsh.delegate" -> delegate(dev, p, fromUser)
+        in RemoteAgentTools.CALLS -> client.call(dev, method, p)
             "dsh.ls" -> client.list(dev, p.optString("id").trim().removePrefix("#"), p.optString("path"))
             "dsh.fetch" -> fetch(dev, p.optString("id").trim().removePrefix("#"), p.optString("path").trim())
             else -> throw IllegalArgumentException("unknown method $method")
         }
+    }
+
+    /**
+     * A job: its 「事」 first (the model's named one, else the continued worker's, else a new one), then the call; the task waits
+     * on the worker that comes back. A call that fails leaves a task it opened itself closed again, so a job that never started
+     * is not left looking like one in hand.
+     */
+    private fun delegate(dev: String, p: JSONObject, fromUser: Boolean): JSONObject {
+        val named = p.optString("for_task").trim()
+        val task = runCatching { tasks?.forJob(p, fromUser).orEmpty() }.getOrElse { if (named.isNotEmpty()) throw it else "" }
+        // The computer knows nothing of our tasks: for_task is ours.
+        val args = JSONObject(p.toString()).apply { remove("for_task") }
+        val r = try {
+            client.call(dev, "dsh.delegate", args)
+        } catch (e: Exception) {
+            if (task.isNotEmpty() && named.isEmpty()) runCatching { tasks?.dropOpened(task, "the job did not start: ${e.message}") }
+            throw e
+        }
+        if (task.isNotEmpty()) runCatching { tasks?.attach(task, r.optString("worker"), p.optString("title").ifEmpty { p.optString("task").take(40) }) }
+        return tasks?.annotate(r, task) ?: r
     }
 
     /** Bring one file over. Returns where it is on this device, its size and how many pieces it took. */

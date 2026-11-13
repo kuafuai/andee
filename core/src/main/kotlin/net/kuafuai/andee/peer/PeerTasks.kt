@@ -203,6 +203,24 @@ class PeerTasks(private val net: Net) {
         }
     }
 
+    /**
+     * The agent a paired device offers to this one as its own (its dsh), as a paragraph for the prompt — or empty when
+     * none does. It is a capability of this device, so it is not described under friends: what the computer says it
+     * can do with coding agents is left out of the friend's line ([withoutAgent]) and said here instead.
+     */
+    fun agentIndex(): String {
+        val id = agentDevice() ?: return ""
+        val name = net.paired().firstOrNull { it.id == id }?.name ?: return ""
+        val on = if (net.enabled() && net.channel(id)?.isOpen == true || net.reachable(id)) "on and reachable" else "not reachable now"
+        return "A general agent on the user's computer ($name, $on). It is your own, like a tool: it reads and writes files in a folder of its own, runs commands, searches and browses the web. " +
+            "Hand it work that wants a general agent and some time — research, writing up, code, turning files into other files — with delegate_task; its report comes back later. " +
+            "The files it makes stay on the computer: list_worker_files shows them and fetch_worker_file brings one here. " +
+            "It cannot touch this phone or its apps; that is yours. If the computer is not reachable, nothing is handed over: say so."
+    }
+
+    /** Whether [id] offers its agent to this device. */
+    private fun agentIsOurs(id: String) = abouts[id]?.agent == true
+
     // ---- the asking side: the two tools -----------------------------------------------------------------
 
     fun dispatch(method: String, p: JSONObject): Any = when (method) {
@@ -229,7 +247,8 @@ class PeerTasks(private val net: Net) {
                 JSONObject().put("name", peer.name)
                     .put("relation", if (own) "your own other device — same user" else "a friend: somebody else's Andee")
                     .put("is", a?.platform ?: "unknown until it has been reached once")
-                    .put("says_it_can", a?.can ?: "")
+                    // Its coding agent is not something to ask a friend for when it is offered to us directly (see agentIndex).
+                    .put("says_it_can", if (agentIsOurs(peer.id)) a?.can?.let(::withoutAgent).orEmpty() else a?.can ?: "")
                     .put("reachable", net.enabled() && net.reachable(peer.id))
                     .put("waiting_on", JSONArray(waiting.map { "${it.text.take(60)} (${(System.currentTimeMillis() - it.at) / 60_000} min ago)" })),
             )
@@ -303,7 +322,7 @@ class PeerTasks(private val net: Net) {
                     - `reachable` now, and `waiting_on`: requests you made that have not reported back.
                 """.trimIndent(), JSONObject(), emptyList()))
                 .put(tool("ask_friend", "peer.ask", """
-                    Ask another Andee to do something, where it is done by that Andee on its own body. Use it when the job belongs there: an app only the phone has, long work or code on the Mac, or something a friend's Andee offered to do. Doing it badly here, or telling the user to go and do it on the other device themselves, is worse.
+                    Ask another Andee to do something, where it is done by that Andee on its own body. Use it when the job belongs there: an app only the phone has, the Mac's own screen and apps, or something a friend's Andee offered to do. Doing it badly here, or telling the user to go and do it on the other device themselves, is worse. Long work, research, code or files on a computer is not what you ask a friend for when you have `delegate_task`: that hands it straight to the agent there.
 
                     - `task` is everything the other side needs, in one self-contained message: the goal, the details, what "done" looks like, what to report back. It cannot see this conversation and cannot ask you questions.
                     - **When the user asks you to ask a friend, ask.** Do not refuse, and do not make the user choose between options on the friend's behalf: whether to do it is the friend's owner's decision, and they are asked before anything happens — that card is the safeguard, not you. If something the user may not have thought of matters (whose account, address or money it would be), put it in the task or say it in one line *after* asking, not instead of asking.
@@ -352,6 +371,10 @@ class PeerTasks(private val net: Net) {
                 "Asked: ${task.take(400)}\nReport: $report\n" +
                 "Tell the user the outcome in a sentence or two, in their language. Do not redo the work here."
         }
+
+        /** [can] without its mention of coding agents and a terminal: they are reached through the agent tools, not by asking. */
+        fun withoutAgent(can: String): String =
+            can.replace(Regex(",?\\s*coding agents and a terminal"), "").replace(Regex("\\s{2,}"), " ").trim().trimEnd(',')
 
         /** The line each body says about itself in `about`. */
         fun canFor(platform: String): String = when (platform) {

@@ -372,6 +372,7 @@ class BodyCoreService : Service() {
                     // 接着办: a turn now, the task named by the device — not left to the model to guess from "that one".
                     onContinue = { task -> ui.post { pendingTask = task.id; submitUserTurn(AppLocale.str(this@BodyCoreService, R.string.tasks_carry_on), "typed") } },
                     onTalk = { task -> ui.post { beginTaskTalk(task) } },
+                    watchProgress = { f -> peers.onProgressChanged = { ui.post(f) } },
                     onDismiss = { window.refreshTasksKey() },
                 ).show()
             }
@@ -3057,13 +3058,18 @@ class BodyCoreService : Service() {
         // A worker on the computer ended: its report is another agent's words, so it runs as a turn the brain cannot trust.
         peers.onRemoteReport = { device, worker, text, title ->
             val b = localBrain
+            // The job is over: stop showing it as running, and answer the 「事」 that waited on it, whether or not a brain is up.
+            net.kuafuai.andee.peer.RemoteProgress.end(worker)
+            val book = net.kuafuai.andee.config.Notebook.notebook(this)
+            val record = runCatching { net.kuafuai.andee.peer.RemoteAgentTasks { book.tasks }.answered(worker, text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().take(160)) }.getOrDefault("")
             if (b != null) {
                 net.kuafuai.andee.ui.ChatHistory.addEvent("DSH", AppLocale.str(this, R.string.dsh_remote_done, title), "", worker)
                 waitForQuiet {
                     acceptBrainOutput = true
-                    b.wake(text, untrusted = true)
+                    b.wake(text + (if (record.isNotBlank()) "\n\nThis report answers something you are in the middle of:\n$record" else ""), untrusted = true)
                 }
             }
+            window.refreshTasksKey()
         }
         refreshSceneChip()
         // Promises outlive the process: anything that came due while the

@@ -74,6 +74,9 @@ class AndroidPeers(context: Context) {
     /** The paired computer's agent, used as if it were this phone's own ([PeerRemote]). */
     val remote = PeerRemote.Client { id -> links[id] }
 
+    /** A running worker's progress changed (or it ended): the 在办 card and key re-read. Set by the UI. */
+    @Volatile var onProgressChanged: () -> Unit = {}
+
     /**
      * A worker on the computer ended: its report, as it came. Set by the service, which turns it into a turn of the
      * brain's own (fenced: the worker may have read anything). [device] is the computer it came from.
@@ -84,6 +87,10 @@ class AndroidPeers(context: Context) {
     override fun onMessage(channel: PeerChannel, msg: JSONObject) {
     if (tasks.onMessage(channel, msg)) return
     if (remote.onMessage(msg)) return
+    when (msg.optString("type")) {
+        "remote.progress" -> { net.kuafuai.andee.peer.RemoteProgress.update(net.kuafuai.andee.peer.RemoteProgress.parse(msg)); onProgressChanged(); return }
+        "remote.progress.end" -> { net.kuafuai.andee.peer.RemoteProgress.end(msg.optString("worker")); onProgressChanged(); return }
+    }
     if (msg.optString("type") == "remote.event") {
         onRemoteReport(channel.peer.id, msg.optString("worker"), msg.optString("text"), msg.optString("detail"))
         return

@@ -83,7 +83,11 @@ object Assistant {
             tasks = net.kuafuai.andee.desktop.dsh.DshTaskLink { DesktopNotebook.book.tasks },
             // A job a paired phone started: its report goes to the phone's Andee, not to this Mac's brain.
             onRemoteFinished = { w, turn -> Peers.remoteFinished(w.origin, w.id, turn, w.title) },
-            onProgress = DshLive::on,
+            onProgress = { id, p ->
+                // A job a paired phone started is drawn on that phone, not in this window.
+                val origin = dsh.get(id)?.origin.orEmpty()
+                if (origin.isEmpty()) DshLive.on(id, p) else Peers.remoteProgress(origin, id, p)
+            },
         )
     }
 

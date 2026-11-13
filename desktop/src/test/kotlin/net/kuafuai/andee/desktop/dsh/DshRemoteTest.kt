@@ -106,6 +106,23 @@ class DshRemoteTest {
         try { phone.read("2", "out.md", 0, 10); fail() } catch (e: IllegalArgumentException) { assertTrue(e.message!!.contains("no worker")) }
     }
 
+    @Test fun aPhonesJobReportsItsProgressToThePhoneOnly() {
+        val seen = java.util.concurrent.CopyOnWriteArrayList<Pair<String, DshWorkers.Progress?>>()
+        val w = DshWorkers(
+            indexFile = File(root, "dsh_workers.json"), home = File(root, "workers"),
+            ask = { false }, onFinished = { _, turn -> ownTurns += turn },
+            locate = { fake }, zh = { false }, tasks = DshTaskLink { tasks },
+            onRemoteFinished = { x, turn -> remoteTurns += x.origin to turn },
+            onProgress = { id, p -> seen += id to p },
+        ).also { made += it }
+        DshRemoteAgent(w, "phone-1") { true }.call("dsh.delegate", JSONObject().put("task", "weekly"))
+        remoteTurns.poll(30, TimeUnit.SECONDS) ?: throw AssertionError("no report")
+        // The progress callback carries the worker id; the Mac looks the origin up from the worker, so it can tell whose it is.
+        assertTrue("progress was reported while it ran", seen.any { it.second != null })
+        assertTrue("and its end", seen.last().second == null)
+        assertEquals("phone-1", w.get("1")!!.origin)
+    }
+
     @Test fun finderIsNotSomethingThatReachesAPhone_andAnOffSwitchMeansNoAgent() {
         val w = workers()
         try { DshRemoteAgent(w, "phone-1") { true }.call("dsh.open", JSONObject().put("id", "1")); fail() } catch (e: IllegalStateException) {

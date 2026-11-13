@@ -133,6 +133,13 @@ interface BrainHost {
     fun friendsIndex(): String = ""
 
     /**
+     * A capability this device has that is not a gadget on it and not a friend: an agent it can hand general work to (the
+     * dsh on a paired computer, offered by its owner). One short paragraph, empty when there is none; a default, so a host
+     * without one changes by not a byte. It is the device's own, so it is not listed under friends.
+     */
+    fun agentIndex(): String = ""
+
+    /**
      * Archive [rows] as one finished topic. Returns null when nothing was
      * written — the caller then keeps the conversation as it was.
      */

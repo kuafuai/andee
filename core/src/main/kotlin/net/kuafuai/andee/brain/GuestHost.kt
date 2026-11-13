@@ -32,6 +32,8 @@ class GuestHost(private val inner: BrainHost) : BrainHost by inner {
     override fun topicsIndex(): String = ""
     override fun gearIndex(): String = ""
     override fun friendsIndex(): String = ""
+    // The owner's computer is the owner's: a friend's request is not told it exists, whatever tools its list would have.
+    override fun agentIndex(): String = ""
     override fun foldTopic(title: String, summary: String, rows: List<ScrollRow>, text: String): FoldedTopic? = null
 
     /** Not forwarded: the owner's own turn state (the Mac's command policy) must not be moved by a guest. */

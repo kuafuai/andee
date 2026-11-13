@@ -3,6 +3,7 @@ package net.kuafuai.andee.peer
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -16,7 +17,7 @@ import java.util.concurrent.TimeUnit
  */
 class PeerTasksTest {
 
-    private class Node(name: String, platform: String) {
+    private class Node(name: String, platform: String, realCan: Boolean = false) {
         val peer = PeerProtocol.Peer(name + "-id", name, ByteArray(4))
         val paired = mutableListOf<PeerProtocol.Peer>()
         val reachable = mutableSetOf<String>()
@@ -24,9 +25,12 @@ class PeerTasksTest {
         /** How to bring a link up to an id, when the test allows it. */
         val dial = mutableMapOf<String, () -> Unit>()
         val trust = mutableMapOf<String, PeerStore.Trust>()
+        /** Devices this node offers its agent to: the owner's switch. */
+        val offers = mutableSetOf<String>()
         val tasks = PeerTasks(object : PeerTasks.Net {
+        override fun offersAgentTo(id: String) = id in offers
             override val platform = platform
-            override val can = "test $platform"
+            override val can = if (realCan) PeerTasks.canFor(platform) else "test $platform"
             override fun trust(id: String) = trust[id] ?: PeerStore.Trust.FRIEND
             override fun enabled() = true
             override fun paired() = paired.toList()
@@ -108,6 +112,62 @@ class PeerTasksTest {
         // Face markers and the end tag are for the voice on the other side, not for this report.
         assertEquals("Built it: ~/site/index.html", asker.last!!.report)
         assertTrue(asker.last!!.done)
+    }
+
+    @Test
+    fun aDeviceThatOffersItsAgentIsKnownToTheOther_andTakingItBackIsToo() {
+        val mac = Node("mac", "mac"); val phone = Node("phone", "phone")
+        pair(mac, phone)
+        mac.trust[phone.peer.id] = PeerStore.Trust.OWN
+        phone.trust[mac.peer.id] = PeerStore.Trust.OWN
+        // Switch off (the default): the link comes up and the phone is told there is no agent for it.
+        link(mac, phone)
+        assertNull("nothing offered yet", phone.tasks.agentDevice())
+        assertFalse(phone.tasks.offersAgent(mac.peer.id))
+        // The owner turns it on at the Mac, with the link already up: the phone hears it at once.
+        mac.offers += phone.peer.id
+        mac.tasks.reannounce(phone.peer.id)
+        assertEquals(mac.peer.id, phone.tasks.agentDevice())
+        assertTrue(phone.tasks.offersAgent(mac.peer.id))
+        // And back off.
+        mac.offers -= phone.peer.id
+        mac.tasks.reannounce(phone.peer.id)
+        assertNull(phone.tasks.agentDevice())
+    }
+
+    @Test
+    fun anOfferIsHeardOnTheNextLinkToo() {
+        val mac = Node("mac", "mac"); val phone = Node("phone", "phone")
+        pair(mac, phone)
+        mac.offers += phone.peer.id          // switched on while the phone was away
+        link(mac, phone)
+        assertEquals(mac.peer.id, phone.tasks.agentDevice())
+    }
+
+    @Test
+    fun anOfferedAgentIsACapabilityOfTheDevice_notAFriendsSkill() {
+        val mac = Node("mac", "mac", realCan = true); val phone = Node("phone", "phone", realCan = true)
+        pair(mac, phone)
+        mac.trust[phone.peer.id] = PeerStore.Trust.OWN
+        phone.trust[mac.peer.id] = PeerStore.Trust.OWN
+        // Not offered: no paragraph, and the friend is described as before, coding agents and all.
+        link(mac, phone)
+        assertEquals("", phone.tasks.agentIndex())
+        assertTrue(phone.tasks.dispatch("peer.list", JSONObject()).toString().contains("coding agents and a terminal"))
+
+        mac.offers += phone.peer.id
+        mac.tasks.reannounce(phone.peer.id)
+        val para = phone.tasks.agentIndex()
+        assertTrue(para, para.contains("delegate_task") && para.contains("It is your own, like a tool"))
+        assertFalse("it is never told to ask a friend for it", para.contains("ask_friend"))
+        // The friend's own line no longer claims the agent as that friend's skill, so nothing leads to asking it.
+        val listed = phone.tasks.dispatch("peer.list", JSONObject()).toString()
+        assertFalse(listed, listed.contains("coding agents"))
+        assertTrue("what the Mac itself can still do is said", listed.contains("browser, files"))
+
+        mac.offers -= phone.peer.id
+        mac.tasks.reannounce(phone.peer.id)
+        assertEquals("withdrawn: gone from the prompt", "", phone.tasks.agentIndex())
     }
 
     @Test
