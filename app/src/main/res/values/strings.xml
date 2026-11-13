@@ -521,6 +521,7 @@
     <string name="topic_continue_prompt">继续「%1$s」：接下来想做什么？说出来或打字告诉我</string>
     <string name="topic_continue_said">继续「%1$s」：%2$s</string>
     <string name="tasks_carry_on">接着办</string>
+    <string name="dsh_remote_done">电脑上的 dsh 做完了：%1$s</string>
     <string name="tasks_said">「%1$s」：%2$s</string>
     <string name="tasks_talk_prompt">关于「%1$s」：想让它怎么办？说出来或打字告诉我</string>
     <string name="textpage_topic_head">话题 · %1$s</string>

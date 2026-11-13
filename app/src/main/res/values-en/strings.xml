@@ -537,6 +537,7 @@
     <string name="topic_continue_prompt">Continue “%1$s”: what next? Say it or type it</string>
     <string name="topic_continue_said">Continue “%1$s”: %2$s</string>
     <string name="tasks_carry_on">Carry on</string>
+    <string name="dsh_remote_done">The dsh on the computer finished: %1$s</string>
     <string name="tasks_said">“%1$s”: %2$s</string>
     <string name="tasks_talk_prompt">About “%1$s”: how should it go on? Say it or type it</string>
     <string name="textpage_topic_head">Topic · %1$s</string>

@@ -122,13 +122,24 @@ class AndroidBrainHost(
         registry.tools(), market.tools(),
         // A tool that can only ever answer "nothing is paired" is a promise made to every user who never set this up.
         net.kuafuai.andee.peer.PeerTasks.TOOLS.takeIf { peers.store.all().isNotEmpty() },
-    )
+        // A computer that has said it offers its agent to this phone: the same tool names the Mac lists for its own dsh, so
+        // this Andee reasons in the same words and does not need to know a link is in the middle.
+        net.kuafuai.andee.peer.RemoteAgentTools.TOOLS.takeIf { agentDevice() != null },
+        )
+
+        /** The paired computer whose agent this phone may use, if one has said it offers it. */
+        private fun agentDevice(): String? = peers.tasks.agentDevice()
+
+        private val agentHost by lazy {
+            net.kuafuai.andee.peer.RemoteAgentHost(peers.remote, { agentDevice() }, File(ctx.filesDir, "agent_inbox"))
+        }
 
     override fun methodOf(toolName: String): String? =
         ToolSchemas.methodOf(toolName)
             ?: toolName.takeIf { registry.hasMethod(it) }
             ?: toolName.takeIf { market.hasMethod(it) }
             ?: net.kuafuai.andee.peer.PeerTasks.methodOf(toolName)
+            ?: net.kuafuai.andee.peer.RemoteAgentTools.methodOf(toolName)?.takeIf { agentDevice() != null }
 
     override fun dispatch(method: String, params: JSONObject, callId: String, silent: Boolean, untrusted: Boolean): Any? {
         Notebook.callBeingRun = callId
@@ -137,7 +148,11 @@ class AndroidBrainHost(
         if (method.startsWith("peer.")) {
             net.kuafuai.andee.net.TurnGuards.check(method, silent, untrusted)
             return peers.tasks.dispatch(method, params)
-        }
+            }
+            if (method.startsWith("dsh.")) {
+                net.kuafuai.andee.net.TurnGuards.check(method, silent, untrusted)
+                return agentHost.dispatch(method, params)
+            }
         return dispatcher.dispatch(method, params, driving = true, silent = silent, untrusted = untrusted)
     }
 

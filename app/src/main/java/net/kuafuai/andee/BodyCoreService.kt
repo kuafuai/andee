@@ -3054,6 +3054,17 @@ class BodyCoreService : Service() {
             onStep = { net.kuafuai.andee.ui.PhoneWorkLog.on(it) },
         )
         peers.tasks.brain = peerBrain
+        // A worker on the computer ended: its report is another agent's words, so it runs as a turn the brain cannot trust.
+        peers.onRemoteReport = { device, worker, text, title ->
+            val b = localBrain
+            if (b != null) {
+                net.kuafuai.andee.ui.ChatHistory.addEvent("DSH", AppLocale.str(this, R.string.dsh_remote_done, title), "", worker)
+                waitForQuiet {
+                    acceptBrainOutput = true
+                    b.wake(text, untrusted = true)
+                }
+            }
+        }
         refreshSceneChip()
         // Promises outlive the process: anything that came due while the
         // accessibility service was off (or the tablet was off) is dealt with
@@ -3076,6 +3087,7 @@ class BodyCoreService : Service() {
         val lb = localBrain ?: return
         localBrain = null
         peers.tasks.brain = null
+        peers.onRemoteReport = { _, _, _, _ -> }
         lb.stop()
         refreshSceneChip()
     }

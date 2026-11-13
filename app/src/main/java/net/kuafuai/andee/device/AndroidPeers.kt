@@ -11,6 +11,7 @@ import net.kuafuai.andee.peer.PeerDiscovery
 import net.kuafuai.andee.peer.PeerEvents
 import net.kuafuai.andee.peer.PeerProtocol
 import net.kuafuai.andee.peer.PeerQr
+import net.kuafuai.andee.peer.PeerRemote
 import net.kuafuai.andee.peer.PeerServer
 import net.kuafuai.andee.peer.PeerStore
 import net.kuafuai.andee.peer.PeerTasks
@@ -70,9 +71,23 @@ class AndroidPeers(context: Context) {
         override fun connect(id: String) = this@AndroidPeers.connect(id)
     })
 
+    /** The paired computer's agent, used as if it were this phone's own ([PeerRemote]). */
+    val remote = PeerRemote.Client { id -> links[id] }
+
+    /**
+     * A worker on the computer ended: its report, as it came. Set by the service, which turns it into a turn of the
+     * brain's own (fenced: the worker may have read anything). [device] is the computer it came from.
+     */
+    @Volatile var onRemoteReport: (device: String, worker: String, text: String, title: String) -> Unit = { _, _, _, _ -> }
+
     private val events = object : PeerEvents {
-        override fun onMessage(channel: PeerChannel, msg: JSONObject) {
-            if (tasks.onMessage(channel, msg)) return
+    override fun onMessage(channel: PeerChannel, msg: JSONObject) {
+    if (tasks.onMessage(channel, msg)) return
+    if (remote.onMessage(msg)) return
+    if (msg.optString("type") == "remote.event") {
+        onRemoteReport(channel.peer.id, msg.optString("worker"), msg.optString("text"), msg.optString("detail"))
+        return
+    }
             if (msg.optString("type") == "ping") channel.send(JSONObject().put("type", "pong").put("n", msg.optInt("n")))
         }
         override fun onConnected(channel: PeerChannel) {

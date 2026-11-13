@@ -71,9 +71,17 @@ class PeerRemoteTest {
         init { phoneToMac.back = macToPhone; macToPhone.back = phoneToMac }
     }
 
+    private fun rigWith(agent: PeerRemote.Agent): Triple<PeerRemote.Agent, PeerRemote.Client, Wire> {
+        val server = PeerRemote.Server({ agent }, { true })
+        lateinit var wire: Wire
+        val client = PeerRemote.Client { wire.phoneToMac }
+        wire = Wire(server, client)
+        return Triple(agent, client, wire)
+    }
+
     private fun rig(allowed: Boolean = true, dir: File = Files.createTempDirectory("worker7").toFile()): Triple<Mac, PeerRemote.Client, Wire> {
-        val mac = Mac(dir)
-        val server = PeerRemote.Server({ mac }, { allowed })
+    val mac = Mac(dir)
+    val server = PeerRemote.Server({ mac }, { allowed })
         lateinit var wire: Wire
         val client = PeerRemote.Client { wire.phoneToMac }
         wire = Wire(server, client)
@@ -153,6 +161,56 @@ class PeerRemoteTest {
         // A range from the middle, without having read what is before it: what a preview that jumps does.
         assertArrayEquals(big.copyOfRange(1000, 1100), phone.get("mac-id", "7", "big.bin", 1000, 100).bytes)
         assertEquals("hello 你好", String(phone.get("mac-id", "7", "notes.txt", 0).bytes, Charsets.UTF_8))
+    }
+
+    @Test fun aFileIsFetchedPieceByPieceToDisk_andAHalfFileIsNeverKept() {
+        val dir = Files.createTempDirectory("worker7").toFile()
+        val big = ByteArray(PeerRemote.CHUNK * 2 + 77) { (it % 241).toByte() }
+        File(dir, "report.pdf").writeBytes(big)
+        val (mac, phone, wire) = rig(dir = dir)
+        val inbox = Files.createTempDirectory("inbox").toFile()
+        val host = RemoteAgentHost(phone, { "mac-id" }, inbox)
+
+        val r = host.dispatch("dsh.fetch", JSONObject().put("id", "7").put("path", "report.pdf")) as JSONObject
+        assertEquals(3, r.getInt("pieces"))
+        assertEquals(big.size.toLong(), r.getLong("size"))
+        assertArrayEquals(big, File(r.getString("path")).readBytes())
+        assertTrue("no half file left beside it", File(inbox, "7").listFiles()!!.none { it.name.endsWith(".part") })
+
+        // The link drops after the first piece: what was written is thrown away, not left looking like the file.
+        var served = 0
+        lateinit var wire2: Wire
+        val flaky = object : PeerRemote.Agent by mac {
+        override fun read(worker: String, path: String, offset: Long, length: Int): PeerRemote.Chunk {
+        val c = mac.read(worker, path, offset, length)
+        if (++served == 2) wire2.phoneToMac.open = false   // the reply to this piece is lost with the link
+        return c
+        }
+        }
+        val (_, phone2, w2) = rigWith(flaky)
+        wire2 = w2
+        try { RemoteAgentHost(phone2, { "mac-id" }, inbox).dispatch("dsh.fetch", JSONObject().put("id", "7").put("path", "report.pdf")); fail("a dropped link must be an error") } catch (e: IllegalStateException) { }
+        assertTrue(File(inbox, "7").listFiles()!!.none { it.name.endsWith(".part") })
+    }
+
+    @Test fun withNoComputerOfferingItsAgentThePhoneSaysSoAndSendsNothing() {
+        val (mac, phone, _) = rig()
+        val host = RemoteAgentHost(phone, { null }, Files.createTempDirectory("inbox").toFile())
+        try { host.dispatch("dsh.delegate", JSONObject().put("task", "x")); fail() } catch (e: IllegalStateException) {
+            assertTrue(e.message, e.message!!.contains("none of the paired devices offers its agent"))
+        }
+        assertTrue(mac.calls.isEmpty())
+    }
+
+    @Test fun theToolsAreTheSameNamesAsTheMacsAndAllResolve() {
+        val names = (0 until RemoteAgentTools.TOOLS.length()).map { RemoteAgentTools.TOOLS.getJSONObject(it).getString("name") }
+        assertEquals(listOf("delegate_task", "delegate_status", "delegate_cancel", "read_worker_file", "list_worker_files", "fetch_worker_file"), names)
+        for (n in names) assertTrue(n, RemoteAgentTools.methodOf(n) != null)
+        for (i in 0 until RemoteAgentTools.TOOLS.length()) {
+            val t = RemoteAgentTools.TOOLS.getJSONObject(i)
+            assertEquals(RemoteAgentTools.methodOf(t.getString("name")), t.getString("method"))
+            assertFalse("no Finder on a phone", t.getString("description").contains("Finder"))
+        }
     }
 
     @Test fun nothingOutsideTheWorkersFolderCanBeListedOrRead() {

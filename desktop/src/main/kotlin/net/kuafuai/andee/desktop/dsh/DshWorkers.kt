@@ -478,7 +478,7 @@ class DshWorkers(
         val summary = (if (ok) "" else "Did not finish: ${error ?: "unknown reason"}. ") +
             (if (files.isNotEmpty()) "Files: " + files.take(6).joinToString(", ") { it.path } + ". " else "") + report.trim().take(160)
         val record = if (w.origin.isNotEmpty()) "" else runCatching { tasks?.answered(w, summary, seen = false) }.getOrNull().orEmpty()
-        val turn = DshPlan.reportTurn(w, ok, error, report, files, steps, tokens) +
+        val turn = DshPlan.reportTurn(w, ok, error, report, files, steps, tokens, remote = w.origin.isNotEmpty()) +
             (if (record.isNotBlank()) "\n\nThis report answers something you are in the middle of:\n$record" else "")
         runCatching { if (w.origin.isNotEmpty()) onRemoteFinished(w, turn) else onFinished(w, turn) }
             .onFailure { Log.w(TAG, "worker #${w.id}: report not delivered", it) }
