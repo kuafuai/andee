@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
@@ -82,7 +82,11 @@ fun Sidebar(nav: Nav, width: androidx.compose.ui.unit.Dp = 228.dp) {
         NavItem(AndeeIcon.FRIENDS, t("朋友", "Friends"), here == "peers", badge = Peers.count.value) { nav.go("peers") }
 
         Spacer(Modifier.height(14.dp))
-        // 在办 above 话题: what is in hand now, then what was said and put away.
+        // 在办 above 话题: what is in hand now, then what was said and put away. Both scroll together in the space the doors
+        // above and 自检/设置 below leave. They used to be a fixed block followed by a list taking "the rest", so enough 事
+        // used the rest up and pushed 自检 and 设置 out of the window.
+        val rail = rememberScrollState()
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rail)) {
         SidebarTasks(nav)
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -107,8 +111,10 @@ fun Sidebar(nav: Nav, width: androidx.compose.ui.unit.Dp = 228.dp) {
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            items(topics, key = { it.id }) { tp ->
+        // A plain column, not a LazyColumn: it now sits inside a scrolling column, where a lazy list has no bounded height.
+        // Topics are capped by the scrollback, so there is no cost to composing them all.
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            for (tp in topics) {
                 val on = here == "topic:${tp.id}"
                 Column(
                     Modifier.fillMaxWidth()
@@ -120,6 +126,7 @@ fun Sidebar(nav: Nav, width: androidx.compose.ui.unit.Dp = 228.dp) {
                     Text(fmt.format(Date(tp.endedAt)), color = Palette.photoInk, fontSize = 10.sp)
                 }
             }
+        }
         }
 
         Spacer(Modifier.height(8.dp))

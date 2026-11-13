@@ -73,6 +73,22 @@ fun main(args: Array<String>) {
             step = 4, secondsAgo = 23,
         )
     }
+    // `chat … many`: twelve 事 in hand, to see that the sidebar scrolls and 自检 / 设置 stay at its foot. Throwaway notebook.
+    if (args.getOrElse(4) { "" } == "many") {
+        DesktopNotebook.storeOverride = object : net.kuafuai.andee.config.NotebookStore {
+            var s: String? = null
+            override fun read() = s
+            override fun write(plain: String): Boolean { s = plain; return true }
+            override fun wipe() { s = null }
+        }
+        val tasks = DesktopNotebook.book.tasks
+        val user = net.kuafuai.andee.brain.Source(kind = "user")
+        listOf("给老王的合作方案", "小王问报价", "北京二手房核心区调研", "Kafka 消息可靠性深度调研", "etcd Raft 实现深度调研", "给 Andee 做官方落地页", "整理桌面截图", "周报", "订机票", "回复客户邮件", "核对发票", "备份照片").forEach { w ->
+            tasks.open(w, "等对方回话再继续", 0L, user, false).getOrNull()?.let { t ->
+                tasks.wait(t.id, net.kuafuai.andee.config.Tasks.Wait(kind = "person", name = "老王", asked = "看完了吗"))
+            }
+        }
+    }
     // `task:T1 … closed`: the page of a 事 the user confirmed done, in a throwaway notebook. Nothing real.
     if (args.getOrElse(4) { "" } == "closed") {
         DesktopNotebook.storeOverride = object : net.kuafuai.andee.config.NotebookStore {
