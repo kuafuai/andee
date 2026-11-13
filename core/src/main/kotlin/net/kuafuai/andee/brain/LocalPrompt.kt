@@ -451,8 +451,9 @@ You are more than the turns someone starts. You keep a record of yourself, and t
         scene: net.kuafuai.andee.config.Scene? = null,
         platform: String = "",
         guard: String = "",
+        base: String = "",
     ): String {
-        var out = if (platform.isBlank()) TEXT else "$platform\n\n$TEXT"
+        var out = if (platform.isBlank()) base else "$platform\n\n$base"
         if (persona.isNotBlank()) {
             out += "\n\n" + """
 ### 12. The character you are wearing
