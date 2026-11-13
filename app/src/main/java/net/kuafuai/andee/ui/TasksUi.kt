@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -36,6 +38,11 @@ class TasksUi(
     private val onTalk: (Tasks.Task) -> Unit,
     /** 工作文件 ›: what worker [id] made, on the computer, as a drive. Null hides the entry. */
     private val onFiles: ((worker: String, title: String) -> Unit)? = null,
+    /**
+     * Stop worker [id] on the computer (the protocol's only way to abandon a job is to end its process). Blocks on the link, so
+     * it is called off the main thread; the result is whether the computer stopped it. Null hides the button.
+     */
+    private val onStopWorker: ((worker: String) -> Boolean)? = null,
     /** Hand the service a callback to run when a worker's progress changes (or `{}` to stop). */
     private val watchProgress: (() -> Unit) -> Unit = {},
     private val onDismiss: () -> Unit = {},
@@ -208,16 +215,16 @@ class TasksUi(
                     },
                 ), matchWrap().apply { bottomMargin = dp(12) })
             }
-            task.active -> body.addView(buttons(
-                t("接着办", "Carry on") to { hide(); onContinue(task) },
-                t("说点要求", "Say how") to { hide(); onTalk(task) },
-                t("办完了", "Done") to { confirm(task) },
-                t("放下", "Let go") to {
-                    tasks.close(task.id, "dropped", t("用户在在办里放下了", "let go by the user in 在办"))
-                    .onSuccess { c -> c.cancel.forEach { Scheduler.cancelTodo(context, it) } }
-                    open = null; rebuild()
-                },
-            ), matchWrap().apply { bottomMargin = dp(12) })
+            task.active -> {
+                val running = TaskRows.runningWorker(task)
+                if (running != null && onStopWorker != null) buildRunningActions(body, task, running)
+                else body.addView(buttons(
+                    t("接着办", "Carry on") to { hide(); onContinue(task) },
+                    t("说点要求", "Say how") to { hide(); onTalk(task) },
+                    t("办完了", "Done") to { confirm(task) },
+                    t("放下", "Let go") to { letGo(task) },
+                ), matchWrap().apply { bottomMargin = dp(12) })
+            }
             else -> {
                 body.addView(label((if (task.status == "done") t("办完了：", "Done: ") else t("放下了：", "Let go: ")) + task.result,
                 Glass.Type.CAPTION, Glass.SECONDARY), matchWrap().apply { bottomMargin = dp(8) })
@@ -308,6 +315,65 @@ class TasksUi(
             for (a in s.recent.takeLast(4)) p.addView(oneLine(label("· $a", Glass.Type.CAPTION, Glass.SECONDARY, top = 2)), matchWrap())
         }
         if (s.files > 0) p.addView(label(t("已经产出 ${s.files} 个文件（在电脑上）", "${s.files} files so far (on the computer)"), Glass.Type.CAPTION, Glass.SECONDARY, top = 6), matchWrap())
+    }
+
+    /** 放下: close the 事 as dropped and cancel the alarms it had armed. */
+    private fun letGo(task: Tasks.Task) {
+        tasks.close(task.id, "dropped", t("用户在在办里放下了", "let go by the user in 在办"))
+            .onSuccess { c -> c.cancel.forEach { Scheduler.cancelTodo(context, it) } }
+        open = null; rebuild()
+    }
+
+    /** The user is asked about a running worker before the 事 is closed: [asking] is "done" or "dropped", null for the buttons. */
+    private var asking: String? = null
+
+    /**
+     * A worker is running on this 事. Carrying on or adding a requirement would only spend a turn (dsh takes no word mid-run, it
+     * can only be stopped), so the one action is 停止 dsh. Closing the 事 is still allowed but asks about the worker first, so it
+     * is not left running on the user's quota with nothing to receive its report.
+     */
+    private fun buildRunningActions(body: LinearLayout, task: Tasks.Task, worker: String) {
+        val mode = asking
+        if (mode == null) {
+            body.addView(buttons(
+                t("停止 dsh", "Stop dsh") to { stopWorker(worker) },
+                t("办完了", "Done") to { asking = "done"; rebuild() },
+                t("放下", "Let go") to { asking = "dropped"; rebuild() },
+            ), matchWrap().apply { bottomMargin = dp(12) })
+            return
+        }
+        val done = mode == "done"
+        val p = panel()
+        p.addView(label(t("dsh #$worker 还在跑", "dsh #$worker is still running"), Glass.Type.BODY, Glass.DANGER), matchWrap())
+        p.addView(label(
+            t("先把它停掉吗？不停的话它会跑完，花的是你的额度，报告回来时这件事已经关了，没人接。",
+                "Stop it first? If not it runs to the end on your quota, and its report arrives after this is closed, with nobody to take it."),
+            Glass.Type.CAPTION, Glass.TITLE, top = 4,
+        ), matchWrap())
+        body.addView(p, matchWrap().apply { bottomMargin = dp(8) })
+        val finish = { if (done) confirm(task) else letGo(task); asking = null }
+        body.addView(buttons(
+            t("停掉并" + if (done) "办完" else "放下", "Stop it and " + if (done) "finish" else "let go") to { stopWorker(worker); finish() },
+            t("让它继续跑", "Leave it running") to { finish() },
+            t("取消", "Cancel") to { asking = null; rebuild() },
+        ), matchWrap().apply { bottomMargin = dp(12) })
+    }
+
+    /** 停止 dsh: asked of the computer off the main thread; a row says what happened and the card redraws when it answers. */
+    private fun stopWorker(worker: String) {
+        val stop = onStopWorker ?: return
+        Thread {
+            val ok = runCatching { stop(worker) }.getOrDefault(false)
+            Handler(Looper.getMainLooper()).post {
+                ChatHistory.addEvent(
+                    net.kuafuai.andee.brain.BrainEvent.Kind.STOPPED.name,
+                    if (ok) t("你叫停了电脑上的 dsh #$worker", "You stopped dsh #$worker on the computer")
+                    else t("没能叫停电脑上的 dsh #$worker（够不着电脑，或它已经结束了）", "Could not stop dsh #$worker on the computer (out of reach, or it already ended)"),
+                    "",
+                )
+                if (root != null) rebuild()
+            }
+        }.apply { isDaemon = true; name = "stop-worker" }.start()
     }
 
     private fun confirm(task: Tasks.Task) {

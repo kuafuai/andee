@@ -219,6 +219,7 @@ fun main(args: Array<String>) {
         Peers.store.add(net.kuafuai.andee.peer.PeerProtocol.Peer("phone-demo", "My phone", net.kuafuai.andee.peer.PeerCrypto.publicBytes(net.kuafuai.andee.peer.PeerCrypto.newKeyPair().public)))
         Peers.count.value = Peers.store.all().size
     }
+    if (args.getOrElse(5) { "" } == "ask-done") TaskPreview.asking = "done"
     val nav = Nav().also { if (screen != "chat") it.go(screen.removeSuffix(":read")) }
     val density = Density(2f)
     // `ask` draws one question card on its own: its layout (the close button in the corner, the

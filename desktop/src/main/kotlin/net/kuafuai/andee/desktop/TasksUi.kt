@@ -291,23 +291,57 @@ fun TaskScreen(id: String, nav: Nav, onTalk: () -> Unit) {
             }
             Spacer(Modifier.height(12.dp))
         } else if (task.active) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PrimaryButton(t("接着办", "Carry on"), Modifier.weight(1f)) {
-                    Assistant.continueTask(task)
-                    nav.go("chat")
+            if (live != null) {
+                // A worker is running on it. Carrying on or adding a requirement would only spend a turn (dsh has no way to take
+                // a word mid-run; it can only be stopped), so the one thing to do here is stop it. Closing the 事 is still
+                // possible, but asks about the worker first, so it is not left running with nothing to receive its report.
+                var asking by remember(task.id) { mutableStateOf<String?>(TaskPreview.asking) }
+                fun stopWorker() {
+                    runCatching { Assistant.dsh.cancel(org.json.JSONObject().put("id", worker)) }
                 }
-                SecondaryButton(t("说点要求再办", "Say how first"), Modifier.weight(1f)) {
-                    Assistant.beginTask(task)
-                    onTalk()
+                if (asking == null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SecondaryButton(t("停止 dsh", "Stop dsh"), Modifier.weight(1f)) { stopWorker() }
+                        SecondaryButton(t("办完了", "Done"), Modifier.weight(0.6f)) { asking = "done" }
+                        SecondaryButton(t("放下", "Let it go"), Modifier.weight(0.6f)) { asking = "dropped" }
+                    }
+                } else {
+                    val done = asking == "done"
+                    ConfirmBlock(
+                        t("dsh #$worker 还在跑", "dsh #$worker is still running"),
+                        t("先把它停掉吗？不停的话它会跑完，花的是你的额度，报告回来时这件事已经关了，没人接。",
+                            "Stop it first? If not it runs to the end on your quota, and its report arrives after this is closed, with nobody to take it."),
+                        t("停掉并" + if (done) "办完" else "放下", "Stop it and " + if (done) "finish" else "let go"),
+                        onNo = { asking = null },
+                        onYes = {
+                            stopWorker()
+                            closeTask(task, done, ::t)
+                            nav.back()
+                        },
+                    )
+                    SecondaryButton(t("让它继续跑，只" + if (done) "办完" else "放下", "Leave it running, only " + if (done) "finish" else "let go"), Modifier.padding(top = 8.dp)) {
+                        closeTask(task, done, ::t)
+                        nav.back()
+                    }
                 }
-                SecondaryButton(t("办完了", "Done"), Modifier.weight(0.6f)) {
-                    DesktopNotebook.book.tasks.confirm(task.id).onSuccess { c -> c.cancel.forEach(DesktopScheduler::cancel) }
-                    nav.back()
-                }
-                SecondaryButton(t("放下", "Let it go"), Modifier.weight(0.6f)) {
-                    DesktopNotebook.book.tasks.close(task.id, "dropped", t("用户在在办里放下了", "let go by the user in 在办"))
-                        .onSuccess { c -> c.cancel.forEach(DesktopScheduler::cancel) }
-                    nav.back()
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PrimaryButton(t("接着办", "Carry on"), Modifier.weight(1f)) {
+                        Assistant.continueTask(task)
+                        nav.go("chat")
+                    }
+                    SecondaryButton(t("说点要求再办", "Say how first"), Modifier.weight(1f)) {
+                        Assistant.beginTask(task)
+                        onTalk()
+                    }
+                    SecondaryButton(t("办完了", "Done"), Modifier.weight(0.6f)) {
+                        closeTask(task, done = true, ::t)
+                        nav.back()
+                    }
+                    SecondaryButton(t("放下", "Let it go"), Modifier.weight(0.6f)) {
+                        closeTask(task, done = false, ::t)
+                        nav.back()
+                    }
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -357,6 +391,18 @@ fun TaskScreen(id: String, nav: Nav, onTalk: () -> Unit) {
             color = Palette.secondary, fontSize = 13.sp, fontStyle = FontStyle.Italic)
         }
     }
+}
+
+/** For the screenshot harness only: open a running 事 already asking whether to stop its worker ("done" or "dropped"). */
+object TaskPreview {
+    @Volatile var asking: String? = null
+}
+
+/** Close a 事 the user finished (confirm) or let go, and cancel the alarms it had armed. */
+private fun closeTask(task: Tasks.Task, done: Boolean, t: (String, String) -> String) {
+    val book = DesktopNotebook.book.tasks
+    val r = if (done) book.confirm(task.id) else book.close(task.id, "dropped", t("用户在在办里放下了", "let go by the user in 在办"))
+    r.onSuccess { c -> c.cancel.forEach(DesktopScheduler::cancel) }
 }
 
 /** The notebook tab that lists 定时 (only the alarms; the 事 are in the sidebar). */

@@ -2535,6 +2535,14 @@ class BodyCoreService : Service() {
             onContinue = { task -> ui.post { pendingTask = task.id; submitUserTurn(AppLocale.str(this, R.string.tasks_carry_on), "typed") } },
             onTalk = { task -> ui.post { beginTaskTalk(task) } },
             onFiles = { worker, title -> ui.post { openWorkerFiles(worker, title) } },
+            // The same path the model's delegate_cancel takes, so the 事's wait is answered as seen and nothing restarts the job.
+            onStopWorker = { worker ->
+                val dev = peers.tasks.agentDevice()
+                dev != null && net.kuafuai.andee.peer.RemoteAgentHost(
+                    peers.remote, net.kuafuai.andee.peer.RemoteAgentTasks { net.kuafuai.andee.config.Notebook.tasks(this) }, { dev },
+                    java.io.File(filesDir, "agent_inbox"),
+                ).dispatch("dsh.cancel", org.json.JSONObject().put("id", worker)).let { (it as? org.json.JSONObject)?.optBoolean("cancelled") == true }
+            },
             watchProgress = { f -> peers.onProgressChanged = { ui.post(f); window.refreshTasksKey() } },
             onDismiss = { window.refreshTasksKey() },
             openTask = taskId,
