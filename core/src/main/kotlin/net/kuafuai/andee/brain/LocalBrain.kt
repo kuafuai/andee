@@ -1943,6 +1943,7 @@ class LocalBrain(
         host.activeSceneName()?.let { host.scene(it) },
         host.platformPrompt(),
         host.guard(),
+        host.basePrompt()
     )
 
     /**
