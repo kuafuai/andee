@@ -180,6 +180,8 @@ interface BrainHost {
      * friend's request ([GuestHost]) starts empty and ends with its turn.
      */
     fun archiveDir(): File? = null
+
+    fun basePrompt(): String = LocalPrompt.TEXT
 }
 
 /** One row of the persisted conversation, as the brain needs to see it. */
