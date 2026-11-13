@@ -48,9 +48,6 @@ object TurnGuards {
     /** The user's own choice of which kinds of app the model is told about. Only a live, trusted turn may move it. */
     private const val GEAR_VISIBILITY = "gear.visibility"
 
-    /** Handing a job to a dsh worker on the Mac (`DshWorkers`). Refused on untrusted and silent turns; see [check]. */
-    const val DSH_DELEGATE = "dsh.delegate"
-
     /**
      * @param silent the turn is the quiet-hour sweep (or a harvest): the brain
      *   is reviewing a finished conversation by itself, with nobody watching.
@@ -93,15 +90,6 @@ object TurnGuards {
                     "it themselves.",
             )
         }
- // A dsh worker is an agent with a shell of its own (sandboxed to its folder, but it can ask to go wider). A
-        // stranger's words must not be able to start one — that would turn a notification into a running program —
-        // and a review has nobody to answer the worker's questions, so neither may delegate.
- if ((untrusted || silent) && method == DSH_DELEGATE) {
-            throw IllegalStateException(
-         "This turn cannot hand work to a dsh worker ($method): it started from somebody else's words, or it is a " +
-      "review with nobody here. Tell the user what you would have handed over and let them ask for it.",
-     )
- }
         // Same stranger, a bigger prize: the user's other devices. A task handed on runs over there as the
         // user's own request — the Mac lets it run commands — so a message somebody else sent must not be
         // able to become one by asking this device to pass it along.

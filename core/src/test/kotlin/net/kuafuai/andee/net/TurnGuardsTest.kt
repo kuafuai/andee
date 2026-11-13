@@ -21,6 +21,21 @@ class TurnGuardsTest {
     }
 
     @Test
+    fun `Andee decides whether a notification is worth a dsh worker`() {
+        // 11-12, the owner's call: the decision is Andee's, so a turn that started from a notification, a todo or a
+        // friend may hand work to dsh like any other. (A first version refused it; that was the guard deciding for Andee.)
+        for (m in listOf("dsh.delegate", "dsh.status", "dsh.cancel", "dsh.read", "dsh.open")) {
+            TurnGuards.check(m, silent = false, untrusted = true)
+        }
+    }
+
+    @Test
+    fun `the quiet-hour review still cannot touch dsh`() {
+        // Not a trust rule: the review is a reading of a finished conversation, with nobody there to answer a worker.
+        refused("dsh.delegate", silent = true)
+    }
+
+    @Test
     fun `a user turn may call anything`() {
         for (m in listOf("screen.tap", "device.vault.fill", "scene.enter", "note.todo")) {
             TurnGuards.check(m, silent = false, untrusted = false)

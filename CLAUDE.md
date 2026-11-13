@@ -877,7 +877,7 @@ meetings, gear, friends) and lists exactly the tools some provider handles. What
   `continue=<id>` resumes that worker's session (it found its own file from "the file you created", measured) —
   **decided by the device** (`DshPlan.reuse`): a session opened on the user's turn is not continued from a todo's,
   nor the reverse, nor one older than 30 days; a fresh one is seeded with the old report. `TurnGuards` refuses
-  `dsh.delegate` on untrusted and silent turns. At most two jobs at once. **A tap on the ball does not cancel them,
+  `dsh.delegate` on silent turns only (the quiet-hour review has nobody to answer a worker). A turn that started from a notification, a todo or a friend may delegate like any other: Andee decides, and TurnGuards does not second-guess it (owner's call, 11-12; a first version refused untrusted turns). At most two jobs at once. **A tap on the ball does not cancel them,
   and neither does a new request or 清空聊天记录** — it did at first, and a tap to say one more sentence killed a
   research job mid-way (11-12); only `delegate_cancel` stops one. Jobs running when Andee quit are marked interrupted
   at the next start and their orphan process ended.
