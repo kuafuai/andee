@@ -427,6 +427,41 @@
     <string name="tree_helper_enabled_row">(This app was hiding its screen; turned on the system\'s accessibility enhance service so it shows it again)</string>
     <string name="settings_scenes_browse">Manage scenes</string>
 
+    <!-- 脚本: recorded flows, the scenes' hands. Same card as scenes, second tab. See ui/ScenesUi.kt. -->
+    <string name="flows_tab">Flows</string>
+    <string name="flows_subtitle">The hands: recorded runs that move by themselves</string>
+    <string name="flows_empty">No recorded flows yet.\nSay “remember this routine” —\nrun it once with me, and it will do it itself next time.</string>
+    <string name="flows_meta">%1$d steps · ok %2$d/%3$d · last %4$s</string>
+    <string name="flows_meta_never">%1$d steps · never run</string>
+    <string name="flows_run">Run</string>
+    <string name="flows_steps_show">Steps</string>
+    <string name="flows_steps_hide">Hide</string>
+    <string name="flows_running">Running — I am watching every step</string>
+    <string name="flows_step_tap">Tap</string>
+    <string name="flows_step_long_press">Hold</string>
+    <string name="flows_step_swipe">Swipe</string>
+    <string name="flows_step_type">Type “%1$s”</string>
+    <string name="flows_step_human">You: %1$s</string>
+    <string name="flows_step_wait">Wait %1$d s</string>
+    <string name="flows_step_launch">Open</string>
+    <string name="flows_step_ai">Andee: %1$s</string>
+    <string name="flows_step_anchor">%1$s · %2$s</string>
+    <!-- The pill under the status bar while a flow is being recorded; see ui/RecordChipUi. -->
+    <string name="flows_recording_chip">● Recording · %1$d steps</string>
+    <!-- Spoken after a flow run from the card's 运行 button. -->
+    <string name="flows_ui_run_done">“%1$s” is done — every step landed.</string>
+    <string name="flows_ui_run_handoff">“%1$s” handed step %2$d to me. I will finish it and carry on.</string>
+    <string name="flows_ui_run_handoff_giveup">“%1$s” handed me step %2$d again and I cannot do it right now. The flow is waiting there — what would you like me to do?</string>
+    <string name="flows_ui_run_failed">“%1$s” stopped at step %2$d. I will take it from here.</string>
+    <string name="flows_ui_run_error">The flow could not run: %1$s</string>
+    <string name="flows_ui_run_giveup">“%1$s” stopped at step %2$d again and I cannot fix it: %3$s. The flow is unchanged — what would you like me to do?</string>
+    <!-- Scrollback rows written when a flow runs from the card — the run happens
+         without the model, so the row is how the next turn's brain learns of it. -->
+    <string name="flows_run_done_row">(Flow “%1$s” finished)</string>
+    <string name="flows_run_handoff_row">(Flow “%1$s” handed step %2$d to me)</string>
+    <string name="flows_run_failed_row">(Flow “%1$s” stopped at step %2$d)</string>
+    <string name="flows_run_heal_row">(Flow “%1$s” stopped at step %2$d — taking over)</string>
+
     <!-- The factory-reset confirmation list; see config/FactoryReset.kt. -->
     <string name="factory_reset_target_keys">the Volcano and DeepSeek keys, and every speech and brain setting</string>
     <string name="factory_reset_target_notebook">the notebook: what it remembers and what it promised</string>

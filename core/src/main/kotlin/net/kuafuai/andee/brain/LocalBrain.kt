@@ -200,6 +200,19 @@ class LocalBrain(
     /** The end-of-turn reminder fires once a turn. */
     private var turnReminded = false
 
+    /**
+     * A flow replay stopped in this turn and has not been continued yet. The
+     * prompt asks the model to take over a stop; this is the half that does
+     * not depend on it agreeing — a turn that ends with a stopped flow and a
+     * shrug is not an answer. Loop thread only.
+     */
+    private var flowStopped: String? = null
+    private var flowRepairReminded = false
+
+    /** The same debt for an `ai` hand-off: the tail of the flow is still unrun. */
+    private var flowPaused: String? = null
+    private var flowHandoffReminded = false
+
     /** What [turnSent] and [turnTyped] are made of; see there. */
     private fun noteSent(method: String) {
         when {
@@ -653,6 +666,10 @@ class LocalBrain(
             turnTyped = false
             turnTasked = false
             turnReminded = false
+            flowStopped = null
+            flowRepairReminded = false
+            flowPaused = null
+            flowHandoffReminded = false
             runningWhat = describe(text, kind)
             aimMisses = 0
             reviewItems = if (kind.silent) mutableListOf() else null
@@ -1144,6 +1161,7 @@ class LocalBrain(
             val self = host.selfIndex()
             val wiki = host.wikiIndex()
             val scenes = host.scenesIndex()
+            val flows = host.flowsIndex()
             // The pages it has made, the same way and for the same reason: a
             // tool answers a question the brain thought to ask, and 「上次那个表格」
             // is exactly the question it does not know to ask. `list_pages` has
@@ -1223,6 +1241,14 @@ class LocalBrain(
                             ""
                         } else {
                             "\n\n(scenes you can enter — see §11; you are in: ${host.activeSceneName() ?: "none"})\n$scenes"
+                        } +
+                        // Recorded flows, same position and same reasoning as
+                        // scenes: a newly saved flow must not cost the prefix
+                        // cache.
+                        if (flows.isEmpty()) {
+                            ""
+                        } else {
+                            "\n\n(recorded flows — see §11; replay one with run_flow when the chore matches)\n$flows"
                         } +
                         // And the shelf of pages it has built (§7). Same
                         // position, same reasoning: this list changes every time
@@ -1357,6 +1383,23 @@ class LocalBrain(
                     history += JSONObject().put("role", "user").put("content", TASK_REMINDER)
                     continue
                 }
+                // A flow stopped and the model is trying to end the turn
+                // without continuing it. Once, make it finish the job (or
+                // explain honestly why it cannot). The second time is its
+                // report — nobody wants a reminder loop.
+                if (!harvest && !quiet && !internal && flowStopped != null && !flowRepairReminded) {
+                    flowRepairReminded = true
+                    history += JSONObject().put("role", "user").put("content", FLOW_REPAIR_REMINDER)
+                    continue
+                }
+                // A hand-off is a different promise to keep. The model may
+                // have done the instruction and still forgotten that half
+                // the script is unrun — this is what sends it back to resume.
+                if (!harvest && !quiet && !internal && flowPaused != null && !flowHandoffReminded) {
+                    flowHandoffReminded = true
+                    history += JSONObject().put("role", "user").put("content", FLOW_HANDOFF_REMINDER)
+                    continue
+                }
                 val answer = reply.content.trim()
                 if (harvest) {
                     // A harvest turn's prose is not an answer to anybody: it is
@@ -1425,6 +1468,19 @@ class LocalBrain(
                     gen, tc.name, host.methodOf(tc.name), tc.argumentsRaw,
                     msg.optString("content"), System.nanoTime() / 1_000_000L - t0,
                 )
+                // A stopped replay is a hand-off to this turn, not a result
+                // to report. Only a run that came back without the repair flag
+                // clears the debt — refit / edit alone still leave the tail of
+                // the flow unrun. See the end-of-turn check below.
+                if (tc.name == "run_flow" || tc.name == "resume_flow") {
+                    val content = msg.optString("content")
+                    val who = host.methodOf(tc.name) ?: tc.name
+                    flowStopped = if (content.contains("flow_repair_required")) who else null
+                    // A pause carries its own debt: the model still has to do
+                    // the instruction and run the tail. Only a later run that
+                    // comes back without the hand-off flag clears it.
+                    flowPaused = if (content.contains("flow_handoff_required")) who else null
+                }
                 history += msg
             }
 
@@ -2365,6 +2421,28 @@ class LocalBrain(
                 "you stop — task open, then task wait — or it will be lost when this turn ends. If it is finished and " +
                 "nothing is pending, leave tasks alone. Then give your final answer again, in full: the one above was " +
                 "not delivered.)"
+
+        /** See the stopped-flow check in [runTurn]. Also not the user's words. */
+        const val FLOW_REPAIR_REMINDER =
+            "(device note, not from the user: a flow replay stopped during this turn and you have not " +
+                "continued it. Do not end here. Read the failure report above (or call flow_status), then either " +
+                "fix the screen and resume_flow, refit_flow / edit_flow the broken step (edit_flow insert a " +
+                "launch step when the FLOW is missing its opening app step) and resume_flow, or — if " +
+                "you genuinely cannot fix it after two tries — say plainly which flow, which step, the reason, " +
+                "what you tried, whether the flow was changed and what the user must do. Never restart from step 1, " +
+                "never suggest re-recording, and never claim the job succeeded without looking at the final " +
+                "screen. Then give your final answer again, in full: the one above was not delivered.)"
+
+        /** See the paused-flow check in [runTurn]. Also not the user's words. */
+        const val FLOW_HANDOFF_REMINDER =
+            "(device note, not from the user: a flow PAUSED at an `ai` step during this turn and you have not " +
+                "continued it. This is a hand-off, NOT a failure — the script is healthy, so do not repair it, " +
+                "do not edit_flow / refit_flow, and do not call it a failed run. Do what the `instruction` said " +
+                "(or, if you already did, confirm it against the screen), then resume_flow from `resume_from` " +
+                "to run the remaining steps, and check the final screen. Never restart from step 1, never " +
+                "re-record, and never end here while the rest of the flow is unrun. If you genuinely cannot do " +
+                "what the instruction asks, say which step the flow is waiting at and why. Then give your " +
+                "final answer again, in full: the one above was not delivered.)"
 
         private val NOT_DONE_KEYS = listOf("written", "added", "changed", "saved", "noted", "linked", "shared", "logged", "settled", "ok", "performed")
 

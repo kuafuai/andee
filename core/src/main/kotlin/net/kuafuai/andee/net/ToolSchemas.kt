@@ -2443,6 +2443,287 @@ object ToolSchemas {
             required = listOf("name"),
             props = mapOf("name" to prop("string", "The scene's name, from list_scenes")),
         ),
+
+        // ------------------------------------------------------------------
+        // Flows — `flow.*`, localOnly. A scene's "hands": recorded runs the
+        // device plays back step by step without a model call per step.
+        // ------------------------------------------------------------------
+        tool(
+            localOnly = true,
+            name = "record_flow_start",
+            method = "flow.record_start",
+            description = """
+        Arm flow recording: from now on every tap, long-press, swipe, typed line and wait_for_user you perform is
+        noted as a step — nothing is stored yet. Do this when the user asked you to record a routine (「把刚才这套记下来」
+        「记一个发视频到TK的流程」). When the whole run is over, propose saving it in words first (「这套存成脚本，以后说
+        发TK我就照做，行不行？」) and call save_flow only after they say yes — the same rule save_scene has.
+    """.trimIndent(),
+            required = emptyList(),
+            props = emptyMap(),
+        ),
+        tool(
+            localOnly = true,
+            name = "record_flow_stop",
+            method = "flow.record_stop",
+            description = """
+        Disarm flow recording. Nothing is saved. Use when the user changed their mind or the run went wrong midway.
+    """.trimIndent(),
+            required = emptyList(),
+            props = emptyMap(),
+        ),
+        tool(
+            localOnly = true,
+            name = "wait_for_user",
+            method = "flow.wait_user",
+            description = """
+        A step only the user can do — logging in, a CAPTCHA, a payment they must confirm themselves. Say out loud
+        what they must do, then call this with `note` in their language; the device waits for the screen to change
+        (their own hand is the confirmation) and records the step as a human step. Replays will speak the same note
+        and wait the same way. Only while recording.
+
+        When it is Andee (not the user) who should do the step — reading a CAPTCHA, judging a dialog — use
+        `handoff_to_ai` instead: that step pauses the replay and wakes you to do the job yourself.
+    """.trimIndent(),
+            required = listOf("note"),
+            props = mapOf("note" to prop("string", "What the user must do, in their language, e.g. 「用你的指纹确认付款」")),
+        ),
+        tool(
+            localOnly = true,
+            name = "handoff_to_ai",
+            method = "flow.handoff",
+            description = """
+        Record a step the FLOW cannot do by itself and must hand back to you — reading a CAPTCHA off the screen and
+        typing it, choosing between dialogs that only appear sometimes, checking whether an upload really finished.
+        Only while recording. Write `note` as a short instruction to your future self IN THE USER'S LANGUAGE, and
+        say what must be true before the flow continues (e.g. 「读出屏幕上的验证码填进去，点确定，确认已经进入下一步」).
+
+        On replay this step performs NO gesture. The flow PAUSES (`paused:true`, NOT a failure), you are woken with
+        the instruction and the current screen, you do the job with your own tools, then `resume_flow` from
+        `resume_from` runs the remaining steps. Nothing is repaired and the run is not counted as a failure.
+
+        Use `wait_for_user` instead when the USER's own hand is required — a fingerprint, a payment, a login only
+        they may do. Do not record an ai step for something only the user is allowed to decide.
+    """.trimIndent(),
+            required = listOf("note"),
+            props = mapOf("note" to prop("string", "What Andee must do at this step, in the user's language.")),
+        ),
+        tool(
+            localOnly = true,
+            name = "save_flow",
+            method = "flow.save",
+            description = """
+        Save the current recording as a flow, or overwrite one under the same name (re-saving is how a repaired flow
+        is written back).
+
+        🔴 **Only after the user said yes to saving this exact flow.** Propose it in words first and wait for the
+        answer. Never on your own initiative. Before asking, show them what was recorded (preview_flow) — they may
+        want a step or two dropped first, and `drop` is how.
+
+        `name` is a short id (lowercase a-z 0-9 _, e.g. publish_tiktok); `title` is what the user sees; `summary` one
+        line about what it does. The steps were noted while recording — nothing more to supply.
+    """.trimIndent(),
+            required = listOf("name", "title"),
+            props = mapOf(
+                "name" to prop("string", "Short id, lowercase a-z 0-9 _ only, e.g. publish_tiktok. Same name = overwrite."),
+                "title" to prop("string", "What the user sees, in their language, e.g. 发布视频到TK"),
+                "summary" to prop("string", "One line: what it does and when to use it"),
+                "drop" to prop("array", "1-based step numbers to leave out, from preview_flow — e.g. [3]. Omit to keep every step."),
+            ),
+        ),
+        tool(
+            localOnly = true,
+            name = "preview_flow",
+            method = "flow.record_list",
+            description = """
+        List what has been recorded so far, in order: step number, kind, what it taps or types. Call this before
+        save_flow and show the user the list in their language — they may want a step dropped (`save_flow` with
+        `drop`). Only while recording.
+    """.trimIndent(),
+            required = emptyList(),
+            props = emptyMap(),
+        ),
+        tool(
+            localOnly = true,
+            name = "list_flows",
+            method = "flow.list",
+            description = """
+        List the recorded flows: name, title, summary, step count, how often it ran and how often it succeeded.
+        Check this before doing a repetitive chore the user has done before — running a matching flow costs one
+        model call instead of one per step.
+    """.trimIndent(),
+            required = emptyList(),
+            props = emptyMap(),
+        ),
+        tool(
+            localOnly = true,
+            name = "get_flow",
+            method = "flow.get",
+            description = """
+        Read one flow in full, steps included. Always read it before deciding to run or change it.
+    """.trimIndent(),
+            required = listOf("name"),
+            props = mapOf("name" to prop("string", "The flow's name, from list_flows")),
+        ),
+        tool(
+            localOnly = true,
+            name = "run_flow",
+            method = "flow.run",
+            description = """
+        Play a recorded flow back, step by step, locally — no model call per step. The device verifies each step
+        before it runs (element still there, same app, screen reacts) and STOPS at the first one that fails instead
+        of guessing. A `human` step speaks its note and waits for the user's own hand. An `ai` step PAUSES the run
+        and hands a job back to you — see "a pause is not a failure" below.
+
+        `replace` parameterises the run: a map of 1-based step number → text, used for steps that type (a new
+        title, a different file path). Pass what the user asked for now.
+
+        🔴 **A stop is YOUR job, not the user's.** If the result comes back `ok:false` with `failed_at`, keep
+        working in THIS turn: read `failure_class` — the machine's diagnosis of what kind of stop it is — and
+        act on it; read `current_screen` in the report, repair that one step, `resume_flow` from
+        `resume_from`, and only then answer. Never restart from step 1, never ask the user what happened, never
+        suggest re-recording. The classes and their fixes: `launch_blocked` → the flow ALREADY has a launch
+        step and it could not bring its app up (system blocked the background start, app slow or missing, a
+        dialog in the way) — do NOT insert another launch step; open the app yourself (launch_app; if it will
+        not come up, system_action home then launch_app), then resume_flow from failed_at+1. `wrong_screen`
+        → fix the screen, resume from failed_at. `stale_anchor` → get_screen_element, refit_flow that step
+        with the fresh eid, resume from its `resume_from`. `screen_frozen` → look; if the step did its job,
+        resume from failed_at+1. `user_absent` → ask whether they are done, resume from failed_at. `bad_step`
+        → edit_flow drop or retype it, resume from failed_at. MISSING opening step (stopped at step 1 from
+        the home screen because the flow never opens its own app) is the LAST reading — check get_flow FIRST:
+        if step 1 is already a `launch` step, this is NOT a missing opening, it is `launch_blocked`. Only when
+        step 1 really is a tap/wait does edit_flow insert a `launch` step before 1, then get_flow for the new
+        numbering. That last one fixes the ROOT CAUSE — re-recording is never the answer. The report's `hint`
+        spells this out again.
+
+        `done:true` is NOT the end: the result carries `final_screen` and `need_review:true`. Look at the screen
+        (or take a screenshot) and confirm the job actually landed. If it did not, deal with it now. Write every
+        repair back into the flow (refit_flow / edit_flow) so the next run needs no help. If you cannot fix it
+        after two tries, say plainly which flow, which step, why, what you tried, and what the user must do.
+
+        🔵 **A pause is NOT a failure.** An `ai` step returns `{paused:true, done:false, ok:true, paused_at,
+        instruction, current_screen, resume_from}` — the script deliberately handed that step to you because a
+        gesture cannot express it (a CAPTCHA, a dialog that may not appear). Nothing is broken: do NOT repair the
+        flow, do NOT edit_flow / refit_flow, do NOT count it as a failed run, do NOT re-record. Do what
+        `instruction` says IN THIS TURN with your own tools, then `resume_flow` from `resume_from` (the step AFTER
+        the hand-off) to run the rest, and check the final screen. A remaining `ai` step may pause you again —
+        that is expected, not a loop.
+    """.trimIndent(),
+            required = listOf("name"),
+            props = mapOf(
+                "name" to prop("string", "The flow's name, from list_flows"),
+                "from_step" to prop("integer", "1-based step to start from. Omit to run the whole flow."),
+                "replace" to prop("object", "Map of 1-based step number → text to type instead of the recorded one, e.g. {\"4\": \"新的标题\"}."),
+            ),
+        ),
+        tool(
+            localOnly = true,
+            name = "resume_flow",
+            method = "flow.resume",
+            description = """
+        Continue a flow from `from_step` (1-based) after you fixed whatever stopped it. `from_step` is the NEXT
+        step to actually execute: the `resume_from` of the failure report, or of refit_flow. If you performed the
+        failed step yourself by hand, that number is failed_at + 1 — using failed_at would repeat the tap.
+        The rest of the steps run locally with the same per-step verification. `replace` works as in run_flow.
+        A `done:true` result still needs the final_screen review, exactly like run_flow. If a later `ai` step
+        pauses again, do its instruction and resume once more — that is the script handing you another job,
+        not a failure.
+    """.trimIndent(),
+            required = listOf("name", "from_step"),
+            props = mapOf(
+                "name" to prop("string", "The flow's name, from list_flows"),
+                "from_step" to prop("integer", "1-based step to continue from — the failed_at of the run that stopped"),
+                "replace" to prop("object", "Map of 1-based step number → text to type instead of the recorded one."),
+            ),
+        ),
+        tool(
+            localOnly = true,
+            name = "delete_flow",
+            method = "flow.delete",
+            description = """
+        Delete a flow for good. Only when the user asks for it; cannot be undone.
+    """.trimIndent(),
+            required = listOf("name"),
+            props = mapOf("name" to prop("string", "The flow's name, from list_flows")),
+        ),
+        tool(
+            localOnly = true,
+            name = "edit_flow",
+            method = "flow.edit",
+            description = """
+        Repair a saved flow in place — what a stuck run ends in. When run_flow stopped at `failed_at` N, first look
+        at the screen and fix what is in front of you; then:
+
+        - the step itself is wrong (an app update moved the element, a step turned out useless) → `drop` it:
+          {"name": "publish_tiktok", "drop": [4]} — later steps keep their actions and renumber.
+        - a step types the wrong default text now → `retype` it: {"name": "...", "retype": {"3": "新的标题"}} —
+          only works on steps that type.
+        - the ROOT CAUSE is a MISSING step → `insert` it. The common one: a flow recorded while its app was
+          already open dies at step 1 from the home screen, because it never opens that app itself. Fix it
+          PERMANENTLY with {"name": "wifi_scan", "insert": [{"before": 1, "kind": "launch",
+          "pkg": "com.android.settings"}]} — use list_installed_apps for the package. NEVER re-record just to
+          add an opening step. `before` is an ORIGINAL get_flow step number, or steps+1 to append.
+
+        `insert` also adds an `ai` step when a routine needs judgement in the middle — {"before": 4, "kind": "ai",
+        "note": "读出屏幕上的验证码填进去并确认"}. On replay that step pauses (never fails) and hands the note
+        back to you; do the job, then resume_flow from the next step. Useful for a CAPTCHA or a dialog that a
+        recorded tap cannot handle. Use `human` {note} when the USER's own hand is required instead.
+
+        Insert kinds: launch {pkg preferred, or label}, wait {seconds}, human {note}, ai {note}, type {text},
+        tap {eid or x/y in 0-1000}. All selectors use the ORIGINAL numbers from get_flow, even when combined
+        in one call.
+        After ANY edit the steps renumber — call get_flow again before run_flow / resume_flow. The repair is
+        SAVED: the run history stays, and the user can still delete the flow.
+    """.trimIndent(),
+            required = listOf("name"),
+            props = mapOf(
+                "name" to prop("string", "The flow's name, from list_flows"),
+                "drop" to prop("array", "1-based step numbers to remove, from get_flow, e.g. [4]."),
+                "retype" to prop("object", "Map of 1-based step number → the new text a type step should type, e.g. {\"3\": \"新标题\"}."),
+                "insert" to prop("array", "Steps to ADD, e.g. [{\"before\":1,\"kind\":\"launch\",\"pkg\":\"com.android.settings\"}] for a missing opening step, or [{\"before\":4,\"kind\":\"ai\",\"note\":\"读出验证码填进去\"}] for a step that needs judgement. before is an ORIGINAL 1-based step number (steps+1 appends)."),
+            ),
+        ),
+        tool(
+            localOnly = true,
+            name = "refit_flow",
+            method = "flow.refit",
+            description = """
+        Re-anchor ONE step to where its element is TODAY and SAVE that repair in the flow — the step an app update
+        moved or renamed no longer needs you next time. Call get_screen_element first, then pass the fresh `eid`
+        of the element this step should tap (or `x`/`y` in 0-1000 when there is no element to name).
+
+        `step` is the 1-based number that stopped (failed_at). `mode`:
+        - "anchor" (default): you only re-anchored it; the step has NOT run yet → resume_flow from `resume_from`.
+        - "done": you ALREADY performed that step by hand → resume from `resume_from` (failed_at + 1). Never use
+          "anchor" in that case, or the tap happens twice — dangerous on publish, send and pay surfaces.
+
+        The answer carries `resume_from`, `flow_finished` and the new anchor. When `flow_finished` is true there is
+        nothing left to replay: go straight to the final check and report. Only tap / long_press steps can be
+        refitted; typed text uses edit_flow's `retype`, a step that is no longer needed uses `drop`.
+    """.trimIndent(),
+            required = listOf("name", "step"),
+            props = mapOf(
+                "name" to prop("string", "The flow's name, from list_flows"),
+                "step" to prop("integer", "1-based number of the step to re-anchor — the failed_at of the run"),
+                "eid" to prop("string", "Element id from a FRESH get_screen_element, e.g. \"e12\". Preferred: carries the view id, label and bounds."),
+                "x" to prop("integer", "0-1000 horizontal centre, used only when there is no eid"),
+                "y" to prop("integer", "0-1000 vertical centre, used only when there is no eid"),
+                "mode" to prop("string", "\"anchor\" (default) or \"done\" if you already performed this step yourself"),
+            ),
+        ),
+        tool(
+            localOnly = true,
+            name = "flow_status",
+            method = "flow.status",
+            description = """
+        Read the full report of the most recent flow run on this device (session-only): the step-by-step trace,
+        where it stopped and why, the screen as it was then, or the final_screen of a completed run. Use this when
+        a device event woke you about a flow and you need the detail rather than the short wake text. `status` is
+        "finished", "stopped" (a failure needing repair) or "paused" (an `ai` step handed you its `instruction`
+        and `resume_from` — do the job and resume, do not repair anything).
+    """.trimIndent(),
+            required = emptyList(),
+            props = emptyMap(),
+        ),
     )
 
     /** Server-side lookup: given a hub-facing tool name, return the method

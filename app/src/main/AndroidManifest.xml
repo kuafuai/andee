@@ -227,6 +227,19 @@
             android:name=".device.PermissionRequestActivity"
             android:theme="@style/Theme.Body"
             android:exported="false" />
+
+        <!-- 后台启动别的 app 的舞台:HyperOS 会 Abort 从 Service 直接发起的
+             跨应用 startActivity,必须先起自己的 Activity,由它在前台转交。
+             不可见(Theme.Body.Transparent)、不在最近任务、不留历史 ——
+             转交完立刻 finish,目标 app 成为任务根,返回键直接退出它,
+             舞台全程一帧都不画。见 device/LaunchPadActivity。 -->
+        <activity
+            android:name=".device.LaunchPadActivity"
+            android:theme="@style/Theme.Body.Transparent"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
+
         <!-- 三个全屏脸共用 Theme.Body.Stage:纯黑底、无标题栏、无系统转场
              动画。入场/退场由 ui/Stage.kt 自己画,平台那一项闭嘴 —— 见
              values/themes.xml 里关于"关闭时闪一下"的说明。 -->

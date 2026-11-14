@@ -217,6 +217,27 @@ object Notebook {
     fun markSceneUsed(context: Context, name: String) = book(context).markSceneUsed(name)
     fun scenesForPrompt(context: Context): String = book(context).scenesForPrompt()
 
+    fun flows(context: Context): List<Flow> = book(context).flows()
+    fun flow(context: Context, name: String): Flow? = book(context).flow(name)
+    fun saveFlow(
+        context: Context,
+        name: String,
+        title: String,
+        summary: String,
+        steps: List<FlowStep>,
+    ): Pair<Flow, Boolean> = book(context).saveFlow(name, title, summary, steps)
+    fun deleteFlow(context: Context, name: String): Boolean = book(context).deleteFlow(name)
+    fun editFlow(
+        context: Context,
+        name: String,
+        drop: List<Int> = emptyList(),
+        retype: Map<Int, String> = emptyMap(),
+        refit: Map<Int, FlowStep> = emptyMap(),
+        insert: List<Pair<Int, FlowStep>> = emptyList(),
+    ): Flow = book(context).editFlow(name, drop, retype, refit, insert)
+    fun markFlowRun(context: Context, name: String, ok: Boolean) = book(context).markFlowRun(name, ok)
+    fun flowsForPrompt(context: Context): String = book(context).flowsForPrompt()
+
     /**
      * Plain-text view for the settings screen. Read-only, and the only way out.
      *

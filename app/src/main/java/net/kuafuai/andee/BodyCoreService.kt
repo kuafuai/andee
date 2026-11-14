@@ -75,6 +75,7 @@ class BodyCoreService : Service() {
     private lateinit var window: FloatingWindowUi
     private lateinit var ripple: EdgeRippleUi
     private lateinit var marker: net.kuafuai.andee.ui.TapMarkerUi
+    private lateinit var recordChip: net.kuafuai.andee.ui.RecordChipUi
     private var settings: SettingsUi? = null
 
     /**
@@ -352,14 +353,17 @@ class BodyCoreService : Service() {
             }
 
             override fun onWikiOpen(id: String) {
+                stopFollowUpListening()
                 net.kuafuai.andee.ui.NotebookUi(this@BodyCoreService, startWiki = id).show()
             }
 
             override fun onWeChatClick() {
+                stopFollowUpListening()
                 net.kuafuai.andee.ui.WeChatQrUi(this@BodyCoreService).show()
             }
 
             override fun onNotebookClick() {
+                stopFollowUpListening()
                 net.kuafuai.andee.ui.NotebookUi(
                     this@BodyCoreService,
                     // 打算 → 告诉它一句: an ordinary typed turn, so the model adjusts its own plan.
@@ -368,6 +372,7 @@ class BodyCoreService : Service() {
             }
 
             override fun onFriendsClick() {
+                stopFollowUpListening()
                 if (::peers.isInitialized) net.kuafuai.andee.ui.PeersUi(this@BodyCoreService, peers).show()
             }
 
@@ -655,6 +660,10 @@ class BodyCoreService : Service() {
         marker = net.kuafuai.andee.ui.TapMarkerUi(this)
         marker.show()
 
+        // The recording pill: born hidden, shown by the flow tools. A fourth
+        // overlay, after the mark, so it never hides behind anything of ours.
+        recordChip = net.kuafuai.andee.ui.RecordChipUi(this)
+
         audio = AudioIO()
         tts = TtsController(this, audio, window)
         // Follow-up window: when an answer has finished draining, the mic
@@ -801,7 +810,7 @@ class BodyCoreService : Service() {
         // sentence the brain can read. The second provider is the
         // accessibility-free way to *look* at the screen — see [captureFallback].
         dispatcher = CommandDispatcher(
-            ::screenOrNull, ::captureFallback, window, ripple, marker,
+            ::screenOrNull, ::captureFallback, window, ripple, marker, recordChip,
             net.kuafuai.andee.device.DeviceInfoController(this),
             net.kuafuai.andee.device.DeviceActionsController(this),
             net.kuafuai.andee.device.DeviceCommsController(this),
@@ -836,6 +845,9 @@ class BodyCoreService : Service() {
             // The ask/alert cards speak their text; the mute rules live here,
             // not in the dispatcher. See [speakCardText].
             sayAloud = { text, listen -> speakCardText(text, listen) },
+            // The card's 运行 button lives here (it needs the brain to wake
+            // on a stop); the dispatcher only forwards the call.
+            onCardFlowRun = { flow -> runFlowFromUi(flow) },
         )
         // Extension coming or going invalidates the hub's cached tool list; the
         // hub has no incremental protocol, so we bounce the outbound client and
@@ -1507,6 +1519,12 @@ class BodyCoreService : Service() {
         if (asr.isActive() || tts.isSpeaking() || meeting.isActive() ||
             net.kuafuai.andee.device.CallState.isActive
         ) return
+        // One of our own cards is in front: the user is working with the UI,
+        // not waiting to answer aloud — a mic that opens here is the conflict
+        // where card taps happen "while Andee listens" and the card's own TTS
+        // plays into the open mic. The card's buttons and the ball remain the
+        // ways to answer.
+        if (net.kuafuai.andee.ui.OwnCard.showing) return
         asr.toggle(userInitiated = false)   // the 3 s silence watchdog closes it
     }
 
@@ -2142,8 +2160,27 @@ class BodyCoreService : Service() {
         return b.build()
     }
 
+    /**
+     * The user has turned to one of our own cards — the follow-up mic that
+     * opened after the last answer (see [followUpWindow]) now has nobody to
+     * hear, and it is actively harmful: it keeps the "listening" state alive
+     * while the user pokes the card, and any TTS the card's own actions
+     * produce (a flow's run result, an alert) plays straight into the open
+     * mic. Close it.
+     *
+     * A mic that belongs to a turn in progress is left alone: the user may be
+     * answering a `ui.ask` right now, and closing it would strand the turn —
+     * that mic has [dispatcher.isTaskActive] behind it.
+     */
+    private fun stopFollowUpListening() {
+        if (!expectFollowUp) return
+        expectFollowUp = false
+        if (asr.isActive() && !dispatcher.isTaskActive()) asr.stop()
+    }
+
     private fun openSettings() {
         if (settings?.isShowing() == true) return
+        stopFollowUpListening()
         // The settings card is focusable and full of text fields, so it takes
         // the keyboard the moment it appears. Leaving ours up would leave two
         // focusable windows fighting, with the user's sentence in the one that
@@ -2317,6 +2354,7 @@ class BodyCoreService : Service() {
      */
     private fun openArtifacts() {
         if (artifactsUi?.isShown() == true) return
+        stopFollowUpListening()
         val a = net.kuafuai.andee.ui.ArtifactsUi(
             context = this,
             onOpen = { e -> e.page?.let { openPageFrom(e, it) } },
@@ -2329,9 +2367,222 @@ class BodyCoreService : Service() {
     /** 情景 — the scenes it has learned. Our own surface, like 产物. */
     private fun openScenes() {
         if (scenesUi?.isShown() == true) return
-        val s = net.kuafuai.andee.ui.ScenesUi(this)
+        stopFollowUpListening()
+        val s = net.kuafuai.andee.ui.ScenesUi(this, onRunFlow = { f -> runFlowFromUi(f) })
         scenesUi = s
         s.show()
+    }
+
+    /**
+     * 脚本的运行 button — run a recorded flow straight from the card, with no
+     * model call per step: that is what a flow is FOR. The device verifies
+     * every step itself and produces a report. A clean run stays local and
+     * costs nothing; a STOP wakes the brain and hands it that report, so the
+     * assistant repairs the one bad step, runs the rest, checks the result
+     * and writes the repair back — the user never has to say 「修」 first.
+     * A PAUSE is different: an `ai` step asked for the brain on purpose, so
+     * it is woken with the instruction instead of a failure report, and the
+     * run is not counted as a failed one.
+     *
+     * This is the whole reason [submitFlowHealTurn] / [submitFlowHandoffTurn]
+     * exist: a card run is not a tool call, so without them the brain learns
+     * of the stop only if the user happens to mention it on the next turn.
+     */
+    private fun runFlowFromUi(flow: net.kuafuai.andee.config.Flow) {
+        runCatching { dispatcher.compactForUser() }
+        // The run's spoken result would otherwise fight the follow-up mic for
+        // the audio path — close the one that is waiting on nobody.
+        stopFollowUpListening()
+        Thread {
+            runCatching {
+                val scr = screenOrNull()
+                    ?: throw IllegalStateException("accessibility is off")
+                val player = net.kuafuai.andee.flow.FlowPlayer(
+                    scr,
+                    { text, _ -> speakCardText(text, false) },
+                    { pkg, label -> dispatcher.launchForFlow(pkg, label) },
+                )
+                val res = player.run(flow)
+                val done = res.optBoolean("done")
+                val paused = res.optBoolean("paused")
+                val failedAt = res.optInt("failed_at")
+                val pausedAt = res.optInt("paused_at")
+                // An ai step is a hand-off, not a failed run. Leave the run
+                // statistics alone: the resume that finishes the tail is the
+                // run that counts.
+                if (!paused) {
+                    net.kuafuai.andee.config.Notebook.markFlowRun(
+                        this, flow.name, res.optBoolean("ok") && res.optBoolean("done"),
+                    )
+                }
+                // A stop wakes the brain — but only twice for the same stuck
+                // step. Three failures means the repair is not working and
+                // the user deserves an honest report rather than a loop.
+                val canHeal = !done && !paused && localBrain != null &&
+                    net.kuafuai.andee.flow.FlowRuntime.allowAutoHeal(flow.name, failedAt)
+                val canHandoff = paused && localBrain != null &&
+                    net.kuafuai.andee.flow.FlowRuntime.allowAutoHandoff(flow.name, pausedAt)
+                ui.post {
+                    val row = when {
+                        done -> AppLocale.str(this, R.string.flows_run_done_row, flow.title)
+                        paused -> AppLocale.str(this, R.string.flows_run_handoff_row, flow.title, pausedAt)
+                        canHeal -> AppLocale.str(this, R.string.flows_run_heal_row, flow.title, failedAt)
+                        else -> AppLocale.str(this, R.string.flows_run_failed_row, flow.title, failedAt)
+                    }
+                    // The detail is what the next brain turn reads. On a
+                    // hand-off it must be the INSTRUCTION, not a "reason" —
+                    // otherwise the model wakes knowing something happened
+                    // but not what it is meant to do (the 「修啥」 problem).
+                    val detail = when {
+                        done -> res.optJSONObject("final_screen")?.toString().orEmpty()
+                        paused -> "step $pausedAt ai handoff: " + res.optString("instruction") +
+                            " | resume_from=" + res.optInt("resume_from")
+                        else -> res.optString("reason")
+                    }
+                    net.kuafuai.andee.ui.PhoneTimeline.body(
+                        net.kuafuai.andee.ui.PhoneTimeline.Body.FLOW, row, detail,
+                    )
+                }
+                val msg = when {
+                    done -> getString(R.string.flows_ui_run_done, flow.title)
+                    canHandoff -> getString(R.string.flows_ui_run_handoff, flow.title, pausedAt)
+                    paused -> getString(R.string.flows_ui_run_handoff_giveup, flow.title, pausedAt)
+                    canHeal -> getString(R.string.flows_ui_run_failed, flow.title, failedAt)
+                    else -> getString(
+                        R.string.flows_ui_run_giveup, flow.title, failedAt,
+                        res.optString("reason").take(120),
+                    )
+                }
+                speakCardText(msg, false)
+                if (canHeal) submitFlowHealTurn(flow, res)
+                if (canHandoff) submitFlowHandoffTurn(flow, res)
+            }.onFailure { t ->
+                ui.post {
+                    net.kuafuai.andee.ui.PhoneTimeline.body(
+                        net.kuafuai.andee.ui.PhoneTimeline.Body.FLOW,
+                        AppLocale.str(this, R.string.flows_run_failed_row, flow.title, 0),
+                        t.message ?: "unknown",
+                    )
+                }
+                speakCardText(
+                    getString(R.string.flows_ui_run_error, t.message ?: "unknown"),
+                    false,
+                )
+            }
+        }.start()
+    }
+
+    /**
+     * Hand a stopped card run to the brain as a device turn — not as user
+     * words (nobody spoke), and not as a wake-up (those are quiet by rule).
+     * The report is summarised here; `flow_status` has the full one.
+     *
+     * Everything the brain needs is in the text: which flow, which step,
+     * what the screen looks like NOW, and the rule that the repair, the rest
+     * of the run, the final check and the write-back all happen in this turn.
+     */
+    private fun submitFlowHealTurn(flow: net.kuafuai.andee.config.Flow, res: JSONObject) {
+        if (exitRequested) return
+        val brain = localBrain ?: return
+        val failedAt = res.optInt("failed_at")
+        val cs = res.optJSONObject("current_screen")
+        val brief = JSONObject()
+            .put("flow", flow.name)
+            .put("failed_at", failedAt)
+            .put("reason", res.optString("reason"))
+            .put("steps_done", res.optInt("steps_done"))
+            .put("total_steps", res.optInt("total_steps"))
+            .put("resume_from", res.optInt("resume_from"))
+            .put("current_pkg", cs?.optString("pkg").orEmpty())
+        cs?.optJSONArray("visible")?.let { v ->
+            brief.put(
+                "current_visible",
+                org.json.JSONArray().apply {
+                    for (i in 0 until minOf(v.length(), 8)) put(v.optString(i))
+                },
+            )
+        }
+        val wake = buildString {
+            append("[Device event — a flow the USER started from the 情景/脚本 card stopped. ")
+            append("Nobody spoke; do not ask what happened and do not wait to be told. Take over now.]\n")
+            append("Flow: ${flow.name} (${flow.title}), ${flow.steps.size} steps. ")
+            append("Steps before the stop already succeeded — they MUST NOT run again.\n")
+            append("Report: ").append(brief).append("\n")
+            append("Follow §11: repair the ONE step that stopped (fix the screen / refit_flow with a fresh eid / ")
+            append("edit_flow drop / edit_flow insert a launch step if the flow never opens its own app), ")
+            append("resume_flow from resume_from, run the remaining steps, then check the final ")
+            append("screen and confirm the result the user wanted. Write the repair back into the flow so next ")
+            append("time it needs no help. Never restart from step 1, never re-record. If it cannot be fixed ")
+            append("after two tries, report which step, why, what you tried, whether the flow was changed and ")
+            append("what the user must do. `flow_status` re-reads the full report. ")
+            append("Answer in the user's language, briefly: what happened, what you changed, the outcome.")
+        }
+        android.util.Log.i("Body", "flow heal turn: ${flow.name} stopped at step $failedAt — waking the brain")
+        ui.post {
+            if (exitRequested) return@post
+            acceptBrainOutput = true
+            dispatcher.beginTask()
+            window.setState(FloatingWindowUi.State.THINKING)
+            brain.submit(wake, emptyList())
+        }
+    }
+
+    /**
+     * Wake the brain for an `ai` step. Deliberately NOT the failure text:
+     * the script is healthy, nothing needs repairing, and telling the model
+     * "a flow stopped, fix it" is exactly what makes it re-anchor a step
+     * that was never broken. It gets the instruction, the screen as it
+     * stands, and the number of the step AFTER the hand-off.
+     */
+    private fun submitFlowHandoffTurn(flow: net.kuafuai.andee.config.Flow, res: JSONObject) {
+        if (exitRequested) return
+        val brain = localBrain ?: return
+        val pausedAt = res.optInt("paused_at")
+        val resumeFrom = res.optInt("resume_from")
+        val instruction = res.optString("instruction")
+        val cs = res.optJSONObject("current_screen")
+        val brief = JSONObject()
+            .put("flow", flow.name)
+            .put("paused_at", pausedAt)
+            .put("instruction", instruction)
+            .put("steps_done", res.optInt("steps_done"))
+            .put("total_steps", res.optInt("total_steps"))
+            .put("resume_from", resumeFrom)
+            .put("current_pkg", cs?.optString("pkg").orEmpty())
+        cs?.optJSONArray("visible")?.let { v ->
+            brief.put(
+                "current_visible",
+                org.json.JSONArray().apply {
+                    for (i in 0 until minOf(v.length(), 8)) put(v.optString(i))
+                },
+            )
+        }
+        val wake = buildString {
+            append("[Device event — a flow the USER started from the 情景/脚本 card has handed step ")
+            append(pausedAt).append(" to you. Nobody spoke. This is an `ai` step, NOT a failure — ")
+            append("the script is healthy and nothing needs repairing.]\n")
+            append("Flow: ${flow.name} (${flow.title}), ${flow.steps.size} steps. ")
+            append("Steps before the hand-off already ran locally — they MUST NOT run again.\n")
+            append("Hand-off instruction: ").append(instruction).append("\n")
+            append("Report: ").append(brief).append("\n")
+            append("Follow §11: DO what the instruction says IN THIS TURN with your own tools ")
+            append("(get_screen_element / take_screenshot / submit_input / taps). Look at current_screen ")
+            append("for where the flow left off. Then resume_flow with from_step=").append(resumeFrom)
+            append(" to run the remaining steps, check final_screen and confirm the result the user wanted.\n")
+            append("Do NOT repair the flow, do NOT edit_flow / refit_flow, do NOT restart from step 1, ")
+            append("do NOT re-record, and do not treat this as a failed run. If you genuinely cannot do ")
+            append("what the instruction asks, say which step the flow is waiting at and why. ")
+            append("`flow_status` re-reads the full report. ")
+            append("Answer in the user's language, briefly: what you did and the outcome.")
+        }
+        android.util.Log.i("Body", "flow handoff turn: ${flow.name} paused at step $pausedAt — waking the brain")
+        ui.post {
+            if (exitRequested) return@post
+            acceptBrainOutput = true
+            dispatcher.beginTask()
+            window.setState(FloatingWindowUi.State.THINKING)
+            brain.submit(wake, emptyList())
+        }
     }
 
     /**

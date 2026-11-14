@@ -69,4 +69,18 @@
     <style name="Theme.Body.Stage.NoPreview" parent="Theme.Body.Stage">
         <item name="android:windowDisablePreview">true</item>
     </style>
+
+    <!--
+      LaunchPadActivity 专用:一步也不画、一帧也不留。舞台的任务是把
+      Service 发来的 intent 在"前台"里转交给目标 app —— 交完立刻 finish,
+      所以整扇窗必须透明且不抢焦点动画:windowIsTranslucent 让它不可见,
+      windowDisablePreview + windowAnimationStyle 让首帧和动画都不存在。
+      backgroundDimEnabled 关掉,否则部分 ROM 会在透明 Activity 下面压一层
+      暗幕,目标 app 起来之前屏幕会闪一下变暗。
+    -->
+    <style name="Theme.Body.Transparent" parent="Theme.Body.Stage.NoPreview">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
 </resources>

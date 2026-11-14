@@ -101,6 +101,7 @@ class CommandDispatcher(
     private val window: FloatingWindowUi,
     private val ripple: EdgeRippleUi,
     private val marker: net.kuafuai.andee.ui.TapMarkerUi,
+    private val recordChip: net.kuafuai.andee.ui.RecordChipUi,
     private val deviceInfo: net.kuafuai.andee.device.DeviceInfoController,
     private val deviceActions: net.kuafuai.andee.device.DeviceActionsController,
     private val deviceComms: net.kuafuai.andee.device.DeviceCommsController,
@@ -155,6 +156,16 @@ class CommandDispatcher(
      * a question nobody hears just waits in silence for its timeout.
      */
     private val sayAloud: (text: String, listen: Boolean) -> Boolean = { _, _ -> false },
+
+    /**
+     * Run a flow the way the 情景/脚本 card's 运行 button does — including
+     * its "a stop wakes the brain" hand-off. Wired to
+     * `BodyCoreService.runFlowFromUi`; exposed as `flow.debug_card_run` on the
+     * local 9008 debug port so that path can be exercised from a cable. It is
+     * deliberately NOT in [net.kuafuai.andee.net.ToolSchemas]: the model has
+     * `run_flow` and must not be able to impersonate a user card press.
+     */
+    private val onCardFlowRun: (net.kuafuai.andee.config.Flow) -> Unit = {},
 ) {
     private val ui = Handler(Looper.getMainLooper())
 
@@ -165,6 +176,19 @@ class CommandDispatcher(
 
     /** The bubble budget. One per dispatcher, so a service restart starts the count again — see [NudgeBook]. */
     val nudgeBook = net.kuafuai.andee.brain.NudgeBook()
+
+    /**
+     * The recording half of flows. Armed by `flow.record_start`, fed by the
+     * recording hooks on the screen tools below, saved by `flow.save`. Lives
+     * on the dispatcher, so a service restart clears a half-done recording —
+     * recordings are session-scoped by design; only saved flows persist.
+     */
+    val flowRecorder = net.kuafuai.andee.flow.FlowRecorder().apply {
+        // The pill under the status bar keeps the user in the loop: recording
+        // happens with the card folded, and the pill is the one thing that
+        // still says so. Steps counted here, shown there.
+        onStep = { n -> recordChip.setSteps(n) }
+    }
 
     /**
      * Put the two guards on a freshly built screen controller.
@@ -314,6 +338,15 @@ class CommandDispatcher(
     /** What is installed and what it is for. Built on first use from [appContext]; one per dispatcher. */
     val gearShelf: net.kuafuai.andee.device.AndroidGear by lazy { net.kuafuai.andee.device.AndroidGear(appContext) }
 
+    /**
+     * The `launch` step of a flow started from the 情景/脚本 card needs the
+     * same app-opening path the brain's `launch_app` uses, but that card runs
+     * in [BodyCoreService] without going through [dispatch]. One door for
+     * both, so a launch step behaves identically however the run was started.
+     */
+    fun launchForFlow(pkg: String, label: String): JSONObject =
+        deviceActions.launchApp(pkg.ifEmpty { null }, label.ifEmpty { null })
+
     fun dispatch(
         method: String,
         params: JSONObject?,
@@ -409,7 +442,17 @@ class CommandDispatcher(
             "device.launch" -> deviceActions.launchApp(
                 pkg = params?.optString("pkg")?.ifEmpty { null },
                 label = params?.optString("label")?.ifEmpty { null },
-            ).also {
+            ).also { res ->
+                // A recording that opens its own app must KEEP that opening as
+                // its first step. Without it the saved flow only works when the
+                // app happens to already be on screen — the classic "dies at
+                // step 1 from the home screen" failure.
+                if (flowRecorder.isActive() && !res.has("error")) {
+                    flowRecorder.noteLaunch(
+                        params?.optString("pkg").orEmpty().ifEmpty { res.optString("launched") },
+                        params?.optString("label").orEmpty(),
+                    )
+                }
                 // The one usage signal that needs no permission: what *we* opened. Used to rank the shelf
                 // when the system has not been allowed to say what the user opens.
                 params?.optString("pkg")?.ifEmpty { null }?.let { gearShelf.noteLaunched(it) }
@@ -1245,14 +1288,20 @@ class CommandDispatcher(
             }
 
             "screen.tap" -> {
+                val scr = requireScreen()
                 passthroughForGesture {
-                    requireScreen().tapAim(
+                    scr.tapAim(
                         on = params?.optString("on")?.ifBlank { null },
                         x = params?.optInt("x", Int.MIN_VALUE)?.takeIf { it != Int.MIN_VALUE },
                         y = params?.optInt("y", Int.MIN_VALUE)?.takeIf { it != Int.MIN_VALUE },
                         cell = params?.optString("cell")?.ifBlank { null },
                         part = params?.optString("part")?.ifBlank { null },
                     )
+                }.also { res ->
+                    if (flowRecorder.isActive()) {
+                        val d = scr.dims()
+                        flowRecorder.noteTap(res, hold = false, w = d[0], h = d[1])
+                    }
                 }
             }
 
@@ -1289,7 +1338,13 @@ class CommandDispatcher(
                 // and e-numbers cover every node the list shows.
                 val eid = params?.optString("eid").orEmpty()
                 require(eid.isNotEmpty()) { "screen.tap_id requires string eid (e.g. \"e7\", from get_screen_element's element list)" }
-                passthroughForGesture { requireScreen().tapByEid(eid) }
+                val scr = requireScreen()
+                passthroughForGesture { scr.tapByEid(eid) }.also { res ->
+                    if (flowRecorder.isActive()) {
+                        val d = scr.dims()
+                        flowRecorder.noteTap(res, hold = false, w = d[0], h = d[1])
+                    }
+                }
             }
 
             "screen.swipe" -> {
@@ -1301,13 +1356,20 @@ class CommandDispatcher(
                 val dur = params.optLong("duration_ms", 300L)
                 val fling = params.optBoolean("fling", false)
                 val screens = params.optInt("screens", 0).takeIf { it > 0 }
-                passthroughForGesture { requireScreen().swipeNorm(x1, y1, x2, y2, dur, fling, screens) }
+                val scr = requireScreen()
+                passthroughForGesture { scr.swipeNorm(x1, y1, x2, y2, dur, fling, screens) }.also { res ->
+                    if (flowRecorder.isActive()) {
+                        val d = scr.dims()
+                        flowRecorder.noteSwipe(x1, y1, x2, y2, dur, res, w = d[0], h = d[1])
+                    }
+                }
             }
 
             "screen.long_press" -> {
                 val dur = params?.optLong("duration_ms", 600L) ?: 600L
+                val scr = requireScreen()
                 passthroughForGesture {
-                    requireScreen().longPressAim(
+                    scr.longPressAim(
                         on = params?.optString("on")?.ifBlank { null },
                         x = params?.optInt("x", Int.MIN_VALUE)?.takeIf { it != Int.MIN_VALUE },
                         y = params?.optInt("y", Int.MIN_VALUE)?.takeIf { it != Int.MIN_VALUE },
@@ -1315,19 +1377,34 @@ class CommandDispatcher(
                         part = params?.optString("part")?.ifBlank { null },
                         durationMs = dur,
                     )
+                }.also { res ->
+                    if (flowRecorder.isActive()) {
+                        val d = scr.dims()
+                        flowRecorder.noteTap(res, hold = true, w = d[0], h = d[1])
+                    }
                 }
             }
 
             "screen.long_press_id" -> {
                 val eid = params?.optString("eid").orEmpty()
                 require(eid.isNotEmpty()) { "screen.long_press_id requires string eid" }
-                passthroughForGesture { requireScreen().longPressByEid(eid, 600L) }
+                val scr = requireScreen()
+                passthroughForGesture { scr.longPressByEid(eid, 600L) }.also { res ->
+                    if (flowRecorder.isActive()) {
+                        val d = scr.dims()
+                        flowRecorder.noteTap(res, hold = true, w = d[0], h = d[1])
+                    }
+                }
             }
 
             "screen.type" -> {
                 val text = params?.optString("text").orEmpty()
                 val id = params?.optString("id")?.ifEmpty { null }
-                requireScreen().typeText(text, id)
+                requireScreen().typeText(text, id).also {
+                    if (flowRecorder.isActive()) {
+                        flowRecorder.noteType(text, requireScreen().currentPkg().orEmpty())
+                    }
+                }
             }
 
             "screen.submit_input" -> {
@@ -1393,6 +1470,9 @@ class CommandDispatcher(
                 val asked = params?.optDouble("seconds", Double.NaN) ?: Double.NaN
                 require(!asked.isNaN() && asked > 0) { "screen.wait requires positive seconds" }
                 val waitMs = (asked * 1000).toLong().coerceAtMost(WAIT_MAX_MS)
+                if (flowRecorder.isActive()) {
+                    flowRecorder.noteWait(asked, requireScreen().currentPkg().orEmpty())
+                }
                 Thread.sleep(waitMs)
                 requireScreen().dumpUiTree(
                     verbose = false,
@@ -1810,6 +1890,389 @@ class CommandDispatcher(
                 JSONObject().put("deleted", s.name)
             }
 
+            // ---- flow.* : recorded runs — the scenes' hands ----------------
+            //
+            // Stored in the notebook next to scenes, so localOnly the same
+            // way. `run`/`resume`/`wait_user` drive the screen, so those fold
+            // the card like a `screen.*` call would; list/get/record/save do
+            // not. Recording is armed by record_start and holds nothing until
+            // save — the same "only after the user said yes" consent as
+            // scene.save.
+            "flow.record_start" -> {
+                flowRecorder.start()
+                // Recording means the device is about to be driven — fold the
+                // card out of the way and put the pill up where the user can
+                // see the state they are in.
+                ensureCompact()
+                recordChip.show(0)
+                JSONObject().put("recording", true).put(
+                    "note",
+                    "Recording armed. From now on every tap, long-press, swipe, typed line, wait_for_user " +
+                        "and handoff_to_ai is noted as a step — nothing is stored yet. When the whole run " +
+                        "is over and the user has agreed to save it, call save_flow.",
+                )
+            }
+
+            "flow.record_stop" -> {
+                flowRecorder.stop()
+                recordChip.hide()
+                JSONObject().put("recording", false).put("note", "Recording disarmed. Nothing was saved.")
+            }
+
+            "flow.record_list" -> {
+                require(flowRecorder.isActive()) {
+                    "not recording — record_flow_start first"
+                }
+                val arr = org.json.JSONArray()
+                for ((i, s) in flowRecorder.snapshot().withIndex()) {
+                    arr.put(
+                        JSONObject()
+                            .put("step", i + 1)
+                            .put("kind", s.kind)
+                            .put("text", s.text)
+                            .put("note", s.note)
+                            .put("pkg", s.pkg),
+                    )
+                }
+                JSONObject().put("recording", true).put("steps", arr).put("count", arr.length())
+                    .put("note", "Show the user this list before save_flow — they may want a step dropped first (save_flow's drop).")
+            }
+
+            "flow.handoff" -> {
+                // The other kind of pause. A human step waits for the USER's
+                // hand; an ai step waits for the MODEL's judgement. Recording
+                // one is how a routine keeps going past a CAPTCHA, a dialog
+                // that appears only sometimes, or a choice no gesture can
+                // express — without pretending those are recordable taps.
+                val note = requireNotNull(params?.optString("note")?.trim()?.ifEmpty { null }) {
+                    "flow.handoff needs note — what Andee must do here, in the user's language"
+                }
+                require(flowRecorder.isActive()) {
+                    "flow.handoff only means something while recording — record_flow_start first"
+                }
+                val pkg = runCatching { requireScreen().currentPkg().orEmpty() }.getOrDefault("")
+                flowRecorder.noteHandoff(note, pkg)
+                JSONObject()
+                    .put("step_recorded", true)
+                    .put("kind", "ai")
+                    .put("count", flowRecorder.count())
+                    .put(
+                        "note",
+                        "Recorded as an ai step. On replay the flow will PAUSE here (not fail), hand Andee " +
+                            "this instruction together with the current screen, and continue from the next " +
+                            "step once it is done.",
+                    )
+            }
+
+            "flow.wait_user" -> {
+                val note = requireNotNull(params?.optString("note")?.trim()?.ifEmpty { null }) {
+                    "flow.wait_user needs note — what the user must do, in their language"
+                }
+                require(flowRecorder.isActive()) {
+                    "flow.wait_user only means something while recording — record_flow_start first"
+                }
+                ensureCompact()
+                val pkg = requireScreen().currentPkg().orEmpty()
+                flowRecorder.noteHuman(note, pkg)
+                sayAloud(note, false)
+                // Wait like the replay will: any screen change is the user's
+                // own hand saying "done".
+                passthroughForGesture {
+                    val scr = requireScreen()
+                    val before = scr.screenFingerprint()
+                    val startSig = before.optInt("sig")
+                    val startPkg = before.optString("pkg")
+                    val deadline = System.currentTimeMillis() +
+                        net.kuafuai.andee.flow.FlowRecorder.DEFAULT_HUMAN_TIMEOUT_SEC * 1000L
+                    var changed = false
+                    while (System.currentTimeMillis() < deadline) {
+                        Thread.sleep(500)
+                        val now = scr.screenFingerprint()
+                        if (now.optInt("sig") != startSig || now.optString("pkg") != startPkg) {
+                            changed = true
+                            break
+                        }
+                    }
+                    JSONObject().put("waited_for_user", changed).put("step_recorded", true)
+                        .put("note", if (changed) "Recorded as a human step." else "No change seen — recorded anyway; it still replays as a human step.")
+                }
+            }
+
+            "flow.save" -> {
+                require(flowRecorder.isActive()) { "not recording — record_flow_start first" }
+                val name = requireNotNull(params?.optString("name")?.trim()?.ifEmpty { null }) {
+                    "flow.save needs name (lowercase a-z 0-9 _, e.g. publish_tiktok)"
+                }
+                val title = requireNotNull(params?.optString("title")?.trim()?.ifEmpty { null }) {
+                    "flow.save needs title — what the user sees"
+                }
+                val stepsRaw = flowRecorder.snapshot()
+                require(stepsRaw.isNotEmpty()) {
+                    "nothing was recorded — at least one tap, swipe, typed line, wait_for_user or handoff_to_ai"
+                }
+                // The user may have seen the preview and asked for a step or
+                // two to go before this is worth keeping — numbers as
+                // preview_flow shows them.
+                val drop = dropList(params)
+                require(drop.all { it in 1..stepsRaw.size }) {
+                    "drop steps must be within 1..${stepsRaw.size}"
+                }
+                val steps = stepsRaw.filterIndexed { i, _ -> (i + 1) !in drop }
+                require(steps.isNotEmpty()) {
+                    "every recorded step was dropped — nothing left to save"
+                }
+                val (f, created) = Notebook.saveFlow(
+                    context = appContext,
+                    name = name,
+                    title = title,
+                    summary = params?.optString("summary").orEmpty(),
+                    steps = steps,
+                )
+                flowRecorder.stop()
+                recordChip.hide()
+                JSONObject()
+                    .put("saved", f.name)
+                    .put("title", f.title)
+                    .put("steps", f.steps.size)
+                    .put("created", created)
+                    .apply { if (drop.isNotEmpty()) put("dropped", org.json.JSONArray(drop)) }
+                    .put("note", "Saved. Replay with run_flow(\"${f.name}\").")
+            }
+
+            "flow.list" -> {
+                val arr = org.json.JSONArray()
+                for (f in Notebook.flows(appContext).sortedByDescending { it.lastRunAt }) {
+                    arr.put(
+                        JSONObject()
+                            .put("name", f.name)
+                            .put("title", f.title)
+                            .put("summary", f.summary)
+                            .put("steps", f.steps.size)
+                            .put("runs", f.runs)
+                            .put("ok_runs", f.okRuns)
+                            .put("last_run_at", f.lastRunAt),
+                    )
+                }
+                JSONObject().put("flows", arr).put("count", arr.length())
+                    .put("recording", flowRecorder.isActive())
+                    .apply { if (flowRecorder.isActive()) put("recording_steps", flowRecorder.count()) }
+            }
+
+            "flow.get" -> {
+                val f = flowParam(params, method)
+                flowJson(f)
+            }
+
+            "flow.run" -> {
+                val f = flowParam(params, method)
+                val from = (params?.optInt("from_step", 1) ?: 1).coerceAtLeast(1)
+                ensureCompact()
+                passthroughForGesture {
+                    val player = net.kuafuai.andee.flow.FlowPlayer(requireScreen(), sayAloud) { pkg, label ->
+                        deviceActions.launchApp(pkg.ifEmpty { null }, label.ifEmpty { null })
+                    }
+                    val res = player.run(f, fromStep = from, replaces = replaceMap(params))
+                    // A paused run is not a failed run: the script handed a
+                    // step to the model on purpose. The run is unfinished;
+                    // the resume that finishes it is what counts.
+                    if (!res.optBoolean("paused")) {
+                        Notebook.markFlowRun(appContext, f.name, res.optBoolean("ok") && res.optBoolean("done"))
+                    }
+                    res.put("flow", f.name)
+                }
+            }
+
+            "flow.resume" -> {
+                val f = flowParam(params, method)
+                val from = requireNotNull(params?.optInt("from_step", 0)?.takeIf { it > 0 }) {
+                    "flow.resume needs from_step — the 1-based step to continue from (see the failed_at of run_flow's result)"
+                }
+                ensureCompact()
+                passthroughForGesture {
+                    val player = net.kuafuai.andee.flow.FlowPlayer(requireScreen(), sayAloud) { pkg, label ->
+                        deviceActions.launchApp(pkg.ifEmpty { null }, label.ifEmpty { null })
+                    }
+                    val res = player.run(f, fromStep = from, replaces = replaceMap(params))
+                    // A paused run is not a failed run: the script handed a
+                    // step to the model on purpose. The run is unfinished;
+                    // the resume that finishes it is what counts.
+                    if (!res.optBoolean("paused")) {
+                        Notebook.markFlowRun(appContext, f.name, res.optBoolean("ok") && res.optBoolean("done"))
+                    }
+                    res.put("flow", f.name)
+                }
+            }
+
+            "flow.delete" -> {
+                val f = flowParam(params, method)
+                Notebook.deleteFlow(appContext, f.name)
+                JSONObject().put("deleted", f.name)
+            }
+
+            "flow.edit" -> {
+                val f = flowParam(params, method)
+                val drop = dropList(params)
+                val retype = HashMap<Int, String>()
+                params?.optJSONObject("retype")?.let { o ->
+                    val keys = o.keys()
+                    while (keys.hasNext()) {
+                        val k = keys.next()
+                        k.toIntOrNull()?.takeIf { it > 0 }?.let { n -> retype[n] = o.optString(k) }
+                    }
+                }
+                // `insert` is how a repair fixes the ROOT CAUSE rather than
+                // just this one run: a flow that only works when its app was
+                // already open gains a launch step at the front, permanently.
+                val insert = parseInsertSteps(params?.optJSONArray("insert"), f.steps.size)
+                val edited = Notebook.editFlow(appContext, f.name, drop, retype, insert = insert)
+                flowJson(edited).put("edited", true)
+                    .put("inserted", insert.size)
+                    .put(
+                        "note",
+                        if (insert.isEmpty()) {
+                            "Repair saved. Step numbers may have shifted — get_flow before any resume_flow."
+                        } else {
+                            "${insert.size} step(s) inserted and SAVED, so the next run starts in the right app " +
+                                "without you. Step numbers have SHIFTED: call get_flow before resume_flow or " +
+                                "run_flow, and use the NEW numbers. Do not re-record."
+                        },
+                    )
+            }
+
+            /**
+             * The last run's report, for a turn that was woken by a card run
+             * and wants the full detail rather than the summary in its wake
+             * text. Session-only — a restart has nothing to report.
+             */
+            // Local debug port only (not a tool): exercise the card's run
+            // button, including the automatic hand-off on a stop, without
+            // having to hit a floating window by hand.
+            "flow.debug_card_run" -> {
+                val f = flowParam(params, method)
+                onCardFlowRun(f)
+                JSONObject().put("card_run_started", f.name)
+                    .put("note", "Asynchronous — the outcome is in flow.status and the scrollback.")
+            }
+
+            "flow.status" -> {
+                val r = net.kuafuai.andee.flow.FlowRuntime.lastReport()
+                if (r == null) {
+                    JSONObject().put("status", "no run yet")
+                } else {
+                    JSONObject()
+                        .put(
+                            "status",
+                            when {
+                                r.optBoolean("done") -> "finished"
+                                r.optBoolean("paused") -> "paused — an ai step is waiting for the brain"
+                                else -> "stopped"
+                            },
+                        )
+                        .put("report", r)
+                }
+            }
+
+            /**
+             * Write a repair back into the flow. This is the difference
+             * between a script that dies when an app updates and one that
+             * learns: the brain finds the element again on the current screen,
+             * and the step's anchor becomes THAT element, permanently.
+             *
+             * `mode=anchor` (default) means the repaired step still has to
+             * run — resume from it. `mode=done` means the brain already
+             * performed that step by hand, so resuming from it would repeat a
+             * tap (dangerous on publish / pay surfaces); resume from n+1.
+             */
+            "flow.refit" -> {
+                val f = flowParam(params, method)
+                val n = requireNotNull(params?.optInt("step", 0)?.takeIf { it > 0 }) {
+                    "flow.refit needs step — the 1-based number that stopped (failed_at)"
+                }
+                require(n in 1..f.steps.size) {
+                    "no step $n in ${f.name} — it has ${f.steps.size} steps; see get_flow"
+                }
+                val old = f.steps[n - 1]
+                require(old.kind == "tap" || old.kind == "long_press") {
+                    "refit only re-anchors tap / long_press steps; step $n is '${old.kind}'. " +
+                        "Use edit_flow's retype for typed text, drop for a step that is no longer needed."
+                }
+                val mode = params?.optString("mode").orEmpty().ifEmpty { "anchor" }
+                require(mode == "anchor" || mode == "done") {
+                    "flow.refit mode must be 'anchor' (resume from this step) or 'done' (you already did it by hand)"
+                }
+                val scr = requireScreen()
+                val eid = params?.optString("eid")?.trim()?.ifEmpty { null }
+                val anchor = if (eid != null) {
+                    // The e-number came from a screen the model looked at a
+                    // moment ago. Dump again, so it names THIS screen's node
+                    // and the eidIndex the lookup reads is the fresh one.
+                    scr.dumpUiTree(verbose = false, withShot = false, capture = { JSONObject() })
+                    scr.anchorOfEid(eid)
+                } else {
+                    val nx = params?.optInt("x", Int.MIN_VALUE)?.takeIf { it != Int.MIN_VALUE }
+                        ?: throw IllegalArgumentException(
+                            "flow.refit needs eid (from get_screen_element) or x/y in 0-1000",
+                        )
+                    val ny = params?.optInt("y", Int.MIN_VALUE)?.takeIf { it != Int.MIN_VALUE }
+                        ?: throw IllegalArgumentException("flow.refit needs both x and y in 0-1000")
+                    val d = scr.dims()
+                    JSONObject()
+                        .put("x", nx * d[0] / 1000)
+                        .put("y", ny * d[1] / 1000)
+                        .put("rel_x", nx)
+                        .put("rel_y", ny)
+                        .put("view_id", "")
+                        .put("text", "")
+                        .put("bounds", "")
+                        .put("pkg", scr.currentPkg().orEmpty())
+                }
+                val fixed = old.copy(
+                    viewId = anchor.optString("view_id").ifEmpty { null },
+                    text = anchor.optString("text"),
+                    bounds = anchor.optString("bounds"),
+                    pkg = anchor.optString("pkg").ifEmpty { old.pkg },
+                    x = anchor.optInt("x", old.x),
+                    y = anchor.optInt("y", old.y),
+                    relX = anchor.optInt("rel_x", old.relX),
+                    relY = anchor.optInt("rel_y", old.relY),
+                )
+                val edited = Notebook.editFlow(appContext, f.name, refit = mapOf(n to fixed))
+                val resumeFrom = if (mode == "done") n + 1 else n
+                val finished = resumeFrom > edited.steps.size
+                JSONObject()
+                    .put("refitted", true)
+                    .put("flow", f.name)
+                    .put("step", n)
+                    .put("mode", mode)
+                    .put("steps", edited.steps.size)
+                    .put("resume_from", resumeFrom)
+                    .put("flow_finished", finished)
+                    .put(
+                        "new_anchor",
+                        JSONObject()
+                            .put("view_id", fixed.viewId ?: "")
+                            .put("text", fixed.text)
+                            .put("bounds", fixed.bounds)
+                            .put("x", fixed.x)
+                            .put("y", fixed.y),
+                    )
+                    .put(
+                        "note",
+                        "The repair is SAVED in the flow, so the next run will not need you here. " +
+                            if (finished) {
+                                "That was the last step — there is nothing left to replay: go straight to the " +
+                                    "final check (get_screen_element / screenshot) and report the outcome, " +
+                                    "including what you changed in the flow."
+                            } else if (mode == "done") {
+                                "You performed step $n yourself, so continue with resume_flow(from_step=" +
+                                    "$resumeFrom) — NOT $n, or the tap happens twice. Then check final_screen."
+                            } else {
+                                "Continue with resume_flow(from_step=$resumeFrom) to run the repaired step. " +
+                                    "Then check final_screen."
+                            },
+                    )
+            }
+
             // No built-in match. Hand it to the call extension (or whatever
             // else has been wired into forwardExternal). The default lambda
             // throws with the same "unknown method" line the else used to
@@ -1906,6 +2369,183 @@ class CommandDispatcher(
             "No scene named \"$name\". Scenes here: " +
                 Notebook.scenes(appContext).joinToString { it.name }.ifEmpty { "(none yet)" },
         )
+    }
+
+    private fun flowParam(params: JSONObject?, method: String): net.kuafuai.andee.config.Flow {
+        val name = requireNotNull(params?.optString("name")?.trim()?.ifEmpty { null }) {
+            "$method requires name"
+        }
+        return Notebook.flow(appContext, name) ?: throw IllegalArgumentException(
+            "No flow named \"$name\". Flows here: " +
+                Notebook.flows(appContext).joinToString { it.name }.ifEmpty { "(none yet)" },
+        )
+    }
+
+    /** `replace` — a map of 1-based step number → text, how a flow gets its arguments. */
+    private fun replaceMap(params: JSONObject?): Map<Int, String> {
+        val o = params?.optJSONObject("replace") ?: return emptyMap()
+        val out = HashMap<Int, String>()
+        val keys = o.keys()
+        while (keys.hasNext()) {
+            val k = keys.next()
+            val idx = k.toIntOrNull() ?: continue
+            if (idx > 0) out[idx] = o.optString(k)
+        }
+        return out
+    }
+
+    /** `drop` — a list of 1-based step numbers to leave out. */
+    private fun dropList(params: JSONObject?): List<Int> {
+        val arr = params?.optJSONArray("drop") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { arr.optInt(it, 0).takeIf { n -> n > 0 } }.distinct()
+    }
+
+    /**
+     * `insert` — steps to ADD, each `{"before": N, "kind": ...}`. N is the
+     * 1-based number the flow had BEFORE this edit (what `get_flow` just
+     * showed); `before = size + 1` appends. `drop` / `retype` / `refit` use
+     * that same original numbering, so a repair can insert and drop in one
+     * call without doing arithmetic in its head.
+     *
+     * `launch` is the important one: it is the missing opening step that made
+     * old recordings unusable from the home screen, and the reason a model
+     * used to reach for `record_flow_start` instead of fixing the script.
+     * The other kinds are here so a pause, a human confirmation, a typed line
+     * or a tap can be added without re-recording either.
+     */
+    private fun parseInsertSteps(
+        arr: org.json.JSONArray?,
+        size: Int,
+    ): List<Pair<Int, net.kuafuai.andee.config.FlowStep>> {
+        if (arr == null || arr.length() == 0) return emptyList()
+        val out = ArrayList<Pair<Int, net.kuafuai.andee.config.FlowStep>>()
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i)
+                ?: throw IllegalArgumentException("insert[$i] must be an object")
+            val before = o.optInt("before", 0)
+            require(before in 1..size + 1) {
+                "insert[$i].before must be 1..${size + 1} (before an existing step, or ${size + 1} to append); got $before"
+            }
+            val note = o.optString("note")
+            val step = when (val kind = o.optString("kind")) {
+                "launch" -> {
+                    val pkg = o.optString("pkg")
+                    val label = o.optString("label").ifEmpty { note }
+                    require(pkg.isNotEmpty() || label.isNotEmpty()) {
+                        "insert[$i] launch needs pkg (preferred; list_installed_apps) or label"
+                    }
+                    net.kuafuai.andee.config.FlowStep(kind = "launch", pkg = pkg, note = label)
+                }
+                "wait" -> {
+                    val ms = o.optLong("duration_ms", 0L).takeIf { it > 0 }
+                        ?: (o.optInt("seconds", 0) * 1000L).takeIf { it > 0 }
+                        ?: 1000L
+                    net.kuafuai.andee.config.FlowStep(
+                        kind = "wait",
+                        durationMs = ms.coerceAtMost(net.kuafuai.andee.flow.FlowRecorder.WAIT_MAX_MS),
+                    )
+                }
+                "human" -> {
+                    require(note.isNotBlank()) { "insert[$i] human needs note — what the user must do" }
+                    net.kuafuai.andee.config.FlowStep(
+                        kind = "human",
+                        note = note,
+                        humanTimeoutSec = o.optInt(
+                            "timeout_sec",
+                            net.kuafuai.andee.flow.FlowRecorder.DEFAULT_HUMAN_TIMEOUT_SEC,
+                        ),
+                    )
+                }
+                "ai" -> {
+                    require(note.isNotBlank()) {
+                        "insert[$i] ai needs note — what Andee must do at this step, in the user's language"
+                    }
+                    net.kuafuai.andee.config.FlowStep(kind = "ai", note = note, pkg = o.optString("pkg"))
+                }
+                "type" -> {
+                    val text = o.optString("text").ifEmpty { note }
+                    require(text.isNotEmpty()) { "insert[$i] type needs text" }
+                    net.kuafuai.andee.config.FlowStep(kind = "type", note = text, pkg = o.optString("pkg"))
+                }
+                "tap" -> {
+                    val eid = o.optString("eid").ifEmpty { null }
+                    if (eid != null) {
+                        val a = freshAnchor(eid)
+                            ?: throw IllegalArgumentException("insert[$i] eid '$eid' is not on the current screen")
+                        net.kuafuai.andee.config.FlowStep(
+                            kind = "tap",
+                            viewId = a.optString("view_id").ifEmpty { null },
+                            text = a.optString("text"),
+                            bounds = a.optString("bounds"),
+                            pkg = a.optString("pkg"),
+                            x = a.optInt("x"),
+                            y = a.optInt("y"),
+                            relX = a.optInt("rel_x"),
+                            relY = a.optInt("rel_y"),
+                        )
+                    } else {
+                        val nx = o.optInt("x", Int.MIN_VALUE).takeIf { it != Int.MIN_VALUE }
+                            ?: throw IllegalArgumentException("insert[$i] tap needs eid or x/y in 0-1000")
+                        val ny = o.optInt("y", Int.MIN_VALUE).takeIf { it != Int.MIN_VALUE }
+                            ?: throw IllegalArgumentException("insert[$i] tap needs both x and y in 0-1000")
+                        val scr = requireScreen()
+                        val d = scr.dims()
+                        net.kuafuai.andee.config.FlowStep(
+                            kind = "tap",
+                            relX = nx,
+                            relY = ny,
+                            x = nx * d[0] / 1000,
+                            y = ny * d[1] / 1000,
+                            pkg = o.optString("pkg").ifEmpty { scr.currentPkg().orEmpty() },
+                        )
+                    }
+                }
+                else -> throw IllegalArgumentException(
+                    "insert[$i] kind '$kind' is not supported — use launch, wait, human, ai, type or tap",
+                )
+            }
+            out.add(before to step)
+        }
+        return out
+    }
+
+    /** A live anchor for an `insert` tap step, or null when the eid has gone. */
+    private fun freshAnchor(eid: String): JSONObject? {
+        val scr = screenOrNull() ?: return null
+        return runCatching {
+            scr.dumpUiTree(verbose = false, withShot = false, capture = { JSONObject() })
+            scr.anchorOfEid(eid)
+        }.getOrNull()
+    }
+
+    /** A flow in full, steps and all — what `get_flow` hands the model. */
+    private fun flowJson(f: net.kuafuai.andee.config.Flow): JSONObject {
+        val steps = org.json.JSONArray()
+        for ((i, s) in f.steps.withIndex()) {
+            steps.put(
+                JSONObject()
+                    .put("step", i + 1)
+                    .put("kind", s.kind)
+                    .put("note", s.note)
+                    .put("text", s.text)
+                    .put("view_id", s.viewId ?: "")
+                    .put("bounds", s.bounds)
+                    .put("pkg", s.pkg)
+                    .put("x", s.x)
+                    .put("y", s.y)
+                    .put("rel_x", s.relX)
+                    .put("rel_y", s.relY)
+                    .put("duration_ms", s.durationMs),
+            )
+        }
+        return JSONObject()
+            .put("name", f.name)
+            .put("title", f.title)
+            .put("summary", f.summary)
+            .put("steps", steps)
+            .put("runs", f.runs)
+            .put("ok_runs", f.okRuns)
+            .put("last_run_at", f.lastRunAt)
     }
 
     private fun ensureCompact() {
@@ -2118,12 +2758,14 @@ class CommandDispatcher(
         window.setTouchable(false)
         ripple.setVisibleForGesture(false)
         marker.setVisibleForGesture(false)
+        recordChip.setVisibleForGesture(false)
         try {
             Thread.sleep(50)
             return block()
         } finally {
             ripple.setVisibleForGesture(true)
             marker.setVisibleForGesture(true)
+            recordChip.setVisibleForGesture(true)
             window.setTouchable(true)
         }
     }
@@ -2154,11 +2796,13 @@ class CommandDispatcher(
     private inline fun <T> blankedForCapture(block: () -> T): T {
         window.setVisibleForCapture(false)
         ripple.setVisibleForCapture(false)
+        recordChip.setVisibleForCapture(false)
         try {
             Thread.sleep(80)
             return block()
         } finally {
             ripple.setVisibleForCapture(true)
+            recordChip.setVisibleForCapture(true)
             window.setVisibleForCapture(true)
         }
     }
