@@ -33,6 +33,7 @@ fun AppRoot(nav: Nav) {
                         screen == "settings" -> SettingsScreen(
                             onDone = { nav.back() }, onOpenGear = { nav.push("gear") },
                             onOpenVault = { nav.push("vault") }, onOpenExpressions = { nav.push("expressions") },
+                            onAskAndee = { words -> nav.go("chat"); Assistant.say(words) },
                         )
                         screen == "selfcheck" -> SelfCheckCard(onDone = { nav.back() }, onOpenSettings = { nav.push("settings") })
                         screen == "notebook" -> NotebookCard(onDone = { nav.back() })

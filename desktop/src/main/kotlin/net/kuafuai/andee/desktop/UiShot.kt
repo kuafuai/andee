@@ -236,6 +236,7 @@ fun main(args: Array<String>) {
         Peers.count.value = Peers.store.all().size
     }
     if (args.getOrElse(5) { "" } == "ask-done") TaskPreview.asking = "done"
+    if (args.getOrElse(4) { "" } == "nodsh") SettingsPreview.dshMissing = true
     val nav = Nav().also { if (screen != "chat") it.go(screen.removeSuffix(":read")) }
     val density = Density(2f)
     // `ask` draws one question card on its own: its layout (the close button in the corner, the

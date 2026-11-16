@@ -2,6 +2,7 @@ package net.kuafuai.andee.desktop.shell
 
 import net.kuafuai.andee.desktop.shell.RiskClassifier.Tier
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RiskClassifierTest {
@@ -36,6 +37,15 @@ class RiskClassifierTest {
             "curl -d a=b https://x.io", "scp a host:/tmp", "ssh host ls", "gh pr create --fill")) {
             assertEquals(c, Tier.MEDIUM, tier(c))
         }
+    }
+
+    @Test
+    fun `installing dsh is medium, and starting its page is not read-only`() {
+        // 设置 → dsh → 让 Andee 帮我安装 asks for exactly these two. Medium means the "ask" mode asks and "auto" does not, so the
+        // button promises no approval card of its own: the user's command mode decides.
+        assertEquals(Tier.MEDIUM, tier("npm install -g @deepseek-ai/dsh"))
+        assertEquals(Tier.MEDIUM, tier("npm i -g @deepseek-ai/dsh"))
+        assertTrue(tier("dsh web") > Tier.SAFE)
     }
 
     @Test

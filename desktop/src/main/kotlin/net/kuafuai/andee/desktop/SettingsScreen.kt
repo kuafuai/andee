@@ -57,6 +57,8 @@ fun SettingsScreen(
     onOpenGear: () -> Unit = {},
     onOpenVault: () -> Unit = {},
     onOpenExpressions: () -> Unit = {},
+    /** Say something to Andee as the user: it lands in the timeline and starts a turn, and the window goes there. */
+    onAskAndee: (String) -> Unit = {},
 ) {
     val zh = Strings.lang() == "zh"
     fun t(a: String, b: String) = if (zh) a else b
@@ -422,7 +424,7 @@ fun SettingsScreen(
                 listOf("off" to st("common_off"), "on" to st("common_on")),
                 v["dsh"].orEmpty().ifEmpty { if (Settings.get("dsh") == "off") "off" else "on" },
             ) { v["dsh"] = it }
-            val installed = remember { runCatching { Assistant.dsh.available() }.getOrDefault(false) }
+            val installed = remember { !SettingsPreview.dshMissing && runCatching { Assistant.dsh.available() }.getOrDefault(false) }
             val jobs = remember { runCatching { Assistant.dsh.status(org.json.JSONObject()).getJSONArray("workers").length() }.getOrDefault(0) }
             Note(if (installed) st("settings_dsh_installed", jobs) else st("settings_dsh_missing"))
             Note(st("settings_dsh_note"))
@@ -430,6 +432,12 @@ fun SettingsScreen(
                 Pill(st("settings_dsh_open")) {
                     val dir = java.io.File(System.getProperty("user.home"), "Andee/workers").apply { mkdirs() }
                     runCatching { ProcessBuilder("open", dir.path).start() }
+                }
+            } else Row(Modifier.padding(top = 8.dp)) {
+                // Said as the user would say it, in the timeline: Andee then runs it as any request, through run_command, so the
+                // approval card (npm install -g is high risk) and the user's command mode apply as they always do.
+                Pill(st("settings_dsh_install")) {
+                    onAskAndee(st("settings_dsh_install_say"))
                 }
             }
         }
@@ -746,3 +754,8 @@ private fun SshKeys(zh: Boolean) {
 }
 
 private fun hostList(s: String) = s.split(',', ' ', '\n').map { it.trim() }.filter { it.isNotEmpty() }
+
+/** For the screenshot harness only: draw 设置 as if dsh were not installed on this Mac. */
+object SettingsPreview {
+    @Volatile var dshMissing = false
+}
