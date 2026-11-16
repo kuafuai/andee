@@ -752,6 +752,241 @@ class NotebookBook(private val store: NotebookStore) {
             "- ${s.name}（${s.title}）：${s.summary}$auto"
         }
 
+    // ------------------------------------------------------------------
+    // flows
+    // ------------------------------------------------------------------
+
+    fun flows(): List<Flow> {
+        val arr = book().optJSONArray("flows") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let(::toFlow) }
+    }
+
+    fun flow(name: String): Flow? = flows().firstOrNull { it.name == name }
+
+    private fun toFlowStep(o: JSONObject): FlowStep = FlowStep(
+        kind = o.optString("kind", "tap"),
+        note = o.optString("note"),
+        viewId = o.optString("view_id").ifEmpty { null },
+        text = o.optString("text"),
+        bounds = o.optString("bounds"),
+        pkg = o.optString("pkg"),
+        x = o.optInt("x"),
+        y = o.optInt("y"),
+        relX = o.optInt("rel_x"),
+        relY = o.optInt("rel_y"),
+        x2 = o.optInt("x2"),
+        y2 = o.optInt("y2"),
+        relX2 = o.optInt("rel_x2"),
+        relY2 = o.optInt("rel_y2"),
+        durationMs = o.optLong("duration_ms"),
+        changedAfter = if (o.isNull("changed_after")) null else o.optBoolean("changed_after"),
+        humanTimeoutSec = o.optInt("human_timeout_sec", 60),
+    )
+
+    private fun toFlow(o: JSONObject): Flow {
+        val steps = o.optJSONArray("steps")
+        return Flow(
+            name = o.optString("name"),
+            title = o.optString("title"),
+            summary = o.optString("summary"),
+            steps = if (steps == null) emptyList()
+            else (0 until steps.length()).mapNotNull { i -> steps.optJSONObject(i)?.let(::toFlowStep) },
+            createdAt = o.optLong("created_at"),
+            updatedAt = o.optLong("updated_at"),
+            lastRunAt = o.optLong("last_run_at"),
+            runs = o.optInt("runs"),
+            okRuns = o.optInt("ok_runs"),
+        )
+    }
+
+    private fun toJson(s: FlowStep): JSONObject = JSONObject()
+        .put("kind", s.kind)
+        .put("note", s.note)
+        .put("view_id", s.viewId ?: "")
+        .put("text", s.text)
+        .put("bounds", s.bounds)
+        .put("pkg", s.pkg)
+        .put("x", s.x)
+        .put("y", s.y)
+        .put("rel_x", s.relX)
+        .put("rel_y", s.relY)
+        .put("x2", s.x2)
+        .put("y2", s.y2)
+        .put("rel_x2", s.relX2)
+        .put("rel_y2", s.relY2)
+        .put("duration_ms", s.durationMs)
+        .put("changed_after", s.changedAfter ?: JSONObject.NULL)
+        .put("human_timeout_sec", s.humanTimeoutSec)
+
+    private fun toJson(f: Flow): JSONObject = JSONObject()
+        .put("name", f.name)
+        .put("title", f.title)
+        .put("summary", f.summary)
+        .put("steps", JSONArray().apply { f.steps.forEach { put(toJson(it)) } })
+        .put("created_at", f.createdAt)
+        .put("updated_at", f.updatedAt)
+        .put("last_run_at", f.lastRunAt)
+        .put("runs", f.runs)
+        .put("ok_runs", f.okRuns)
+
+    /** Create or overwrite. The second value is true when it was new. */
+    fun saveFlow(
+        name: String,
+        title: String,
+        summary: String,
+        steps: List<FlowStep>,
+    ): Pair<Flow, Boolean> {
+        require(SCENE_NAME.matches(name)) { "name must be 1-40 chars of a-z 0-9 _ (got \"$name\")" }
+        require(title.isNotBlank()) { "title is required" }
+        require(steps.isNotEmpty()) { "a flow needs at least one step" }
+        require(steps.size <= MAX_FLOW_STEPS) { "at most $MAX_FLOW_STEPS steps; this one has ${steps.size}" }
+        val b = book().let { JSONObject(it.toString()) }
+        val arr = b.optJSONArray("flows") ?: JSONArray()
+        val now = System.currentTimeMillis()
+        var old: Flow? = null
+        val kept = JSONArray()
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (o.optString("name") == name) old = toFlow(o) else kept.put(o)
+        }
+        check(old != null || kept.length() < MAX_FLOWS) {
+            "already $MAX_FLOWS flows; delete one first"
+        }
+        val f = Flow(
+            name = name,
+            title = title.trim().take(40),
+            summary = summary.trim().take(160),
+            steps = steps,
+            createdAt = old?.createdAt ?: now,
+            updatedAt = now,
+            lastRunAt = old?.lastRunAt ?: 0L,
+            runs = old?.runs ?: 0,
+            okRuns = old?.okRuns ?: 0,
+        )
+        kept.put(toJson(f))
+        b.put("flows", kept)
+        write(b)
+        return f to (old == null)
+    }
+
+    fun deleteFlow(name: String): Boolean {
+        val b = book().let { JSONObject(it.toString()) }
+        val arr = b.optJSONArray("flows") ?: return false
+        val kept = JSONArray()
+        var found = false
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (o.optString("name") == name) found = true else kept.put(o)
+        }
+        if (!found) return false
+        b.put("flows", kept)
+        write(b)
+        return true
+    }
+
+    /**
+     * Edit a saved flow in place — the repair a stuck run ends in. `drop`
+     * removes steps by their 1-based number (an app updated and the element
+     * is gone; a step proved useless). `retype` changes what a `type` step
+     * will type (a renamed title, a new default). `refit` replaces a step's
+     * anchor with the element's position TODAY, so a repaired run writes its
+     * lesson back into the flow instead of needing the brain again next time.
+     * `insert` ADDS steps (`before` a 1-based number, or `size + 1` to append)
+     * — this is what fixes the root cause when a flow simply never opened its
+     * own app and so dies at step 1 from the home screen. All four selectors
+     * read the ORIGINAL numbers `get_flow` showed, so a repair never has to
+     * renumber in its head. Steps added or removed make the later steps
+     * renumber, which is why the caller is told to re-read the flow. Stats and
+     * timestamps survive, so the user can still see which version has been
+     * earning its keep.
+     */
+    fun editFlow(
+        name: String,
+        drop: List<Int> = emptyList(),
+        retype: Map<Int, String> = emptyMap(),
+        refit: Map<Int, FlowStep> = emptyMap(),
+        insert: List<Pair<Int, FlowStep>> = emptyList(),
+    ): Flow {
+        val f = flow(name) ?: throw IllegalArgumentException("no flow named \"$name\"")
+        require(drop.all { it in 1..f.steps.size }) {
+            "drop step numbers must be within 1..${f.steps.size} (got ${drop.sorted()})"
+        }
+        for (n in retype.keys) {
+            require(n in 1..f.steps.size) { "retype step $n does not exist (1..${f.steps.size})" }
+            require(f.steps[n - 1].kind == "type") {
+                "retype only works on type steps; step $n is a ${f.steps[n - 1].kind}"
+            }
+        }
+        for ((n, replacement) in refit) {
+            require(n in 1..f.steps.size) { "refit step $n does not exist (1..${f.steps.size})" }
+            require(replacement.kind == f.steps[n - 1].kind) {
+                "refit cannot change what step $n does (${f.steps[n - 1].kind})"
+            }
+        }
+        require(insert.all { it.first in 1..f.steps.size + 1 }) {
+            "insert 'before' must be within 1..${f.steps.size + 1} (append = ${f.steps.size + 1})"
+        }
+        // Walk the ORIGINAL numbering once: inserts land before their step,
+        // replacements/retypes apply to that same number, and drops simply
+        // skip it. Doing it this way means `drop`, `retype`, `refit` and
+        // `insert` can all be sent in one call using the numbers get_flow
+        // printed, with no off-by-one after an insertion.
+        val byBefore = insert.groupBy { it.first }
+        val rebuilt = ArrayList<FlowStep>(f.steps.size + insert.size)
+        for (n in 1..f.steps.size) {
+            byBefore[n]?.forEach { rebuilt.add(it.second) }
+            if (n in drop) continue
+            var out = refit[n] ?: f.steps[n - 1]
+            retype[n]?.let { out = out.copy(note = it) }
+            rebuilt.add(out)
+        }
+        byBefore[f.steps.size + 1]?.forEach { rebuilt.add(it.second) }
+        val newSteps = rebuilt
+        require(newSteps.isNotEmpty()) { "every step was dropped — nothing left of \"$name\"" }
+        require(newSteps.size <= MAX_FLOW_STEPS) { "at most $MAX_FLOW_STEPS steps; this edit would leave ${newSteps.size}" }
+
+        val b = book().let { JSONObject(it.toString()) }
+        val arr = b.optJSONArray("flows") ?: JSONArray()
+        val now = System.currentTimeMillis()
+        val edited = f.copy(steps = newSteps, updatedAt = now)
+        val kept = JSONArray()
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            kept.put(if (o.optString("name") == name) toJson(edited) else o)
+        }
+        b.put("flows", kept)
+        write(b)
+        return edited
+    }
+
+    fun markFlowRun(name: String, ok: Boolean) {
+        val b = book().let { JSONObject(it.toString()) }
+        val arr = b.optJSONArray("flows") ?: return
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (o.optString("name") != name) continue
+            o.put("runs", o.optInt("runs") + 1)
+            if (ok) o.put("ok_runs", o.optInt("ok_runs") + 1)
+            o.put("last_run_at", System.currentTimeMillis())
+            b.put("flows", arr)
+            write(b)
+            return
+        }
+    }
+
+    /**
+     * One line per flow for the per-turn user message; empty when there are
+     * none. The line carries the summary — a flow whose title alone does not
+     * ring a bell is a flow the brain never runs, and the summary is the
+     * "what this chore actually does" half of matching it to a request.
+     */
+    fun flowsForPrompt(): String =
+        flows().sortedByDescending { it.lastRunAt }.joinToString("\n") { f ->
+            val ok = if (f.runs == 0) "never run" else "ok ${f.okRuns}/${f.runs}"
+            val what = f.summary.trim().takeIf { it.isNotEmpty() }?.let { "：${it.take(60)}" } ?: ""
+            "- ${f.name}（${f.title}）$what · ${f.steps.size} steps, $ok"
+        }
+
     companion object {
         private const val META_SEEDED = "defaults_seeded"
         private const val META_MORNING_SEEDED = "morning_seeded"
@@ -892,6 +1127,8 @@ class NotebookBook(private val store: NotebookStore) {
         const val SOURCE_FAILURE_REVIEW = "failure_review"
         const val MAX_SCENES = 30
         const val MAX_SCENE_PROMPT = 3000
+        const val MAX_FLOWS = 30
+        const val MAX_FLOW_STEPS = 60
 
         /**
          * Time-based, and never the same twice: two todos made in one millisecond (the defaults are seeded in

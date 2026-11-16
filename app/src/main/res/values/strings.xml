@@ -410,6 +410,41 @@
     <string name="tree_helper_enabled_row">（这个应用把界面藏起来了，已打开系统的「无障碍增强」服务让它交出来）</string>
     <string name="settings_scenes_browse">管理情景</string>
 
+    <!-- 脚本: recorded flows, the scenes' hands. Same card as scenes, second tab. See ui/ScenesUi.kt. -->
+    <string name="flows_tab">脚本</string>
+    <string name="flows_subtitle">机器的手：记下来的流程，下次自己就会动</string>
+    <string name="flows_empty">还没有录制的脚本。\n跟我说「把刚才这套记下来」，\n跑熟一次，下次它自己就会做了。</string>
+    <string name="flows_meta">%1$d 步 · 成功 %2$d/%3$d · 上次 %4$s</string>
+    <string name="flows_meta_never">%1$d 步 · 还没跑过</string>
+    <string name="flows_run">运行</string>
+    <string name="flows_steps_show">看步骤</string>
+    <string name="flows_steps_hide">收起</string>
+    <string name="flows_running">运行中，我盯紧每一步</string>
+    <string name="flows_step_tap">点</string>
+    <string name="flows_step_long_press">长按</string>
+    <string name="flows_step_swipe">滑</string>
+    <string name="flows_step_type">输入「%1$s」</string>
+    <string name="flows_step_human">你来做：%1$s</string>
+    <string name="flows_step_wait">等 %1$d 秒</string>
+    <string name="flows_step_launch">打开</string>
+    <string name="flows_step_ai">交给我：%1$s</string>
+    <string name="flows_step_anchor">%1$s · %2$s</string>
+    <!-- The pill under the status bar while a flow is being recorded; see ui/RecordChipUi. -->
+    <string name="flows_recording_chip">● 录制中 · %1$d 步</string>
+    <!-- Spoken after a flow run from the card's 运行 button. -->
+    <string name="flows_ui_run_done">「%1$s」跑完了，每一步都到位。</string>
+    <string name="flows_ui_run_handoff">「%1$s」第 %2$d 步交给我了，我处理完接着往下跑。</string>
+    <string name="flows_ui_run_handoff_giveup">「%1$s」第 %2$d 步又交给我了，这步我暂时处理不了，脚本停在这里，你想怎么办？</string>
+    <string name="flows_ui_run_failed">「%1$s」在第 %2$d 步停住了，我接着处理。</string>
+    <string name="flows_ui_run_error">脚本没跑成：%1$s</string>
+    <string name="flows_ui_run_giveup">「%1$s」第 %2$d 步又停住了，我修不动了：%3$s。脚本没有改动，你想怎么处理？</string>
+    <!-- Scrollback rows written when a flow runs from the card — the run happens
+         without the model, so the row is how the next turn's brain learns of it. -->
+    <string name="flows_run_done_row">（脚本「%1$s」跑完了）</string>
+    <string name="flows_run_handoff_row">（脚本「%1$s」第 %2$d 步交给我处理）</string>
+    <string name="flows_run_failed_row">（脚本「%1$s」在第 %2$d 步停住了）</string>
+    <string name="flows_run_heal_row">（脚本「%1$s」在第 %2$d 步停住了，我来接手）</string>
+
     <!-- The 恢复出厂设置 confirmation list: one line per thing wiped.
          Kept beside config/FactoryReset.kt, which walks them in this order. -->
     <string name="factory_reset_target_keys">火山 key、DeepSeek key，以及所有语音与大脑的设置</string>

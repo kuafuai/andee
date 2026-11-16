@@ -1023,6 +1023,12 @@ class ScreenController(
      */
     private fun lastPkg(): String? = lastDumpPkg
 
+    /** Current package name, from the last dump. */
+    fun currentPkg(): String? = lastDumpPkg
+
+    /** The display in pixels, [x, y]. */
+    fun dims(): IntArray = intArrayOf(screenW, screenH)
+
     // ---- element-index tapping ----------------------------------------------
     //
     // Coordinate math by the model is the top accuracy risk: models
@@ -1052,6 +1058,7 @@ class ScreenController(
         val pkg: String,         // owning app, from the node's root at dump time
         val viewId: String?,     // resource id if any
         val bounds: String,      // "l,t,r,b" in pixels at dump time
+        val text: String,        // visible label (text > desc > #id) at dump time
     )
 
     private val eidLock = Any()
@@ -1062,6 +1069,47 @@ class ScreenController(
 
     fun tapByEid(eid: String): JSONObject {
         val entry = lookupEid(eid)
+        return tapEntry(entry, hold = false, durationMs = 0L, logLabel = eid)
+            .put("eid", eid)
+    }
+
+    fun longPressByEid(eid: String, durationMs: Long): JSONObject {
+        val entry = lookupEid(eid)
+        return tapEntry(entry, hold = true, durationMs = durationMs, logLabel = eid)
+            .put("eid", eid)
+    }
+
+    /**
+     * Tap by a remembered anchor rather than a fresh e-number — the flow
+     * replay path. The entry is rebuilt from the recorded step, [findLiveNode]
+     * re-locates it live, and the remembered centre is the fallback, exactly
+     * like an eid tap. The result carries the anchor fields so a recorder can
+     * capture them without re-walking the tree.
+     */
+    fun tapByAnchor(viewId: String?, text: String, bounds: String, pkg: String, x: Int, y: Int): JSONObject =
+        tapEntry(
+            EidEntry(intArrayOf(x, y), pkg, viewId, bounds, text),
+            hold = false,
+            durationMs = 0L,
+            logLabel = text.ifEmpty { "anchor" },
+        )
+
+    fun longPressByAnchor(
+        viewId: String?,
+        text: String,
+        bounds: String,
+        pkg: String,
+        x: Int,
+        y: Int,
+        durationMs: Long,
+    ): JSONObject = tapEntry(
+        EidEntry(intArrayOf(x, y), pkg, viewId, bounds, text),
+        hold = true,
+        durationMs = durationMs,
+        logLabel = text.ifEmpty { "anchor" },
+    )
+
+    private fun tapEntry(entry: EidEntry, hold: Boolean, durationMs: Long, logLabel: String): JSONObject {
         // Re-locate live before touching anything: a match means the element
         // still exists where we found it; no match means either it scrolled
         // away or the pane changed — remembered center, best effort.
@@ -1073,28 +1121,57 @@ class ScreenController(
         } else {
             x = entry.px[0]; y = entry.px[1]
         }
-        GroundingLog.noteTapEid(eid, x, y, screenW, screenH, hold = false, relocated = live != null, pkg = lastPkg())
-        return tap(x, y)
-            .put("eid", eid)
+        GroundingLog.noteTapEid(logLabel, x, y, screenW, screenH, hold = hold, relocated = live != null, pkg = lastPkg())
+        val res = if (hold) longPress(x, y, durationMs) else tap(x, y)
+        return res
             .put("px", "$x,$y")
             .put("relocated", live != null)
+            .apply {
+                // `relocated:true` was being read as "the aim was off and the
+                // device moved it". It means the opposite: the element WAS
+                // found live on this screen, and the tap went to its current
+                // centre. Say so where the model can see it.
+                if (live != null) {
+                    put(
+                        "anchor_note",
+                        "The element was found LIVE on this screen and the tap was aimed at its current " +
+                            "centre — this is a MATCH, not a mis-aim.",
+                    )
+                }
+            }
+            .put("view_id", entry.viewId ?: "")
+            .put("text", entry.text)
+            .put("bounds", entry.bounds)
+            .put("pkg", entry.pkg)
     }
 
-    fun longPressByEid(eid: String, durationMs: Long): JSONObject {
-        val entry = lookupEid(eid)
-        val live = findLiveNode(entry)
-        val x: Int; val y: Int
-        if (live != null) {
-            x = (live[0] + live[2]) / 2
-            y = (live[1] + live[3]) / 2
-        } else {
-            x = entry.px[0]; y = entry.px[1]
-        }
-        GroundingLog.noteTapEid(eid, x, y, screenW, screenH, hold = true, relocated = live != null, pkg = lastPkg())
-        return longPress(x, y, durationMs)
+    /**
+     * The live identity of an element on the CURRENT screen, in the same
+     * shape a recorded flow step stores it. `flow.refit` uses this to teach a
+     * stale step where its element has moved: an app update renames a button
+     * or shifts a layout, the brain finds it again with
+     * get_screen_element, and the fresh anchor is written back into the flow
+     * so the next run does not need the brain at all.
+     *
+     * The eid index is rebuilt by every non-verbose dump, so the caller must
+     * dump first — refit does, rather than trusting an e-number the model may
+     * have read a screen or two ago.
+     */
+    fun anchorOfEid(eid: String): JSONObject {
+        val e = lookupEid(eid)
+        val d = dims()
+        return JSONObject()
             .put("eid", eid)
-            .put("px", "$x,$y")
-            .put("relocated", live != null)
+            .put("view_id", e.viewId ?: "")
+            .put("text", e.text)
+            .put("bounds", e.bounds)
+            .put("pkg", e.pkg)
+            .put("x", e.px[0])
+            .put("y", e.px[1])
+            // 0-1000, the same normalisation FlowRecorder uses; the fallback
+            // for another resolution.
+            .put("rel_x", if (d[0] > 0) e.px[0] * 1000 / d[0] else 0)
+            .put("rel_y", if (d[1] > 0) e.px[1] * 1000 / d[1] else 0)
     }
 
     private fun lookupEid(eid: String): EidEntry {
@@ -1213,8 +1290,11 @@ class ScreenController(
      * animation is still running, elements are mid-flight, and "dump again
      * immediately" reads a screen that does not exist yet. One fingerprint,
      * taken after a fixed beat, answers "did it land" without any of that.
+     *
+     * Public for the flow player: the recorded `changed_after` of each step
+     * is judged against the same signature.
      */
-    private fun screenFingerprint(): JSONObject {
+    fun screenFingerprint(): JSONObject {
         val root = runCatching { activeRoot() }.getOrNull()
             // No active window at all — a full-screen video surface is the
             // usual cause (WeChat's 视频号 playback page answers null here,
@@ -1488,6 +1568,19 @@ class ScreenController(
                 )
         }
         result.put("screen_changed", changed)
+        // A gesture whose pixels do not move is still a DELIVERED gesture.
+        // The brain used to read screen_changed:false as "I missed" and went
+        // into a re-aim loop on refresh-style taps, while the replay engine
+        // counted the very same step as done. Say the two things separately,
+        // in fields that cannot be mistaken for a verdict on the tap.
+        result.put("tap_delivered", true)
+        if (!changed) {
+            result.put(
+                "screen_changed_meaning",
+                "no visual change detected; the tap WAS delivered. Normal for refresh / toggle / submit " +
+                    "actions. Not evidence of a miss — judge from the attached screenshot.",
+            )
+        }
         if (before.optBoolean("cut") || after.optBoolean("cut")) {
             result.put(
                 "screen_changed_note",
@@ -1557,11 +1650,16 @@ class ScreenController(
             result.put(
                 if (told) "same_spot_hint" else "unknown_spot_hint",
                 if (told) {
-                    "the screen did NOT react to this tap. miss_shot shows where the ring " +
-                        "landed — the tapped point, magnified with its surroundings. Its grid " +
-                        "is lowercase (a1..h12) because it is a zoom, so a cell read off it is " +
-                        "aimed with {\"cell\": \"d7\", \"part\": \"…\", \"on\": \"zoom\"}, which " +
-                        "the device converts for you. Aim the retry from that image, not from " +
+                    "The tap WAS delivered — screen_changed:false only means no VISUAL change was " +
+                        "detected. That is NORMAL for in-place actions (refresh, a toggle, a like, a " +
+                        "submit whose result appears later, a list that re-renders identically). It is " +
+                        "NOT evidence the tap missed, and a saved flow counts this step as done. Carry " +
+                        "on with the next step unless the attached screenshot positively shows you " +
+                        "are still on the wrong screen. Only re-aim when you have a real reason: " +
+                        "miss_shot shows where the ring landed — the tapped point, magnified with its " +
+                        "surroundings. Its grid is lowercase (a1..h12) because it is a zoom, so a cell " +
+                        "read off it is aimed with {\"cell\": \"d7\", \"part\": \"…\", \"on\": \"zoom\"}, " +
+                        "which the device converts for you. Aim the retry from that image, not from " +
                         "the previous full screenshot."
                 } else {
                     "I could not tell whether that tap landed. miss_shot shows where the ring " +
@@ -2993,6 +3091,7 @@ class ScreenController(
                     pkg = pkg,
                     viewId = row.node.optString("id").ifEmpty { null },
                     bounds = row.bounds,
+                    text = labelOf(row.node),
                 )
             }
             val indent = "  ".repeat(minOf(row.depth, MAX_INDENT))

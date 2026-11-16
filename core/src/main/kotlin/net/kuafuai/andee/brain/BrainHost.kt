@@ -70,6 +70,9 @@ interface BrainHost {
     /** The scenes the user can enter, one line each; empty when there are none. */
     fun scenesIndex(): String
 
+    /** The recorded flows the brain may replay, one line each; empty when there are none. */
+    fun flowsIndex(): String = ""
+
     fun scene(name: String): Scene?
 
     // ---- scrollback ----

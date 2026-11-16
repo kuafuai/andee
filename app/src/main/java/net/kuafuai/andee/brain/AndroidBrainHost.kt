@@ -65,6 +65,7 @@ class AndroidBrainHost(
     override fun todoStillActive(id: String): Boolean = Notebook.todoById(ctx, id)?.status == "active"
 
     override fun scenesIndex(): String = Notebook.scenesForPrompt(ctx)
+    override fun flowsIndex(): String = Notebook.flowsForPrompt(ctx)
 
     override fun scene(name: String): Scene? = Notebook.scene(ctx, name)
 

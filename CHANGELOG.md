@@ -29,6 +29,97 @@ hash into `versionName` at build time would close this hole; it is not implement
 
 ## [Unreleased]
 
+### Added
+
+- **Recorded flows — the scenes' hands.** Recorded runs the device plays back step by step, locally,
+  with no model call per step: `record_flow_start` arms recording, `wait_for_user` marks a step only
+  the user can do, `save_flow` stores it in the notebook (same consent rule as scenes), and
+  `run_flow` / `resume_flow` replay it. Every step is verified before it runs — the element must
+  still be there, the app must match, and the screen must react — and a failure stops the flow with
+  a structured `failed_at` instead of guessing, so the model can fix the screen and resume from that
+  step. Human steps speak their note and wait for the user's own hand. Flows are local-only like
+  scenes, never reach a hub, and are listed on the user messages next to the scenes.
+- **脚本 tab on the 情景 card.** The scenes card now has two tabs — 情景 / 脚本 — so a flow can be
+  run straight from the card (no model involved), its steps inspected before it runs, and deleted
+  with the same two-tap confirm. Reported: 蔡·鱼儿's token spend on repetitive chores, #43.
+- **A recording pill under the status bar.** While `record_flow_start` is armed, a small
+  「● 录制中 · N 步」 pill sits at the top of the screen counting steps — the one indicator that
+  survives the card folding, which is exactly when recording happens. Hidden for gestures and
+  captures like the glow.
+- **A stopped flow heals itself instead of ending the conversation.** Reported: *「某一步卡住了，
+  就得从头来，或者从头开始重新录」*. A replay now returns a **report**, not a boolean: the step trace,
+  `current_screen` (app + visible lines), `resume_from` and a hint; a completed run returns
+  `final_screen` with `need_review`, because every tap landing is not the same as the job succeeding.
+  `refit_flow` re-anchors one stale step to the element where it is today and **saves the repair into
+  the flow**, so an app update no longer kills a script — `mode:done` also prevents a tap the brain
+  already performed by hand from firing twice. `flow_status` re-reads the last report.
+  A run started from the card's 运行 button now **wakes the brain on a stop** with that report (nobody
+  has to say 「修」 first), and a model-driven turn that tries to end with a stopped flow gets one
+  device reminder to finish the repair. Three takeovers on the same stuck step within two minutes
+  stop the loop and give the user an honest report. §11 tells the brain the whole loop — repair one
+  step, resume from it, check the final screen, write the fix back, report — and forbids restarting
+  from step 1 or suggesting a re-record. Verified end-to-end on the tablet: forced stop → brain woken
+  → 8 tool calls → `done:true`, flow unchanged and replayable.
+- **A flow can be repaired by ADDING a step, not only removing one.** After the end-to-end tablet test,
+  the one thing the brain could not fix was a script that never opens its own app: `edit_flow` had only
+  `drop` / `retype`, so the model reached for `record_flow_start` — the re-record the user forbade.
+  `edit_flow` now takes `insert` (`[{"before":1,"kind":"launch","pkg":"com.android.settings"}]`), and
+  `FlowStep` has a **`launch` kind** replayed through the same `device.launch` path the brain uses.
+  `device.launch` is noted while recording too, so a new flow keeps its opening step. Insert kinds:
+  launch / wait / human / type / tap; every selector uses the original `get_flow` numbering, even
+  combined in one call. §11 now spells out the fourth failure case and forbids re-recording as a
+  repair. Verified on the tablet: a broken one-step flow was fixed by the brain with `edit_flow insert`,
+  then ran `done:true` three times in a row from the home screen, with no re-record.
+- **A flow can hand a step back to the brain on purpose.** Some jobs are not recordable gestures —
+  reading a CAPTCHA, judging a dialog that appears only sometimes, checking an upload really finished.
+  A new **`ai` step** (`handoff_to_ai` while recording, or `edit_flow` `insert` with `kind:"ai"`) performs
+  no gesture: replay returns `paused:true` with `instruction`, `current_screen` and `resume_from`, NOT a
+  failure. The brain does the job with its own tools and `resume_flow`s the tail. A pause is excluded
+  from the run statistics, carries no repair flag, and does not consume the self-heal budget; a card run
+  wakes the brain with the **instruction** rather than a failure report, so it knows what to do (the
+  「修啥」 problem). `FLOW_HANDOFF_REMINDER` stops a model-driven turn ending with the tail unrun.
+  `wait_for_user` stays the user's own hand — the two kinds of pause are kept deliberately separate.
+  Verified on the tablet: pause on step 2 → brain read the screen → `resume_flow(3)` → `done:true`;
+  three hand-offs in one flow all resumed; a hand-off as the LAST step finishes cleanly; card-run
+  wake-up, failure-path regression and the two-wake-ups-in-two-minutes loop guard all passed.
+
+### Fixed
+
+- **A tap that changes nothing is no longer reported as a miss.** `screen_changed:false` on a refresh,
+  toggle or submit used to come back as *「the screen did NOT react to this tap」*, sending the brain into
+  a re-aim loop while the replay engine counted the same step as `done`. The hint now says the tap WAS
+  delivered, alongside `tap_delivered:true` and `screen_changed_meaning`; `relocated:true` carries an
+  `anchor_note` so it is not mistaken for a mis-aim.
+- **The per-step app gate stopped trusting a stale cache.** `ScreenController.currentPkg()` is only the
+  last tree dump's package — null, or still 「home」 after an app has already come forward. The gate now
+  reads the live window first, and a `launch` step double-checks with a tree dump before declaring
+  failure. Without this a flow started from the home screen either ran its taps on the launcher or
+  reported a launch that had succeeded as stopped.
+- **A background launch now opens through our own invisible stage, and Xiaomi's guard is tapped through.**
+  HyperOS aborts ANY Activity start from a background app — even Andee's own — unless the launcher is
+  the foreground app, and it measures the abort window in seconds after HOME. `device.launch` /
+  `open_url` / `set_alarm` / a flow's `launch` step now go home via `GLOBAL_ACTION_HOME` (the one route
+  the ROM executes as the system and never aborts), settle past the window, open through a new
+  transparent `LaunchPadActivity` that hands the intent on from the foreground and vanishes, then VERIFY
+  the target actually reached the foreground — retrying once from the launcher before reporting. For
+  apps Xiaomi guards (TikTok measured), the chained-launch confirmation dialog is tapped by Andee
+  itself — the launch was the user's request, so its 「允许」 is the user's standing permission — and
+  only a dialog that could not be tapped becomes an error that names it. `launch_app` returning success
+  while nothing opened is gone; so is the minutes-long loop of retry-dialog-retry.
+- **A failure report now names the KIND of stop.** `failure_class` — launch_blocked / wrong_screen /
+  stale_anchor / screen_frozen / user_absent / bad_step — rides in every stopped report with a
+  per-class hint, so the brain acts on the machine's diagnosis instead of re-diagnosing; §11 and the
+  `run_flow` schema spell out each class's fix. The missing-opening-step reading is demoted to the
+  LAST resort and requires `get_flow` first: a launch step blocked by the system had once been
+  misread as "no launch step" and the follow-up repair would have inserted a duplicate.
+- **The flows index on every user message now carries what each flow DOES.** One line per flow gains
+  its summary, and §11 directs the brain to reuse a matching flow for one STEP of a bigger job, not
+  only when the whole request matches — the flow is its hands, the brain stays the head.
+- **A `wait` step is no longer gated on its recorded package.** A wait performs no touch, so there is
+  nothing to land on the wrong app; its recorded package is often the previous app's (measured on a
+  TikTok flow, a wait right after launch kept Lark's package and gated every replay at step 2).
+  `flows_step_wait`'s `%s`→`%d` fix returns lint to its baseline of 10 pre-existing errors.
+
 ## [0.15.0] - 2026-11-12
 
 **The phone never operates WeChat — one tap locks you out of your own WeChat. Plus a local quit that needs
