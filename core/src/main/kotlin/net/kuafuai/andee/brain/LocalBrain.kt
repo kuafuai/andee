@@ -197,6 +197,13 @@ class LocalBrain(
     /** The turn touched a task (any `task` call), so it has already thought about what is pending. */
     private var turnTasked = false
 
+    /**
+     * The turn has already done something outside the conversation: a tool with an effect ran (a tap, a message, a command, a
+     * page, a note). Set in [runTool]'s caller, read when a background turn is taken over before it answered — one that has
+     * acted must not run again from the top, because doing it twice is worse than the report arriving late. Loop thread only.
+     */
+    private var turnActed = false
+
     /** The end-of-turn reminder fires once a turn. */
     private var turnReminded = false
 
@@ -657,6 +664,9 @@ class LocalBrain(
         // `ContextCompactionTest`, which says the next thing the moment an answer arrives. A later [submit] or
         // [cancel] still cuts a background turn short, as before.
         val gen = if (kind == TurnKind.USER) generation.incrementAndGet() else generation.get()
+        // Taken now, on the caller's side: a tap on the ball between here and the turn's end is what [stopAll] means, and
+        // it is the one thing that is allowed to end a background turn for good (see the requeue in the `finally`).
+        val stopEpochAtStart = stopEpoch.get()
         loop.execute {
             busy.set(true)
             currentKind = kind
@@ -665,6 +675,7 @@ class LocalBrain(
             turnSent = false
             turnTyped = false
             turnTasked = false
+            turnActed = false
             net.kuafuai.andee.peer.HandedJobs.reset()
             turnReminded = false
             flowStopped = null
@@ -732,8 +743,20 @@ class LocalBrain(
                 // answer of the turn that is still current counts: a turn the user talked over here has
                 // nothing to report, and a stale answer would read as the job being done.
                 val answer = turnAnswer.takeIf { gen == generation.get() }
+                // A turn the device started — a report from the computer, a todo, a notification — that the user's own next
+                // words took over before it had said anything. It was abandoned at its next checkpoint with no answer and no
+                // error, and nothing queued to run it again, so what it was about was never dealt with: the phone was
+                // reading out one answer, the report arrived, and the user (or the follow-up mic that opens when the
+                // reading ends) started a turn that cut the report's turn off. It goes back to the queue instead, behind
+                // the user's turn. Only a ■ (see [stopAll]) ends one for good; that bumped [stopEpoch] and is not requeued.
+                val superseded = answer == null && turnAnswer == null && gen != generation.get() &&
+                    stopEpochAtStart == stopEpoch.get() && requeueable(kind)
+                if (superseded) {
+                    host.logInfo(TAG, "$kind turn was taken over by the user before it answered; it runs again after: ${text.take(60)}")
+                    pendingWakes.addFirst(Queued(text, kind, onAnswer, territory, source, untrusted))
+                }
                 turnAnswer = null
-                onAnswer?.let { cb -> runCatching { cb(answer) }.onFailure { host.logWarn(TAG, "answer callback failed", it) } }
+                if (!superseded) onAnswer?.let { cb -> runCatching { cb(answer) }.onFailure { host.logWarn(TAG, "answer callback failed", it) } }
                 busy.set(false)
                 dropUnfinishedHarvest(kind)
                 // A harvest the user talked over did not try and fail: it gave way. Measured on the phone (2026-11-11): a user
@@ -1077,6 +1100,15 @@ class LocalBrain(
         host.logInfo(TAG, "todo $id is no longer active; its turn is dropped")
         return true
     }
+
+    /**
+     * Whether a turn the user's own words took over, before it answered, goes back in the queue. Only the turns the device
+     * starts on someone else's behalf (a report, a todo, a notification, a friend's job) and only while they have done
+     * nothing yet: a turn that already acted would act again from the top. The reviews are bookkeeping and the work turn
+     * has its own pacing; neither is worth running twice.
+     */
+    private fun requeueable(kind: TurnKind): Boolean =
+        !turnActed && (kind == TurnKind.WAKE || kind == TurnKind.NOTIFY || kind == TurnKind.PEER)
 
     /** Loop thread. True (and recorded) when [stopAll] ran after [epoch] was taken: this turn was stopped before it began. */
     private fun stoppedSince(epoch: Int, text: String, kind: TurnKind): Boolean {
@@ -1468,6 +1500,7 @@ class LocalBrain(
                 step(WorkStep.Action(step, narrate(tc.name)))
                 val t0 = System.nanoTime() / 1_000_000L
                 acted = true
+                turnActed = true
                 val msg = runTool(tc, images, internal, kind.untrusted || turnUntrusted)
                 BrainTrace.tool(
                     gen, tc.name, host.methodOf(tc.name), tc.argumentsRaw,
