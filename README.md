@@ -59,7 +59,10 @@
   No root. No custom ROM. <b>One APK on Android, one app on the Mac.</b>  
 </p>
 
-<https://github.com/user-attachments/assets/bf560279-d86c-4301-9bcb-01d60fa33d06>
+<!-- 1/4 · English demo · drag the upload here, bare URL on its own line -->
+<!-- 2/4 · 中文演示 -->
+<!-- 3/4 · 回消息 -->
+<!-- 4/4 · 砍价 -->
 
 <a id="english"></a>
 
@@ -311,8 +314,6 @@ See [CHANGELOG.md](CHANGELOG.md) for what changed and for the versioning policy.
   手机、Mac、平板，都是他住进去的身体；不同设备上的 Andee，还能成为<b>朋友</b>。<br>
   不用 root，不用刷机，不用插着电脑。<b>Android 上一个 APK，Mac 上一个 App。</b>
 </p>
-
-https://github.com/user-attachments/assets/866e8333-e97b-4bf5-9525-540f9fdb01cd
 
 ## Andee 是你的 Personal Agent
 
