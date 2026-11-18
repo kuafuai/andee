@@ -10,7 +10,7 @@ Pick the route that matches what you want to do:
 
 - **Try it without building:** use the [CodeFlying build page](https://www.codeflying.app/andee) for a pre-configured APK. This is a separate service, and its own terms and token limits apply.
 - **Try a repository build:** download the bare debug APK from the [latest release](https://github.com/kuafuai/andee/releases/latest). It has no credentials, so you must configure the on-device model and voice keys later.
-- **Build it yourself:** follow the Android requirements and commands in [Build from source](../README.md#build-from-source), then use the detailed [Provisioning](../README.md#provisioning) reference if the toolchain is not ready.
+- **Build it yourself:** follow the Android requirements and commands in [Build from source](build-and-provision.md#build-from-source), then use the detailed [Provisioning](build-and-provision.md#provisioning) reference if the toolchain is not ready.
 
 For a first run, use a real Android 11 (API 30) or newer device. The app installs on Android 8.1 (API 27) and up, but **below 11 it cannot see the screen** (screen capture, visual tap targeting and window blur need API 30+), so the device-control half is what you lose. An emulator can install the app, but most device-control features are not meaningful there.
 
@@ -23,7 +23,7 @@ After the APK is on the device, do these four things in order:
 3. **Enable Andee under Accessibility.** This lets Andee see and touch the screen. If the service is off, the ball may be visible but it cannot operate another app. Android or a device manufacturer may turn this service off again after a force-stop or system update.
 4. **Tap the ball and allow the microphone.** If you refused it earlier, enable Microphone under Android Settings → Apps → Andee → Permissions. Without it, typing remains possible but voice input and wake-word use do not.
 
-The same order is summarized in the README’s [Provisioning order](../README.md#provisioning-order). The [Permissions reference](permissions.md) explains what each permission enables and what Andee does when you refuse it.
+The same order is summarized in [Provisioning order](build-and-provision.md#provisioning-order). The [Permissions reference](permissions.md) explains what each permission enables and what Andee does when you refuse it.
 
 ## 3. Configure a brain and try one interaction
 
@@ -37,6 +37,6 @@ Now tap the ball, type a simple request such as “What can you see on this scre
 
 Self-check is the in-app checklist, not a second setup wizard. Open **✓** in the ball’s control bar, or launch Andee again when the accessibility service is off. Each failed row names the missing readiness item and, where possible, opens the relevant settings page. Fix one row, return to Self-check, and check again.
 
-The README describes where the [Self-check surface appears](../README.md#what-it-looks-like), and the full [Permissions reference](permissions.md) explains the rationale behind its permission rows. For build and device setup failures, return to [Provisioning](../README.md#provisioning); for a successful install that still cannot reach the configured brain, check the endpoint and key under **Backend → On-device** before changing permissions.
+[Where the self-check surface appears](reference.md#what-it-looks-like) is described in the Reference, and the full [Permissions reference](permissions.md) explains the rationale behind its permission rows. For build and device setup failures, return to [Provisioning](build-and-provision.md#provisioning); for a successful install that still cannot reach the configured brain, check the endpoint and key under **Backend → On-device** before changing permissions.
 
-When the ball is visible and the typed request has received an answer, the first-run path is complete. The README remains the reference for advanced provisioning, cloud/hub mode, wake word setup, and known limitations.
+When the ball is visible and the typed request has received an answer, the first-run path is complete. [Build and provision](build-and-provision.md) and the [Reference](reference.md) remain the references for advanced provisioning, cloud/hub mode, wake word setup, and known limitations.

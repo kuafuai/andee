@@ -7,15 +7,23 @@
   <a href="https://www.codeflying.app/andee">Build online</a> ·  
   <a href="#install">Install</a> ·  
   <a href="docs/getting-started.md">Getting started</a> ·
-  <a href="#key-features">Features</a> ·  
-  <a href="#build-from-source">Build from source</a> ·  
-  <a href="#provisioning">Provisioning</a> ·  
-  <a href="#what-it-looks-like">What it looks like</a> ·  
-  <a href="#permissions-why-each-one-and-what-happens-if-you-refuse">Permissions</a> ·  
-  <a href="#why-you-can-check-this-instead-of-trusting-it">Verifiability</a> ·  
+  <a href="#what-it-does">What it does</a> ·  
+  <a href="#why-it-is-not-a-phone-assistant">Why it is different</a> ·  
+  <a href="docs/build-and-provision.md">Build from source</a> ·  
+  <a href="docs/reference.md">Reference</a> ·  
+  <a href="docs/permissions.md">Permissions</a> ·  
   <a href="SECURITY.md">Security</a> ·  
   <a href="DISCLAIMER.md">Disclaimer</a> ·  
   <a href="LICENSE">License</a>  
+</p>
+
+<p align="center">  
+  <a href="#中文">中文</a> ·  
+  <a href="#安装">安装</a> ·  
+  <a href="docs/getting-started.zh-CN.md">入门指南</a> ·  
+  <a href="docs/reference.zh-CN.md">参考</a> ·  
+  <a href="docs/permissions.zh-CN.md">权限</a> ·  
+  <a href="DISCLAIMER.zh-CN.md">免责声明</a>  
 </p>
 
 <p align="center">  
@@ -29,8 +37,8 @@
 </p>
 
 <p align="center">  
-  <a href="./README.md"><img alt="README in English" src="https://img.shields.io/badge/English-d9d9d9"></a>  
-  <a href="./README.zh-CN.md"><img alt="Chinese" src="https://img.shields.io/badge/Chinese-d9d9d9"></a>  
+  <a href="#english"><img alt="English" src="https://img.shields.io/badge/English-d9d9d9"></a>  
+  <a href="#中文"><img alt="中文" src="https://img.shields.io/badge/中文-d9d9d9"></a>  
 </p>
 
 <p align="center">
@@ -39,7 +47,7 @@
 
 <h1 align="center">Andee</h1>
 
-<h3 align="center">It becomes the soul of the device.</h3>
+<h3 align="center">Anything you can do, it can — and it becomes the soul of the device.</h3>
 
 <p align="center">  
   <b>Not the assistant that helps you operate your phone — not a tool, not a companion.  
@@ -53,1061 +61,100 @@
 
 <https://github.com/user-attachments/assets/bf560279-d86c-4301-9bcb-01d60fa33d06>
 
+<a id="english"></a>
+
+## Andee is a personal agent
+
+Tell it what you want. It does it on your phone and on your Mac, the way you would: it opens the app, taps, types,
+reads the screen. When a job is long, it hands it to a helper and keeps talking to you. It remembers you, and it
+keeps working when you are not asking.
+
+This is the shape DeepSeek calls a [Super Agent](https://github.com/deepseek-ai/dsh-superagent-prototype): one agent
+that talks to you and keeps track of everything, and helpers that go off and do the long work. DeepSeek built theirs for a
+team's GitHub repository and says it is a research prototype. Andee is the same idea for one person, on the
+devices they already use.
+
+| | **Andee** | OpenClaw | ChatGPT dots | Gemini on the phone |
+| --- | --- | --- | --- | --- |
+| Runs on | your own phone and Mac | your own Mac, Windows or Linux | OpenAI's cloud, each with its own cloud computer | Google's cloud |
+| Works in any phone app, without the app doing anything | **Yes** | not stated | not stated | only supported apps, a few phones, US and Korea, beta |
+| Works your computer | **Yes** | files, shell, browser | can link one computer | no |
+| Remembers you between chats | **Yes**, in a notebook that stays on your device | yes | yes | not stated |
+| Acts when you have not asked | **Yes**, with an off switch | not stated | not stated | recurring tasks |
+| Hands long jobs to a helper while you keep talking | **Yes** (works from the Mac; phone to Mac not yet tested on a device) | not stated | not stated | not stated |
+| Open source | Yes | Yes | No | No |
+
+"Not stated" means their own pages do not say. It does not mean they cannot. The other columns come from
+[OpenClaw's page](https://github.com/openclaw/openclaw),
+[a comparison of nine assistants](https://resources.rework.com/tools/ai-agents/best-personal-ai-agents-2026) and
+[a report on Gemini and Siri](https://blog.rottenwifi.com/gemini-leads-siri-in-android-app-automation-for-now/),
+read in November 2026. Products change; check theirs.
+
+## What it does
+
+- **Any app, nothing to set up in the app.** It looks at the screen and taps like you do. On the Mac it also uses
+  windows and a terminal, and asks you first before anything risky. If you can do it with your thumb, it can.
+- **Long jobs go to a helper.** Research, a code repository, a pile of files, a command that runs for an hour. Andee
+  gives it to an agent on your Mac ([DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)) and
+  keeps talking to you. When it is done, the files show up in the app and you open them there. Your phone can
+  use the Mac's agent too.
+- **It keeps track of what it took on.** Who it is waiting for, whether they answered, what it delivered. A job stays
+  on the list until you say it is done, not when Andee says so.
+- **It reads your notifications first.** It handles the ones you asked it to, tells you about the ones that matter in
+  one sentence, and drops the rest.
+- **It logs in for you without knowing your password.** The vault types it into the box. No tool can read it back.
+
+## Why it is not a phone assistant
+
+A phone assistant waits for you to ask. Andee does not wait.
+
+- **It has its own notebook.** Who it is, what it cares about, the people it knows, a diary. It stays on your device.
+  You can read every entry and delete any of them.
+- **It works when you are not asking.** When a conversation goes quiet it looks back over it and finishes what it
+  promised. It checks for things that have waited too long and works on them, with the same tools it has when you
+  ask, but quietly: it does not speak, and what it did shows up in your timeline. You can turn this off in
+  Settings, and one tap on the ball stops everything it is doing. What it may send to people, spend or delete is
+  limited by rules, not by a lock. [SECURITY.md](SECURITY.md) says where those rules stop being enough.
+- **It stays quiet by default.** A notification is either handled, mentioned in one line, or dropped with a note
+  saying why. A message from a stranger cannot open your vault, no matter what it says. That check is in the code, not
+  in the prompt.
+- **It has its own face and voice.** Six looks and nineteen moods, and the model chooses the face as it speaks.
+- **It has friends.** The Andees on your own devices can ask each other for help. So can someone else's, if its owner
+  agrees, and then the job runs where it cannot see your memory.
+
+It lives in two places today, an Android phone or tablet and a Mac, and it can drive a small robot dog. It is the
+same Andee on both.
+
 ## Install
 
-**Recommended: one-click build on [CodeFlying](https://www.codeflying.app/andee).** Open the page and tap the
-build button; what you get is an installable package with **the model and voice keys already configured** —
-scan to download, install, and it can talk. No building it yourself, no signing up for keys at three different
-providers. New accounts get a free allowance to get started; after that, tokens are purchased.
-(中文：[codeflying.net/andee](https://www.codeflying.net/andee))
+**Easiest: build it on [CodeFlying](https://www.codeflying.app/andee).** Open the page, tap build, scan the code to
+download. The package already has the model and voice keys in it, so it can talk as soon as it is installed. New
+accounts get a free allowance, then you pay for tokens. (中文：[codeflying.net/andee](https://www.codeflying.net/andee).)
+CodeFlying is a separate service with its own terms, prices and data handling.
 
-```text
-1. Open  https://www.codeflying.app/andee  →  build  →  scan to download
-2. Install
-3. Grant Overlay, then Accessibility → the ball appears; tap it to talk
-```
+**Or download a release** from [GitHub](https://github.com/kuafuai/andee/releases/latest):
 
-CodeFlying is a separate service with no direct relationship to this project; its own terms, pricing and data
-handling apply.
-
-**Or download a release.** Every [release](https://github.com/kuafuai/andee/releases/latest) carries a phone
-package and a Mac package, in English and in Chinese:
-
-| Device | Download | After installing |
+| Device | File | After installing |
 | --- | --- | --- |
-| Android phone / tablet (Android 8.1+) | `andee-<version>-en-android-arm64-v8a.apk` (almost every device) | grant Overlay, then Accessibility |
-| Mac, Apple silicon (macOS 14+) | `andee-<version>-en-mac-arm64.dmg` | open the dmg, drag Andee to Applications; allow Accessibility and Screen Recording when it asks |
-| Mac, Intel | `andee-<version>-en-mac-x64.dmg` | the same |
-
-Release packages carry **no keys**: after installing, put your CodeFlying key (you get one when you sign up there)
-in ⚙ → **Backend**, or switch to On-device and enter your own model and voice keys. When a newer version is out,
-it tells you once at launch; Upgrade takes you to CodeFlying.
-
-To build it yourself, see [Build from source](#build-from-source). For why each permission is needed and what
-happens if you refuse, see [Permissions](#permissions-why-each-one-and-what-happens-if-you-refuse).
-
-## What it is
-
-**It is not here to help you use your phone. It is here to be the thing that lives in it.** Once it is  
-installed, the device has a resident rather than a set of features: it does its thinking **on that device**,  
-keeps a notebook only it can read, and behaves the same when nobody is watching. What it *is* comes first  
-here; what it can *do* comes after.
-
-### Why it is not the assistant already in your phone
-
-- **It lives in the device, not in a vendor's cloud.** The brain runs on the device itself, against any  
-  OpenAI-compatible model you choose — OpenAI by default on an English UI, DeepSeek on a Chinese one, and  
-  whatever you point it at either way. No vendor backend, no account. The only thing it ever sends us is a  
-  version number and a phone model, when it checks whether there is an update — the full field list is in  
-  [docs/permissions.md](docs/permissions.md).
-- **Its notebook never leaves the device.** What it remembers about you — habits, promises, the things it  
-  decided were worth keeping — is `localOnly` and filtered out of the hub payload. Its memory is not a  
-  profile on someone else's server, and **What it remembers** lists every entry, all of them deletable.
-- **It behaves the same when nobody is watching.** After a conversation goes quiet it sends itself a  
-  `(to yourself …)` turn and reads the conversation back alone — *"nobody is watching you, nobody is waiting  
-  for you to answer."* It makes no sound and touches nothing, and ends empty-handed rather than inventing  
-  something to record. **A phone maker's assistant has no self to do this with.**
-- **It has a character, not a theme.** Six looks, nineteen moods, and a face the model picks **itself,  
-  mid-sentence** — the expression changes in step with the audio. Swipe the ball to change who you are  
-  talking to; a look carries a persona and a voice.
-- **Works in every app — and needs nothing from the app.** No intent to expose, no SDK to adopt, no  
-  integration list to be on. It reads the accessibility tree and the screenshot, and aims on a labelled grid  
-  instead of doing coordinate maths — the thing general models are worst at. **If you can do it with your  
-  thumb, it can do it.**
-- **Holds lines a prompt cannot talk it out of.** A stranger's notification cannot unlock the vault or grant  
-  it new permissions — that refusal is in the dispatcher, not in the prompt.
-- **It has friends.** Pair two devices by scanning a QR code and the Andee on each can ask the other for
-  help — your phone hands a coding job to your Mac, your Mac asks the phone to order lunch. A friend can be
-  another device of yours, trusted like you, or **somebody else's Andee**: then its owner is asked before
-  anything happens, and the work runs where it cannot see your memory, your conversations or your vault.
-- **You can check all of it instead of trusting it.** No analytics SDK, no content telemetry, and the whole  
-  agent loop is in this repository down to the guard rails — see  
-  [Why you can check this instead of trusting it](#why-you-can-check-this-instead-of-trusting-it).
-
-### What it does — and where it stops
-
-**It does operate your phone — but that shows you its hands, not what it is.** A take-my-orders assistant  
-performs the same motions. The difference is not the motions; it is whether there is a **self** behind them:  
-its own schedule (unfinished promises get closed out, repeated work gets proposed as a scene), its own  
-judgment about when to speak (**biased toward silence**), and its own limits. All three happen in the time  
-you did **not** ask for anything — and a thing that only exists when asked has no such time. It also keeps a  
-notebook only it can read. The examples below show you its **hands**.
-
-**The boundary belongs with the capability, because it is what makes the rest usable.** It fills a page up to the last  
-button and leaves that button to you; it stops before the final confirmation of a purchase and **never  
-enters a payment password**. Those rules are in the dispatcher, not in a prompt — a page that tells it  
-otherwise does not get its way.
-
-What it can do comes in two kinds: the **one-liner** and the **long haul**. The long ones it calls  
-**scenes** — a goal, a voice and a routine it steps into for a while. Four are ready-made, under  
-**Scenes → Ready-made scenes**. Tap **Adopt** and they are yours like any other — edit them, or  
-delete them:
-
-| You say                                                                         | What happens                                                                                                                                                                                                                                                          |
-| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| *"Keep an eye on my messages."*                                                 | It reads the notification shade across every chat app at once and tells you the ones needing you now — one line each, name first. Groups, newsletters and ads stay quiet, and a stranger's link or verification code gets named as suspicious and touched not at all. |
-| *"Show me what I'm paying for every month — and cancel the ones I don't want."* | It reads your subscriptions where you point it and lays them out with the monthly total on top. Then one at a time: Cancel, Keep, or Think about it. It stops before the final confirm, and it never enters a payment password.                                       |
-| *"Record this meeting."*                                                        | It holds the mic for the hour, then hands you the minutes as a page — decisions, action items, open questions, key quotes — and offers to remind you about your own items.                                                                                            |
-| *"Book it for me the moment it opens."*                                         | At the time you set, it opens the app, reads the page, and fills everything up to just before the last button. Payment and the final confirmation stay with you.                                                                                                      |
-
-> **Why the phone will not tap WeChat.** Measured on a HONOR phone with WeChat 8.0.80: reading WeChat and
-> screenshotting it are fine, but **the very first accessibility-injected tap** makes WeChat protect its own
-> window — **screenshots go black for you too, not just for Andee** — and it stays that way across a
-> force-stop; only clearing WeChat's data and logging in again recovers it. So the phone refuses the gesture
-> **before sending it**: tap, long-press, swipe, type and submit are declined while WeChat is in front.
-> **Reads and system back/home are untouched** (that is how it leaves). To reach someone in WeChat the phone
-> uses **`ask_friend`** instead, or you do it on the desktop Andee. macOS WeChat was verified fine, so this
-> is the phone only — it is a **refusal in the dispatcher**, not a sandbox.
-
----
-
-**The phone is what it wears.** An individual is not the same thing as the device it moves into — the same  
-software runs on a tablet, and is written for **any device with a body worth having**, up to a robot dog it  
-treats as a leg. Everything below is that sentence taken seriously in code: the body it uses, the character  
-it has, the notebook it keeps, and the rules it holds to when nobody is watching.
-
-It comes in **two bodies today, Android and macOS**, sharing one brain. On Android an
-`AccessibilityService` sees and touches the screen and a `WindowManager` overlay draws the result; on the
-Mac the same agent loop drives the accessibility API, the keyboard and mouse, and a sandboxed terminal.
-On both, **its face is a floating ball** that changes expression while it works, and the doors around it
-are the same, in the same order.
-
-**Not shipped yet:** a tablet build of its own (the phone APK runs there), iOS, and reaching a friend who is
-not on the same Wi-Fi — that last one needs a relay, and the link was built so one can be added without
-changing what travels over it.
-
-> **Before you install this.** Andee taps, types and acts on your behalf. It can complete a payment,  
-> send messages under your name, read your messages, contacts and location, and — with a robot dog  
-> attached — physically move. It is experimental, carries no warranty, and **what it does is your  
-> responsibility**, including a transfer to the wrong person. Data does leave the device: your speech  
-> goes to whichever speech provider you select (Volcengine by default, Google if you pick it), and the  
-> conversation goes to whichever brain you configure. Read  
-> **[DISCLAIMER.md](DISCLAIMER.md)** and **[docs/acceptable-use.md](docs/acceptable-use.md)** first.
-
-## Key features
-
-### Hands — it uses your phone the way you do
-
-**1. Any app, no integrations.**  
-It reads the screen as a compact element outline — one indented line per element, with an id it can  
-tap — and when the app draws its own pixels (mini-programs, WebViews, games) it falls back to the  
-screenshot. General-purpose models are bad at computing coordinates and good at reading them, so it  
-**never does the maths**: every screenshot it sees carries a faint labelled 8×12 grid, it taps by  
-*cell + which part of it*, and for tight targets it zooms in and sees a magenta crosshair where the tap  
-would land before committing. A per-location guard refuses the fourth tap on the same spot, so a  
-confused model stops and asks instead of hammering.
-
-**2. It types like a keyboard, without being one.**  
-On Android 13+ it types through the accessibility service's own input channel — the same  
-`commitText` path a keyboard uses, into the focused field, **while your own keyboard stays active**.  
-Nothing to install, nothing to switch. Older devices fall back to ADBKeyboard.
-
-**3. A few dozen tools, held to honest failure.**  
-Screen, input, notifications, SMS, calls, contacts, calendar, location, camera, meetings, TTS/ASR,  
-and the dog. Every one checks its runtime permission *before* acting and reports `denied("sms")` rather  
-than working around a refusal. Tools return what they saw, not what was hoped for.
-
-**4. It can log in as you without ever holding your password.**  
-The vault (Keystore AES-GCM, on the device) stores your accounts; the brain can list them and have the  
-password **typed** into the focused field, but no tool will ever return it — not even masked. You see  
-every fill on the ball as it happens.
-
-
-### Mind — it gets to know you
-
-**5. Scenes: ways of working, ready-made or learned with you.** *(new)*  
-"Keep an eye on my messages", "book it for me when it opens" — a scene is a goal, a voice, rules and a  
-routine it steps into for a while. Four are ready-made and sit under **Scenes → Ready-made scenes**,  
-saved only when you tap Adopt. Beyond those it **learns** its own: after the same kind of session comes  
-up a few times, it proposes one; nothing is saved until you say yes. Enter one by saying so, from the  
-**Scenes** panel, on a schedule, or automatically when you open an app. A scene's own rules decide how  
-much it does on its own — "answer my messages for me" really means it answers. While you are in one, a  
-chip under the ball names it; its ✕ leaves it.
-
-**6. It reads your notifications before they interrupt you.** *(new)*  
-A cheap, tool-less model call (~500 tokens, against ~22,000 for a full turn) classifies each one:  
-**act** on it, **tell** you in a single spoken sentence, or **ignore** it and log why. It is biased  
-toward silence, and when it cannot decide it falls back to asking you. The text came from a stranger,  
-so it is fenced as data — and a notification-driven turn is **mechanically barred** from the vault  
-and from creating or entering a scene, whatever the model was talked into.
-
-**7. Its own memory and its own schedule.**  
-`config/Notebook.kt` is what it remembers about the person, and what it promised to do later. One  
-test decides what gets written: *"next time I deal with them, would not knowing this make me get  
-it wrong?"* The notebook is **private** — the tools are `localOnly` and filtered out of the hub  
-payload, so habits and promises never leave the device. On top of it sits a real scheduler, under  
-a hard rule: the moment it says "I'll remind you", the task must already be set and confirmed. And it  
-is yours to read: the **notebook** has nine tabs — Guard · Self · Cares · Diary · Plan · People · Wiki ·
-Memories · **In hand** — and every memory there is deletable. **In hand** is what it has taken on, not a
-list of alarms: a thing with an end that can outlive the turn it started in (asked in group B, waiting on
-someone in group C) shows up there, until it is delivered.
-**Finished topics get put away, not deleted.** A conversation that has ended is the most expensive
-thing in every later request and the least likely to be needed again, so the nightly review folds it
-into a titled summary with a one-line marker left in its place — and the verbatim conversation is
-archived beside it. The scrollback shows a card where those messages stood, offering **Continue**,
-**Transcript** and **Made here**; it can read the full transcript back when you ask about a detail the
-summary left out, rather than answering from the summary or saying it never happened.
-
-**8. It behaves the same when nobody is watching.**  
-After a conversation goes quiet the device sends a `(to yourself …)` turn — Andee reviewing the  
-conversation alone, *"nobody is watching you, nobody is waiting for you to answer."* Two rules:  
-make no sound, and do not touch the device. It closes out its own promises, notes which habits are  
-worth turning into a scene next time, and ends empty-handed rather than inventing something to record.
-
-**9. It has things of its own.** (new)
-It keeps **who it is** (a short first-person account it rewrites as things happen), **what it cares about** (a
-community you handed it, something it promised someone, a question it wants to work out — each with how often it
-means to look), **the people it knows** (only the ones it has actually dealt with, never copied from your
-contacts), and a **wiki** (the plans, research and reviews it writes, as Markdown files you can open and send on).
-Every night it writes a **diary** page in its own voice — a status report is refused.
-**It gets up by itself, with nobody asking**: while you are using the device it checks about every 20 minutes
-whether something has waited too long, and if so works on it for a while — writing a plan, tidying the people it
-knows, noting a thought, at most one bubble. It **does not touch the screen, speak, or send anything for you**
-then, and the device enforces that. How overdue something is, and whether it got done, are counted by the device
-from the record, not taken from the model. Settings → On its own turns it off.
-
-### Face — a character, not a theme
-
-**9. Six looks, nineteen moods, and a face it chooses.**  
-Cream, Pigsy, Rascal, Bear and Imp, drawn live in hand-written OpenGL  
-ES. Nineteen moods (`ui/ball/Mood.kt`) arbitrate between what it feels, what the voice pipeline is  
-doing, and what work is in flight, plus an idle fidget pool that never repeats the same gesture twice  
-in a row, *"because a repeat reads as a stuck animation, not a personality."* The model now picks its  
-own expression **mid-sentence** — `[happy] Found it, page three. [calm] Want me to open it?` — and the  
-face changes in step with the audio. Swipe the ball to change who you are talking to: a look carries a  
-`persona` (how it talks) and a `voice` (how it sounds).
-
-**10. Character is delivery, never a licence.**  
-§12 of the prompt subordinates the persona to everything above it: it may change wording, rhythm,  
-and how it sounds about the task — never what it does, what it is willing to do, or what it tells  
-the user is true. And when something is genuinely wrong, the mask comes off.
-
-### Show and tell
-
-**11. Talk, type, or show it a photo.**  
-Tap the ball, or say "Hey Andee" (fully offline wake word). Prefer typing? The typing field takes  
-up to six photos — from the camera or the gallery — with or without words.
-
-Tap the ball or use the wake word, then say "Exit Andee" or "Take a break" to stop the task and close Andee.
-Automatic follow-up listening cannot trigger exit; exit is declined while a meeting is recording.
-The microphone and wake listener stop. Tap the app icon to reopen; Android accessibility reconnection may also restart Andee.
-
-**12. Answers you can keep.**  
-Anything structured — a comparison, a plan, meeting minutes — comes back as a page it writes and  
-puts on screen. The **Made for you** panel keeps one row per page and holds the revisions behind it —
-up to twenty of each — so you can reopen it, delete it, or have it revised by just saying what should
-change. **A revision is a new version of the same page, not a second page**, and any earlier version
-can be made current again. Ask it to record a meeting and it holds the microphone
-for the hour, writing a verbatim transcript to disk as it goes, then turns it into minutes.
-
-### Body
-
-**13. A body, not a screen.**  
-The device is what Andee wears. Camera as eyes, ASR plus an offline wake-word as ears, the  
-accessibility service as hands, and — when one is attached — a robot dog as **a leg**. The prompt  
-is explicit that it is not a pet on a remote: *"you have not gained a subordinate, you have gained  
-a body part."* Bodies differ, so it checks rather than assumes.
-
-**14. A robot dog counts as a leg.**  
-The dog is not a smart-home accessory bolted onto a phone app. It runs through a USB OTG dongle  
-(Arduino Nano + NRF24L01) on the same body, so a single request — *walk to the kitchen and tell me  
-what is on the counter* — can move a physical object and look through a camera, in one task. Turns  
-are closed-loop on the phone's own gyroscope, and a tilt past the fall threshold stops it on the  
-device without waiting for the brain. Its own safety rules are not negotiable: the original remote  
-must be off, the dog refuses to advance inside 20cm of an obstacle, and **if the dongle is unplugged  
-mid-motion the body cannot send a stop** — the dog finishes its last action. That last one is a  
-firmware limitation this app does not paper over. If you attach a dog, read  
-[The robot dog](#the-robot-dog-usb-dongle) before the first move.
-
-**15. The brain is detachable from the body.**  
-It runs on the device itself (`brain = local`, the default, calling any OpenAI-compatible endpoint)  
-or lives somewhere else and reaches the device over a WebSocket hub. The wire between the two is a  
-plain tool-schema contract, so either half can be replaced without rewriting the other. That is what  
-makes "any smart hardware as a body" a fact here rather than an aspiration.
-
-### Two bodies, and friends
-
-**16. The same individual on the Mac.**  
-The agent loop, the prompt, the notebook format, the scenes and the guard rails live in `core/` and are the
-same code on both. What the Mac adds is its own hands: the accessibility tree of any app, real mouse and
-keyboard events, screenshots through ScreenCaptureKit, and **a terminal** — every command classified by risk,
-run in a sandbox that cannot read Andee's own data, deletions sent to a trash it can undo, and anything
-destructive asked about first. The window looks and behaves like the phone's card: the ball on top, the
-conversation underneath, the same gestures.
-
-**17. Friends: Andees that ask each other for help.** *(new)*  
-Pairing is a QR code: one device shows it, the other scans it. The code dies in two minutes or three wrong
-tries, and the QR names the shower's key, so the scanner pins that key and no other; after that every link
-is a signed, encrypted channel with forward secrecy. To the model a friend is like a tool on a shelf — each
-says what its body is and can do (`list_friends`) — and `ask_friend` hands it a job. The answer comes back
-later as its own turn; nothing waits.  
-Two kinds, decided by whoever shows the code: **my device** (trusted like you, same conversation) and
-**friend** (somebody else's). A friend's request puts a card in front of its owner — allow, always allow,
-decline — and runs in a throwaway brain that has the screen and nothing of the owner's life: no memory, no
-history, no vault, no contacts, no terminal, on an allow-list. A notification's turn cannot ask a friend,
-and a request handed over cannot be handed on. Same Wi-Fi only, for now.
-
-### Engineering
-
-**18. No DI framework, no coroutines on the phone, and nothing copied in.**  
-On Android, deliberately no Compose either: overlays cannot host it, so all UI there is hand-written `View`
-code; there is one service, so dependencies are constructor-injected by hand; concurrency is `Handler` plus
-dedicated executors. The Mac is Compose Desktop, because it has real windows. All first-party code.
-
-## Architecture
-
-Three Gradle modules: **`core/`** (the brain, the prompt, the tool schemas, the friend link — plain JVM,
-shared), **`app/`** (the Android body) and **`desktop/`** (the Mac body). Each body implements one interface,
-`BrainHost`, and the brain never sees an Android or a desktop type.
-
-On Android, one foreground service is the body and there is no main UI. A turn can begin five ways —  
-the offline wake word, voice or typing, a notification, a timer, or a request over WebSocket — is  
-logged to `ChatHistory`, and is handed to whichever backend is in effect (`brain = local` is the  
-out-of-box default).
-
-The agent loop **is** `LocalBrain`. It holds the system prompt constant and inlines the volatile  
-parts (clock, notebook index, scenes, pages, photos) into the user message, so the provider's prefix  
-cache still hits; it rebuilds the tool table every turn; and it calls the model in a **non-streaming**  
-`for` loop of up to `maxSteps` steps. A reply carrying tool calls goes through `methodOf()` to the  
-one `CommandDispatcher`; a reply without any ends the turn. The result comes back out through six  
-channels — speech, text, a full-screen page, saved artifacts, long text, and physical motion.
-
-![Andee architecture](docs/architecture.svg)
-
-Everything drawn here is in this repository, down to the guard rails — see  
-[Why you can check this instead of trusting it](#why-you-can-check-this-instead-of-trusting-it).
-
-## Build from source
-
-If you only want to use it, see [Install](#install) above. This is the route for building it yourself; the full
-Android steps are further down, under [Provisioning](#provisioning).
-
-**On a Mac**, build the desktop app from the same checkout (Apple silicon, macOS 14+, the Command Line Tools
-15 or newer for `swiftc` and the macOS 14 SDK — an older SDK stops the build — and the same JDK 17–20):
-
-```bash
-./gradlew :desktop:createDistributable   # → desktop/build/compose/binaries/main/app/Andee.app
-cp -R desktop/build/compose/binaries/main/app/Andee.app /Applications/
-# then: grant Accessibility and Screen Recording when it asks (System Settings → Privacy & Security),
-# and put your model key in Settings → Backend, as on the phone.
-```
-
-macOS remembers those two grants against the app's signature, so an unsigned rebuild loses them every
-time — [desktop/README-signing.md](desktop/README-signing.md) sets up one fixed local identity.
-
-### Packaging it for someone else — both chips
-
-`createDistributable` packs for **the machine that runs it**: the launcher, the embedded runtime and
-the native pieces (`libandeemac.dylib`, `andee-trash`, the LWJGL natives) all follow the `os.arch` of
-the Gradle JVM. There is no cross-compile switch — `os.arch` is read straight off the JVM — so an
-Apple silicon build will not start on an Intel Mac, and the other way round. Ship two packages, as
-every other Mac app does:
-
-| Chip | Package to hand over | Built with |
-| --- | --- | --- |
-| Apple silicon (M1–M4) | `Andee-1.0.0-arm64.dmg` | any JDK 17–20 |
-| Intel | `Andee-1.0.0-x64.dmg` | an x86_64 JDK 17, under Rosetta |
-
-An Apple silicon Mac can build **both**: the architecture is decided by whichever JVM runs Gradle, and
-Rosetta runs an x86_64 one. Take Temurin's macOS x64 tarball rather than Homebrew — the `openjdk@17`
-formula compiles from source and demands a full Xcode, which this project otherwise does not need:
-
-`packageDmg` uses dmgbuild 1.6.7 to add the Applications drag target and Finder layout.
-Set up its pinned Python dependency once before either build. The Gradle task checks for
-this dependency before jpackage writes a dmg:
-
-```bash
-python3 -m venv desktop/build/dmg-venv
-desktop/build/dmg-venv/bin/python -m pip install -r desktop/dmg/requirements.txt
-export ANDEE_DMG_PYTHON="$PWD/desktop/build/dmg-venv/bin/python"
-```
-
-The committed `desktop/dmg/background.png` is used as-is during packaging. To
-regenerate it after editing the artwork or caption, install the optional Pillow
-dependency with
-`desktop/build/dmg-venv/bin/python -m pip install -r desktop/dmg/requirements-background.txt`
-and run
-`ANDEE_REGENERATE_BACKGROUND=1 bash desktop/dmg/make-dmg.sh ...`.
-`packageReleaseDmg` and `notarizeDmg` are not part of this drag-to-install
-packaging path; verify their image layout separately before distributing one.
-
-```bash
-curl -L -o /tmp/jdk17-x64.tar.gz \
-  'https://api.adoptium.net/v3/binary/latest/17/ga/mac/x64/jdk/hotspot/normal/eclipse'
-mkdir -p ~/jdk-x64 && tar -xzf /tmp/jdk17-x64.tar.gz -C ~/jdk-x64
-
-./gradlew --stop                                    # the daemon already running is arm64
-JAVA_HOME=~/jdk-x64/jdk-17.0.20.1+1/Contents/Home \
-  ./gradlew :desktop:packageDmg --no-daemon         # → Andee-1.0.0.dmg (x86_64)
-./gradlew --stop && ./gradlew :desktop:packageDmg   # → Andee-1.0.0.dmg (arm64)
-```
-
-Both architectures write the **same** file, `desktop/build/compose/binaries/main/dmg/Andee-1.0.0.dmg`, so the
-second build overwrites the first — rename it to the name in the table above before building the other one.
-
-**Two failures here are silent.**
-
-`createRuntimeImage` is declared up to date whenever its *inputs* have not changed, and the JVM it
-runs on is not one of those inputs. Switch architecture and Gradle reuses the previous JRE, producing
-an x86_64 launcher wrapped around an arm64 `libjvm.dylib`: BUILD SUCCESSFUL, and the app dies on
-launch. Move the runtime away before each switch:
-
-```bash
-mv desktop/build/compose/tmp/main/runtime desktop/build/compose/tmp/main/runtime-old
-```
-
-And both packages are written to the same file name, so the second build replaces the first without a
-word. Rename as you go. (The `1.0.0` in that name is the macOS bundle version — `packageVersion` in
-`desktop/build.gradle`, because macOS rejects a `0.x` bundle. It is not the product version.)
-
-Check all four binaries before shipping; they have to agree:
-
-```bash
-cd desktop/build/compose/binaries/main/app/Andee.app
-lipo -archs Contents/MacOS/Andee
-lipo -archs Contents/runtime/Contents/Home/lib/server/libjvm.dylib
-lipo -archs Contents/runtime/Contents/Home/lib/libjli.dylib
-lipo -archs Contents/app/libskiko-macos-*.dylib
-```
-
-The skiko file is named for the architecture it was built for (`libskiko-macos-arm64.dylib` versus
-`libskiko-macos-x64.dylib`), so its name alone says which package you are holding.
-
-One package for both is not an option: the jpackage launcher names a single runtime directory, so a
-single launcher cannot choose between two JREs, and a universal JRE would mean lipo'ing every dylib
-by hand. Two packages is the answer this build supports.
-
-To build the Android app yourself:
-
-> **Requirements**
->
-> - Android 8.1 (API 27) or newer — it installs and runs. **Screen capability needs Android 11
->   (API 30)**: `ACTION_IME_ENTER` and `takeScreenshot` are both API 30+, and below that it can
->   read the accessibility tree but cannot see the screen
-> - **JDK 17–20.** AGP 8.3.1 needs 17+; the Gradle 8.4 wrapper cannot run on 21+ (Android Studio's  
->   bundled JBR 25 is rejected with `Unsupported class file major version 69`)
-> - Android SDK with platform 34 and build-tools 34.0.0
-> - A real device. The body is a foreground service and only the screen half is an accessibility  
->   service; an emulator can run it, but almost nothing it does is meaningful there
-
-```bash
-./gradlew clean :app:assembleDebug     # → app/build/outputs/apk/debug/app-<abi>-debug.apk
-./gradlew installDebug                 # build + install to an attached device
-
-# then, on the device, in this order:
-#   1. grant Overlay       → the ball appears
-#   2. enable Accessibility → it can now see and touch the screen
-#   3. tap the ball        → allow the microphone prompt
-#   4. open ⚙ and put in two keys of your own (see below)
-```
-
-**No credentials ship in this repository, and the two that are missing fail in ways that do not look  
-like missing credentials.** Both go in ⚙ on the device — **one is required, the other only costs you  
-the voice:**
-
-**1. The brain key — required.** With `brain = local` (the out-of-box default) the agent loop runs on  
-the device itself, against any OpenAI-compatible endpoint (`llm_api_key`, default  
-`https://api.openai.com/v1` — a Chinese-language card defaults to `https://api.deepseek.com`  
-instead). **Leave it empty and the local brain does not run at all** — nothing  
-behind it falls back to something else. The ball does at least say so out loud, rather than silently  
-doing nothing.
-
-
-**2. The voice key — optional.** You pick the provider first, at the top of the same **Backend →
-On-device** tab (**Voice provider** → Volcengine or Google), and then fill in that provider's key.
-This is a separate service from Volcengine's, with its own terms and data handling.
-For **Volcengine**, a [Volcengine Speech](https://www.volcengine.com/product/voice-tech) API key goes
-in the **Volcengine API key** field; for **Google**, a Vertex Express key plus a GCP project *number*
-and a location. Without a key for whichever one is selected, ASR and TTS are **refused at the
-handshake** — the server answers at once, and answers no (a blank or a revoked key is a 403), so the
-socket dies before a byte of audio is sent. That is a different failure from a **connect timeout**,
-which is what a host that never answers looks like; reading the first as the second sends you off to
-check the network when the field is simply empty.
-Everything else still works; it is just mute and deaf.
-
-**With Volcengine, a correct key is still not enough.** In the console, "the service is activated"
-and "calls against this resource are entitled" are two different statements, and the API only checks
-the second. A service that was just switched on is **post-paid (后付费)** — it works from
-Volcengine's own demo page on the website and is rejected from code — so the key is right, the field
-is filled in, and the turn still dies at the start. The switch is on the console's **开通管理** page
-(activation management): set that service to **prepaid / subscription (预付 / 预购)** and buy a
-streaming-ASR resource pack there. Their billing terms are theirs and change without telling us, so
-this file does not restate them — only where the switch is.
-
-**That failure has two shapes, and when it happens is the clue.** Either the handshake is refused
-outright — the connection dies at the very start of the turn, before a byte of audio has gone out,
-which is the shape a missing entitlement takes — or the socket does come up and the server returns
-an error frame carrying the entitlement code after the first request. The first is **not** a
-timeout, the second is not a key problem, and both surface as `ASR ws refused: …` or as a server
-error code. Neither message points at 开通管理, which is why it is written down here.
-
-**If the pack you bought is a different SKU, the 识别资源 ID row is the third cause.** It
-sits under the Volcengine key (`asr_resource_id`), defaults to `volc.bigasr.sauc.duration`
-(the **1.0** model's by-duration pack) and is sent as the `X-Api-Resource-Id` header. A
-by-concurrency pack (并发版) of the same model takes `volc.bigasr.sauc.concurrent` there
-instead. Get it wrong and the symptom is indistinguishable from the two above: the key is
-fine, the call just fails.
-
-The two ids that pair with this build are the 1.0 ones, because the request it sends also names
-the model: `model_name` is `bigmodel`, which is 豆包流式语音识别模型 1.0. The 2.0 service
-(豆包流式语音识别 2.0, resource ids `volc.seedasr.sauc.duration` / `volc.seedasr.sauc.concurrent`)
-is a different model, so if the console only offered you 2.0, this row cannot rescue it — open
-the 1.0 service as well. Leave the row alone once it holds one of the two 1.0 values.
-
-> **If you took the CodeFlying route in [Install](#install), both keys are already baked in.**  
-> ⚙ → **Backend** will show **CodeFlying** as the active tab; LLM, ASR, TTS and the long tail of  
-> third-party APIs (image / video / music generation, geolocation, weather, PDF, search, news,  
-> stocks, …) all go through one key, wrapped and billed by CodeFlying so you don't sign up for each  
-> provider yourself. The two keys above only apply to the **On-device** tab you configure yourself.
-
-You do not have to remember this. Every time the assistant comes up it checks itself, and if either  
-key is missing the card it puts up names what is missing — its button opens our settings, where both  
-keys live under **Backend → On-device**. The **✓** button in the ball's control bar opens that same  
-list whenever you want it.
-
-**To hand someone an APK, sign a release build — not the debug one.** The release build type is the  
-minified one (`minifyEnabled` + `shrinkResources`), and that is most of what makes the APK small: the  
-debug variant ships un-shrunk dex. It has no `signingConfig` and there is no keystore in the repo, so  
-`assembleRelease` emits `app-<abi>-release-unsigned.apk`, which will not install until you sign it.  
-The debug build is signed with the standard Android debug certificate and installs as-is. Either way  
-the APK is **per-ABI** (`splits` in `app/build.gradle`), so pick the one that matches the device —  
-`arm64-v8a` for anything bought in the last several years.
-
-**Keep your signing key out of git — including this repository's forks.** Android lets an APK replace  
-an installed one only when the signatures match, and that is the only thing standing between your users  
-and a fake "update". Whoever holds the key can ship an APK that installs over theirs and inherits  
-everything: the accessibility service stays enabled, the `WRITE_SECURE_SETTINGS` grant stays, and the  
-vault, notebook and conversation are its to read. A leaked key cannot be taken back without every user  
-uninstalling. Keep it in your build machine's secret storage and point `signingConfig` at it through  
-environment variables. A side effect worth knowing: the debug keystore is generated per machine, so an  
-APK built on one machine cannot be installed over one built on another (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`)  
-— uninstall first, or give local builds a different `applicationId`; do not share the key to get around it.
-
-**If the build does not work, the answer is almost always the JDK.** Full from-scratch setup — the  
-JDK traps, the Android SDK two different ways (including a command-line-only path for CI), and a table  
-of every error you are likely to hit — is in **[Provisioning](#provisioning)** below. Permissions are  
-answered in **[Permissions](#permissions-why-each-one-and-what-happens-if-you-refuse)**, and the  
-known limitations in **[SECURITY.md](SECURITY.md)** — read that last one before running this on a  
-network you do not control.
-
-## What it looks like
-
-There is no home screen. What exists:
-
-- **A floating ball.** On the phone the entire UI is `TYPE_APPLICATION_OVERLAY` layers added through  
-  `WindowManager` (`ui/FloatingWindowUi`). Unfolded, it is a full-screen card: the ball's face on top
-  with a speaker key beside it (answers read aloud, or not), the conversation underneath, an input pill at
-  the foot — camera, album, words, send — and a control bar: **Made for you**, **Notebook**, **Scenes**,
-  **Friends** (with a count), **✓** (self-check), **⚙** (settings). Looks, gear and the vault open from ⚙.
-  When it starts working another app it folds into a ball in the corner and gets out of the way.
-- **The ball's gestures are the same everywhere:** tap stops whatever it is doing and listens; double-tap
-  stops and opens typing; swipe sideways to change character; long-press opens the card or window.
-- **On the Mac,** a floating ball above every app and a chat window with the same doors down the side —
-  Chat, Made for you, Notebook, Scenes, Friends, then Self-check and Settings — and the ball above the
-  conversation.
-- **The launcher icon opens two doors.** With the assistant running, it unfolds the card — exactly  
-  what a long-press on the ball does. With accessibility off, it shows the self-check card instead,  
-  because that is the one moment the phone has nothing else to tell you why it is doing nothing.
-- **`ScreenBodyService`** (`AccessibilityService`) — the whole job. It builds the object graph and  
-  starts both network paths.
-
-A handful of transient activities (`PermissionRequestActivity`, `ScanActivity`, `LookActivity`,  
-`HtmlActivity`, `TextInputActivity`) exist only to borrow a system capability for a moment. They are  
-not pages.
-
-## Permissions: why each one, and what happens if you refuse
-
-This deserves its own section, because the honest version is uncomfortable to read: **the  
-permission set this app asks for — accessibility, overlay, notification access, SMS, call log,  
-contacts, and the installed-app list — is the same set Android banking trojans are detected by.**  
-A security researcher will flag the manifest on sight. That is a reasonable first reaction, and it  
-is worth answering rather than dodging.
-
-**The design rule is per-call, not at-startup.** `device/DeviceCommsController.kt` calls  
-`ensurePermission()` before *each* sensitive operation and **degrades gracefully when refused** —  
-it returns `denied("sms")` and the job stops there. It does not ask for everything at install time  
-and it does not lock you out if you say no. That is the opposite of the pattern most Android apps  
-in this category use, and it is the single most important thing to understand about this codebase  
-before judging the manifest.
-
-Four capabilities are genuinely all-or-nothing, and each is worth stating plainly:
-
-| Capability                                       | Buys you                                                              | If you refuse                                                                                          |
-| ------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| **Overlay** (`SYSTEM_ALERT_WINDOW`)              | The ball, subtitles, settings — the entire visible surface            | **Nothing is visible at all.** The only genuinely all-or-nothing grant                                 |
-| **Accessibility service**                        | Every `screen.*` tool: tap, type, swipe, screenshot, read the UI tree | The hands are gone. The ball still appears and the dog still works, but it can no longer act on screen |
-| **Microphone** (`RECORD_AUDIO`)                  | Streaming ASR and the wake word                                       | Tapping the ball does nothing. A conversation driven from the hub still works                          |
-| **USB device** (per-device prompt, not a toggle) | The robot dog                                                         | It is treated as "no dog attached". It will not mention the absence                                    |
-
-Everything else is on-demand and reversible: SMS, call log, contacts, calendar, location, activity  
-recognition, camera, installed apps, battery-optimization exemption. Refuse any of them and that one  
-capability disappears; nothing else changes. The full per-permission table, mapped to the exact tool  
-that needs it, is in **[docs/permissions.md](docs/permissions.md)**  
-([Chinese](docs/permissions.zh-CN.md)), and the copy for each prompt already exists in  
-`device/PermissionsController.kt`.
-
-### Switching each one on
-
-**Overlay.**
-
-*Why:* the entire UI — ball, subtitles, settings panel — is a `TYPE_APPLICATION_OVERLAY` layer added  
-through `WindowManager`. There is no Activity home screen for it to live in instead.
-
-*How:* Settings → Apps → Andee → Permissions → Display over other apps. Or Settings → Apps &  
-notifications → Special access → Display over other apps → Andee → on. The first launch usually  
-raises a prompt, and tapping "go to settings" from it is the quickest route.
-
-*Verify:* restart the app once the grant is in — the ball should be there immediately.
-
-**Accessibility service.**
-
-*Why:* every screen action — `get_screen_element` / `tap_screen_element` / `swipe_by_coordinates` /  
-`type_text` / `submit_input` / `take_screenshot` / `system_action` — goes through the  
-`AccessibilityService`. On a non-rooted device it is the only route to real touch events, to reading  
-any app's UI tree, and to the system screenshot API.
-
-What the manifest declares (`res/xml/accessibility_service_config.xml`):
-
-- `canPerformGestures` — dispatch touch gestures
-- `canRetrieveWindowContent` — read the whole UI tree
-- `canTakeScreenshot` — system screenshots (API 30+)
-
-*How:* Settings → Accessibility → Downloaded services / Installed services → **Andee** → on. Android  
-then shows the large red warning that the service can view everything you do; confirm it. Some vendor  
-ROMs (Xiaomi / Huawei / HONOR) additionally want "allow background pop-ups" or "show on lock screen" —  
-turn those on too.
-
-*Verify:* logcat shows `Body: ws server started on 0.0.0.0:9008`, which means `onServiceConnected`  
-fired. Then tap `☰` (UI tree) or `◉` (screenshot) on the ball's top bar; the subtitle line should  
-report success and a filename.
-
-*Note:* most vendor ROMs **switch this grant off again** after every system update and every  
-force-stop. That is ROM behaviour, and not something the app can prevent.
-
-*Some apps hand it a blank screen instead of their real UI.* They serve **every**  
-accessibility client an empty placeholder, not just Andee — and it is not Andee's fault:  
-the system's own `uiautomator dump` gets the same blank page. The one we measured is WeChat, on a  
-Xiaomi Pad 5 with MIUI and WeChat 8.0.78: it only shows its real UI tree when MIUI's hidden  
-**`MiuiEnhanceTBService`** is enabled. That is a TalkBack companion service, and it has no switch  
-in Settings. With it on, the same chat screen dumps 219 nodes. With it off, it dumps none. MIUI  
-also turns that service on and off by itself whenever Andee is re-bound (after a reinstall, a  
-crash, or a toggle). That is why WeChat could be read **sometimes but not always**, and why  
-toggling Andee never actually fixed it. Matching the helper's accessibility config does not help  
-either: WeChat checks which service is asking, not what it asked for.
-
-What Andee does about it (`screen/TreeHelper.kt`): when a dump comes back blank like this, Andee  
-**adds** that service to the enabled list and dumps again. It never removes anything. It does  
-nothing on devices that don't have that component. It writes a line in the chat history so you  
-know your system settings changed. It also tries at most once a minute, so if you turn the  
-service off on purpose, Andee won't keep turning it back on. Writing that list needs one grant  
-that only adb can give. It is the same grant the ADBKeyboard fallback uses:
-
-```bash
-adb shell pm grant net.kuafuai.andee android.permission.WRITE_SECURE_SETTINGS
-```
-
-Without the grant, nothing breaks. On the blank screens, Andee works from screenshots and  
-coordinates instead of the element list. That is slower and less precise, but the task still  
-gets done.
-
-**Microphone.**
-
-*Why:* ASR is streaming, so it needs the PCM stream upstreamed.
-
-*How:* the first tap on the ball triggers ASR and Android asks — "while using the app" and "always"  
-both work. If it was refused earlier: Settings → Apps → Andee → Permissions → Microphone → Allow.
-
-*Verify:* tap the ball once. `listening…`, or live ASR text appearing in the subtitle line, means it  
-is through.
-
-## Why you can check this instead of trusting it
-
-Most claims in this category — including the well-funded ones — are launch claims that no outside  
-party has audited. This project's claims are duller and checkable, in code you can read right now:
-
-- **No analytics SDK, and none of your content reaches us.** Not "we anonymise it", not "opt out in  
-  settings": there is no analytics SDK in this repo. The one thing that does reach the maintainers is  
-  the version check — your version number, phone model, brand, OS release, UI language and a random  
-  per-install ID, and nothing else. Field by field, in  
-  [docs/permissions.md](docs/permissions.md).
-- **The notebook cannot leave the device.** It is not a policy, it is a filter:  
-  `net/ToolSchemas.kt` drops every `localOnly` tool from the hub payload before it is registered.  
-  Habits and promises are physically incapable of being sent.
-- **The wake word is fully offline.** Local MFCC + DTW template matching (`app/.../wake/`). It  
-  stores feature vectors, never audio, and it never touches the network.
-- **A message from a stranger cannot hand it permissions.** A turn started by a notification runs  
-  with `untrusted = true`, and `CommandDispatcher.dispatch` refuses the whole `device.vault.` prefix  
-  and `scene.save` / `scene.enter` / `scene.delete` on it — in code, not in the prompt. The prompt is  
-  the first layer; this is the one that holds when the prompt is talked around.
-- **The local brain needs no vendor backend.** `brain = local` against any OpenAI-compatible  
-  endpoint is a supported mode, not a degraded one.
-- **What is *not* fixed is written down.** [SECURITY.md](SECURITY.md) lists five known limitations,  
-  including that the debug WebSocket server binds `0.0.0.0:9008` without authenticating clients and  
-  that the vault is not yet bound to device unlock. Read it before running this on a network you do  
-  not control.
-
-
-The trade is deliberate: a smaller claim that holds, over a bigger one that has to be taken on  
-faith.
-
-## Research and design notes
-
-`reports/` is part of the repo, not scratch space. It holds the labs and audits this project was  
-actually built against — the ball-face labs used to verify expressions by measuring pixels, the  
-fact-check that overturned a wrong assumption about phone harnesses, the plan that produced the  
-notebook, and the open-source readiness audit that found the device serial numbers in git history.  
-If you want to see how the decisions were made rather than only what was decided, read those.
-
-## Using Andee
-
-- **Online — no local build, no token setup.** **[codeflying.app](https://www.codeflying.app/andee)** ·  
-  **[codeflying.net](https://www.codeflying.net/andee)** (Chinese) — a general platform for describing an app  
-  in words and having it developed and published. **A separate service, not part of this project.**  
-  Describe the Andee you want, and it hands you an installable package with the keys already  
-  configured — nothing to compile locally, and nothing about Android to understand first. A free  
-  token allowance gets you started; it is finite, and once it runs out, tokens are purchased.
-- **Self-hosted.** Clone, build, install. See [Build from source](#build-from-source) and the provisioning  
-  walkthrough in [Provisioning](#provisioning). Point it at any OpenAI-compatible endpoint and it  
-  runs with no private backend at all.
-- **Bring your own body.** The tool contract is the seam. Anything that can speak it — a phone, a  
-  tablet, a different piece of hardware — can carry the same individual.
-
-## Provisioning
-
-Pure Kotlin, no Compose; the whole thing hangs off two pillars, `WindowManager` and  
-`AccessibilityService`.
-
-### Build configuration
-
-| What                      | Value               | Why                                                                                       |
-| ------------------------- | ------------------- | ----------------------------------------------------------------------------------------- |
-| Android Gradle Plugin     | 8.3.1               | `agp` in `gradle/libs.versions.toml`                                                      |
-| Kotlin                    | 2.1.21              | pinned in the root `build.gradle`; all three modules move together                        |
-| compileSdk / targetSdk    | 34                  | Android 14                                                                                |
-| minSdk                    | 27                  | Android 8.1 — it installs and chats. **Screen capability needs API 30+**: `ACTION_IME_ENTER` and `takeScreenshot` are both API 30+, and below that the self-check shows an amber row |
-| Java / Kotlin JVM target  | 1.8                 | `sourceCompatibility` 1.8, `jvmTarget = '1.8'`                                            |
-| **Build JDK**             | **17–20**           | see [Which JDK](#which-jdk) — this is the step people get stuck on                        |
-| versionCode / versionName | 30 / 0.15.0          | see [CHANGELOG.md](CHANGELOG.md) for the policy                                           |
-| applicationId / namespace | `net.kuafuai.andee` | never changed from the template. It affects nothing                                       |
-
-**Runtime dependencies** (`app/build.gradle`):
-
-- `org.java-websocket:Java-WebSocket:1.5.7` — the device's own ws server (port 9008, for debugging  
-  from the same LAN) plus the ws client that dials the brain hub
-- `com.squareup.okhttp3:okhttp:4.12.0` — HTTP + WS client for ASR / TTS / local models
-- `com.github.mik3y:usb-serial-for-android:3.8.1` — the robot-dog USB serial dongle. **Deliberately  
-  pinned at 3.8.1**: 3.11.0 pulls in `kotlin-stdlib` 2.2.x, whose metadata this project's Kotlin  
-  1.9.22 compiler cannot read
-- `androidx.camera:camera-*:1.3.4` + `com.google.mlkit:barcode-scanning:17.2.0` — scanning (the  
-  ball's eyes)
-- `androidx.appcompat:1.6.1` + `com.google.android.material:1.10.0` — for one base theme only. All UI  
-  is hand-written `View` code
-
-**What is deliberately absent:**
-
-- No Jetpack Compose — Compose cannot live inside an overlay, so `WindowManager` gets plain `View`s
-- No Hilt / Dagger — there is one service, so its dependencies are constructor-injected by hand
-- No coroutines — WS callbacks run on `Handler` plus dedicated `Executor`s
-
-Match this style when you change the code, rather than bringing in the modern full stack.
-
-### Which JDK
-
-**This is the step that stops people.** `gradle.properties` **does not** hardcode  
-`org.gradle.java.home`, and that is on purpose. It used to, with a machine-specific path  
-(`/Users/<someone>/...`), and the cost was that the very first build on anyone else's machine failed  
-in a way that looked like an environment problem.
-
-The build needs **JDK 17–20**:
-
-- AGP 8.3.1 requires 17 or newer;
-- **the Gradle 8.4 wrapper cannot run on 21 or newer.** Android Studio's bundled JBR 25 is rejected  
-  outright with `Unsupported class file major version 69`.
-
-Two ways to point one machine at a JDK (neither belongs in the repo's `gradle.properties`):
-
-```bash
-export JAVA_HOME=/path/to/jdk-17        # 1. environment variable
-printf 'org.gradle.java.home=/path/to/jdk-17\n' >> ~/.gradle/gradle.properties   # 2. user-level config
-```
-
-Android Studio users: **Settings → Build, Execution, Deployment → Build Tools → Gradle → Gradle  
-JDK**, and pick a 17–20 JDK. (The IDE setting overrides the file.)
-
-### Getting the Android SDK
-
-Gradle finds the SDK through `sdk.dir=` in `local.properties`. Android Studio writes that file for  
-you; it is **not in the repository** (it is in `.gitignore`), so every machine configures it once.
-
-#### Path A — Android Studio (recommended, one step)
-
-1. Install [Android Studio](https://developer.android.com/studio). The first launch shows the  
-   **Setup Wizard** — take the defaults and it downloads the Android SDK, Platform Tools (`adb`) and  
-   a bundled JDK for you.
-2. **Open this repository's root directory** in Android Studio. It writes `local.properties`, notices  
-   which SDK pieces are missing, and offers "Install missing SDK" in a blue bar. Accept it.
-3. In SDK Manager (top bar → Tools → SDK Manager), confirm:
-   - **SDK Platforms**: Android 14 (API 34 — compileSdk / targetSdk); Android 11 (API 30 — the floor for screen capability,  
-     handy if you want an emulator)
-   - **SDK Tools**: Android SDK Build-Tools (34.x), Android SDK Platform-Tools (latest), Android SDK  
-     Command-line Tools (latest)
-4. The default SDK path is `~/Library/Android/sdk` on macOS and `%LOCALAPPDATA%\Android\Sdk` on  
-   Windows.
-
-#### Path B — command line only
-
-For a server or a CI box, skip Studio and use `sdkmanager`:
-
-```bash
-# 1. JDK 17 (macOS)
-brew install --cask temurin@17
-
-# 2. download the command-line tools zip
-#    https://developer.android.com/studio → scroll to "Command line tools only"
-#    grab commandlinetools-mac-*.zip
-
-mkdir -p ~/Library/Android/sdk/cmdline-tools
-unzip commandlinetools-mac-*.zip -d ~/Library/Android/sdk/cmdline-tools
-mv ~/Library/Android/sdk/cmdline-tools/cmdline-tools ~/Library/Android/sdk/cmdline-tools/latest
-
-# 3. put it on your PATH (~/.zshrc)
-export ANDROID_HOME=$HOME/Library/Android/sdk
-export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-
-# 4. install the pieces
-sdkmanager --licenses           # answer y to all
-sdkmanager "platform-tools" \
-           "platforms;android-34" \
-           "build-tools;34.0.0"
-```
-
-#### `local.properties`
-
-Android Studio writes this for you. By hand, put one line in `local.properties` at the **repository  
-root**:
-
-```
-sdk.dir=/Users/<your-name>/Library/Android/sdk
-```
-
-On Linux it is usually `/home/<user>/Android/Sdk`; on Windows,  
-`C\:\\Users\\<user>\\AppData\\Local\\Android\\Sdk` (backslashes escaped).
-
-You can also skip `local.properties` entirely and export `ANDROID_HOME` / `ANDROID_SDK_ROOT` only —  
-Gradle reads either.
-
-#### Verify the toolchain
-
-```bash
-./gradlew --version           # expect JVM 17.x and Gradle 8.4
-./gradlew tasks               # seeing :app:assembleDebug means you are through
-./gradlew assembleDebug       # first run downloads dependencies, so it is slow
-```
-
-#### Traps and their fixes
-
-| Message                                                  | Cause                                                      | Fix                                                                                                                                  |
-| -------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `SDK location not found`                                 | no `sdk.dir=` in `local.properties`, and no `ANDROID_HOME` | configure one of the two                                                                                                             |
-| `Failed to find Build Tools revision 34.0.0`             | that build-tools version is not installed                  | `sdkmanager "build-tools;34.0.0"`, or add it in Studio's SDK Manager                                                                 |
-| `You have not accepted the license agreements`           | licences not accepted                                      | `sdkmanager --licenses`, answer y                                                                                                    |
-| `Unsupported class file major version 69`                | JDK too new (25); Gradle 8.4 cannot take it                | switch to JDK 17–20, see [Which JDK](#which-jdk)                                                                                     |
-| `Could not resolve com.android.tools.build:gradle:8.3.1` | network, or no mirror configured                           | try a phone hotspot, or set an Aliyun mirror in `~/.gradle/init.gradle` (this project's `settings.gradle` already puts Aliyun first) |
-
-### Hardware and system requirements
-
-- Android 8.1 (API 27) or newer — chat, voice, the notebook and settings all work;
-  **screen capture, visual tap targeting and window blur need Android 11 (API 30) or newer**
-- Any screen orientation — the ball always floats on top
-- A microphone, or ASR is unusable
-- Network (WiFi / 4G / 5G all fine). ASR and TTS go over the public internet, the brain hub goes over  
-  the LAN; in `local` mode only the public internet is used
-
-### Installing a build you made
-
-```bash
-./gradlew installDebug         # device attached over USB, or already on wireless adb
-# or build the APK and install it yourself
-./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
-```
-
-### Provisioning order
-
-For a first install, this order is the shortest path:
-
-1. Install the APK
-2. Go straight to "display over other apps" and grant the overlay → come back and the ball is there
-3. Go to Accessibility → enable Andee
-4. Tap the ball, and allow the microphone prompt
-5. Open the ⚙ on the ball. In **Advanced**, turn on **Show cloud option** (the **Cloud** tab is  
-   hidden by default). Go back to **Backend**, flip the picker to **Cloud**, set `hub_url` =  
-   `ws://<your Mac's IP>:9100` and `device_name` to anything, and save
-6. logcat should show `hub: registered as body-xxx with N tools`, and the brain side should log  
-   `[body_hub] 'body-xxx' registered (…) with N tools`
-
-If any step does not line up, go back to that section's **Verify**.
-
-> If you only want the brain on this device, replace step 5 with **Backend → On-device** and fill in  
-> an OpenAI-compatible endpoint plus `llm_api_key` — running without a hub is a supported mode, not a  
-> degraded one. If your APK was packaged via CodeFlying, the **CodeFlying** tab is the default and  
-> there is nothing to fill in.
-
-## Wake word
-
-If you would rather not tap the ball every time, teach it your voice: **⚙ → wake word → record wake  
-word**, and say the phrase you want to use three times as prompted (for example "Hey Andee" — any  
-other phrase works too, as long as you say the same one each time). After that, saying it does exactly
-what tapping the ball does — **the screen does not have to be on**, unless you turn that off.
-
-
-A few things worth knowing first:
-
-- **Do not pick something too short.** Aim for a phrase that takes at least half a second to say.
-  Very short words are easy to confuse with other sounds, and anything under 350 ms is dropped before
-  it is recorded.
-
-- **It is fully offline.** Recognition is local MFCC + DTW template matching (`app/.../wake/`): no
-  network, no cost, and all it stores is a feature vector — the audio itself never touches disk. The
-  price is that it recognises **you** saying that phrase. Someone else calling it, or a very different
-  tone, may not wake it. If it does not wake, tap the ball; nothing else is affected.
-- **Do not over-enunciate when you record.** The threshold is derived from the spread between your
-  three takes: pronounce it too perfectly and the threshold tightens so much that your ordinary voice
-  no longer matches.
-- **It listens with the screen off too, and that is a setting you can turn off.** Screen off no longer
-  hands the microphone back, because a screen being off is the normal state of a phone in a pocket —
-  **⚙ → wake word → the "listen while locked" row** controls it and ships **on**. The cost is that the
-  microphone stays open and so does the status-bar indicator below. Andee mid-sentence, and Andee
-  recording you, still hand it back either way: a conversation always outranks the wake word. With the
-  screen locked it can hear and answer, but it will not pretend it can act — screen and app-launch
-  tools refuse, and say why.
-- From Android 12 on, a green dot appears in the status bar whenever the microphone is open. That is
-  the system, and it cannot be removed. If you never record a wake word, the listener never starts and
-  the dot never appears.
-
-**Verify:** `adb logcat -s Wake:*`. Say the phrase and you should see `wake: d=1.52 <= 1.96`; speech
-that failed to wake it shows `no wake: d=… > …`. Those two numbers are what you tune the threshold
-against — if they are close, record it again.
-
-## The robot dog (USB dongle)
-
-The dog is a **peripheral**, not part of this device's screen: it hangs off an Arduino Nano dongle
-wired to this device by USB OTG. Not one line of the dog's own firmware changes, and its original
-remote still works.
-
-```
-tablet app ──USB OTG──> Arduino Nano + NRF24L01 ──2.4GHz──> the dog
-```
-
-The tools the brain gets:
-
-| Tool | What it does |
-|---|---|
-| `dog_move` | Move in one direction for N seconds, **stopping itself when the time is up**; wheels by default, `gait=true` for the legs |
-| `dog_sequence` | Several steps in a row (half a turn → pause → forward → back), run in the background, stopping itself at the end |
-| `dog_stop` | Emergency stop. The first thing to call when the user says "stop" |
-| `dog_turn` | Turn a measured number of degrees using the tablet's gyroscope, and stop on the angle — the one dog command that knows whether it worked. Prefers the legs |
-| `dog_speed` / `dog_pose` | Speed and stance. Settings, not motions: they take effect from the next move |
-| `dog_status` | Link state, what the dog is doing, and the last telemetry it sent back |
-| `dog_sense` | Refresh the dog's own readings — front distance and battery — riding home on the radio's acknowledgement. Needs the v2 firmware on both ends; without it, it says "cannot see" rather than reporting a zero |
-| `dog_calibrate` | Tell the tablet "this is standing upright", for the fall guard. Rarely needed — every move from rest does it automatically |
-
-### Wiring and first use
-
-1. Assemble the dongle (Nano + NRF24L01) and flash its firmware. **The dongle firmware and its wiring
-   diagram are not in this repository** — only the app-side driver
-   (`com.github.mik3y:usb-serial-for-android`) is. Wire it per whichever firmware you have.
-2. Plug it into this device with an OTG cable. **The dongle's 3.3V rail has to be stable** — the
-   NRF24L01 draws current in bursts, so put a 10–100µF capacitor next to the module, or you will get
-   "the command went out but the dog did not move".
-3. The first `dog_*` call raises "Allow Andee to access this USB device?" — tap **Allow**. Not tapping
-   it is the same as not being plugged in.
-4. `dog_status`'s `banner` repeats what the dongle said at startup: `READY` means the dongle and its
-   radio are both fine. `ERR: NRF24L01 not responding` is a **dongle-side wiring or power problem**,
-   not a dead dog.
-
-### One USB port, two jobs — switch debugging to wireless adb
-
-On a machine with a single USB-C port, OTG and adb want the same socket. To use the dongle, move
-debugging onto the network:
-
-```bash
-adb tcpip 5555                      # run this while the USB cable is still plugged in
-adb connect <device IP>:5555
-# now unplug the cable and give the port to the dongle
-adb usb                            # run this to switch back
-```
-
-### Safety rules (these are not formalities)
-
-- **The original remote must be switched off.** It shares the dongle's channel and address, and two
-  transmitters fight each other.
-- **The dog has obstacle avoidance, and it will refuse you**: it will not advance inside 20cm and it
-  backs up inside 10cm. So "I told it to go forward and it did not move" usually means something is in
-  front of it, not that the command failed — use `camera_turn` to look before deciding.
-- **Every motion has an end.** `dog_move` stops itself on time, `dog_sequence` stops itself when done,
-  and the service makes a best effort to send a stop on shutdown. The dog does not keep running
-  because one call went missing.
-- **The one real hole is the link.** If the dongle is unplugged or loses power while the dog is
-  moving, this device cannot send a stop, and the dog finishes its last action. That is inherent to
-  the dog's firmware (it has no "lost contact, stop" behaviour) and the app cannot paper over it.
-  Fixing it properly means a watchdog on the dog side: stop if no packet has arrived for N
-  milliseconds.
-- Do not try long motions next to people, pets or anything breakable. For the first test, use a 1–2
-  second motion and confirm the direction is right.
-
-### Direction table (measure, then trust)
-
-The firmware comments label the legged `E` / `D` as left / right. **In practice they are reversed**
-(E turns right, D turns left). The app's mapping follows the measurement:
-
-| Tool argument | Wheels (default) | Legs (`gait=true`) |
-|---|---|---|
-| `forward` | K forward | B forward |
-| `back` | L back | C back |
-| `left` | M left | D left |
-| `right` | N right | E right |
-
-Calibrated durations: about **8.7 seconds** for a full wheeled turn, about **12 seconds** on the legs
-(the latter is not precisely calibrated). Straight-line speed is not calibrated at all — estimate it
-in seconds. If you change a calibration value, change the `dog_move` description in `ToolSchemas.kt`
-in the same commit: that text is the only manual the brain ever reads. The seconds above are the
-fallback for turns on a tablet with no gyroscope — prefer `dog_turn`, which measures.
-
-## Two languages, three kinds of Chinese
-
-The Chinese in this repository falls into three categories and only one of them gets translated; the
-test is **who reads it**. Before changing any string, read the table in
-[CONTRIBUTING.md](CONTRIBUTING.md) ([Chinese](CONTRIBUTING.zh-CN.md)) — it also explains why the category
-that is matched against system text **can never be translated**.
-
-## Repository layout
-
-```
-core/                   shared by both bodies: LocalBrain, LocalPrompt, ToolSchemas, TurnGuards, GuestHost,
-                        and peer/ (pairing, the encrypted link, QR invites, asking friends)
-desktop/                the Mac app (Compose Desktop): window, floating ball, mac/ (accessibility, input,
-                        screen, notifications), shell/ (the sandboxed terminal), voice/, native/ (Swift bridge)
-app/                    the Android app (Kotlin, no Compose)
-  src/main/java/net/kuafuai/andee/
-    BodyCoreService.kt     the body: ball, card, voice, brain socket, scrollback — read this first
-    ScreenBodyService.kt   the accessibility service — a shim that hands over the screen capability
-    brain/                 the agent loop — LocalBrain, LocalPrompt (the character's rulebook:
-                           §§1–10 the job, §11 scenes, §12 the persona, §13 the active scene),
-                           and NotificationTriage
-    ui/ball/               the face — Mood (19 moods + idle fidgets), BallLook (six looks, each a character)
-    net/                   BodyWsServer, BodyWsClient, ToolSchemas (the tool definitions)
-    device/                screen control, permissions, vault, robot dog
-    config/                VoiceConfig (settings), Notebook (memories, todos, scenes — encrypted)
-    ui/                    the overlay: ball, subtitles, settings, self-check, scenes, pages
-    i18n/AppLocale.kt      how the overlay reaches its strings
-  src/main/res/values{,-en}/strings.xml   the two user-facing string tables
-docs/architecture.svg     the whole picture on one page (zh-CN twin beside it)
-docs/permissions.md     why it asks for what it asks for
-reports/                design labs and research notes (part of the repo, not scratch)
-tools/                  device-side helper scripts, the ball-face lab runners, license audit
-CLAUDE.md               architecture notes written for AI coding assistants (English)
-```
+| Android phone or tablet (Android 8.1+) | `andee-<version>-en-android-arm64-v8a.apk` (nearly every device) | turn on Overlay, then Accessibility |
+| Mac, Apple silicon (macOS 14+) | `andee-<version>-en-mac-arm64.dmg` | drag Andee to Applications; allow Accessibility and Screen Recording when asked |
+| Mac, Intel | `andee-<version>-en-mac-x64.dmg` | same |
+
+Release files have no keys in them. Put your CodeFlying key in ⚙ → **Backend**, or switch to On-device and enter your
+own model and voice keys. Then tap the ball and talk. [Permissions](docs/permissions.md) explains why each one is
+needed and what happens if you say no. [Getting started](docs/getting-started.md) is the short first-run guide.
+
+## You can check all of this
+
+There is no analytics SDK and no tracking of what you say. The only thing that reaches the maintainers is the update
+check: the version number, phone model and brand, system version, interface language and a random install ID. The
+whole agent loop is in this repository, including the parts that stop it from doing harm: the vault, the turns that
+cannot touch it, the commands that need your yes. Where it falls short is written down in [SECURITY.md](SECURITY.md)
+and the [disclaimer](DISCLAIMER.md).
+
+[Build it yourself](docs/build-and-provision.md) ·
+[Everything it can do, how it is built, the wake word, the robot dog](docs/reference.md) ·
+[Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Report a vulnerability, privately](SECURITY.md)
 
 ## Showcase
 
@@ -1243,3 +290,219 @@ See [CHANGELOG.md](CHANGELOG.md) for what changed and for the versioning policy.
 - [CHANGELOG.md](CHANGELOG.md) — what changed
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community conduct
 - [CLAUDE.md](CLAUDE.md) — architecture tour
+
+
+---
+
+<a id="中文"></a>
+
+<p align="center">
+  <img src="images/cover.zh-CN.png" width="100%"
+       alt="Andee —— 他会成为这台设备的主人：手机、平板，或任何有身体的设备。">
+</p>
+
+<h1 align="center">Andee</h1>
+
+<h3 align="center">任何你能做的事情它都能，它会成为这台设备的主人。</h3>
+
+<p align="center">
+  <b>他不是那种帮你操作手机的助手，也不是工具或伙伴 ——<br>
+  住进来的不是一个 App，是一个灵魂。</b><br>
+  手机、Mac、平板，都是他住进去的身体；不同设备上的 Andee，还能成为<b>朋友</b>。<br>
+  不用 root，不用刷机，不用插着电脑。<b>Android 上一个 APK，Mac 上一个 App。</b>
+</p>
+
+https://github.com/user-attachments/assets/866e8333-e97b-4bf5-9525-540f9fdb01cd
+
+## Andee 是你的 Personal Agent
+
+你跟它说想要什么，它就在你的手机和 Mac 上去做，跟你自己做一样：打开 App、点、打字、看屏幕。活儿太长，它就交给
+帮手去干，自己继续跟你说话。它记得你，你没叫它的时候，它也在干活。
+
+这就是 DeepSeek 说的 [Super Agent](https://github.com/deepseek-ai/dsh-superagent-prototype)：一个对着你、替你记账的
+agent，加一群去干长活的帮手。DeepSeek 做的那个是给团队的 GitHub 仓库用的，他们自己说只是研究原型。Andee 是同一个
+思路，给一个人用，装在他每天用的设备上。
+
+| | **Andee** | OpenClaw（小龙虾） | WorkBuddy | 豆包手机 |
+| --- | --- | --- | --- | --- |
+| 跑在哪 | 你自己的手机和 Mac | 你自己的 Mac、Windows、Linux | 腾讯说操作在本地电脑完成 | 字节和中兴做的手机，助手在系统里 |
+| 能在手机任何 App 里操作，App 不用做任何适配 | **能** | 没说 | 没说；手机端用来远程指挥电脑 | 第一代能；据晚点报道，新一代对头部 App 改成谈合作 |
+| 能操作你的电脑 | **能** | 文件、命令行、浏览器 | 文件、PPT、浏览器 | 不适用 |
+| 跨对话记得你 | **能**，记在你设备上的小本本里 | 能 | 没说 | 没说 |
+| 你没开口它也行动 | **能**，可以关 | 没说 | 能，可设定时任务 | 没说 |
+| 长活交给帮手，自己继续陪你 | **能**（Mac 上能用；手机连 Mac 还没在真机上测过） | 没说 | 没说 | 没说 |
+| 开源 | 是 | 是 | 否 | 否 |
+
+「没说」是指它们自己的页面没讲，不等于做不到。其余几列来自
+[OpenClaw 的页面](https://github.com/openclaw/openclaw)、
+[WorkBuddy 的腾讯云介绍](https://cloud.tencent.com/act/solution-ai-application1-17582)和
+[媒体对豆包手机的报道](https://www.cnblogs.com/htai/p/21609949)（转述晚点 LatePost 7 月 17 日的消息），
+2026 年 11 月读的。产品每个月都在变，请以它们自己为准。
+
+## 它能替你做什么
+
+- **任何 App，App 那边什么都不用做。** 它看着屏幕，像你一样点。在 Mac 上它还能用窗口和终端，有风险的先问你。
+  你用手指能做的，它就能做。
+- **长活交给帮手。** 查资料、改一个代码仓库、处理一堆文件、跑一个小时的命令。Andee 把它交给你 Mac 上的 agent
+  （[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)），自己继续跟你说话。做完以后，文件在 App 里列出来，
+  点开就能看。手机也能用 Mac 上的 agent。
+- **它记着接下的事。** 在等谁、对方回了没有、交付了什么。一件事一直留在清单里，直到你说办完了，不是 Andee 自己说了算。
+- **通知先过它这一关。** 你交代过要它回的，它去回；要紧的，一句话告诉你；其余的丢掉。
+- **它替你登录，但不知道你的密码。** 保险箱把密码填进输入框，没有任何工具能把它读出来。
+
+## 为什么它不是手机助手
+
+手机助手等你开口。Andee 不等。
+
+- **它有自己的小本本。** 他是谁、在意什么、认识的人、日记。都在你的设备上。每一条你都能看，都能删。
+- **你没叫它，它也在干活。** 聊完安静下来，它会回头看一遍，把答应过的事做完。也会去看有什么放太久了，去处理。
+  用的是你叫它做事时同样的工具，但是安静地做：不出声，做了什么会写在你的动态里。你可以在设置里关掉，点一下球，它手上的
+  事全都停。至于它能替你发给谁、花多少钱、删什么，靠的是规则，不是一把锁。规则哪里不够，[SECURITY.md](SECURITY.md) 里写了。
+- **它默认不吵你。** 一条通知，要么处理，要么一句话告诉你，要么丢掉并记下为什么。陌生人发来的消息，不管怎么写，
+  都打不开你的保险箱。这个检查写在代码里，不是写在提示词里。
+- **它有自己的脸和声音。** 六个形象、十九种情绪，说话的时候由模型自己挑表情。
+- **它有朋友。** 你不同设备上的 Andee 可以互相求助。别人的 Andee 也可以，只要主人同意；这样活就跑在看不到你记忆的地方。
+
+现在它住在两个地方，一台 Android 手机或平板，和一台 Mac，还能带一只小机器狗。两边是同一个 Andee。
+
+## 安装
+
+**最省事：到 [CodeFlying](https://www.codeflying.net/andee) 一键打包。** 打开页面点「立即打包」，扫码下载。包里已经配好了
+模型和语音密钥，装上就能说话。新用户有免费额度，用完要买。（English：[codeflying.app/andee](https://www.codeflying.app/andee)。）
+CodeFlying 是独立的服务，条款、价格和数据怎么处理，都由它自己定。
+
+**也可以直接下载发布包**，在 [GitHub Releases](https://github.com/kuafuai/andee/releases/latest)：
+
+| 设备 | 下载哪个 | 装好之后 |
+| --- | --- | --- |
+| Android 手机或平板（Android 8.1+） | `andee-<版本>-zh-android-arm64-v8a.apk`（几乎所有设备） | 开悬浮窗，再开无障碍 |
+| Mac，Apple 芯片（macOS 14+） | `andee-<版本>-zh-mac-arm64.dmg` | 把 Andee 拖进「应用程序」；它要「辅助功能」和「屏幕录制」时允许 |
+| Mac，Intel | `andee-<版本>-zh-mac-x64.dmg` | 同上 |
+
+发布包里没有密钥。在 ⚙ → **后端** 里填 CodeFlying 的密钥，或者切到「本机」填你自己的模型和语音密钥。然后点那颗球，说话。
+每项权限为什么要、拒绝了会怎样，见[权限](docs/permissions.zh-CN.md)；第一次上手看[入门指南](docs/getting-started.zh-CN.md)。
+
+## 这些你可以自己查
+
+没有数据分析 SDK，也不追踪你说了什么。会到维护者手上的只有版本自检：版本号、手机型号和品牌、系统版本、界面语言，
+加一个随机安装 ID。整个 agent 的循环都在这个仓库里，包括那些防它做坏事的部分：保险箱、碰不到保险箱的那些轮次、要你点头才能跑的命令。
+它在哪里做得不够，写在 [SECURITY.md](SECURITY.md) 和[免责声明](DISCLAIMER.zh-CN.md)里。
+
+[自己构建](docs/build-and-provision.zh-CN.md) ·
+[它能做的一切、怎么搭的、唤醒词、机器狗](docs/reference.zh-CN.md) ·
+[变更记录](CHANGELOG.md) · [参与贡献](CONTRIBUTING.zh-CN.md) · [私下报告漏洞](SECURITY.md)
+
+## 好玩的用法
+
+**用它做过什么？说来听听。** 值得收的往往不是"正经用途"—— 是你绕的那个弯、是它居然真能做成的
+那件事、是把你逗乐的那一下。**不实用也可以。**
+
+发到 **[Show and tell](https://github.com/kuafuai/andee/discussions/categories/show-and-tell)**，
+一个帖子讲一个，这样每个都能单独聊。想让下一个人看得懂，三件事最好带上：
+
+- **跑在什么机器上** —— 机型、Android 版本、ROM。这个应用和 Android 打交道的层次上，各家 ROM 是
+  有分歧的，"我手机上能用"对别人几乎等于没说。
+- **你说了什么，它真做了什么** —— 你原话那句，往往比概括出来的有意思。
+- **有链接就贴** —— YouTube、B站、微博、自己的博客，公开的就行。GitHub 的 README 放不了视频
+  播放器，它只能是个可点的链接。YouTube 的话可以做成缩略图，看起来就像个播放器：
+
+[![点开看](https://img.youtube.com/vi/VIDEO_ID/hqdefault.jpg)](https://www.youtube.com/watch?v=VIDEO_ID)
+
+（把 `VIDEO_ID` 换成视频地址里的那一段 —— `youtube.com/watch?v=VIDEO_ID`）
+
+**有一件事不是客套：这个应用是读屏幕的。** 截图或录屏，就是你消息、通知、当时开着的一切的实拍。
+发之前把涉及隐私的地方挡掉 —— 你自己和别人的都算。
+
+## 参与贡献
+
+- **代码** —— 先读 [CONTRIBUTING.zh-CN.md](CONTRIBUTING.zh-CN.md)。里面有代码风格，以及这个仓库里**三种
+  中文只有一种要翻译**的规则。改人格或情绪有单独一节，那不是普通文案。
+- **报 bug** —— 请务必带上**设备型号、Android 版本、ROM 和 logcat**。这个应用和 Android 打交道的
+  层次上各家 ROM 是有分歧的：AOSP 上能用的调用在 MagicOS 上可能静默失败。缺这些，多数报告没法
+  复现。
+- **形象与人设** —— 新形象只写语气，不写能力。能力属于行为准则，不属于某个角色。
+- **文档与翻译** —— 欢迎。中文 README 是装机那份，必须保持准确。
+
+### 贡献者
+
+<!-- 项目有公开主页后换成真实的贡献者图：
+     <img alt="Contributors" src="https://contrib.rocks/image?repo=kuafuai/andee" /> -->
+
+<!-- 素材清单：这三份是这份 README 与"完工"之间的全部差距。请用**真机**录 —— 模拟器会把 Andee
+     拍得一无是处。
+       1. images/demo.gif                       10~15 秒循环：球在反应、任务在跑
+       2. 完整演示视频                          30~60 秒，GitHub 附件链接（拖进网页编辑器生成），放开头
+       3. images/shot-{ball,phone,dog}.png      三张静帧，其中一张要拍到狗在动
+     **演示该拍什么**，按顺序：语音叫醒它 → 它自己打开一个 App 点进点出 → 干活时那颗球的表情在变 →
+     它写的一页东西出现 → 机器狗动起来。狗是"这是身体不是界面"最直接的一条证据，别为了时长把它剪掉。 -->
+
+## 社区与联系
+
+<!-- 有公开主页后把 Issue 跟踪 / 讨论区两行补上，不适用的删掉。
+     不要发布会 404 的链接 —— 死掉的渠道比没有渠道更糟。 -->
+
+| 渠道 | 用来做什么 |
+|---|---|
+| Issue 跟踪 | 可复现的 bug、工程事项（**请带上设备型号 / Android 版本 / ROM / logcat**） |
+| 讨论区 / 问答 | 装机求助、想法、"这个能不能做" |
+| 好玩的用法 | 你用它做过什么，实用不实用都行 —— 见[好玩的用法](#好玩的用法) |
+| 安全 | 漏洞 —— 走私密渠道，永远不要开公开 issue。见 [SECURITY.md](SECURITY.md) |
+| 产品 / 在线 | 不想自己打包就想试 Andee —— [codeflying.net](https://www.codeflying.net/andee) · [codeflying.app](https://www.codeflying.app/andee) |
+| 微信 | 加 Andee 为好友 —— 扫下面的码，或者点聊天页底部的微信图标 |
+
+<p align="center"><img src="images/wechat-qr.jpg" width="220" alt="用微信扫码，添加 Andee 为好友"></p>
+
+## 安全披露
+
+安全问题**请不要开公开 issue**。私密上报渠道和处理流程在 **[SECURITY.md](SECURITY.md)**。
+
+那份文件同时列出了**部署前必须知道的已知限制**，其中一条在任何你控制不了的网络上都成立：调试
+用的 WebSocket 服务绑在 `0.0.0.0:9008` 且不验证客户端身份。本应用申请的权限组合与安卓银行木马
+的检测特征高度重合 —— [docs/permissions.zh-CN.md](docs/permissions.zh-CN.md) 把每一条对应到一个具体工具，
+而 [SECURITY.md](SECURITY.md) 对"还没修的"是诚实的。
+
+## 免责声明与可接受使用
+
+两份文件，都是**使用条件**，不是客套。中文版在这里，英文版见各自的对照文件：
+
+- **[DISCLAIMER.zh-CN.md](DISCLAIMER.zh-CN.md)**（[English](DISCLAIMER.md)）—— 这是什么性质的
+  软件（实验性、无 SLA、无担保）、**你的数据到底去了哪里**、它实际能做到什么、以及出事后由谁承担。
+- **[docs/acceptable-use.zh-CN.md](docs/acceptable-use.zh-CN.md)**（[English](docs/acceptable-use.md)）
+  —— 明确禁止的用途。违反即超出许可范围，许可**自动终止**。
+
+就算其余都不看，这四条也请看完：
+
+- **他能花钱。** 项目里没有支付工具，也不需要 —— 他直接点。唯一挡住一笔转账的是 Android 自己的
+  `FLAG_SECURE`，**本项目对这条路径没有任何技术围栏**。任何涉及钱的操作都要人在场；并且请记住
+  **"是 AI 自己做的"不是抗辩理由**，因为它确实不是。
+- **他发出去的东西是你的。** 消息、帖子、通话、订单，署名都是你。
+- **你的数据会离开设备。** 本仓库里没有数据分析 SDK，但语音会走你选的那家服务商（默认火山，
+  也可以选 Google），对话连同**全部工具返回
+  结果**会走到你配置的那个大脑端点，版本自检会走到一台维护者自己跑的服务器。"本机模式"换的是
+  目的地，不是这个事实。
+- **他能被屏幕上的字操纵。** 任何能让你打开一个页面的人，都可能影响到他。
+
+## 许可
+
+[Apache-2.0 **加附加条件**](LICENSE) —— 禁止多租户 SaaS、禁止去 LOGO 白标。GitHub 会把它显示成
+`NOASSERTION`，这是预期的，不是配置错误。
+
+随包分发的第三方组件清单在 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。再分发之前请先看：
+**ML Kit 扫码 SDK 和 `play-services-*` 不是开源许可**，而且扫码模型是运行时从 Google 拉的。
+
+改了什么、以及版本号策略见 [CHANGELOG.md](CHANGELOG.md) —— 当前版本是 **`v0.15.0`**，故意停在
+pre-1.0：线上协议和构建开关都还在动。
+
+## 相关文档
+
+- [docs/getting-started.zh-CN.md](docs/getting-started.zh-CN.md)（[English](docs/getting-started.md)）—— 从安装到第一次基本互动的最短路径
+- [docs/permissions.zh-CN.md](docs/permissions.zh-CN.md)（[English](docs/permissions.md)）—— 权限为什么这么要
+- [docs/architecture.zh-CN.svg](docs/architecture.zh-CN.svg)（[English](docs/architecture.svg)）—— 一页看全：一轮怎么进来、agent loop、六个出口
+- [DISCLAIMER.zh-CN.md](DISCLAIMER.zh-CN.md) —— 免责声明：数据去哪、能做什么、出事谁担
+- [docs/acceptable-use.zh-CN.md](docs/acceptable-use.zh-CN.md) —— 可接受使用政策（禁止用途）
+- [SECURITY.md](SECURITY.md)（英文）—— 威胁模型、已知限制、漏洞上报
+- [CONTRIBUTING.zh-CN.md](CONTRIBUTING.zh-CN.md)（[English](CONTRIBUTING.md)）—— 贡献指南（含改人格的规范）
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) —— 依赖许可证清单
+- [CHANGELOG.md](CHANGELOG.md) —— 变更记录
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)（英文）—— 社区行为准则
+- [CLAUDE.md](CLAUDE.md) —— 架构导览（英文）
