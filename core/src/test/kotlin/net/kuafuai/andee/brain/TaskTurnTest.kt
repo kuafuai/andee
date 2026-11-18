@@ -72,6 +72,7 @@ class TaskTurnTest {
             "text" -> (args[0] as BrainText).name
             "locale" -> Locale.ENGLISH
             "maxSteps" -> 10
+            "basePrompt" -> LocalPrompt.TEXT
             "persona", "platformPrompt", "notebookIndex", "scenesIndex", "pagesIndex", "topicsIndex",
             "gearIndex", "planIndex", "friendsIndex", "agentIndex", "selfIndex", "stageIndex", "wikiIndex", "reviewRecord", "guard" -> ""
             "tasksIndex" -> tasks.indexForPrompt()
