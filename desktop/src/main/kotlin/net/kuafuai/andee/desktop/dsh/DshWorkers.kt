@@ -143,7 +143,8 @@ class DshWorkers(
                     if (!p.waitFor(5, TimeUnit.SECONDS)) { p.destroyForcibly(); null } else p.inputStream.bufferedReader().readLines().map { it.trim() }
                 }.getOrNull().orEmpty()
                 val dsh = viaShell.firstOrNull { it.endsWith("/dsh") && File(it).canExecute() }
-                    ?: listOf("/usr/local/bin/dsh", "/opt/homebrew/bin/dsh", System.getProperty("user.home") + "/.npm-global/bin/dsh")
+                    // The first of these is where [DshInstaller] puts it: the user's own folder, which is on no GUI app's PATH.
+                    ?: listOf(DshInstaller.PREFIX.path + "/bin/dsh", "/usr/local/bin/dsh", "/opt/homebrew/bin/dsh")
                         .firstOrNull { File(it).canExecute() }
                     ?: return null
                 val node = viaShell.firstOrNull { it.endsWith("/node") && File(it).canExecute() }
@@ -177,6 +178,9 @@ class DshWorkers(
         bin = runCatching { locate() }.getOrNull()
         return bin != null
     }
+
+    /** Look again at once, not after the minute [available] waits between looks: dsh was just installed. */
+    fun forgetLookup() { lookedAt = 0L; bin = null }
 
     fun get(id: String): Worker? = synchronized(lock) { workers[id.trim().removePrefix("#")] }
 

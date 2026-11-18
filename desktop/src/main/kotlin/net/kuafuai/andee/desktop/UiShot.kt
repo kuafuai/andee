@@ -236,7 +236,11 @@ fun main(args: Array<String>) {
         Peers.count.value = Peers.store.all().size
     }
     if (args.getOrElse(5) { "" } == "ask-done") TaskPreview.asking = "done"
-    if (args.getOrElse(4) { "" } == "nodsh") SettingsPreview.dshMissing = true
+    if (args.getOrElse(4) { "" }.startsWith("nodsh")) {
+        SettingsPreview.dshMissing = true
+        // `nodsh:confirm` / `nodsh:running` / `nodsh:done:0.2.2-rc.1` / `nodsh:failed` draw the install row in that phase.
+        SettingsPreview.dshInstall = args[4].substringAfter("nodsh:", "")
+    }
     val nav = Nav().also { if (screen != "chat") it.go(screen.removeSuffix(":read")) }
     val density = Density(2f)
     // `ask` draws one question card on its own: its layout (the close button in the corner, the

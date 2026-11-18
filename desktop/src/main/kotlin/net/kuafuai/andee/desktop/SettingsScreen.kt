@@ -57,8 +57,6 @@ fun SettingsScreen(
     onOpenGear: () -> Unit = {},
     onOpenVault: () -> Unit = {},
     onOpenExpressions: () -> Unit = {},
-    /** Say something to Andee as the user: it lands in the timeline and starts a turn, and the window goes there. */
-    onAskAndee: (String) -> Unit = {},
 ) {
     val zh = Strings.lang() == "zh"
     fun t(a: String, b: String) = if (zh) a else b
@@ -433,13 +431,7 @@ fun SettingsScreen(
                     val dir = java.io.File(System.getProperty("user.home"), "Andee/workers").apply { mkdirs() }
                     runCatching { ProcessBuilder("open", dir.path).start() }
                 }
-            } else Row(Modifier.padding(top = 8.dp)) {
-                // Said as the user would say it, in the timeline: Andee then runs it as any request, through run_command, so the
-                // approval card (npm install -g is high risk) and the user's command mode apply as they always do.
-                Pill(st("settings_dsh_install")) {
-                    onAskAndee(st("settings_dsh_install_say"))
-                }
-            }
+            } else DshInstallRow(onDone = { v["dsh"] = "on" })
         }
         // ---- 对话里显示: everything, or only what was said. A preference, not a control you reach for, so it
         // left the chat header for here — the phone moved it the same way. 全部 leftmost; unset reads as 全部. ----
@@ -662,6 +654,63 @@ internal fun ConfirmBlock(title: String, body: String, confirmLabel: String, onN
     }
 }
 
+/**
+ * 让 Andee 帮我安装 (dsh): asks once, naming the exact command, then installs outside the terminal's sandbox and opens dsh's web
+ * page for the key. It is not a turn of the brain: the terminal a turn uses cannot write npm's global folder or reach the
+ * network, which is why this exists (see [net.kuafuai.andee.desktop.dsh.DshInstaller]).
+ */
+@Composable
+private fun DshInstallRow(onDone: () -> Unit) {
+    val installer = remember { net.kuafuai.andee.desktop.dsh.DshInstaller() }
+    // "" asking nothing · "confirm" · "running" · "done:<version>" · "nonode" · "failed:<why>"
+    var phase by remember { mutableStateOf(if (SettingsPreview.dshInstall.isNotEmpty()) SettingsPreview.dshInstall else "") }
+    var detail by remember { mutableStateOf("") }
+    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when {
+            phase == "" -> Row { Pill(st("settings_dsh_install")) { phase = "confirm" } }
+            phase == "confirm" -> ConfirmBlock(
+                st("settings_dsh_install_ask_title"),
+                st("settings_dsh_install_ask_body", installer.commandLine()),
+                st("settings_dsh_install_ask_yes"),
+                onNo = { phase = "" },
+                onYes = {
+                    phase = "running"
+                    Thread {
+                        when (val r = installer.install()) {
+                            is net.kuafuai.andee.desktop.dsh.DshInstaller.Outcome.Installed -> {
+                                // The bin was found just now; the next look must not wait out a minute of "not found".
+                                runCatching { Assistant.dsh.forgetLookup() }
+                                runCatching { installer.startWeb(r.bin) }
+                                TimelineEvents.body(TimelineEvents.Body.DSH, st("settings_dsh_install_done_row", r.version), r.output)
+                                phase = "done:" + r.version
+                                onDone()
+                            }
+                            is net.kuafuai.andee.desktop.dsh.DshInstaller.Outcome.NoNode -> {
+                                TimelineEvents.body(TimelineEvents.Body.DSH, st("settings_dsh_install_nonode_row"))
+                                phase = "nonode"
+                            }
+                            is net.kuafuai.andee.desktop.dsh.DshInstaller.Outcome.Failed -> {
+                                TimelineEvents.body(TimelineEvents.Body.DSH, st("settings_dsh_install_failed_row", r.why), r.output)
+                                detail = r.why + if (r.output.isNotBlank()) "\n" + r.output else ""
+                                phase = "failed"
+                            }
+                        }
+                    }.apply { isDaemon = true; name = "dsh-install" }.start()
+                },
+            )
+            phase == "running" -> Note(st("settings_dsh_install_running"))
+            phase.startsWith("done:") -> Note(st("settings_dsh_install_done", phase.removePrefix("done:")))
+            phase == "nonode" -> Note(st("settings_dsh_install_nonode"))
+            phase == "failed" -> {
+                if (detail.isEmpty() && SettingsPreview.dshInstall == "failed") detail = "npm stopped with exit code 243\nnpm error code EACCES"
+                Note(st("settings_dsh_install_failed"))
+                if (detail.isNotBlank()) Text(detail, color = Palette.secondary, fontSize = 11.sp, lineHeight = 15.sp)
+                Row { Pill(st("settings_dsh_install")) { phase = "confirm" } }
+            }
+        }
+    }
+}
+
 /** What 恢复出厂设置 removes on the Mac, in the order the confirmation lists it. */
 private fun factoryItems(zh: Boolean): List<String> =
     if (zh) listOf("所有设置和 Key（CodeFlying key 保留）", "小本本（记忆、提醒、情景）", "保险箱里的账号", "聊天记录和它生成过的页面", "SSH 钥匙和命令白名单")
@@ -758,4 +807,6 @@ private fun hostList(s: String) = s.split(',', ' ', '\n').map { it.trim() }.filt
 /** For the screenshot harness only: draw 设置 as if dsh were not installed on this Mac. */
 object SettingsPreview {
     @Volatile var dshMissing = false
+    /** Open the install row already in this phase ("confirm", "running", "done:0.2.2", "nonode", "failed"). */
+    @Volatile var dshInstall = ""
 }
