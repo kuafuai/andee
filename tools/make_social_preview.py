@@ -62,16 +62,18 @@ DEV_BLUE = 80                     # 角色判据：B − R > 80（手机是中�
 Y_EYEBROW, Y_TITLE, Y_TAG = 118, 244, 304
 Y_RULE, Y_FOOT = 388, 430
 
-# 最下面那条「一张插画 + 一个字」的行：五张横向排开，标签居中在每张下面。
+# 最下面那条「一个形象 + 一个名字」的行：五个桌宠形象，站着的常态（idle），不放动作。
 # 宽度锁在左栏里（96 → 608），这样右侧主图（手机左端在 ~518）不会压到最后一格。
-# 插画是 App 的手势情绪（WINK / WAVE / PROTECT / REST 那批带道具的），
-# 网页渲染器 ball.js 画不出它们，所以这里用的是真图，不是渲出来的。
+# 这五张是桌面端桌宠的立绘（desktop/src/main/resources/pet/<id>-idle.webp，透明底），
+# 和封面上的毛绒角色同一套画风。球是圆的、另外四个是站着的，按"等高"排会一个大一个窄，
+# 所以每个形象有自己的高度（FLOW_H），**底线对齐**，名字在下面居中。
 FLOW_W = 512
-FLOW_IMG = 88
-FLOW_TOP = 486
+FLOW_BASE = 566                    # 所有形象脚底（或球底）落在这一条线上
 FLOW_LABEL_DY = 26
 FLOW_FONT = 15
-FLOW_DIR = REPO / "images" / "brand" / "illustrations"
+FLOW_DIR = REPO / "desktop" / "src" / "main" / "resources" / "pet"
+# id → 画出来多高(px)。球 64 够看清脸；站着的角色要高一些才看得清五官。
+FLOW_H = {"andee": 78, "girl": 84, "boy": 84, "andee-girl": 84, "cat": 76}
 
 INK = "#10172A"
 INK_SOFT = "#3B4768"
@@ -83,8 +85,8 @@ EN = {
     "title": "Andee",
     "tagline": ["It becomes the soul", "of the device."],
     "foot": ["Nineteen moods. Its own notebook.", "It reviews itself when nobody watches."],
-    "flow": [("wave", "Listen"), ("wink", "Look"), ("think", "Think"),
-             ("protect", "Act"), ("rest", "Speak")],
+    "flow": [("andee", "Andee"), ("girl", "Cream"), ("boy", "Cream short"),
+             ("andee-girl", "Andee girl"), ("cat", "Kitten")],
     "font": "'SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif",
 }
 ZH = {
@@ -92,8 +94,8 @@ ZH = {
     "title": "Andee",
     "tagline": ["他会成为这台设备的", "主人。"],
     "foot": ["十九种情绪、一本只有他自己能读的笔记本。", "没人看着的时候，他会自己复盘。"],
-    "flow": [("wave", "听"), ("wink", "看"), ("think", "想"),
-             ("protect", "做"), ("rest", "说")],
+    "flow": [("andee", "Andee"), ("girl", "奶油金"), ("boy", "短发"),
+             ("andee-girl", "Andee娘"), ("cat", "小猫")],
     "font": "'PingFang SC','Hiragino Sans GB','Heiti SC',sans-serif",
 }
 
@@ -144,7 +146,7 @@ def build_svg(copy: dict) -> str:
         for i, l in enumerate(copy["foot"]))
     cell_w = FLOW_W / len(copy["flow"])
     flow = "\n  ".join(
-        f'<text x="{96 + i * cell_w + cell_w / 2:.1f}" y="{FLOW_TOP + FLOW_IMG + FLOW_LABEL_DY}"'
+        f'<text x="{96 + i * cell_w + cell_w / 2:.1f}" y="{FLOW_BASE + FLOW_LABEL_DY}"'
         f' text-anchor="middle" class="flow" fill="{INK_SOFT}">{html.escape(label)}</text>'
         for i, (_, label) in enumerate(copy["flow"]))
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">
@@ -247,18 +249,19 @@ def _drop_edge_fragments(im):
 
 
 def flow_layer(copy: dict):
-    """五张插画按同一高度排成一行（源图是 512×512 方图，直接缩，不裁边）。
+    """五个形象的立绘：裁到人物的包围盒，各按自己的高度缩，脚底落在同一条线上，横向居中在各自的格子里。
 
-    刻意**不裁透明边**：这五张是同一套画，球的大小和位置本来就一致，伸出去的是道具
-    （挥手、盾牌、手指）和动效线。裁边会把带道具的那几张的包围盒撑宽、按高度归一化之后
-    球反而变小 —— 五个排出来一大一小。整张方图一起缩，球的尺寸才是齐的。
-    只做一件事：把误切进来的邻居碎片抹掉（见 [_drop_edge_fragments]）。
+    这和旧的"整张方图一起缩"相反，原因也相反：旧的是同一套球，球的大小本来就一致，裁边会把带道具的
+    撑宽；现在是一个球加四个站着的人，宽高比差很多，只能裁到人物本身、再按各自的高度调。
     """
     cell_w = FLOW_W / len(copy["flow"])
     for i, (key, _) in enumerate(copy["flow"]):
-        im, _ = _drop_edge_fragments(Image.open(FLOW_DIR / f"{key}.webp").convert("RGBA"))
-        im = im.resize((FLOW_IMG, FLOW_IMG), Image.LANCZOS)
-        yield im, (round(96 + i * cell_w + (cell_w - FLOW_IMG) / 2), FLOW_TOP)
+        im = Image.open(FLOW_DIR / f"{key}-idle.webp").convert("RGBA")
+        im = im.crop(im.getbbox())
+        h = FLOW_H[key]
+        im = im.resize((max(1, round(im.size[0] * h / im.size[1])), h), Image.LANCZOS)
+        x = round(96 + i * cell_w + (cell_w - im.size[0]) / 2)
+        yield im, (x, FLOW_BASE - h)
 
 
 def compose(copy, name, tmp, size=None):
