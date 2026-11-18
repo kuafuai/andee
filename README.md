@@ -59,10 +59,12 @@
   No root. No custom ROM. <b>One APK on Android, one app on the Mac.</b>  
 </p>
 
-<!-- 1/4 · English demo · drag the upload here, bare URL on its own line -->
-<!-- 2/4 · 中文演示 -->
-<!-- 3/4 · 回消息 -->
-<!-- 4/4 · 砍价 -->
+
+https://github.com/user-attachments/assets/b092ec8d-d9ad-4f6b-9f5f-4312f5f1cedf
+https://github.com/user-attachments/assets/c54d8148-7ba9-4e5a-b5c9-de51839655ec
+https://github.com/user-attachments/assets/e79d05c3-5521-4679-8981-b6ba761be23a
+https://github.com/user-attachments/assets/71031c67-d53e-4b48-8c42-60417106fada
+
 
 <a id="english"></a>
 
