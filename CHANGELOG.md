@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`30` / `"0.15.0"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`31` / `"0.16.0"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -29,7 +29,15 @@ hash into `versionName` at build time would close this hole; it is not implement
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-18
+
 ### Added
+
+- **The README is one short page now, English above and Chinese below.** Four demo videos sit at the
+  hero in place of the two that were there, one paragraph each so each becomes its own player, and the long
+  reference material moved into `docs/` (`reference`, `build-and-provision`, `permissions`,
+  `acceptable-use`, each with a `.zh-CN` counterpart). `README.zh-CN.md` is gone: the language switch is an
+  in-page anchor, not a second file. The cover's bottom row now shows the desk pet's five characters.
 
 - **Recorded flows — the scenes' hands.** Recorded runs the device plays back step by step, locally,
   with no model call per step: `record_flow_start` arms recording, `wait_for_user` marks a step only
@@ -82,6 +90,52 @@ hash into `versionName` at build time would close this hole; it is not implement
   Verified on the tablet: pause on step 2 → brain read the screen → `resume_flow(3)` → `done:true`;
   three hand-offs in one flow all resumed; a hand-off as the LAST step finishes cleanly; card-run
   wake-up, failure-path regression and the two-wake-ups-in-two-minutes loop guard all passed.
+
+- **dsh as a worker: a job handed over comes back as a task.** `delegate_task` hands a job to a DeepSeek
+  Harness session (`dsh --profile sdk`) in its own folder and returns at once; the report comes back as a
+  **fenced, untrusted turn**. **What a job produced is read off the folder by the device**, not from the
+  report's prose. Every job is a task: the device sets a worker wait and answers it on the report
+  (`Tasks.workerAnswered`). `continue=<id>` resumes the worker's session; if another dsh window holds its
+  write lock, the job goes on in a **new session in the same folder**, told the old report and the files
+  already there. **A tap on the ball, a new request and clearing the chat no longer cancel a worker** —
+  only `delegate_cancel` does. Live progress (step, time, tokens, its own checklist, newest actions) rides
+  in `DshLive`. There is deliberately **no link into dsh's web window**: `dsh web` reads a running session
+  as a dead turn and then holds its write lock.
+- **在办 (what it is carrying) is now a first-class door on both bodies.** The Mac gets a sidebar list
+  above 话题 (answered first, then running, six at most) and one page per task with 接着办 / 说点要求再办 /
+  办完了 / 放下; 全部 lists the rest and what was finished in the last seven days. The phone gets a 在办
+  key on the top bar (with a count, and a red dot when a task is delivered or answered) opening the same
+  list and pages. **The notebook's last tab is now 定时 and keeps only the alarms**, because tasks have
+  left it.
+- **A phone can use the computer's agent as if it were its own.** When a paired computer offers its agent,
+  the phone lists the same tools the Mac lists for its own dsh — `delegate_task`, `delegate_status`,
+  `delegate_cancel`, `read_worker_file` — plus `list_worker_files` and `fetch_worker_file`. Calls go over
+  the authenticated link; a file is fetched in chunks to disk and **a half-file is never kept**. A worker's
+  report arrives as a turn of its own, fenced as another agent's words. **The path to the Mac's folder is
+  left out of it.**
+  - **The owner's switch is per own device and off by default**, on the friends page. A friend's Andee
+    never gets it, and filing a device as a friend takes it away. The Mac does not judge the call — **the
+    other Andee already decided**.
+  - **A job started this way belongs to that device** (`Worker.origin`): no task is opened on the Mac, the
+    report goes back to that device and not to this Mac's brain, and the device sees and reads only its own
+    workers, **inside their folders** (links that leave a folder are outside it).
+  - `about` now says whether a device offers its agent, and is re-sent when the switch changes.
+- **A job handed to the computer's agent is a task on the phone too, with live progress.** The phone opens
+  a 「事」 that waits on the worker the computer returned; the report answers that wait and rides on the
+  report's turn with the task's record, and **a job that never started leaves no task behind**. The
+  computer sends step, time, checklist and newest actions to the phone that started it at most every two
+  seconds. **The agent is described to the phone's model as a capability of its own**, in a paragraph of
+  its own — not as something a friend can do.
+- **A worker's files are listed and opened in the app on both bodies.** The phone's 工作文件 card reads
+  text **in the card** (Markdown drawn as Markdown) instead of handing it to the system, which had
+  resolved `text/markdown` to a music app that opened and closed at once; other types go through a
+  chooser, and a phone with no viewer says so. The Mac gets a page that lists the worker's folder and opens
+  a file from there. **Nothing leaves the worker's folder**, and a link that would counts as outside.
+- **A task with a worker running offers 停止 dsh, and closing it asks about the worker first.** Carrying on
+  or adding a requirement does nothing for a running worker — dsh takes no word mid-run, it can only be
+  stopped — and 放下 / 办完了 used to close the 事 while **leaving the worker running on the user's quota
+  with nobody to take its report**. While a worker runs, both bodies show 停止 dsh / 办完了 / 放下, and
+  **办完了 and 放下 ask first**: stop it and close, leave it running and close, or cancel.
 
 ### Fixed
 
