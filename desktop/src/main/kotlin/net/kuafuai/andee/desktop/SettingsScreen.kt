@@ -390,6 +390,16 @@ fun SettingsScreen(
             }
 
         }
+        // ---- 干完回到前台: after a turn, raise Andee's own window so a driven app is not left frontmost.
+        // Off by default; unset reads as off. It is unconditional (the user's call): no test of whether this
+        // turn touched the screen, so it also fires after a background turn. That is the point of the switch.
+        Section(st("settings_section_front")) {
+            SegmentedPicker(
+                listOf("off" to st("common_off"), "on" to st("common_on")),
+                v["front_after_task"].orEmpty().ifEmpty { "off" },
+            ) { v["front_after_task"] = it }
+            Note(st("settings_front_note"))
+        }
         // ---- 主动招呼: how often a bubble may go up beside the ball. 关 leftmost, as everywhere ----
         Section(st("settings_section_nudge")) {
             SegmentedPicker(

@@ -332,6 +332,7 @@ object Assistant {
             reply(answer)
             guest = null
             busy(false)
+            frontAfterTask()
             // Not from inside its own loop thread: stop() shuts that thread down.
             Thread { g.stop() }.apply { isDaemon = true }.start()
         }
@@ -367,7 +368,7 @@ object Assistant {
                 busy(false)
                 if (!muted) net.kuafuai.andee.desktop.voice.MacVoice.speak(text)
             },
-            onTurnEnd = { busy(false) },
+            onTurnEnd = { busy(false); frontAfterTask() },
             onSweepSpent = { Sweep.spent(it) },
             // `[quiet]`: the answer is already a timeline row; only rest.
             onQuietFinal = { BallCaption.clear(); busy(false) },
@@ -586,6 +587,20 @@ object Assistant {
 
     /** Bring the window up on a screen (`wiki:<id>`, …). Set by the window once it exists; any thread. */
     @Volatile var openScreen: (String) -> Unit = {}
+
+    /**
+     * Bring Andee's own window to the front without changing what it shows. Set by the window; any thread.
+     *
+     * This is the "干完回到前台" switch: a task that drove another app leaves that app frontmost (the screen tools
+     * yield Andee's window first, and nothing puts it back), and a frontmost WeChat posts no system notification — so
+     * the next message is invisible to the notification reader. Bringing the window back after a turn closes that gap.
+     */
+    @Volatile var bringToFront: () -> Unit = {}
+
+    /** The setting-gated action run at the end of every turn; [bringToFront] must be set before it fires. */
+    private fun frontAfterTask() {
+        if (Settings.get("front_after_task") == "on") bringToFront()
+    }
 
     /** The brain as built, if it is; never builds one. For the heartbeat, which must not wake a brain nobody is using. */
     fun built(): LocalBrain? = brain

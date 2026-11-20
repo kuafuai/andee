@@ -70,6 +70,9 @@ fun main() {
             frontTick++
         }
         Assistant.openScreen = { s -> javax.swing.SwingUtilities.invokeLater { openChat(s) } }
+        // "干完回到前台": raise the window after a turn without changing which page it is on. `openChat` would
+        // also run `nav.go`, resetting a 在办 or 话题 page back to the chat, which a finishing task should not do.
+        Assistant.bringToFront = { javax.swing.SwingUtilities.invokeLater { chat = true; frontTick++ } }
         LaunchedEffect(frontTick) {
             if (frontTick == 0) return@LaunchedEffect
             delay(60)
