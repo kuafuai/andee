@@ -703,17 +703,30 @@ public func andee_notif_latest_id() -> Int64 {
     }
 }
 
-/// Every record newer than [afterId], decoded: id, app bundle id, app name, title, subtitle, body, delivered (epoch ms).
+/// The store's newest `delivered_date` (Cocoa epoch seconds). This is the boundary for in-place updates:
+/// an app reusing the previous notification bumps it without a new rec_id, so it must be tracked separately.
+@_cdecl("andee_notif_latest_delivered")
+public func andee_notif_latest_delivered() -> Double {
+    guard case .at(let dir) = notifLocate() else { return 0 }
+    guard let rows = notifQuery(dir, "select coalesce(max(delivered_date),0) m from record"),
+          let m = (rows.first?["m"] as? NSNumber)?.doubleValue else { return 0 }
+    return m
+}
+
+/// Every record newer than [afterId], or updated in place since [afterDelivered]: an app that folds a new
+/// notification into the previous one bumps `delivered_date` without creating a new `rec_id`, and the rec_id
+/// condition alone would never see it. Decoded: id, app bundle id, app name, title, subtitle, body, delivered
+/// (epoch ms), and the raw delivered_date as `d` so the caller can track the delivered boundary.
 @_cdecl("andee_notif_since")
-public func andee_notif_since(_ afterId: Int64) -> UnsafeMutablePointer<CChar> {
-    let sql = "select r.rec_id id, a.identifier bundle, r.delivered_date d, r.data data from record r join app a using(app_id) where r.rec_id > \(afterId) order by r.rec_id limit 50"
+public func andee_notif_since(_ afterId: Int64, _ afterDelivered: Double) -> UnsafeMutablePointer<CChar> {
+    let sql = "select r.rec_id id, a.identifier bundle, r.delivered_date d, r.data data from record r join app a using(app_id) where r.rec_id > \(afterId) or r.delivered_date > \(String(format: "%.17g", afterDelivered)) order by r.rec_id limit 50"
     guard case .at(let dir) = notifLocate(), let rows = notifQuery(dir, sql) else { return json(["error": "unreadable"]) }
     var out: [[String: Any]] = []
     for r in rows {
         let id = (r["id"] as? NSNumber)?.int64Value ?? 0
         let bundle = (r["bundle"] as? String) ?? ""
         var o: [String: Any] = ["id": id, "bundle": bundle]
-        if let d = (r["d"] as? NSNumber)?.doubleValue { o["when"] = Int64((d + 978_307_200) * 1000) }
+        if let d = (r["d"] as? NSNumber)?.doubleValue { o["d"] = d; o["when"] = Int64((d + 978_307_200) * 1000) }
         if let blob = r["data"] as? Data,
            let pl = try? PropertyListSerialization.propertyList(from: blob, format: nil) as? [String: Any],
            let req = pl["req"] as? [String: Any] {

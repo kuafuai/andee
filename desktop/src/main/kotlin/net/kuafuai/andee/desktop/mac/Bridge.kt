@@ -44,6 +44,7 @@ object Bridge {
         fun andee_mouse_down(): Int
         fun andee_set_own_alpha(alpha: Double): Int
         fun andee_notif_latest_id(): Long
+        fun andee_notif_latest_delivered(): Double
         fun andee_own_window_at(x: Double, y: Double): Int
         fun andee_camera_shot(path: String, front: Int, maxSide: Int): Int
         fun andee_screen_locked(): Int
@@ -51,7 +52,7 @@ object Bridge {
         fun andee_brightness_get(): Double
         fun andee_brightness_set(b: Double): Int
         fun andee_location(): Pointer
-        fun andee_notif_since(afterId: Long): Pointer
+        fun andee_notif_since(afterId: Long, afterDelivered: Double): Pointer
         fun andee_notif_watch(cb: NotifCallback): Int
         fun andee_notif_keep_awake(): Int
         fun andee_notif_let_sleep()
@@ -148,8 +149,10 @@ object Bridge {
 
     /** Newest record id in the system notification store; -1 when it refuses us (Full Disk Access), -2 when there is no store where this macOS keeps it. */
     fun notifLatestId(): Long = lib?.andee_notif_latest_id() ?: -1
-    /** Records after [afterId]: id, bundle, app, title, subtitle, body, when. */
-    fun notifSince(afterId: Long): JSONObject = JSONObject(str(need().andee_notif_since(afterId)))
+    /** Newest delivered_date (Cocoa epoch seconds); 0 when the store cannot be read. */
+    fun notifLatestDelivered(): Double = lib?.andee_notif_latest_delivered() ?: 0.0
+    /** Records after [afterId] or updated in place since [afterDelivered]: id, bundle, app, title, subtitle, body, when, d. */
+    fun notifSince(afterId: Long, afterDelivered: Double): JSONObject = JSONObject(str(need().andee_notif_since(afterId, afterDelivered)))
     /** Keep a strong reference to [cb]: JNA does not, and a collected callback is a crash. */
     fun notifWatch(cb: NotifCallback): Boolean = lib?.andee_notif_watch(cb) == 1
 

@@ -93,6 +93,7 @@ object MacNotifications {
     private val pending = HashMap<String, ScheduledFuture<*>>()
     private val ring = ArrayDeque<JSONObject>()
     private var lastId = -1L
+    private var lastDelivered = 0.0
     private var host: Host? = null
     private var windowStart = 0L
     private var used = 0
@@ -104,6 +105,7 @@ object MacNotifications {
     fun start(h: Host) = exec.execute {
         host = h
         lastId = Bridge.notifLatestId()
+        lastDelivered = Bridge.notifLatestDelivered()
         state = stateFor(lastId)
         Log.i(TAG, "notification store: $state (from record $lastId)")
         watchStarted()
@@ -167,6 +169,8 @@ object MacNotifications {
     fun recheck() {
         val id = Bridge.notifLatestId()
         if (id > lastId) lastId = id
+        val d = Bridge.notifLatestDelivered()
+        if (d > lastDelivered) lastDelivered = d
         if (state == State.WATCHING) return
         state = stateFor(id)
         Log.i(TAG, "notification store re-checked: $state (from record $lastId)")
@@ -187,15 +191,16 @@ object MacNotifications {
         }, delayMs, TimeUnit.MILLISECONDS)
     }
 
-    /** Pull everything after [lastId]; true when anything arrived. */
+    /** Pull everything after [lastId] (or updated in place after [lastDelivered]); true when anything arrived. */
     private fun readNew(): Boolean {
         if (lastId < 0) return false
-        val items = runCatching { Bridge.notifSince(lastId).optJSONArray("items") }.getOrNull() ?: return false
+        val items = runCatching { Bridge.notifSince(lastId, lastDelivered).optJSONArray("items") }.getOrNull() ?: return false
         if (items.length() == 0) return false
         Log.i(TAG, "read ${items.length()} new record(s)")
         for (i in 0 until items.length()) {
             val r = items.getJSONObject(i)
             lastId = maxOf(lastId, r.optLong("id"))
+            lastDelivered = maxOf(lastDelivered, r.optDouble("d", lastDelivered))
             onNotification(r)
         }
         return true
