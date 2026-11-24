@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`31` / `"0.16.0"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`32` / `"0.16.1"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,31 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.16.1] - 2026-11-24
+
+**Mac: a message folded into an existing notification is seen now, and a task that drove another app no
+longer hides the next one from Andee.**
+
+Both are the same story from two ends: Andee reads notifications from macOS's own store, and two things
+were making records invisible to it.
+
+### Fixed
+
+- **A notification that updates in place is no longer missed.** **Feishu** (and others) **fold a new
+  message into the previous notification** — bumping `delivered_date` **without creating a new `rec_id`**.
+  The incremental query was `rec_id > lastId`, so those folds were **never seen at all**: a second message
+  arriving minutes after the first produced **no timeline row**, and the read that would have followed it
+  never happened. `delivered_date` is now tracked as **a second incremental key**
+  (`rec_id > ? or delivered_date > ?`), seeded from the store's own maximum alongside `lastId`. The raw
+  `delivered_date` rides in each row as `d` so the caller can keep the boundary.
+  - The timestamp conversion is stated where it happens: the store keeps **Cocoa epoch seconds**
+  (`2001-01-01`), so the offset is added back explicitly rather than assumed.
+- **A task that drove another app no longer leaves Andee behind it — a new 干完回到前台 switch.** The
+  screen tools **yield Andee's own window first** and **nothing put it back**, so after a task that drove
+  another app, that app stayed frontmost. **A frontmost WeChat posts no system notification** — so the next
+  message was invisible to the reader above. The switch (Settings → 干完回到前台, **off by default**) brings
+  Andee's window back **after every turn, without changing which page it is on**.
 
 ## [0.16.0] - 2026-11-18
 
