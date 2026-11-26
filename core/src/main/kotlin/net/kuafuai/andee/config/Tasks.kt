@@ -89,6 +89,9 @@ class Tasks(
 
     private val lock = Any()
 
+    /** A wait older than this is marked stale in the index — the model decides whether to act on it. */
+    private val STALE_WAIT_MS = 48L * 60 * 60 * 1000
+
     private fun load(): JSONObject = book.section(SECTION)
     private fun save(o: JSONObject) = book.putSection(SECTION, o)
 
@@ -368,7 +371,11 @@ class Tasks(
         append(" · ").append(t.what.take(80))
         if (t.deliverTo.kind != "user") append(" · for ").append(t.deliverTo.short())
         t.waits.filter { it.open }.takeIf { it.isNotEmpty() }?.let { w ->
-            append(" · waiting on ").append(w.joinToString(", ") { it.short() + " " + ago(now - it.at) })
+            append(" · waiting on ").append(w.joinToString(", ") {
+                val age = now - it.at
+                val stale = age > STALE_WAIT_MS
+                it.short() + " " + ago(age) + if (stale) " (stale)" else ""
+            })
         }
         t.waits.filter { !it.open && !it.seen }.forEach { append(" · ").append(it.short()).append(" answered: 「").append(it.answer.take(60)).append("」") }
         if (t.due > 0) append(" · due ").append(stamp(t.due))

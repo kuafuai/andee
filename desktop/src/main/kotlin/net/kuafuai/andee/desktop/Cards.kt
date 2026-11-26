@@ -683,8 +683,16 @@ private fun PersonCard(
         // What is open between us: the tasks for them or waiting on them (Tasks.owedFor), as on the phone.
         person.owed.filter { it.status == "open" }.forEach { o ->
             Spacer(Modifier.height(6.dp))
-            Text((if (o.dir == "i_owe") (if (zh) "要交给他：" else "For them: ") else (if (zh) "在等他：" else "Waiting on them: ")) + o.what,
-                color = Palette.accent, fontSize = 12.sp)
+            val staleText = if (o.dir == "they_owe") {
+                val task = DesktopNotebook.book.tasks.get(o.id)
+                val wait = task?.waits?.firstOrNull { it.open && it.kind == "person" }
+                if (wait != null && wait.at > 0) {
+                    val ageDays = (System.currentTimeMillis() - wait.at) / (24 * 60 * 60 * 1000)
+                    if (ageDays >= 2) (if (zh) "（已 ${ageDays} 天）" else " (${ageDays}d)") else ""
+                } else ""
+            } else ""
+            Text((if (o.dir == "i_owe") (if (zh) "要交给他：" else "For them: ") else (if (zh) "在等他：" else "Waiting on them: ")) + o.what + staleText,
+                color = if (staleText.isNotEmpty()) Palette.muted else Palette.accent, fontSize = 12.sp)
         }
     }
 }
