@@ -44,6 +44,7 @@ class QuietTurnTest {
     }
     private val trace = File.createTempFile("trace", "").also { it.delete(); it.mkdirs() }
     private val quietEnded = CountDownLatch(1)
+    private val answerEnded = CountDownLatch(1)
 
     private val host = Proxy.newProxyInstance(javaClass.classLoader, arrayOf(BrainHost::class.java)) { proxy, m, args ->
         when (m.name) {
@@ -51,7 +52,7 @@ class QuietTurnTest {
             "locale" -> Locale.ENGLISH
             "maxSteps" -> 10
             "basePrompt" -> LocalPrompt.TEXT
-            "persona", "platformPrompt", "notebookIndex", "scenesIndex", "pagesIndex", "topicsIndex",
+            "persona", "platformPrompt", "notebookIndex", "scenesIndex", "flowsIndex", "pagesIndex", "topicsIndex",
             "gearIndex", "planIndex", "friendsIndex", "agentIndex", "selfIndex", "stageIndex", "wikiIndex", "tasksIndex", "peopleIndex", "reviewRecord", "guard" -> ""
             "scrollback" -> emptyList<ScrollRow>()
             "toolLists" -> listOf(JSONArray().put(JSONObject().put("name", "tap").put("method", "screen.tap").put("description", "tap")
@@ -67,7 +68,8 @@ class QuietTurnTest {
 
     private val brain = LocalBrain(
         BrainConfig(BrainConfig.BRAIN_LOCAL, "key", "http://127.0.0.1:${server.address.port}", "m", false, "low"),
-        host, onProgress = { spoken += it }, onFinal = { spoken += it },
+        host, onProgress = { spoken += it },
+        onFinal = { spoken += it; answerEnded.countDown() },
         onQuietFinal = { quietEnded.countDown() },
     )
 
@@ -87,11 +89,33 @@ class QuietTurnTest {
         assertFalse(q[0].detail.contains("["))
     }
 
+    @Test fun aDirectRequestIgnoresModelChosenQuiet() {
+        brain.submit("把今天放到舞台上")
+        assertTrue("the spoken answer never came", answerEnded.await(20, TimeUnit.SECONDS))
+        assertEquals("the model's [quiet] ended a direct user turn", 1L, quietEnded.count)
+        assertEquals(
+            listOf("我把今天放到舞台上", "今天的安排放上去了。三件事，下午那件最要紧。"),
+            spoken.map { SpeechMood.strip(it) },
+        )
+        assertTrue(synchronized(events) { events.none { it.kind == BrainEvent.Kind.QUIET } })
+    }
+
+    @Test fun theUserMayStillExplicitlyAskForQuiet() {
+        val request = "别出声，把今天放到舞台上"
+        brain.submit(request, allowQuiet = SpeechMood.userRequestedQuiet(request))
+        assertTrue("the explicit quiet ending never came", quietEnded.await(20, TimeUnit.SECONDS))
+        assertTrue("an explicitly quiet turn spoke: $spoken", spoken.isEmpty())
+        assertEquals(1L, answerEnded.count)
+    }
+
     @Test fun theMarkerIsStrippedInBothLanguages() {
         assertTrue(SpeechMood.isQuiet("好的 [quiet]"))
         assertTrue(SpeechMood.isQuiet("【安静】放好了"))
         assertFalse(SpeechMood.isQuiet("[happy]放好了 [END]"))
         assertEquals("放好了", SpeechMood.strip("【安静】放好了"))
         assertEquals("放好了", SpeechMood.strip("[quiet] 放好了"))
+        assertTrue(SpeechMood.userRequestedQuiet("别出声，把今天放到舞台上"))
+        assertTrue(SpeechMood.userRequestedQuiet("Please do this quietly"))
+        assertFalse(SpeechMood.userRequestedQuiet("把今天放到舞台上"))
     }
 }

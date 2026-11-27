@@ -521,7 +521,7 @@ object Assistant {
             null -> t
         }
         val withFiles = if (files.isEmpty()) forBrain else forBrain + Attachments.fileNote(files)
-        ensure().submit(withFiles, photos.map { it.jpegBase64 })
+        ensure().submit(withFiles, photos.map { it.jpegBase64 }, allowQuiet = net.kuafuai.andee.brain.SpeechMood.userRequestedQuiet(t))
     }
 
     private fun editQuery(page: Pages.Page, said: String): String {

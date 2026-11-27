@@ -1259,7 +1259,7 @@ class BodyCoreService : Service() {
         // Same turn, different brain. The local one takes the text directly —
         // there is no socket in between, and no event kind it would have to be
         // taught (see the meeting callback).
-        localBrain?.submit(forBrain, images)
+        localBrain?.submit(forBrain, images, allowQuiet = SpeechMood.userRequestedQuiet(said))
         // Task start, and deliberately at the request rather than at the
         // reply: from here the device is being worked on, whether that reaches
         // us as a tool call or as thirty seconds of thinking. Nobody listening

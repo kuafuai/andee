@@ -144,6 +144,24 @@ object SpeechMood {
     fun isQuiet(raw: String): Boolean =
         MARKER.findAll(raw).any { it.groupValues[1].lowercase() in QUIET }
 
+    /**
+     * The user's own explicit request for silence, as opposed to the model choosing it for them. Deliberately a small
+     * list of ordinary imperatives: missing one makes a direct answer audible (the safe default), never the reverse.
+     */
+    fun userRequestedQuiet(raw: String): Boolean =
+        USER_QUIET.any { raw.contains(it) } || USER_QUIET_EN.containsMatchIn(raw)
+
+    private val USER_QUIET = listOf(
+        "别出声", "不要出声", "不用出声", "不出声", "别说话", "不要说话", "不用说话", "不说话",
+        "安静点", "安静一点", "安静地", "静音", "别朗读", "不要朗读", "不用朗读",
+        "别读出来", "不要读出来", "不用读出来",
+    )
+    private val USER_QUIET_EN = Regex(
+        "(?i)\\b(?:be|stay|keep)\\s+quiet\\b|\\bquietly\\b|\\bsilently\\b|" +
+            "\\b(?:don['’]t|do\\s+not)\\s+(?:speak|talk|read|say)\\b|" +
+            "\\bwithout\\s+(?:speaking|talking|voice)\\b|\\bno\\s+(?:voice|speech)\\b",
+    )
+
     private val MARKER = Regex("[\\[\\uFF3B\\u3010]\\s*([A-Za-z\\u4e00-\\u9fff]{1,12})\\s*[\\]\\uFF3D\\u3011]")
 
     /**

@@ -427,8 +427,12 @@ class LocalBrain(
      */
     private val photoMessages = mutableListOf<JSONObject>()
 
-    /** [images] are base64 JPEGs; with any of them, [userText] may be empty. */
-    fun submit(userText: String, images: List<String> = emptyList()) {
+    /**
+     * [images] are base64 JPEGs; with any of them, [userText] may be empty.
+     * [allowQuiet] is set only when the user explicitly asked for silence. A direct request otherwise speaks back even
+     * if the model writes `[quiet]` — that marker is its choice on a device-initiated turn, not a way to ignore a person.
+     */
+    fun submit(userText: String, images: List<String> = emptyList(), allowQuiet: Boolean = false) {
         val text = userText.trim()
         if (text.isEmpty() && images.isEmpty()) return
         if (cfg.apiKey.isEmpty()) {
@@ -442,7 +446,7 @@ class LocalBrain(
         // must not look like the user spoke, or it would keep pushing its own
         // trigger out.
         host.touchActivity()
-        launch(text, TurnKind.USER, images)
+        launch(text, TurnKind.USER, images, allowQuiet = allowQuiet)
     }
 
     /**
@@ -656,6 +660,7 @@ class LocalBrain(
         territory: String? = null,
         source: Source? = null,
         untrusted: Boolean = false,
+        allowQuiet: Boolean = true,
     ) {
         // Only the user's own words supersede what came before. A turn the device starts itself — the harvest or a
         // queued wake out of a turn's `finally`, a todo, a sweep — is only ever launched when nothing is running, and
@@ -700,6 +705,7 @@ class LocalBrain(
             }
             turnAnswer = null
             turnQuiet = false
+            quietAllowed = kind != TurnKind.USER || allowQuiet
             // Every turn that answers someone shows its work; the reviews and a work turn of its own do not.
             stepsOn = !kind.silent && !kind.quiet
             stepsAt = System.currentTimeMillis()
@@ -986,6 +992,13 @@ class LocalBrain(
      */
     private var turnQuiet = false
 
+    /**
+     * Whether the model may choose `[quiet]` for this turn. A direct user turn may not, unless their own words asked for
+     * silence; the bodies detect that explicit request and pass it to [submit]. Device-initiated turns keep the old rule.
+     * Loop thread only.
+     */
+    private var quietAllowed = true
+
     /** The quiet ending: the answer as one [BrainEvent.Kind.QUIET] row that opens to the whole of it. */
     private fun finishQuietly(text: String) {
         turnAnswer = text
@@ -1229,6 +1242,13 @@ class LocalBrain(
                 userText
             }
             val head = "[now ${stamp()}${if (kind == TurnKind.USER && !wordless) "" else " · ui-language ${uiLangTag()}"}] $said"
+            // Keep the constant system prompt cached. The near, turn-specific rule is only a hint; quietAllowed above is
+            // the mechanism that makes a direct answer audible even when the model ignores both copies of the rule.
+            val voiceRule = when {
+                kind != TurnKind.USER -> ""
+                quietAllowed -> "\n\n(the user explicitly asked for silence; [quiet] is allowed for this turn)"
+                else -> "\n\n(the user addressed you directly: answer aloud; [quiet] is disabled for this turn and the device will ignore it)"
+            }
             JSONObject()
                 .put("role", "user")
                 .put(
@@ -1251,7 +1271,7 @@ class LocalBrain(
                     // is the answer and absent when there is a better one, and
                     // the model is never asked to arbitrate between two.
                     "content",
-                    head +
+                    head + voiceRule +
                         if (index.isEmpty()) {
                             ""
                         } else {
@@ -1408,8 +1428,9 @@ class LocalBrain(
             BrainTrace.step(gen, step, reply.content, reply.reasoning, reply.toolCalls.size, reply.promptTokens)
             history += reply.assistantMessage
 
-            // `[quiet]` anywhere in what the model wrote: the rest of this turn says nothing aloud (§10).
-            if (!turnQuiet && SpeechMood.isQuiet(reply.content)) turnQuiet = true
+            // `[quiet]` is a choice only where the device allows it. On a direct user turn the marker is still stripped
+            // by the body's normal SpeechMood pass, but it cannot suppress narration, the answer or the follow-up mic.
+            if (!turnQuiet && quietAllowed && SpeechMood.isQuiet(reply.content)) turnQuiet = true
 
             if (reply.toolCalls.isEmpty()) {
                 // It sent something to somebody and wrote nothing down about what is pending: once, before the turn
