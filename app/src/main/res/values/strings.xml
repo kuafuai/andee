@@ -177,6 +177,7 @@
     <string name="settings_llm_model">模型</string>
     <string name="settings_llm_base_url">接口地址</string>
     <string name="settings_llm_thinking">深度思考</string>
+    <string name="common_auto">自动</string>
     <string name="common_on">开</string>
     <string name="common_off">关</string>
     <string name="settings_llm_effort">思考强度</string>

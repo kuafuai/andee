@@ -33,7 +33,7 @@ class PlanMind(
         baseUrl = cfg.baseUrl,
         apiKey = cfg.apiKey,
         model = cfg.model,
-        thinking = false,
+        thinking = BrainConfig.THINKING_DISABLED,
         reasoningEffort = cfg.reasoningEffort,
     )
 

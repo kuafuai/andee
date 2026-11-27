@@ -185,7 +185,7 @@ object VoiceConfig {
 
         const val DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
         const val DEFAULT_LLM_MODEL = "deepseek-flash"
-        const val DEFAULT_REASONING_EFFORT = "high"
+        const val DEFAULT_REASONING_EFFORT = BrainConfig.EFFORT_AUTO
 
         /**
          * The same two defaults for an **English** card, pointing at OpenAI.
@@ -386,8 +386,7 @@ object VoiceConfig {
                     baseUrl = codeFlyingLlmBaseUrl(context),
                     model = p.getString("llm_model", DEFAULT_LLM_MODEL)
                         .orEmpty().trim().ifEmpty { DEFAULT_LLM_MODEL },
-                    thinking = p.getString("llm_thinking", defaultThinking())
-                        ?.trim()?.lowercase() != "disabled",
+                    thinking = p.getString("llm_thinking", BrainConfig.THINKING_AUTO).orEmpty(),
                     reasoningEffort = p.getString("llm_reasoning_effort", DEFAULT_REASONING_EFFORT)
                         .orEmpty().trim().ifEmpty { DEFAULT_REASONING_EFFORT },
                 )
@@ -407,8 +406,7 @@ object VoiceConfig {
                     .orEmpty().trim().trimEnd('/').ifEmpty { defaultBaseUrl },
                 model = p.getString("llm_model", defaultModel)
                     .orEmpty().trim().ifEmpty { defaultModel },
-                thinking = p.getString("llm_thinking", defaultThinking())
-                    ?.trim()?.lowercase() != "disabled",
+                thinking = p.getString("llm_thinking", BrainConfig.THINKING_AUTO).orEmpty(),
                 reasoningEffort = p.getString("llm_reasoning_effort", DEFAULT_REASONING_EFFORT)
                     .orEmpty().trim().ifEmpty { DEFAULT_REASONING_EFFORT },
             )
@@ -719,8 +717,8 @@ object VoiceConfig {
                 // Round-tripped as the wire words rather than a boolean: this map
                 // feeds SettingsUi's pickers and the picker's value is what comes
                 // back to [save], which only speaks String.
-                "llm_thinking" to if (bc.thinking) "enabled" else "disabled",
-                "llm_reasoning_effort" to bc.reasoningEffort,
+                "llm_thinking" to BrainConfig.normalizeThinking(bc.thinking),
+                "llm_reasoning_effort" to BrainConfig.normalizeEffort(bc.reasoningEffort),
                 "grounding" to p.getString("grounding", "off")!!,
                 "notify" to notifyScope(context),
                 "nudge" to nudgeLevel(context),
@@ -753,14 +751,6 @@ object VoiceConfig {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .getString("grounding", "off")
                 ?.trim()?.lowercase() == "on"
-
-        /**
-         * Thinking for a device that has never saved the setting: the build's
-         * `DEFAULT_THINKING` (local.properties, `on` / `off`), else on. Only the
-         * unset case — a saved choice always wins, same as [uiLanguage].
-         */
-        private fun defaultThinking(): String =
-            if (BuildConfig.DEFAULT_THINKING.trim().lowercase() == "off") "disabled" else "enabled"
 
         /**
          * Hard cap on tool-call steps per task. A real task is a dozen steps;

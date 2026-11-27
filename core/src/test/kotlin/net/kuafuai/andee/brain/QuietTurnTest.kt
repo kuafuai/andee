@@ -24,9 +24,11 @@ class QuietTurnTest {
     private val spoken = mutableListOf<String>()
     private val events = mutableListOf<BrainEvent>()
     private var calls = 0
+    private val requests = mutableListOf<JSONObject>()
     private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
         createContext("/chat/completions") { ex ->
-            ex.requestBody.readBytes()
+            val request = JSONObject(ex.requestBody.readBytes().toString(Charsets.UTF_8))
+            synchronized(requests) { requests += request }
             val n = synchronized(this@QuietTurnTest) { ++calls }
             val msg = if (n == 1) {
                 JSONObject().put("role", "assistant").put("content", "[quiet]我把今天放到舞台上")
@@ -67,7 +69,7 @@ class QuietTurnTest {
     } as BrainHost
 
     private val brain = LocalBrain(
-        BrainConfig(BrainConfig.BRAIN_LOCAL, "key", "http://127.0.0.1:${server.address.port}", "m", false, "low"),
+        BrainConfig(BrainConfig.BRAIN_LOCAL, "key", "http://127.0.0.1:${server.address.port}", "m", BrainConfig.THINKING_AUTO, "low"),
         host, onProgress = { spoken += it },
         onFinal = { spoken += it; answerEnded.countDown() },
         onQuietFinal = { quietEnded.countDown() },
@@ -87,6 +89,9 @@ class QuietTurnTest {
         assertEquals("今天的安排放上去了。", q[0].subject)
         assertEquals("今天的安排放上去了。三件事，下午那件最要紧。", q[0].detail)
         assertFalse(q[0].detail.contains("["))
+        val firstRequest = synchronized(requests) { requests.first() }
+        assertFalse("a wake turn must not force auto thinking off", firstRequest.has("thinking"))
+        assertFalse(firstRequest.has("reasoning_effort"))
     }
 
     @Test fun aDirectRequestIgnoresModelChosenQuiet() {

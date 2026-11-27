@@ -34,7 +34,7 @@ class Locator(cfg: BrainConfig, private val model: String, private val log: (war
     }
 
     private val key = cfg.baseUrl
-    private val llm = LlmClient(baseUrl = cfg.baseUrl, apiKey = cfg.apiKey, model = model, thinking = false, reasoningEffort = "low")
+    private val llm = LlmClient(baseUrl = cfg.baseUrl, apiKey = cfg.apiKey, model = model, thinking = BrainConfig.THINKING_DISABLED, reasoningEffort = "low")
 
     /** Blocks for one model call (~2 s). [pngBase64] is the screenshot exactly as captured, no grid on it. */
     fun locate(pngBase64: String, target: String): Result {
@@ -47,7 +47,7 @@ class Locator(cfg: BrainConfig, private val model: String, private val log: (war
             ),
         )
         val reply = try {
-            llm.complete(messages, JSONArray(), noThinking = true)
+            llm.complete(messages, JSONArray())
         } catch (e: LlmHttpException) {
             // A model this backend does not serve, or one that cannot take an image: not going to change this run.
             if (e.code in setOf(400, 401, 403, 404, 415, 422)) withdraw("HTTP ${e.code}")

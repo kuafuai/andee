@@ -18,13 +18,13 @@ class BrainConfigTest {
         apiKey = "sk-one",
         baseUrl = "https://api.example.com/v1",
         model = "m1",
-        thinking = true,
+        thinking = BrainConfig.THINKING_ENABLED,
         reasoningEffort = "high",
     )
 
     @Test
     fun `how it is asked does not change the backend`() {
-        assertTrue(base.sameBackend(base.copy(thinking = false)))
+        assertTrue(base.sameBackend(base.copy(thinking = BrainConfig.THINKING_AUTO)))
         assertTrue(base.sameBackend(base.copy(reasoningEffort = "low")))
         assertTrue(base.sameBackend(base.copy(model = "m2")))
     }

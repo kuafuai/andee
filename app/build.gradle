@@ -158,7 +158,6 @@ android {
         buildConfigField "String",  "CODEFLYING_DOMAIN",       buildConfigString('CODEFLYING_DOMAIN')
         buildConfigField "boolean", "CODEFLYING_SSL_ENABLED",  buildConfigBool('CODEFLYING_SSL_ENABLED')
         buildConfigField "String",  "DEFAULT_LANG",            buildConfigString('DEFAULT_LANG')
-        buildConfigField "String",  "DEFAULT_THINKING",        buildConfigString('DEFAULT_THINKING')
 
         // The Google voice path, baked in at package time.
         //

@@ -125,17 +125,34 @@ fun SettingsScreen(
                     NoKeyHint { v["brain"] = "codeflying" }
                     GlassField(st("settings_llm_model"), v["llm_model"].orEmpty(), { v["llm_model"] = it }, hint = llmModelHint)
                     GlassField(st("settings_llm_base_url"), v["llm_base_url"].orEmpty(), { v["llm_base_url"] = it }, hint = llmUrlHint)
-                    RowLabel(st("settings_llm_thinking"))
-                    val thinking = v["llm_thinking"].orEmpty().ifEmpty { "enabled" }
-                    SegmentedPicker(listOf("enabled" to st("common_on"), "disabled" to st("common_off")), thinking) { v["llm_thinking"] = it }
-                    if (thinking != "disabled") {
-                        RowLabel(st("settings_llm_effort"))
-                        SegmentedPicker(
-                            listOf("high" to st("common_high"), "medium" to st("common_medium"), "low" to st("common_low")),
-                            v["llm_reasoning_effort"].orEmpty().ifEmpty { "high" },
-                        ) { v["llm_reasoning_effort"] = it }
-                    }
                     Note(st("settings_brain_local_note"))
+                }
+            }
+
+            // Shared by local and CodeFlying: where the backend lives does not
+            // decide how much reasoning this task needs. A remote hub owns its own.
+            if (brain != BrainConfig.BRAIN_HUB) {
+                RowLabel(st("settings_llm_thinking"))
+                val thinking = BrainConfig.normalizeThinking(v["llm_thinking"])
+                SegmentedPicker(
+                    listOf(
+                        BrainConfig.THINKING_AUTO to st("common_auto"),
+                        BrainConfig.THINKING_ENABLED to st("common_on"),
+                        BrainConfig.THINKING_DISABLED to st("common_off"),
+                    ),
+                    thinking,
+                ) { v["llm_thinking"] = it }
+                if (thinking == BrainConfig.THINKING_ENABLED) {
+                    RowLabel(st("settings_llm_effort"))
+                    SegmentedPicker(
+                        listOf(
+                            BrainConfig.EFFORT_AUTO to st("common_auto"),
+                            "high" to st("common_high"),
+                            "medium" to st("common_medium"),
+                            "low" to st("common_low"),
+                        ),
+                        BrainConfig.normalizeEffort(v["llm_reasoning_effort"]),
+                    ) { v["llm_reasoning_effort"] = it }
                 }
             }
 

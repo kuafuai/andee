@@ -1,5 +1,6 @@
 package net.kuafuai.andee.brain
 
+import net.kuafuai.andee.config.BrainConfig
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -54,9 +55,12 @@ class LlmHttpException(val code: Int, val body: String) :
  *  * **`tool_calls[].function.arguments` is a JSON *string*, not an object.**
  *    It has to be re-parsed, and a model that emits malformed JSON must not
  *    take the turn down — see [ToolCall.argumentsOrNull].
- *  * **`reasoning_content` must never be sent back.** DeepSeek rejects requests
- *    whose assistant messages carry it, so [Reply.reasoning] exists to be
- *    logged and thrown away, never to be appended to the history.
+ *  * **`reasoning_content` belongs in the assistant history.** Current DeepSeek
+ *    thinking requests with tools require the earlier replies' reasoning and
+ *    answer 400 without it. The reply is still logged for the work card, and
+ *    [Reply.assistantMessage] retains the field for the next request. Requests
+ *    without tools may ignore it; backends that returned no reasoning never
+ *    grow a synthetic field here.
  *
  * Threading: [complete] blocks the calling thread. It is only ever called from
  * [LocalBrain]'s single loop thread.
@@ -65,7 +69,7 @@ class LlmClient(
     private val baseUrl: String,
     private val apiKey: String,
     model: String,
-    thinking: Boolean,
+    thinking: String,
     reasoningEffort: String,
     /**
      * How long to wait for an answer. 180 s for a turn (a thinking model answers in minutes); a caller that
@@ -79,8 +83,8 @@ class LlmClient(
     // lands from the main thread while the loop thread may be mid-turn; the turn
     // in flight keeps what it already sent and the next request carries the new.
     @Volatile private var model = model
-    @Volatile private var thinking = thinking
-    @Volatile private var reasoningEffort = reasoningEffort
+    @Volatile private var thinking = BrainConfig.normalizeThinking(thinking)
+    @Volatile private var reasoningEffort = BrainConfig.normalizeEffort(reasoningEffort)
 
     /**
      * Change what the next request asks for, without touching the endpoint or
@@ -88,10 +92,10 @@ class LlmClient(
      * how it is asked, so a settings change to them has no reason to cost the
      * user their conversation.
      */
-    fun retune(model: String, thinking: Boolean, reasoningEffort: String) {
+    fun retune(model: String, thinking: String, reasoningEffort: String) {
         this.model = model
-        this.thinking = thinking
-        this.reasoningEffort = reasoningEffort
+        this.thinking = BrainConfig.normalizeThinking(thinking)
+        this.reasoningEffort = BrainConfig.normalizeEffort(reasoningEffort)
     }
 
     /**
@@ -144,22 +148,31 @@ class LlmClient(
         val toolCalls: List<ToolCall>,
         /**
          * The assistant message exactly as it must be echoed back into the
-         * history. Kept verbatim from the response rather than rebuilt, minus
-         * `reasoning_content`, so no field the API cares about gets lost in
-         * translation.
+         * history. Kept verbatim from the response rather than rebuilt,
+         * including `reasoning_content`, so no field the API cares about gets
+         * lost in translation.
          */
         val assistantMessage: JSONObject,
         val promptTokens: Int,
         val completionTokens: Int,
         val cachedTokens: Int,
+        /**
+         * The backend rejected this step because a restored or device-written
+         * assistant message had no reasoning to replay, so the identical request
+         * was retried once with thinking disabled. The setting itself is unchanged.
+         */
+        val thinkingFallback: Boolean = false,
     )
 
     /**
      * @param messages the full conversation, system message first.
      * @param tools OpenAI-format function specs — see [toolSpecs].
-     * @param noThinking ask without reasoning whatever the user's setting is.
+     *
+     * Auto leaves both controls out: the selected model decides per request.
+     * There is no portable `auto` wire value (DeepSeek accepts only enabled and
+     * disabled), so inventing one would make the default fail on a stock backend.
      */
-    fun complete(messages: List<JSONObject>, tools: JSONArray, noThinking: Boolean = false): Reply {
+    fun complete(messages: List<JSONObject>, tools: JSONArray): Reply {
         val msgArr = JSONArray()
         for (m in messages) msgArr.put(m)
         val body = JSONObject()
@@ -169,40 +182,36 @@ class LlmClient(
         if (tools.length() > 0) {
             body.put("tools", tools).put("tool_choice", "auto")
         }
-        if (thinking && !noThinking) {
-            body.put("thinking", JSONObject().put("type", "enabled"))
-            body.put("reasoning_effort", reasoningEffort)
-        } else {
-            body.put("thinking", JSONObject().put("type", "disabled"))
-        }
-
-        val req = Request.Builder()
-            .url("$baseUrl/chat/completions")
-            .addHeader("Authorization", "Bearer $apiKey")
-            .addHeader("Content-Type", "application/json")
-            .post(body.toString().toRequestBody(JSON))
-            .build()
-
-        val call = http.newCall(req)
-        current = call
-        val text = try {
-            call.execute().use { resp ->
-                // Read the body either way: DeepSeek puts the useful part of an
-                // error (bad key, unknown model, context overflow) in the body,
-                // and a bare "HTTP 400" sends whoever is debugging to the wrong
-                // place entirely.
-                val raw = resp.body?.string().orEmpty()
-                if (resp.code in 300..399) {
-                    throw LlmMovedException(resp.code, resp.header("Location").orEmpty())
+        when (thinking) {
+            BrainConfig.THINKING_ENABLED -> {
+                body.put("thinking", JSONObject().put("type", "enabled"))
+                if (reasoningEffort != BrainConfig.EFFORT_AUTO) {
+                    body.put("reasoning_effort", reasoningEffort)
                 }
-                if (!resp.isSuccessful) {
-                    throw LlmHttpException(resp.code, raw)
-                }
-                raw
             }
-        } finally {
-            current = null
+            BrainConfig.THINKING_DISABLED ->
+                body.put("thinking", JSONObject().put("type", "disabled"))
+            // Auto is omission, not `type=auto`: see [complete].
         }
+
+        var thinkingFallback = false
+        val fallback = runCatching { execute(body) }.recoverCatching { error ->
+            // Restarts, harvests, trim/topic markers and guard endings all write
+            // assistant messages for which no model reasoning exists. DeepSeek
+            // rejects those histories in a tool-using thinking request. Do not
+            // invent reasoning, relabel the device's words as the user's, drop
+            // the conversation or remove the tools: when the backend names this
+            // exact protocol error, retry only this request without thinking.
+            // The saved auto/enabled choice still governs the next request.
+            val missingHistory = error is LlmHttpException && error.code == 400 &&
+                error.detail.contains("reasoning_content", ignoreCase = true)
+            if (tools.length() == 0 || thinking == BrainConfig.THINKING_DISABLED || !missingHistory) throw error
+            body.put("thinking", JSONObject().put("type", "disabled"))
+            body.remove("reasoning_effort")
+            thinkingFallback = true
+            execute(body)
+        }
+        val text = fallback.getOrThrow()
 
         // A 200 that is not JSON is a web server answering where the API should: a proxy page, a login wall.
         val root = runCatching { JSONObject(text) }.getOrElse {
@@ -251,7 +260,37 @@ class LlmClient(
                 if (details != null && details.has("cached_tokens")) details.optInt("cached_tokens")
                 else u.optInt("prompt_cache_hit_tokens")
             } ?: 0,
+            thinkingFallback = thinkingFallback,
         )
+    }
+
+    private fun execute(body: JSONObject): String {
+        val req = Request.Builder()
+            .url("$baseUrl/chat/completions")
+            .addHeader("Authorization", "Bearer $apiKey")
+            .addHeader("Content-Type", "application/json")
+            .post(body.toString().toRequestBody(JSON))
+            .build()
+        val call = http.newCall(req)
+        current = call
+        return try {
+            call.execute().use { resp ->
+                // Read the body either way: DeepSeek puts the useful part of an
+                // error (bad key, unknown model, context overflow) in the body,
+                // and a bare "HTTP 400" sends whoever is debugging to the wrong
+                // place entirely.
+                val raw = resp.body?.string().orEmpty()
+                if (resp.code in 300..399) {
+                    throw LlmMovedException(resp.code, resp.header("Location").orEmpty())
+                }
+                if (!resp.isSuccessful) {
+                    throw LlmHttpException(resp.code, raw)
+                }
+                raw
+            }
+        } finally {
+            current = null
+        }
     }
 
     /**
@@ -271,6 +310,9 @@ class LlmClient(
         // turn was tool calls.
         val content = msg.optString("content").orEmpty()
         out.put("content", if (content.isEmpty()) JSONObject.NULL else content)
+        msg.optString("reasoning_content").orEmpty().takeIf { it.isNotEmpty() }?.let {
+            out.put("reasoning_content", it)
+        }
         msg.optJSONArray("tool_calls")?.let { if (it.length() > 0) out.put("tool_calls", it) }
         return out
     }

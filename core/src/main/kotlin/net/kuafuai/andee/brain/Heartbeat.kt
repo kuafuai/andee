@@ -49,7 +49,7 @@ class Heartbeat(
     private val ready = cfg.apiKey.isNotEmpty() || ask != null
 
     private val llm by lazy {
-        LlmClient(baseUrl = cfg.baseUrl, apiKey = cfg.apiKey, model = cfg.model, thinking = false, reasoningEffort = cfg.reasoningEffort)
+        LlmClient(baseUrl = cfg.baseUrl, apiKey = cfg.apiKey, model = cfg.model, thinking = BrainConfig.THINKING_DISABLED, reasoningEffort = cfg.reasoningEffort)
     }
 
     /** Why a beat would stop before the model call right now, or null when it would go ahead. For logs and tests. */

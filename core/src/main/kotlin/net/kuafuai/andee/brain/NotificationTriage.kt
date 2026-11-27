@@ -54,8 +54,9 @@ class NotificationTriage(
         baseUrl = cfg.baseUrl,
         apiKey = cfg.apiKey,
         model = cfg.model,
-        // See the class KDoc: a classification does not think.
-        thinking = false,
+        // This one-shot, tool-less classification has its own latency budget;
+        // that task property, not the notification trigger, keeps it lightweight.
+        thinking = net.kuafuai.andee.config.BrainConfig.THINKING_DISABLED,
         reasoningEffort = cfg.reasoningEffort,
         // ~500 tokens in, one line out. On the phone this runs inside a wake lock with a deadline
         // (NotificationRelayService.KeepAwake), and the call has to end before the lock does; a triage that

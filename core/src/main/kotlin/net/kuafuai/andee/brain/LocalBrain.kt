@@ -1399,14 +1399,20 @@ class LocalBrain(
             // reads, not only the next one. A string compare, free when nothing
             // moved.
             if (step > 1) reseatPersona()
-            // Silent reviews ask without thinking. In thinking mode the
-            // backend wants every earlier assistant turn's reasoning sent back,
-            // and a review replays a long history whose reasoning was never
-            // kept, so it failed with HTTP 400 (seen 2026-10-20 and 10-21). A
-            // review is bookkeeping and loses little without it.
+            // Reasoning is a property of the work, not of what triggered it:
+            // reviews, harvests and heartbeat turns use the same auto/on/off
+            // setting as a request the user typed. LlmClient keeps the reasoning
+            // history the old silent-turn workaround used to discard.
             stepsCount = step
             step(WorkStep.Waiting(step))
-            val reply = llm.complete(history, tools, noThinking = internal)
+            val reply = llm.complete(history, tools)
+            if (reply.thinkingFallback) {
+                host.logWarn(
+                    TAG,
+                    "step $step: backend required reasoning missing from restored/device-written history; " +
+                        "retried this step without thinking, keeping the full conversation and tools",
+                )
+            }
             if (gen != generation.get()) return
             if (reply.reasoning.isNotBlank()) step(WorkStep.Thought(step, reply.reasoning.trim()))
             if (reply.content.isNotBlank() && reply.toolCalls.isNotEmpty()) {

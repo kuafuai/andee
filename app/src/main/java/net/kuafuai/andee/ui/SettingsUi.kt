@@ -18,6 +18,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.annotation.StringRes
 import net.kuafuai.andee.R
+import net.kuafuai.andee.config.BrainConfig
 import net.kuafuai.andee.config.FactoryReset
 import net.kuafuai.andee.config.Notebook
 import net.kuafuai.andee.config.Vault
@@ -716,26 +717,35 @@ class SettingsUi(
             hint = VoiceConfig.llmBaseUrlDefault(context),
         )
 
-        rowLabel(localBlock, lctx.getString(R.string.settings_llm_thinking))
+        note(localBlock, lctx.getString(R.string.settings_brain_local_note))
+
+        // How the model is asked, rather than where it lives: local and
+        // CodeFlying read the same two preferences. Only a hub owns these itself.
+        val thinkingBlock = block(panel)
+        rowLabel(thinkingBlock, lctx.getString(R.string.settings_llm_thinking))
         var applyThinking: ((String, Boolean) -> Unit)? = null
         val thinking = segmented(
-            localBlock,
+            thinkingBlock,
             "llm_thinking",
-            listOf("enabled" to lctx.getString(R.string.common_on), "disabled" to lctx.getString(R.string.common_off)),
+            listOf(
+                BrainConfig.THINKING_AUTO to lctx.getString(R.string.common_auto),
+                BrainConfig.THINKING_ENABLED to lctx.getString(R.string.common_on),
+                BrainConfig.THINKING_DISABLED to lctx.getString(R.string.common_off),
+            ),
         ) { applyThinking?.invoke(it, true) }
 
-        val effortBlock = block(localBlock)
+        val effortBlock = block(thinkingBlock)
         rowLabel(effortBlock, lctx.getString(R.string.settings_llm_effort))
         segmented(
             effortBlock,
             "llm_reasoning_effort",
             listOf(
+                BrainConfig.EFFORT_AUTO to lctx.getString(R.string.common_auto),
                 "high" to lctx.getString(R.string.common_high),
                 "medium" to lctx.getString(R.string.common_medium),
                 "low" to lctx.getString(R.string.common_low),
             ),
         )
-        note(localBlock, lctx.getString(R.string.settings_brain_local_note))
 
         // ---- Which service hears and speaks ----
         //
@@ -918,6 +928,7 @@ class SettingsUi(
             Glass.setVisible(hubBlock, m == VoiceConfig.BRAIN_HUB, animate)
             Glass.setVisible(cfBlock, m == VoiceConfig.BRAIN_CODEFLYING, animate)
             Glass.setVisible(localBlock, m == VoiceConfig.BRAIN_LOCAL, animate)
+            Glass.setVisible(thinkingBlock, m != VoiceConfig.BRAIN_HUB, animate)
             // Keyed on the tab the user is looking at, not on what the build
             // can resolve it to: CodeFlying carries its own voice, and a voice
             // key row under that tab is a row nothing reads.
@@ -925,7 +936,7 @@ class SettingsUi(
         }
         applyMode(mode, false)
         applyThinking = { th, animate ->
-            Glass.setVisible(effortBlock, th != "disabled", animate)
+            Glass.setVisible(effortBlock, th == BrainConfig.THINKING_ENABLED, animate)
         }
         applyThinking(thinking, false)
     }

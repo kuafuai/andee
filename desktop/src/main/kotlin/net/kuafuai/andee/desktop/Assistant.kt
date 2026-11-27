@@ -149,8 +149,8 @@ object Assistant {
     fun config(): BrainConfig {
         val zh = Strings.lang() == "zh"
         val cf = codeFlyingEndpoint()
-        val thinking = Settings.get("llm_thinking") != "disabled"
-        val effort = Settings.get("llm_reasoning_effort").ifEmpty { "high" }
+        val thinking = BrainConfig.normalizeThinking(Settings.get("llm_thinking"))
+        val effort = BrainConfig.normalizeEffort(Settings.get("llm_reasoning_effort"))
         if (brainMode() == BrainConfig.BRAIN_CODEFLYING && cf != null) {
             return BrainConfig(
                 mode = BrainConfig.BRAIN_CODEFLYING,
@@ -168,7 +168,7 @@ object Assistant {
                 if (zh) "https://api.deepseek.com" else "https://api.openai.com/v1"
             },
             model = Settings.get("llm_model").ifEmpty { if (zh) "deepseek-flash" else "gpt-4o-mini" },
-            // Unset reads as on, as on the phone (its build default is on); only an explicit "disabled" turns it off.
+            // Unset is auto; the same saved three-state setting applies to local and CodeFlying.
             thinking = thinking,
             reasoningEffort = effort,
         )

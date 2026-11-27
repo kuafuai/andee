@@ -28,7 +28,7 @@ class LlmClientMovedTest {
     @After fun stop() = server.stop(0)
 
     private fun call(path: String): LlmMovedException {
-        val c = LlmClient("http://127.0.0.1:${server.address.port}/$path", "k", "m", false, "low")
+        val c = LlmClient("http://127.0.0.1:${server.address.port}/$path", "k", "m", "disabled", "low")
         try {
             c.complete(listOf(JSONObject().put("role", "user").put("content", "hi")), JSONArray())
         } catch (e: LlmMovedException) {

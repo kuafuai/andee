@@ -200,6 +200,7 @@
     <string name="settings_llm_model">Model</string>
     <string name="settings_llm_base_url">Base URL</string>
     <string name="settings_llm_thinking">Deep thinking</string>
+    <string name="common_auto">Auto</string>
     <string name="common_on">On</string>
     <string name="common_off">Off</string>
     <string name="settings_llm_effort">Reasoning effort</string>
