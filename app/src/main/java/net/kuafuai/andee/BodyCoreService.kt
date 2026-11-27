@@ -312,6 +312,16 @@ class BodyCoreService : Service() {
                 toggleTyping(then = what)
             }
 
+            override fun onPushToTalkStart(): Boolean = beginPushToTalk()
+
+            override fun onPushToTalkStop() {
+                endPushToTalk(cancel = false)
+            }
+
+            override fun onPushToTalkCancel() {
+                endPushToTalk(cancel = true)
+            }
+
             override fun onLongPress() {
                 // Long-press the ball — folded or not — asks for the full card
                 // back: the scrollback and the control bar only exist at full
@@ -696,6 +706,9 @@ class BodyCoreService : Service() {
         // rather than an overlay — an overlay window cannot raise the soft
         // keyboard on this ROM. See ui/TextInputActivity.
         net.kuafuai.andee.ui.TextInputActivity.onSubmit = { text, images -> submitUserTurn(text, "typed", images) }
+        net.kuafuai.andee.ui.TextInputActivity.onPushStart = { beginPushToTalk() }
+        net.kuafuai.andee.ui.TextInputActivity.onPushStop = { endPushToTalk(cancel = false) }
+        net.kuafuai.andee.ui.TextInputActivity.onPushCancel = { endPushToTalk(cancel = true) }
         // The camera and the photo picker are other apps' windows, and the card
         // is an overlay that sorts above them — so it steps aside while they are up.
         net.kuafuai.andee.ui.TextInputActivity.onAway = { window.setAway(it) }
@@ -1174,6 +1187,41 @@ class BodyCoreService : Service() {
     }
 
     /**
+     * A held input-strip button is not [startTurn]: the typing Activity must
+     * stay up until release, and a second press must not toggle off a session
+     * this press did not start. The transcript still uses the one onTranscript
+     * path above, so exit commands and both brains behave exactly as they do
+     * for a ball-initiated voice turn.
+     */
+    private fun beginPushToTalk(): Boolean {
+        if (exitRequested || meeting.isActive() || asr.isActive()) return false
+        if (net.kuafuai.andee.device.CallState.isActive) {
+            window.setSubtitle(
+                AppLocale.str(this, R.string.svc_call_in_progress),
+                FloatingWindowUi.SubtitleKind.FINAL,
+            )
+            return false
+        }
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            // Only an Activity can ask. Its permission result deliberately does
+            // not start recording: the next real hold is the user's consent.
+            toggleTyping(then = "microphone")
+            return false
+        }
+        tts.stopSpeaking()
+        acceptBrainOutput = true
+        voiceFailureReported = false
+        asr.startPushToTalk()
+        return true
+    }
+
+    private fun endPushToTalk(cancel: Boolean) {
+        if (::asr.isInitialized) asr.finishPushToTalk(cancel)
+    }
+
+    /**
      * One turn, one way in.
      *
      * A sentence the user **typed** and a sentence they **said** are the same
@@ -1295,10 +1343,9 @@ class BodyCoreService : Service() {
         if (window.isCompact()) dispatcher.expand()
         // No keyboard to borrow and nothing to switch: the device's own IME is
         // the user's, and this field types on it like any other app's would.
-        // The only way this fails is a tablet whose single IME is the headless
-        // one — where nobody can type anywhere, and a field here would take a
-        // sentence and show it to nobody.
-        if (net.kuafuai.andee.ui.ImeSwitch.typable(this).isEmpty()) {
+        // Voice and its permission prompt do not need an IME at all.
+        val voiceOnly = then == "voice" || then == "microphone"
+        if (!voiceOnly && net.kuafuai.andee.ui.ImeSwitch.typable(this).isEmpty()) {
             net.kuafuai.andee.ui.CardUi.error(
                 AppLocale.str(this, R.string.svc_no_typable_ime),
             )
@@ -1307,7 +1354,7 @@ class BodyCoreService : Service() {
         typingFromFullscreen = true
         // The short-lived Activity may not emit its own accessibility event.
         noteOwnActivity()
-        net.kuafuai.andee.ui.TextInputActivity.start(this, then)
+        net.kuafuai.andee.ui.TextInputActivity.start(this, then ?: "keyboard")
     }
 
     /**

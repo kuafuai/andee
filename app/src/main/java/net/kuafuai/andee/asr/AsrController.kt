@@ -90,6 +90,19 @@ class AsrController(
     /** When this turn began, for the [MAX_TURN_MS] ceiling. */
     private var turnStartedAt = 0L
 
+    /** A held button ends this turn; silence alone must not. */
+    @Volatile
+    private var pushToTalk = false
+
+    /** Cancel is per session: a late final must not be revived by the next press. */
+    private var sessionSerial = 0L
+
+    @Volatile
+    private var activeSession = 0L
+
+    @Volatile
+    private var discardedSession = 0L
+
     /**
      * Set by [AsrEngine.Listener.onReady]; false until the engine can hear.
      * See [checkSilence] for why the clock waits on it.
@@ -131,6 +144,32 @@ class AsrController(
     }
 
     /**
+     * Open the microphone for a held button. Unlike [toggle], an already-live
+     * stream is left alone: pressing must never turn somebody else's recording
+     * off, and the matching release is only sent for a press the owner accepted.
+     */
+    fun startPushToTalk() {
+        executor.execute {
+            try {
+                if (!audio.isStreaming()) startImpl(userInitiated = true, pushToTalk = true)
+            } catch (t: Throwable) {
+                Log.e(TAG, "push-to-talk start failed", t)
+                runCatching { stopImpl() }
+                window.setState(FloatingWindowUi.State.ERROR)
+                onError(t.message ?: "asr error")
+            }
+        }
+    }
+
+    /** Release sends; a cancelled touch closes the microphone and drops its final. */
+    fun finishPushToTalk(cancel: Boolean = false) {
+        executor.execute {
+            if (cancel) discardedSession = activeSession
+            runCatching { stopImpl() }
+        }
+    }
+
+    /**
      * [bySilence] is true only from [checkSilence] — the caller's own silence
      * rule is the reason, which an engine uses to decide how long its last
      * results can possibly still be worth waiting for. See
@@ -145,8 +184,11 @@ class AsrController(
         executor.shutdownNow()
     }
 
-    private fun startImpl(userInitiated: Boolean) {
+    private fun startImpl(userInitiated: Boolean, pushToTalk: Boolean = false) {
         val cfg = VoiceConfig.load(context)
+        this.pushToTalk = pushToTalk
+        val session = ++sessionSerial
+        activeSession = session
         // Set here, not in [armSilenceWatchdog], because 火山 reports
         // [AsrEngine.Listener.onReady] from *inside* its own connect — before
         // the capture starts and before that method runs. Measuring the
@@ -182,6 +224,9 @@ class AsrController(
             }
 
             override fun onFinal(text: String) {
+                // Read the cancellation before queueing: a new press may have
+                // started by the time this runnable reaches the executor.
+                val deliver = discardedSession != session
                 // Either way the band comes down. An empty turn — tapped the
                 // ball, said nothing — has nothing to show; a real transcript
                 // is about to become the first row of the scrollback via
@@ -192,7 +237,7 @@ class AsrController(
                     runCatching { stopImpl() }
                     // Capture the origin per session; a later tap must not
                     // turn an earlier follow-up result into an exit command.
-                    if (text.isNotBlank()) onTranscript(text, userInitiated)
+                    if (deliver && text.isNotBlank()) onTranscript(text, userInitiated)
                 }
             }
 
@@ -349,6 +394,13 @@ class AsrController(
             runCatching { stop() }
             return
         }
+        // A held button owns the end of the turn. Keep the watchdog solely for
+        // the ceiling above: recogniser silence is normal while somebody holds
+        // the button to think, and must not send half of their sentence.
+        if (pushToTalk) {
+            silence.postDelayed(silenceWatchdog, SILENCE_CHECK_MS)
+            return
+        }
         if (!engineReady) {
             silence.postDelayed(silenceWatchdog, SILENCE_CHECK_MS)
             return
@@ -386,6 +438,7 @@ class AsrController(
         runCatching { client?.waitFinished(client.finalWaitMs) }
         runCatching { client?.close() }
         asr = null
+        pushToTalk = false
         // Only now, so the media app doesn't resume into the final transcript
         // — that arrives some time after we said the turn was over, and the
         // user is still waiting on it.

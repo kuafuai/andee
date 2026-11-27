@@ -591,6 +591,10 @@
     <string name="bubble_tap_to_talk">点击说话</string>
     <string name="input_hint">打字跟它说…</string>
     <string name="input_send">发送</string>
+    <string name="input_hold_to_talk">按住说话</string>
+    <string name="input_release_to_send">松开发送</string>
+    <string name="input_switch_voice">切换语音输入</string>
+    <string name="input_switch_keyboard">切换键盘输入</string>
     <string name="input_hint_photos">可以直接发送，或者补一句…</string>
     <string name="input_take_photo">拍照</string>
     <string name="input_pick_photos">选图片</string>

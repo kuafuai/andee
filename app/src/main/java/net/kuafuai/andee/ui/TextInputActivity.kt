@@ -20,6 +20,8 @@ import android.text.InputType
 import android.util.Base64
 import android.util.Log
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
@@ -84,7 +86,10 @@ import kotlin.math.roundToInt
 class TextInputActivity : Activity() {
 
     private lateinit var field: EditText
+    private lateinit var pill: LinearLayout
     private var sent = false
+    private var voiceMode = true
+    private var holdingMic = false
 
     /** Strings in the user's language; views are still built on `this`. */
     private lateinit var lctx: Context
@@ -120,7 +125,7 @@ class TextInputActivity : Activity() {
     private val keyboardRetry = Runnable {
         val visible = ViewCompat.getRootWindowInsets(field)
             ?.isVisible(WindowInsetsCompat.Type.ime()) == true
-        if (resumed && !isFinishing && !picking && hasWindowFocus() && field.hasFocus() && !visible) {
+        if (resumed && !voiceMode && !isFinishing && !picking && hasWindowFocus() && field.hasFocus() && !visible) {
             (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
                 .showSoftInput(field, InputMethodManager.SHOW_IMPLICIT)
         }
@@ -150,6 +155,10 @@ class TextInputActivity : Activity() {
         // until something loads the saved one, and this page draws immediately.
         Theme.load(this)
         lctx = AppLocale.wrap(this)
+        val then = intent?.getStringExtra(EXTRA_THEN)
+        // Direct voice entry is the default. The ball's double-tap and the
+        // camera/photo routes explicitly ask for the keyboard as before.
+        voiceMode = then == null || then == "voice" || then == "microphone"
 
         field = EditText(this).apply {
             hint = lctx.getString(R.string.input_hint)
@@ -180,12 +189,9 @@ class TextInputActivity : Activity() {
             }
         }
 
-        // The same pill as the card's resting one — camera, album, words, send — so the field opening is the
-        // keyboard arriving and nothing else. Closing is the keyboard going (or back): the pill has no ✕.
-        val row = InputPill.build(
-            this, field,
-            onCamera = { takePhoto() }, onAlbum = { pickPhotos() }, onSend = { send() },
-        )
+        // The same pill as the card's resting one. Voice needs no IME; keyboard
+        // mode is the same Activity because an overlay cannot raise it here.
+        pill = buildPill()
 
         thumbs = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -226,7 +232,7 @@ class TextInputActivity : Activity() {
             setPadding(dp(8), dp(8), dp(8), dp(8))
             setPadding(dp(8), dp(8), dp(8), dp(8))
             addView(thumbScroll, LinearLayout.LayoutParams(MATCH_PARENT, WRAP))
-            addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP))
+            addView(pill, LinearLayout.LayoutParams(MATCH_PARENT, WRAP))
         }
 
         // The strip sits on **the card's own backdrop**, not on the user's app.
@@ -258,8 +264,12 @@ class TextInputActivity : Activity() {
         // keyboard, and the inset listener below already closes the field once
         // the keys are really gone ([scheduleCloseWhenGone]).
         backdrop.setOnClickListener {
-            field.clearFocus()
-            hideKeyboard()
+            if (voiceMode) {
+                finish()
+            } else {
+                field.clearFocus()
+                hideKeyboard()
+            }
         }
 
         // One row, anchored at the bottom. See the backdrop above for why the
@@ -282,10 +292,18 @@ class TextInputActivity : Activity() {
             )
         }
         setContentView(root)
+        // With no IME there is no inset callback to report where the strip is.
+        // Shrink the overlay to it explicitly, or the card would cover the very
+        // button the user is meant to hold.
+        if (voiceMode) root.post {
+            trackTop = true
+            reportTop()
+        }
         // Opened from the resting pill's camera or album icon: carry on to that.
-        when (intent?.getStringExtra(EXTRA_THEN)) {
+        when (then) {
             "camera" -> root.post { takePhoto() }
             "album" -> root.post { pickPhotos() }
+            "microphone" -> root.post { requestMicPermission() }
         }
 
         // The keyboard is most of a phone screen, and it arrives **over** this
@@ -313,7 +331,7 @@ class TextInputActivity : Activity() {
                 // and comes back in onResume. Leave the card's height alone.
                 trackTop = false
                 return@setOnApplyWindowInsetsListener insets
-            } else if (imeShown && photos.isEmpty()) {
+            } else if (!voiceMode && imeShown && photos.isEmpty()) {
                 // The keyboard is on its way out, and so is this field:收起键盘
                 // means the user is done typing, and a strip left behind on an
                 // otherwise empty screen is a thing to dismiss twice.
@@ -333,7 +351,7 @@ class TextInputActivity : Activity() {
             }
             // Before the keyboard has ever arrived the strip sits at the very bottom, under the card's own
             // identical pill. Telling the card to end there would only make it jump twice.
-            if (!imeShown) return@setOnApplyWindowInsetsListener insets
+            if (!imeShown && !voiceMode) return@setOnApplyWindowInsetsListener insets
             if (sliding) {
                 // This listener sees where the keyboard will *end* before it starts moving. The card takes that
                 // edge once, now — resizing an overlay every frame is a relayout of the whole card per frame,
@@ -395,7 +413,7 @@ class TextInputActivity : Activity() {
                     reportTop()
                     return
                 }
-                if (imeShown && photos.isEmpty() && !picking) {
+                if (!voiceMode && imeShown && photos.isEmpty() && !picking) {
                     // The keys are down: hand the card its full height back now — its own pill is the same
                     // picture as this strip, so the hand-over is invisible — and close.
                     onTop?.invoke(0)
@@ -416,16 +434,23 @@ class TextInputActivity : Activity() {
         super.onResume()
         resumed = true
         keyboardRequested = false
-        field.requestFocus()
-        field.post { showKeyboard() }
+        if (!voiceMode) {
+            field.requestFocus()
+            field.post { showKeyboard() }
+        } else {
+            trackTop = true
+            field.post { reportTop() }
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus && ::field.isInitialized) showKeyboard()
+        if (hasFocus && !voiceMode && ::field.isInitialized) showKeyboard()
     }
 
     override fun onPause() {
+        // Losing the window mid-press is ACTION_CANCEL, never release-to-send.
+        cancelHeldTalk()
         // Paired with [resumed] in the companion, which is what makes
         // `isShowing` mean "on screen" rather than "alive". Measured: HOME (or
         // anything else that backgrounds this without finishing it) leaves the
@@ -444,6 +469,7 @@ class TextInputActivity : Activity() {
     }
 
     override fun onDestroy() {
+        cancelHeldTalk()
         if (::field.isInitialized) field.removeCallbacks(keyboardRetry)
         cancelCloseWhenGone()
         worker.shutdownNow()
@@ -459,6 +485,99 @@ class TextInputActivity : Activity() {
         // invisible, untouchable card: no ball, and no way to ask for one.
         onClosed?.invoke()
         super.onDestroy()
+    }
+
+    private fun buildPill(): LinearLayout {
+        val middle: View = if (voiceMode) holdToTalkButton() else field
+        return InputPill.build(
+            this, middle, voiceMode,
+            onCamera = {
+                if (voiceMode) setVoiceMode(false)
+                takePhoto()
+            },
+            onAlbum = {
+                if (voiceMode) setVoiceMode(false)
+                pickPhotos()
+            },
+            onSend = { send() },
+            onToggleMode = { setVoiceMode(!voiceMode) },
+        )
+    }
+
+    private fun holdToTalkButton(): TextView = TextView(this).apply {
+        text = lctx.getString(R.string.input_hold_to_talk)
+        contentDescription = text
+        textSize = Glass.Type.BODY
+        setTextColor(Color.parseColor(Glass.TITLE))
+        gravity = Gravity.CENTER
+        minHeight = dp(40)
+        isClickable = true
+        setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                    if (!holdingMic && requestMicPermission()) {
+                        holdingMic = onPushStart?.invoke() == true
+                        if (holdingMic) {
+                            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            text = lctx.getString(R.string.input_release_to_send)
+                        }
+                    }
+                }
+                MotionEvent.ACTION_UP -> if (holdingMic) {
+                    holdingMic = false
+                    onPushStop?.invoke()
+                    finish()
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    cancelHeldTalk()
+                    text = lctx.getString(R.string.input_hold_to_talk)
+                }
+            }
+            true
+        }
+    }
+
+    /** True when recording may start; otherwise the permission dialog owns the screen. */
+    private fun requestMicPermission(): Boolean {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            return true
+        }
+        goAway()
+        requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQ_MIC_PERMISSION)
+        return false
+    }
+
+    private fun cancelHeldTalk() {
+        if (!holdingMic) return
+        holdingMic = false
+        onPushCancel?.invoke()
+    }
+
+    private fun setVoiceMode(enabled: Boolean) {
+        if (voiceMode == enabled) return
+        cancelHeldTalk()
+        cancelCloseWhenGone()
+        field.removeCallbacks(keyboardRetry)
+        keyboardRequested = false
+        if (enabled) {
+            field.clearFocus()
+            hideKeyboard()
+            // The zero inset that follows is a mode change, not "done typing".
+            imeShown = false
+        }
+        voiceMode = enabled
+        val index = strip.indexOfChild(pill)
+        strip.removeView(pill)
+        pill = buildPill()
+        strip.addView(pill, index, LinearLayout.LayoutParams(MATCH_PARENT, WRAP))
+        trackTop = true
+        if (enabled) {
+            pill.post { reportTop() }
+        } else {
+            field.requestFocus()
+            field.post { showKeyboard() }
+        }
     }
 
     /**
@@ -543,9 +662,11 @@ class TextInputActivity : Activity() {
 
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code, permissions, results)
-        if (code != REQ_CAMERA_PERMISSION) return
+        if (code != REQ_CAMERA_PERMISSION && code != REQ_MIC_PERMISSION) return
         comeBack()
-        if (results.firstOrNull() == PackageManager.PERMISSION_GRANTED) takePhoto()
+        // A microphone grant does not synthesise the press that the permission
+        // dialog interrupted: the next deliberate hold starts the recording.
+        if (code == REQ_CAMERA_PERMISSION && results.firstOrNull() == PackageManager.PERMISSION_GRANTED) takePhoto()
     }
 
     @Deprecated("Activity has no other way to get a result without androidx.activity")
@@ -715,7 +836,7 @@ class TextInputActivity : Activity() {
      * cancels it.
      */
     private fun scheduleCloseWhenGone() {
-        if (closeWhenGone != null || isFinishing || picking) return
+        if (voiceMode || closeWhenGone != null || isFinishing || picking) return
         val r = Runnable {
             closeWhenGone = null
             if (!isFinishing) finish()
@@ -736,7 +857,7 @@ class TextInputActivity : Activity() {
     }
 
     private fun showKeyboard() {
-        if (!resumed || isFinishing || picking || !hasWindowFocus() || keyboardRequested) return
+        if (voiceMode || !resumed || isFinishing || picking || !hasWindowFocus() || keyboardRequested) return
         keyboardRequested = true
         (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
             .showSoftInput(field, InputMethodManager.SHOW_IMPLICIT)
@@ -791,6 +912,7 @@ class TextInputActivity : Activity() {
         private const val REQ_CAMERA = 1
         private const val REQ_PICK = 2
         private const val REQ_CAMERA_PERMISSION = 3
+        private const val REQ_MIC_PERMISSION = 4
 
         /**
          * How long the keyboard has to stay gone before the field follows it.
@@ -804,6 +926,16 @@ class TextInputActivity : Activity() {
         /** Set once by the service, like [ChatHistory.init]. Text may be empty when photos are not. */
         @Volatile
         var onSubmit: ((String, List<String>) -> Unit)? = null
+
+        /** A press is accepted only when the service can actually open the mic. */
+        @Volatile
+        var onPushStart: (() -> Boolean)? = null
+
+        @Volatile
+        var onPushStop: (() -> Unit)? = null
+
+        @Volatile
+        var onPushCancel: (() -> Unit)? = null
 
         /**
          * The field is sending the user to the camera / photo picker (true) or

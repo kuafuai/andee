@@ -256,6 +256,11 @@ class FloatingWindowUi(
         /** The resting pill's camera / album icon: open the field and go straight on to [what]. */
         fun onTypeThen(what: String) {}
 
+        /** Direct hold-to-talk on the resting pill; only an accepted press gets a release. */
+        fun onPushToTalkStart(): Boolean = false
+        fun onPushToTalkStop() {}
+        fun onPushToTalkCancel() {}
+
         /**
          * A page row in the scrollback, tapped to be shown again.
          *
@@ -1339,7 +1344,10 @@ class FloatingWindowUi(
     fun onLocaleChanged() {
         ui.post {
             tipsText?.text = AppLocale.str(context, R.string.window_tips)
-            inputHint?.text = AppLocale.str(context, R.string.window_input_hint)
+            inputHint?.text = AppLocale.str(
+                context,
+                if (inputHint?.isActivated == true) R.string.input_release_to_send else R.string.input_hold_to_talk,
+            )
             paintMute()
             paintViewKey()
             historyView?.onLocaleChanged()
@@ -3248,22 +3256,50 @@ class FloatingWindowUi(
             setPadding(dp(16), dp(4), dp(16), 0)
         }
         val hint = TextView(context).apply {
-            text = AppLocale.str(context, R.string.window_input_hint)
+            text = AppLocale.str(context, R.string.input_hold_to_talk)
+            contentDescription = text
             textSize = Glass.Type.BODY
             // SECONDARY, not MUTED: the well is translucent over the photograph, and MUTED vanished into it.
             setTextColor(Color.parseColor(Glass.SECONDARY))
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.CENTER
             minHeight = dp(40)
             isClickable = true
-            setOnClickListener { listeners.onTextInputToggle() }
+            var holding = false
+            setOnTouchListener { v, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.parent?.requestDisallowInterceptTouchEvent(true)
+                        holding = listeners.onPushToTalkStart()
+                        isActivated = holding
+                        if (holding) {
+                            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            text = AppLocale.str(context, R.string.input_release_to_send)
+                        }
+                    }
+                    MotionEvent.ACTION_UP -> if (holding) {
+                        holding = false
+                        isActivated = false
+                        listeners.onPushToTalkStop()
+                        text = AppLocale.str(context, R.string.input_hold_to_talk)
+                    }
+                    MotionEvent.ACTION_CANCEL -> if (holding) {
+                        holding = false
+                        isActivated = false
+                        listeners.onPushToTalkCancel()
+                        text = AppLocale.str(context, R.string.input_hold_to_talk)
+                    }
+                }
+                true
+            }
         }
-        // The same pill the open field draws ([InputPill]); here every part opens the field.
+        // Voice works directly on the overlay. Only the keyboard needs the Activity.
         val pill = InputPill.build(
-            context, hint,
+            context, hint, voiceMode = true,
             onCamera = { listeners.onTypeThen("camera") },
             onAlbum = { listeners.onTypeThen("album") },
-            onSend = { listeners.onTextInputToggle() },
-        ).apply { setOnClickListener { listeners.onTextInputToggle() } }
+            onSend = {},
+            onToggleMode = { listeners.onTypeThen("keyboard") },
+        )
         inputHint = hint; inputPill = pill
         inputRow.addView(pill, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         val tips = LinearLayout(context).apply {

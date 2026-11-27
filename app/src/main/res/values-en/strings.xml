@@ -609,6 +609,10 @@
     <string name="bubble_tap_to_talk">Tap to talk</string>
     <string name="input_hint">Type to talk to it…</string>
     <string name="input_send">Send</string>
+    <string name="input_hold_to_talk">Hold to talk</string>
+    <string name="input_release_to_send">Release to send</string>
+    <string name="input_switch_voice">Switch to voice input</string>
+    <string name="input_switch_keyboard">Switch to keyboard input</string>
     <string name="input_hint_photos">Send as is, or add a few words…</string>
     <string name="input_take_photo">Take photo</string>
     <string name="input_pick_photos">Choose images</string>
