@@ -230,7 +230,7 @@ Pure Kotlin, no Compose; the whole thing hangs off two pillars, `WindowManager` 
 | minSdk                    | 27                  | Android 8.1 — it installs and chats. **Screen capability needs API 30+**: `ACTION_IME_ENTER` and `takeScreenshot` are both API 30+, and below that the self-check shows an amber row |
 | Java / Kotlin JVM target  | 1.8                 | `sourceCompatibility` 1.8, `jvmTarget = '1.8'`                                            |
 | **Build JDK**             | **17–20**           | see [Which JDK](#which-jdk) — this is the step people get stuck on                        |
-| versionCode / versionName | 32 / 0.16.1          | see [CHANGELOG.md](../CHANGELOG.md) for the policy                                           |
+| versionCode / versionName | 33 / 0.17.0          | see [CHANGELOG.md](../CHANGELOG.md) for the policy                                           |
 | applicationId / namespace | `net.kuafuai.andee` | never changed from the template. It affects nothing                                       |
 
 **Runtime dependencies** (`app/build.gradle`):

@@ -4,7 +4,7 @@ Notable changes to Andee. The format follows [Keep a Changelog](https://keepacha
 
 ## Versioning policy
 
-- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`32` / `"0.16.1"`**. The
+- `versionCode` / `versionName` live in `app/build.gradle` and are currently **`33` / `"0.17.0"`**. The
   Mac's product version is read from that same `versionName`, so both bodies carry one number.
 - Releases are tagged `vMAJOR.MINOR.PATCH`, `versionName` mirrors the tag without the leading `v`,
   and `versionCode` increases by one per release. `versionCode` must increase **monotonically** or
@@ -28,6 +28,63 @@ anything not built at a tag, identify it by the short commit hash it was built f
 hash into `versionName` at build time would close this hole; it is not implemented yet.)
 
 ## [Unreleased]
+
+## [0.17.0] - 2026-11-28
+
+**Thinking is a property of the work now, not of what triggered the turn — and the phone's voice input is
+press-to-talk.**
+
+Plus two things that were making it hard to trust it: a direct question could be answered silently, and a
+wait that had gone stale looked exactly like one that was still live.
+
+### Added
+
+- **Thinking is `auto` / `on` / `off`, and it belongs to the work rather than to the trigger.** `llm_thinking`
+  and `llm_reasoning_effort` are shared by local and CodeFlying on both bodies (a hub owns its own
+  settings); **unset or unreadable is `auto`**, while an old explicit `enabled` / `disabled` still survives
+  an upgrade.
+  - **`auto` omits both fields** — there is no portable `thinking.type=auto` — so the selected model or
+    backend applies its own default. `on` sends `enabled` with an optional high / medium / low; `off` sends
+    `disabled`.
+  - **Reviews, harvests and heartbeat work turns use that same setting.** The old `noThinking = internal`
+    let **the trigger, rather than the task, decide** — which is the thing this release is about. The narrow
+    low-latency paths (the one-shot tool-less heartbeat verdict, `PlanMind`, `Locator`, notification triage)
+    stay **explicitly disabled because those tasks are lightweight**, not because a notification or a
+    heartbeat triggered them.
+  - **A thinking reply's `reasoning_content` stays on the assistant message for replay.** Current DeepSeek's
+    tool-using thinking contract requires earlier reasoning and returns **400** when it is absent; the old
+    `sanitizeAssistant` discarded it, **which is why silent turns had been forced non-thinking in the first
+    place**. On a 400 that explicitly names `reasoning_content` — and only with tools and a non-disabled
+    setting — `LlmClient` retries **that one request** with thinking disabled, the identical messages and
+    tools, and no effort field. It **never invents reasoning, rewrites those words as a user utterance, drops
+    history, or changes the saved setting**; `Reply.thinkingFallback` makes `LocalBrain` log the degradation,
+    and the next request tries the saved choice again.
+- **The phone's voice input is press-to-talk.** A held input-strip button is deliberately **not** a toggle:
+  the typing Activity stays up until you release, and a second press cannot switch off a session this press
+  did not start. The transcript still goes through the one `onTranscript` path, so **exit commands and both
+  brains behave exactly as they do for a ball-initiated voice turn**. A cancel gesture ends it without
+  sending.
+- **Waits that have gone stale are marked, and the nightly review may tidy the notebook.** A wait older than
+  **48 hours** is shown as `(stale)` in the task line the model reads, and the person card shows the age in
+  days for 「在等他」 entries. The review rules gain an item that makes tidying **its own judgement rather
+  than a rule**: a memory about something now finished, or a preference that has changed, is forgotten or
+  overwritten under the same name; **a wait marked stale gets the question "does this still matter?"**, and
+  the task is closed only if the answer is no. **The device supplies the facts — the markers and the age —
+  and the model makes the judgement.**
+
+### Fixed
+
+- **A direct question is answered audibly, mechanically — not merely asked to be.** `submit(...,
+  allowQuiet = false)` is now the default; the phone and the Mac pass `true` **only when the user's own
+  explicit 「别出声」 / "do it quietly"** is recognised. Otherwise `quietAllowed` refuses to latch the quiet
+  state, **so even a model-written `[quiet]` is stripped** while narration, the spoken answer and the
+  follow-up mic all carry on. A ball that says nothing to a direct question looks broken.
+  - **The constant system prompt is not rewritten per turn** — that would throw away the prefix cache — so
+    the turn-specific rule rides on the user message instead.
+  - Device-initiated turns still choose quiet by judgement: when the result is already where it will be seen
+    (stage, page, notebook), late at night, or when the user has said they are busy. The two default todos
+    (`MORNING_TODO`, `NIGHTLY_PICTURE`) remain the exception that is **not** left to judgement — their text
+    tells the model to open with `[quiet]`.
 
 ## [0.16.1] - 2026-11-24
 
