@@ -884,7 +884,7 @@ class ScreenController(
 
     /**
      * N deterministic swipes of one finger-travel each, stopping early when the
-     * list stops moving.
+     * screen stops changing.
      *
      * This exists because a fling is the wrong tool for an agent and the right
      * tool for a thumb. A fling's landing distance is decided by the system's
@@ -896,47 +896,79 @@ class ScreenController(
      * finger did, every time. N of them move it N times that far, which makes
      * distance something the brain can COUNT: "three screens down from the top"
      * is a place, and a place can be returned to. The early stop is the second
-     * half of it — a list that has nowhere left to go says so instead of
-     * swallowing the gesture.
+     * half of it — but an identical fingerprint is not the end of the list.
+     * [screenFingerprint] hashes structure and text, so a spinner, a skeleton,
+     * or a page that has not come back yet looks the same before and after, and
+     * a blind tree whose screenshot never arrived was never compared at all.
+     * Saying "more swipes will do nothing" there is what made the model end a
+     * batch early. A miss now waits out the settle and reports the observation.
      */
     private fun swipeScreens(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long, screens: Int): JSONObject {
         val n = screens.coerceIn(1, MAX_SCREENS)
         var moved = 0
-        var stoppedAtEnd = false
+        var stop = SwipeStop.NONE
         for (i in 0 until n) {
             val before = screenFingerprint()
             val beforePx = if (before.optBoolean("blind")) pixelSignature() else null
             swipe(x1, y1, x2, y2, durationMs, fling = false)
             try { Thread.sleep(SCREEN_SETTLE_MS) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
             val after = screenFingerprint()
-            var changed = before.optString("pkg") != after.optString("pkg") ||
-                before.optInt("sig") != after.optInt("sig")
-            if (!changed && beforePx != null) {
-                pixelSignature()?.let { if (pixelsMoved(beforePx, it)) changed = true }
+            var step = observeSwipeStep(before, after, beforePx)
+            // A cut walk stops at a different node each time, so a later
+            // fingerprint cannot confirm the first. An interrupt keeps the
+            // observation already in hand instead of sleeping on a cancelled call.
+            if (step != SwipeStop.NONE &&
+                !before.optBoolean("cut") && !after.optBoolean("cut") &&
+                !Thread.currentThread().isInterrupted
+            ) {
+                var tries = 0
+                while (tries < STABLE_MAX_TRIES) {
+                    try {
+                        Thread.sleep(STABLE_POLL_MS)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        break
+                    }
+                    val retry = screenFingerprint()
+                    if (retry.optBoolean("cut")) break
+                    // A retry whose frame did not arrive must not erase a
+                    // comparison an earlier look did make.
+                    val seen = observeSwipeStep(before, retry, beforePx)
+                    if (seen != SwipeStop.UNREADABLE) step = seen
+                    if (step == SwipeStop.NONE) break
+                    tries++
+                    if (Thread.currentThread().isInterrupted) break
+                }
             }
-            if (!changed) { stoppedAtEnd = true; break }
-            moved++
+            if (step == SwipeStop.NONE) {
+                moved++
+            } else {
+                stop = step
+                break
+            }
         }
-        val out = JSONObject()
-            .put("from", "$x1,$y1").put("to", "$x2,$y2")
-            .put("duration_ms", durationMs).put("fling", false)
-            .put("screens_moved", moved)
-            .put("requested", n)
-        if (stoppedAtEnd) {
-            out.put(
-                "list_end",
-                "true — the screen stopped moving after $moved of $n swipes, so this list is at " +
-                    "its end in that direction. More swipes the same way will do nothing.",
-            )
-        } else {
-            out.put(
-                "position_hint",
-                "You moved $moved screen${if (moved == 1) "" else "s"} at one full finger-travel " +
-                    "each. Count from where you started: that is how you get back, and how you " +
-                    "know you have passed something.",
-            )
+        return swipeScreensResult(x1, y1, x2, y2, durationMs, n, moved, stop)
+    }
+
+    /**
+     * One before/after of a [swipeScreens] step, reduced to [SwipeStop].
+     *
+     * [beforePx] is non-null only for a blind tree — the case whose signature
+     * cannot see a change, so the pixels are the second opinion. [pixelTold]
+     * is true exactly when a non-null after-frame was compared, which is what
+     * separates "the pixels did not move" from "nothing read the screen".
+     */
+    private fun observeSwipeStep(before: JSONObject, after: JSONObject, beforePx: FloatArray?): SwipeStop {
+        var pixelTold = false
+        var pxMoved = false
+        if (beforePx != null) {
+            val afterPx = pixelSignature()
+            if (afterPx != null) {
+                pixelTold = true
+                pxMoved = pixelsMoved(beforePx, afterPx)
+            }
         }
-        return out
+        return swipeStepStop(before, after, pixelTold, pxMoved)
     }
 
     // ---- stuck-loop guard (per-location counting) --------------------------
@@ -3802,7 +3834,9 @@ class ScreenController(
          * already are (the brain is told to ignore anything round and blue).
          * Magenta appears in none of them.
          */
-        private val CROSSHAIR = Color.rgb(224, 0, 255)
+        // Same bits as Color.rgb(224, 0, 255). A const keeps the companion
+        // loadable from a unit test — Color.rgb throws on the stub android.jar.
+        private const val CROSSHAIR = 0xFFE000FF.toInt()
 
         /**
          * Hard ceiling on outline lines. Generous — it is a safety valve for a
@@ -3863,6 +3897,96 @@ class ScreenController(
 
         /** Beat between the determinate swipes of one [swipeScreens] call. */
         private const val SCREEN_SETTLE_MS = 380L
+
+        /**
+         * Why [swipeScreens] stopped, if it stopped.
+         *
+         * [NONE] — every swipe that ran changed the screen. [UNCHANGED] — a
+         * real comparison (the tree, or pixels on a blind tree) saw nothing
+         * move, which is the end of the list or content still loading; the
+         * result names both and does not pick. [UNREADABLE] — the tree was
+         * blind and no pixels were compared, so "nothing moved" was never observed.
+         */
+        internal enum class SwipeStop { NONE, UNCHANGED, UNREADABLE }
+
+        /**
+         * Classify one before/after pair.
+         *
+         * A package or signature change, or pixels that moved, is [SwipeStop.NONE].
+         * Otherwise a blind tree that never got a pixel reading — no root, or a
+         * withheld one — is [SwipeStop.UNREADABLE]: `screen_changed: false` then
+         * means unknown, not that the list ended. A comparison that really saw
+         * the same screen is [SwipeStop.UNCHANGED].
+         *
+         * [pixelTold] is true only when a non-null after-frame was compared.
+         * [pxMoved] is that comparison's answer.
+         */
+        internal fun swipeStepStop(
+            before: JSONObject,
+            after: JSONObject,
+            pixelTold: Boolean,
+            pxMoved: Boolean,
+        ): SwipeStop {
+            val treeMoved = before.optString("pkg") != after.optString("pkg") ||
+                before.optInt("sig") != after.optInt("sig")
+            if (treeMoved || pxMoved) return SwipeStop.NONE
+            if ((before.optBoolean("blind") || after.optBoolean("blind")) && !pixelTold) {
+                return SwipeStop.UNREADABLE
+            }
+            return SwipeStop.UNCHANGED
+        }
+
+        /**
+         * What [swipeScreens] tells the model. The counts are facts. A stop is
+         * an observation: there is no `list_end`, and nothing here says further
+         * swipes will do nothing — that sentence is what made a loading page
+         * look finished.
+         */
+        internal fun swipeScreensResult(
+            x1: Int,
+            y1: Int,
+            x2: Int,
+            y2: Int,
+            durationMs: Long,
+            requested: Int,
+            moved: Int,
+            stop: SwipeStop,
+        ): JSONObject {
+            val out = JSONObject()
+                .put("from", "$x1,$y1").put("to", "$x2,$y2")
+                .put("duration_ms", durationMs).put("fling", false)
+                .put("screens_moved", moved)
+                .put("requested", requested)
+            when (stop) {
+                SwipeStop.NONE -> out
+                    .put("screen_changed", true)
+                    .put(
+                        "position_hint",
+                        "You moved $moved screen${if (moved == 1) "" else "s"} at one full finger-travel " +
+                            "each. Count from where you started: that is how you get back, and how you " +
+                            "know you have passed something.",
+                    )
+                SwipeStop.UNCHANGED -> out
+                    .put("screen_changed", false)
+                    .put("possible_causes", JSONArray().put("end_of_list").put("content_loading"))
+                    .put(
+                        "screen_changed_note",
+                        "The screen looked the same after this swipe. That can mean the list is at its " +
+                            "end in this direction, or that content is still loading. Wait briefly, then " +
+                            "verify with get_screen_element or take_screenshot before treating the list " +
+                            "as finished.",
+                    )
+                SwipeStop.UNREADABLE -> out
+                    .put("screen_changed", false)
+                    .put("possible_causes", JSONArray().put("screen_unreadable"))
+                    .put(
+                        "screen_changed_note",
+                        "Nothing on this device could read the screen before or after this swipe, so " +
+                            "screen_changed: false means UNKNOWN, not that the list is at its end.",
+                    )
+            }
+            return out
+        }
 
         private const val LOOP_HELP =
             net.kuafuai.andee.brain.AimHints.REPEAT_REFUSED + " (stuck-loop guard: more than " +
